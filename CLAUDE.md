@@ -47,7 +47,7 @@ swappable, independently-released component.
 | `Fct.LegacyHost` | net48 | clean-room ACT engine; hosts the four real plugins. |
 | `Fct.Bridge` | net48;net10 | IPC transport + versioned wire protocol. |
 | `Fct.Parser.Legacy` | net48 | wraps real FFXIV_ACT_Plugin as `IGameDataSource`. |
-| `Fct.Parser.Native` | net10 | clean-room capture+opcodes+memory (later). |
+| `Fct.Parser.Native` | net10 | clean-room parser. Structural `NetworkLogLine` today (line type/timestamp/actor/zone/ability); capture + opcode/damage decode + memory later. |
 | `Fct.App` | net10 | Avalonia control panel + shell (MVVM). |
 | `Fct.Overlays` | net10 | native WebView2 overlay layer (later). |
 | `Fct.Compat.Act` | net48 | the ACT facade surface (in LegacyHost). |
@@ -116,6 +116,16 @@ the satellite output to `bin\<cfg>\net10.0\satellite\`. At runtime the host laun
 
 Toolchain present: .NET 10 SDK (10.0.301), net48 targeting pack, WindowsDesktop runtime,
 VS 2026 / MSBuild.
+
+## Test
+
+`./test.ps1` builds + stages the satellite, then runs all suites under `tests/`
+(`Fct.Compat.Act.Tests` net48, `Fct.App.Tests`, `Fct.Parser.Native.Tests`,
+`Fct.Integration.Tests` net10). 75 tests. Data-dependent tests skip when their
+prerequisites are absent: the real-log smoke needs a `Network_*.log` (`%APPDATA%\Advanced
+Combat Tracker\FFXIVLogs`, or `FCT_FFXIV_LOGS`); the satellite integration's plugin/self-test
+assertions need `FFXIV_ACT_Plugin.dll` installed. CI (`.github/workflows/ci.yml`) runs the
+suite on `windows-latest`. Full details: [`docs/TESTING.md`](docs/TESTING.md).
 
 Run the slice end-to-end (launches host → satellite → loads real plugins):
 

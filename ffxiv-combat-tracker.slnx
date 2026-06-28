@@ -2,5 +2,13 @@
   <Folder Name="/src/">
     <Project Path="src/Fct.App/Fct.App.csproj" />
     <Project Path="src/Fct.LegacyHost/Fct.LegacyHost.csproj" />
+    <Project Path="src/Fct.Compat.Act/Fct.Compat.Act.csproj" />
+    <Project Path="src/Fct.Parser.Native/Fct.Parser.Native.csproj" />
+  </Folder>
+  <Folder Name="/tests/">
+    <Project Path="tests/Fct.Compat.Act.Tests/Fct.Compat.Act.Tests.csproj" />
+    <Project Path="tests/Fct.App.Tests/Fct.App.Tests.csproj" />
+    <Project Path="tests/Fct.Parser.Native.Tests/Fct.Parser.Native.Tests.csproj" />
+    <Project Path="tests/Fct.Integration.Tests/Fct.Integration.Tests.csproj" />
   </Folder>
 </Solution>
