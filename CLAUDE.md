@@ -103,4 +103,19 @@ verified findings: [`docs/SLICE-1.md`](docs/SLICE-1.md). Key locked facts:
 
 ## Build
 
-No solution or projects exist yet. This section is updated when scaffolding lands.
+Solution: `ffxiv-combat-tracker.sln`. Projects under `src/`.
+
+```powershell
+dotnet build src\Fct.App\Fct.App.csproj   # net10 host; chains + stages the net48 satellite
+```
+
+`Fct.App` (net10, Avalonia 12) build-depends on `Fct.LegacyHost` (net48, x64, WinForms)
+via a `ReferenceOutputAssembly=false` ProjectReference, and a `StageSatellite` target copies
+the satellite output to `bin\<cfg>\net10.0\satellite\`. At runtime the host launches
+`satellite\Fct.LegacyHost.exe --bridge <pipeName>` and they handshake over a named pipe.
+
+Toolchain present: .NET 10 SDK (10.0.301), net48 targeting pack, WindowsDesktop runtime,
+VS 2026 / MSBuild.
+
+Status: **S0 done** (two-process launch + IPC handshake verified). Next: S1 (cross-process
+`SetParent` window embedding). See `docs/SLICE-1.md`.
