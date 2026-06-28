@@ -17,4 +17,8 @@
     <RootNamespace>Fct.LegacyHost</RootNamespace>
   </PropertyGroup>
 
+  <ItemGroup>
+    <ProjectReference Include="..\Fct.Compat.Act\Fct.Compat.Act.csproj" />
+  </ItemGroup>
+
 </Project>

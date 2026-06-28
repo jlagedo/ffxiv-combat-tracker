@@ -1,0 +1,29 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!--
+    The ACT facade. Compiles to an assembly named "Advanced Combat Tracker" so the real
+    (strong-named) plugins' references resolve to it via AppDomain.AssemblyResolve in the
+    satellite (the strong name/version are not re-checked on the resolve path).
+    Defines the Advanced_Combat_Tracker types the plugins touch. WinForms because
+    FormActMain derives from Form and ActPluginData holds WinForms controls.
+  -->
+  <PropertyGroup>
+    <TargetFramework>net48</TargetFramework>
+    <UseWindowsForms>true</UseWindowsForms>
+    <LangVersion>latest</LangVersion>
+    <Nullable>disable</Nullable>
+    <AssemblyName>Advanced Combat Tracker</AssemblyName>
+    <RootNamespace>Advanced_Combat_Tracker</RootNamespace>
+    <!-- Impersonate ACT's file version so OverlayPlugin's GetVersion() check passes. -->
+    <AssemblyVersion>3.8.5.288</AssemblyVersion>
+    <FileVersion>3.8.5.288</FileVersion>
+    <!-- Public-sign with ACT's PUBLIC key so the facade carries ACT's exact public key
+         token (a946b61e93d97868). The plugins' strong references then bind directly.
+         No private key needed: .NET Framework's strong-name bypass skips signature
+         verification for full-trust assemblies loaded from local disk. -->
+    <SignAssembly>true</SignAssembly>
+    <PublicSign>true</PublicSign>
+    <AssemblyOriginatorKeyFile>act.publickey</AssemblyOriginatorKeyFile>
+  </PropertyGroup>
+
+</Project>

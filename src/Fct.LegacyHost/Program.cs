@@ -2,59 +2,100 @@ using System;
 using System.IO;
 using System.IO.Pipes;
 using System.Windows.Forms;
+using Advanced_Combat_Tracker;
 
 namespace Fct.LegacyHost
 {
-    // The net48 satellite. Hosts the real FFXIV_ACT_Plugin + OverlayPlugin and the ACT
-    // facade (later steps). For S1 it creates a borderless WinForms window and hands its
-    // HWND to the host, which reparents it into the Avalonia window.
+    // The net48 satellite. Stands up the ACT facade, loads the real plugins into WinForms
+    // tabs inside a borderless host window, and hands that window's HWND to the Avalonia
+    // host for embedding. Writes a verification log next to the executable.
     internal static class Program
     {
         private static NamedPipeClientStream _bridge;
         private static StreamWriter _writer;
+        private static readonly string LogPath =
+            Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "s2-ffxiv.log");
+
+        private static TabControl _tabs;
+        private static ActPluginData _ffxiv;
 
         [STAThread]
         private static void Main(string[] args)
         {
+            try { File.WriteAllText(LogPath, $"satellite start {DateTime.Now:HH:mm:ss}\n"); } catch { }
+            FacadeHost.Log = Log;
+
             var pipeName = ParseBridgeArg(args);
             if (pipeName != null)
                 ConnectBridge(pipeName);
 
+            // Must be installed before any plugin assembly is loaded.
+            FacadeHost.InstallAssemblyResolver();
+
             Application.EnableVisualStyles();
             Application.SetCompatibleTextRenderingDefault(false);
 
-            var form = new Form
+            // The ACT facade (hidden form: handle + Invoke marshaling).
+            FacadeHost.CreateAct();
+
+            // The embeddable host window with the plugin tab strip.
+            var hostForm = new Form
             {
                 Text = "Fct.LegacyHost",
                 FormBorderStyle = FormBorderStyle.None,
                 StartPosition = FormStartPosition.Manual,
                 ShowInTaskbar = false,
-                Width = 600,
-                Height = 360,
+                Width = 700,
+                Height = 460,
                 BackColor = System.Drawing.Color.FromArgb(248, 250, 252),
             };
-            form.Controls.Add(new Label
-            {
-                Dock = DockStyle.Fill,
-                TextAlign = System.Drawing.ContentAlignment.MiddleCenter,
-                Font = new System.Drawing.Font("Segoe UI", 11f),
-                Text = $"Embedded net48 satellite (WinForms, x64={Environment.Is64BitProcess})\n" +
-                       "This content lives in Fct.LegacyHost and is reparented into the Avalonia host."
-            });
+            _tabs = new TabControl { Dock = DockStyle.Fill };
+            hostForm.Controls.Add(_tabs);
 
-            // Force native handle creation, then hand the HWND to the host for reparenting.
-            var handle = form.Handle;
-            SendLine($"HWND {handle.ToInt64():X}");
+            var handle = hostForm.Handle;            // realize handle
+            SendLine($"HWND {handle.ToInt64():X}");   // hand to host for reparenting
+
+            // Load plugins once the message loop is running (some plugins poll via timers).
+            ScheduleOnce(250, LoadPlugins);
+            ScheduleOnce(6000, WriteSummary);
 
             if (pipeName != null)
-                // Host owns visibility (reparent + ShowWindow); run a bare message loop so
-                // the form's HWND keeps pumping on this thread.
                 Application.Run(new ApplicationContext());
             else
-                // Standalone (no host): show the form normally.
-                Application.Run(form);
+            { hostForm.FormBorderStyle = FormBorderStyle.Sizable; Application.Run(hostForm); }
 
-            GC.KeepAlive(form);
+            GC.KeepAlive(hostForm);
+        }
+
+        private static void LoadPlugins()
+        {
+            Log("loading FFXIV_ACT_Plugin from: " + FacadeHost.FfxivPluginPath);
+            _ffxiv = FacadeHost.LoadPlugin(_tabs, "FFXIV_ACT_Plugin",
+                FacadeHost.FfxivPluginPath, "FFXIV_ACT_Plugin.FFXIV_ACT_Plugin");
+        }
+
+        private static void WriteSummary()
+        {
+            var act = ActGlobals.oFormActMain;
+            var logFolder = Path.Combine(FacadeHost.AppData, "FFXIVLogs");
+            string[] networkLogs = Array.Empty<string>();
+            try { networkLogs = Directory.GetFiles(logFolder, "Network_*.log"); } catch { }
+            var today = networkLogs.Length > 0
+                ? Path.GetFileName(networkLogs[networkLogs.Length - 1])
+                : "(none)";
+
+            Log("==== SUMMARY ====");
+            Log($"FFXIV status: '{_ffxiv?.lblPluginStatus?.Text}'");
+            Log($"AddCombatAction={act.AddCombatActionCount} SetEncounter={act.SetEncounterCount} " +
+                $"ChangeZone={act.ChangeZoneCount} InCombat={act.InCombat} Zone='{act.CurrentZone}'");
+            Log($"Network_*.log count={networkLogs.Length} latest={today}");
+        }
+
+        private static void ScheduleOnce(int ms, Action action)
+        {
+            var t = new Timer { Interval = ms };
+            t.Tick += (s, e) => { t.Stop(); t.Dispose(); try { action(); } catch (Exception ex) { Log("tick error: " + ex); } };
+            t.Start();
         }
 
         private static string ParseBridgeArg(string[] args)
@@ -75,16 +116,14 @@ namespace Fct.LegacyHost
                 SendLine($"READY pid={System.Diagnostics.Process.GetCurrentProcess().Id} " +
                          $"x64={Environment.Is64BitProcess} clr={Environment.Version}");
             }
-            catch
-            {
-                _bridge = null;
-                _writer = null;
-            }
+            catch { _bridge = null; _writer = null; }
         }
 
-        private static void SendLine(string s)
+        private static void SendLine(string s) { try { _writer?.WriteLine(s); } catch { } }
+
+        private static void Log(string s)
         {
-            try { _writer?.WriteLine(s); } catch { }
+            try { File.AppendAllText(LogPath, $"{DateTime.Now:HH:mm:ss.fff} {s}\n"); } catch { }
         }
     }
 }
