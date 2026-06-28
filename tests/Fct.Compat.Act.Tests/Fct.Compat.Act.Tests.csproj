@@ -1,0 +1,35 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!--
+    Unit tests for the clean-room ACT facade engine (Fct.Compat.Act). net48 to match the
+    facade TFM; UseWindowsForms because SettingsSerializer and ActPluginData touch WinForms
+    controls. These tests are pure/deterministic: no game, no plugin, no satellite.
+  -->
+  <PropertyGroup>
+    <TargetFramework>net48</TargetFramework>
+    <UseWindowsForms>true</UseWindowsForms>
+    <LangVersion>latest</LangVersion>
+    <Nullable>disable</Nullable>
+    <IsPackable>false</IsPackable>
+    <PlatformTarget>x64</PlatformTarget>
+    <Prefer32Bit>false</Prefer32Bit>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Microsoft.NET.Test.Sdk" Version="17.12.0" />
+    <PackageReference Include="xunit" Version="2.9.2" />
+    <PackageReference Include="xunit.runner.visualstudio" Version="2.8.2" />
+  </ItemGroup>
+
+  <!--
+    Compile the facade sources directly instead of referencing the built DLL. The shipped
+    facade is public-signed with ACT's key (an invalid signature that the .NET Framework
+    strong-name bypass tolerates in the satellite, but VSTest's testhost rejects on load).
+    Linking the sources tests the same engine logic without the signed-binary load barrier.
+    The signed artifact's identity/binding is covered by the satellite integration test.
+  -->
+  <ItemGroup>
+    <Compile Include="..\..\src\Fct.Compat.Act\*.cs" />
+  </ItemGroup>
+
+</Project>

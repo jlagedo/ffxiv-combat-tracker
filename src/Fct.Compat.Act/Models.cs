@@ -9,11 +9,13 @@ namespace Advanced_Combat_Tracker
     {
         private string damageString;
 
-        public static Dnum NoDamage => 0L;
-        public static Dnum Miss => -1L;
-        public static Dnum Unknown => -9L;
-        public static Dnum Death => -10L;
-        public static Dnum ThreatPosition => -11L;
+        // Constructed directly (not via the implicit long operator) so sentinels below
+        // Death(-10) keep their exact value instead of being clamped to Unknown(-9).
+        public static Dnum NoDamage => new Dnum(0L);
+        public static Dnum Miss => new Dnum(-1L);
+        public static Dnum Unknown => new Dnum(-9L);
+        public static Dnum Death => new Dnum(-10L);
+        public static Dnum ThreatPosition => new Dnum(-11L);
 
         public long Number { get; }
         public string DamageString
