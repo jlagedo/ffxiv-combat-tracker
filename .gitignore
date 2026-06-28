@@ -1,0 +1,15 @@
+# Reference source junctions — external repos, not part of this repo
+/reference/
+
+# .NET build artifacts
+bin/
+obj/
+[Dd]ebug/
+[Rr]elease/
+*.user
+.vs/
+artifacts/
+
+# Tooling
+*.binlog
+TestResults/

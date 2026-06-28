@@ -1,0 +1,82 @@
+# CLAUDE.md
+
+Guidance for Claude Code when working in this repository.
+
+## What this repo is
+
+**FFXIV Combat Tracker** — a clean-slate, FFXIV-only rebuild of the
+ACT + FFXIV_ACT_Plugin + OverlayPlugin stack. It is currently in the **design
+phase**: no application code yet. The full design lives in
+[`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md) — read it before proposing changes.
+
+The product is a host that runs the **existing plugin ecosystem unmodified**
+(FFXIV_ACT_Plugin, OverlayPlugin/cactbot, Triggernometry, Discord triggers) while
+exposing a typed, future-facing plugin API, with the network/opcode parser as a
+swappable, independently-released component.
+
+## Two hard directives (these gate every decision)
+
+1. The first version must run the four legacy plugins above by **drop-in, unmodified**.
+2. Built for the future with a **clear legacy → native migration path**, opt-in and
+   incremental — never a flag day.
+
+## Load-bearing architecture facts
+
+- **Opcodes never cross the plugin boundary.** The host↔plugin contract is typed domain
+  events. A game patch ships a new parser plugin only; the host and other plugins are
+  untouched. One opt-in escape hatch (`IRawPacketSource`) exposes raw packets for legacy
+  `RegisterNetworkParser` consumers.
+- **Two runtimes, two processes.** net48 and net10 cannot share a process, and the four
+  legacy plugins cannot load unmodified on .NET 10 (CefSharp's net48 build alone settles
+  it). Legacy plugins run in a **real .NET Framework 4.8 satellite process**
+  (`Fct.LegacyHost`); the **.NET 10 host** (`Fct.Host`) runs new plugins; they bridge over
+  IPC. `AssemblyLoadContext` isolates net10 plugins from each other — it is **not**
+  cross-runtime.
+- **We build only the ACT engine.** The FFXIV SDK and the OverlayPlugin/cactbot surface
+  self-host by loading the real plugins; hosting the real FFXIV_ACT_Plugin inherits its
+  per-patch opcode cadence for free.
+- **`Fct.Abstractions` multi-targets `net48;net10`** so the same record/interface types
+  exist on both sides of the bridge.
+
+## Project map (target — not yet created)
+
+| Project | TFM | Role |
+|---|---|---|
+| `Fct.Abstractions` | net48;net10 | the plugin SDK: contracts + domain records. No opcodes. |
+| `Fct.Host` | net10 | microkernel: ALC plugin loader, typed bus, Generic Host. |
+| `Fct.LegacyHost` | net48 | clean-room ACT engine; hosts the four real plugins. |
+| `Fct.Bridge` | net48;net10 | IPC transport + versioned wire protocol. |
+| `Fct.Parser.Legacy` | net48 | wraps real FFXIV_ACT_Plugin as `IGameDataSource`. |
+| `Fct.Parser.Native` | net10 | clean-room capture+opcodes+memory (later). |
+| `Fct.Overlays` | net10 | native WebView2 overlay layer (later). |
+| `Fct.Compat.Act` | net48 | the ACT facade surface (in LegacyHost). |
+
+## Reference sources (read-only)
+
+Hard-linked Windows directory junctions under `reference/` — searchable in place.
+**Never modify anything under `reference/`**; these are external repos.
+
+- `reference/overlayplugin/` → `E:\dev\OverlayPlugin` (ngld OverlayPlugin, net48).
+- `reference/act-decompiled/` → `E:\dev\ACT-decompiled` (clean decompiles of ACT and
+  FFXIV_ACT_Plugin). The compat-surface oracle is
+  `reference/act-decompiled/Advanced_Combat_Tracker/` (`Forms/FormActMain.cs`,
+  `ActGlobals.cs`, `IActPluginV1.cs`, `Models/`, `Events/`). FFXIV_ACT_Plugin internals
+  are under `reference/act-decompiled/.audit/ffxiv_act_plugin/decompiled/`.
+
+When a compat detail is in doubt, the decompile is the authority — match the exact
+signature/shape there, not an approximation.
+
+## Conventions
+
+- **Naming:** assemblies are prefixed `Fct.` (FFXIV Combat Tracker). Facade assemblies
+  that must impersonate legacy DLLs keep the **legacy** identity (e.g. `Advanced Combat
+  Tracker`, `FFXIV_ACT_Plugin.Common`) — that is intentional, not a mistake.
+- **Modern .NET patterns** on the net10 side: Generic Host + MEDI, `System.Threading.
+  Channels` for the bus, `System.Text.Json` source-gen, `ILogger` source-gen, records +
+  spans. No Newtonsoft, no hand-rolled DI containers on the net10 side.
+- **This file is a facts document.** Present-tense state only — no change history or
+  rationale-for-past-decisions. Design rationale belongs in `docs/ARCHITECTURE.md`.
+
+## Build
+
+No solution or projects exist yet. This section is updated when scaffolding lands.
