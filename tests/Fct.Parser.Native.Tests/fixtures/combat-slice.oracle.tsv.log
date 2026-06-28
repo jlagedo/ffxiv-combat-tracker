@@ -1,0 +1,7 @@
+20:50:46.436 oracle start log=E:\dev\ffxiv-combat-tracker\tests\Fct.Parser.Native.Tests\fixtures\combat-slice.log max=100000
+20:50:46.762 [FFXIV_ACT_Plugin] instantiated FFXIV_ACT_Plugin.FFXIV_ACT_Plugin v3.0.2.3; calling InitPlugin…
+20:50:51.808 [FFXIV_ACT_Plugin] InitPlugin returned. status='FFXIV_ACT_Plugin Started.'
+20:50:51.808 plugin status='FFXIV_ACT_Plugin Started.'
+20:50:51.817 [ChangeZone] Shirogane
+20:50:51.869 [ChangeZone] Futures Rewritten (Ultimate)
+20:50:51.890 done fed=694 captured=493 -> E:\dev\ffxiv-combat-tracker\tests\Fct.Parser.Native.Tests\fixtures\combat-slice.oracle.tsv

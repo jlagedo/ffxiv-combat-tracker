@@ -24,6 +24,15 @@ namespace Fct.LegacyHost
         [STAThread]
         private static void Main(string[] args)
         {
+            // Oracle capture mode: replay a log through the real plugin and dump its parse.
+            //   --parse-oracle <logPath> <maxLines> <outPath>
+            int oi = Array.IndexOf(args, "--parse-oracle");
+            if (oi >= 0 && args.Length >= oi + 4)
+            {
+                ParseOracle.Run(args[oi + 1], int.Parse(args[oi + 2]), args[oi + 3]);
+                return;
+            }
+
             try { File.WriteAllText(LogPath, $"satellite start {DateTime.Now:HH:mm:ss}\n"); } catch { }
             FacadeHost.Log = Log;
 

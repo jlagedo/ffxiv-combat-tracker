@@ -19,4 +19,8 @@
     <ProjectReference Include="..\..\src\Fct.Parser.Native\Fct.Parser.Native.csproj" />
   </ItemGroup>
 
+  <ItemGroup>
+    <None Include="fixtures\**\*" CopyToOutputDirectory="PreserveNewest" LinkBase="fixtures" />
+  </ItemGroup>
+
 </Project>

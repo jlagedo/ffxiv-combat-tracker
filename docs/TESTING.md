@@ -44,10 +44,39 @@ canonical regression vector is **10 hits of 1000 over 9 s, every 3rd a crit ⇒ 
 crit% 40, encdps 1111** — asserted both directly (unit) and through the live satellite
 (integration).
 
-## Known coverage gap
+## Differential parser compat (ours vs ACT)
 
-`Fct.Parser.Native` parses log-line **structure** only (types, timestamps, actor/zone/ability
-names). It does **not** decode FFXIV damage/heal amounts — that encoding belongs to the full
-native parser and is not yet implemented, so no test certifies native damage numbers. Live
-damage aggregation is covered today through the real FFXIV plugin feeding the ACT engine
-(verified by the satellite integration self-test).
+`Fct.Parser.Native.ActionEffectDecoder` decodes FFXIV ActionEffect (21/22) lines into
+damage/heal values. It is validated **directly against ACT's own parse** of the same lines:
+
+- **Oracle capture** — the satellite's `--parse-oracle` mode replays a real log through the
+  real FFXIV_ACT_Plugin (which subscribes to `FormActMain.BeforeLogLineRead`) and records
+  every `MasterSwing` the plugin produces. That is ACT's authoritative parse.
+- **Fixtures** — `tests/Fct.Parser.Native.Tests/fixtures/combat-slice.log` is an anonymized
+  real combat slice (name fields blanked; the decode reads only the effect bytes), and
+  `combat-slice.oracle.tsv` is ACT's captured parse of it. Regenerate with
+  `tests/fixtures/make-slice.sh` + the satellite (see below).
+- **Diff test** (`ParseCompatTests`) decodes the slice and compares value multisets to the
+  oracle.
+
+Current compat on the slice:
+- **Damage values: exact (100%).** Every damage `MasterSwing` ACT produces — amount (including
+  the `>65535` `Flags2&0x40 ? Flags1<<16` transform), crit flag, and miss/block/parry — is
+  reproduced exactly (443/443 on the fixture).
+- **Heals: every ACT-reported heal reproduced (0 missing).** Our decode is a superset because
+  ACT only reports heals while `InCombat` (`ReportCombatData.AddHealEntry`); the extras are
+  out-of-combat heals ACT suppresses.
+
+Remaining toward full parity (tracked, not yet done): combat-state (`InCombat`) tracking for
+exact heal/shield/resource reporting; swing-type (auto-attack vs ability) and the
+damage-type/element enums; DoT/HoT simulation; and combatant/name resolution.
+
+Regenerate the oracle fixture (needs the ACT install):
+
+```powershell
+bash tests/fixtures/make-slice.sh "<a Network_*.log>" tests/Fct.Parser.Native.Tests/fixtures/combat-slice.log 600
+# build the satellite, then:
+src/Fct.LegacyHost/bin/Debug/net48/Fct.LegacyHost.exe --parse-oracle `
+  tests/Fct.Parser.Native.Tests/fixtures/combat-slice.log 100000 `
+  tests/Fct.Parser.Native.Tests/fixtures/combat-slice.oracle.tsv
+```

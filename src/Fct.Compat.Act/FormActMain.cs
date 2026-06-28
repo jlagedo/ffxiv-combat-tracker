@@ -98,6 +98,15 @@ namespace Advanced_Combat_Tracker
         public void WriteInfoLog(string message) => Log($"[Info] {message}");
         public void WriteDebugLog(string message) => Log($"[Debug] {message}");
 
+        // Raise BeforeLogLineRead from outside the class (events can only be raised by their
+        // declaring type). The FFXIV plugin subscribes to this to drive its log parser, so the
+        // oracle harness uses it to replay real log lines through the plugin's decode.
+        public void FireBeforeLogLineRead(bool isImport, LogLineEventArgs args)
+            => BeforeLogLineRead?.Invoke(isImport, args);
+
+        public void FireLogLineRead(bool isImport, LogLineEventArgs args)
+            => OnLogLineRead?.Invoke(isImport, args);
+
         // --- Log file integration (plugin tails/writes Network_*.log) ---
         public void OpenLog(bool getCurrentZone, bool getCharNameFromFile)
         {
