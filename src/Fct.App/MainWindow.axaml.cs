@@ -18,10 +18,15 @@ public partial class MainWindow : Window
         var logPath = Path.Combine(AppContext.BaseDirectory, "s0-handshake.log");
         try
         {
-            var handshake = await new SatelliteHost().StartAsync();
-            var msg = "Satellite handshake OK:\n" + handshake;
-            StatusText.Text = msg;
-            File.WriteAllText(logPath, msg);
+            var result = await new SatelliteHost().StartAsync();
+            StatusText.Text =
+                $"Satellite: {result.Handshake}   |   child HWND: 0x{result.WindowHandle.ToInt64():X}";
+            File.WriteAllText(logPath, StatusText.Text);
+
+            if (result.WindowHandle != IntPtr.Zero)
+                EmbedHost.Child = new EmbeddedSatelliteView(result.WindowHandle);
+            else
+                StatusText.Text += "   (no HWND received — nothing to embed)";
         }
         catch (Exception ex)
         {

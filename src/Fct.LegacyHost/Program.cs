@@ -5,37 +5,56 @@ using System.Windows.Forms;
 
 namespace Fct.LegacyHost
 {
-    // The net48 satellite entry point. For S0 this is a placeholder WinForms host;
-    // it grows into the ACT facade host (TabControl + plugin loading) in later steps.
+    // The net48 satellite. Hosts the real FFXIV_ACT_Plugin + OverlayPlugin and the ACT
+    // facade (later steps). For S1 it creates a borderless WinForms window and hands its
+    // HWND to the host, which reparents it into the Avalonia window.
     internal static class Program
     {
-        // Kept alive for the process lifetime so the handshake pipe stays open.
         private static NamedPipeClientStream _bridge;
+        private static StreamWriter _writer;
 
         [STAThread]
         private static void Main(string[] args)
         {
             var pipeName = ParseBridgeArg(args);
             if (pipeName != null)
-                TrySendHandshake(pipeName);
+                ConnectBridge(pipeName);
 
             Application.EnableVisualStyles();
             Application.SetCompatibleTextRenderingDefault(false);
 
-            using var form = new Form
+            var form = new Form
             {
-                Text = "Fct.LegacyHost (net48 satellite)",
-                Width = 480,
-                Height = 320
+                Text = "Fct.LegacyHost",
+                FormBorderStyle = FormBorderStyle.None,
+                StartPosition = FormStartPosition.Manual,
+                ShowInTaskbar = false,
+                Width = 600,
+                Height = 360,
+                BackColor = System.Drawing.Color.FromArgb(248, 250, 252),
             };
             form.Controls.Add(new Label
             {
                 Dock = DockStyle.Fill,
                 TextAlign = System.Drawing.ContentAlignment.MiddleCenter,
-                Text = $"Fct.LegacyHost running\n64-bit: {Environment.Is64BitProcess}\nCLR: {Environment.Version}"
+                Font = new System.Drawing.Font("Segoe UI", 11f),
+                Text = $"Embedded net48 satellite (WinForms, x64={Environment.Is64BitProcess})\n" +
+                       "This content lives in Fct.LegacyHost and is reparented into the Avalonia host."
             });
 
-            Application.Run(form);
+            // Force native handle creation, then hand the HWND to the host for reparenting.
+            var handle = form.Handle;
+            SendLine($"HWND {handle.ToInt64():X}");
+
+            if (pipeName != null)
+                // Host owns visibility (reparent + ShowWindow); run a bare message loop so
+                // the form's HWND keeps pumping on this thread.
+                Application.Run(new ApplicationContext());
+            else
+                // Standalone (no host): show the form normally.
+                Application.Run(form);
+
+            GC.KeepAlive(form);
         }
 
         private static string ParseBridgeArg(string[] args)
@@ -46,22 +65,26 @@ namespace Fct.LegacyHost
             return null;
         }
 
-        private static void TrySendHandshake(string pipeName)
+        private static void ConnectBridge(string pipeName)
         {
             try
             {
                 _bridge = new NamedPipeClientStream(".", pipeName, PipeDirection.Out);
                 _bridge.Connect(5000);
-                var writer = new StreamWriter(_bridge) { AutoFlush = true };
-                writer.WriteLine(
-                    $"READY pid={System.Diagnostics.Process.GetCurrentProcess().Id} " +
-                    $"x64={Environment.Is64BitProcess} clr={Environment.Version}");
-                // Leave _bridge open for the process lifetime (handshake channel).
+                _writer = new StreamWriter(_bridge) { AutoFlush = true };
+                SendLine($"READY pid={System.Diagnostics.Process.GetCurrentProcess().Id} " +
+                         $"x64={Environment.Is64BitProcess} clr={Environment.Version}");
             }
             catch
             {
-                // S0: a missing/closed pipe is non-fatal; the satellite still runs standalone.
+                _bridge = null;
+                _writer = null;
             }
+        }
+
+        private static void SendLine(string s)
+        {
+            try { _writer?.WriteLine(s); } catch { }
         }
     }
 }
