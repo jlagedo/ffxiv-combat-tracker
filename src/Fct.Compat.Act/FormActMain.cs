@@ -40,7 +40,11 @@ namespace Advanced_Combat_Tracker
             AppDataFolder = new DirectoryInfo(Path.Combine(
                 Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData),
                 "Advanced Combat Tracker"));
+            CombatTables.Setup();
         }
+
+        public string CreateDamageString(Dnum damage, bool useSuffix, bool useDecimals)
+            => ((long)damage).ToString();
 
         protected override void SetVisibleCore(bool value) => base.SetVisibleCore(false);
 
@@ -103,25 +107,29 @@ namespace Advanced_Combat_Tracker
 
         public void ActCommands(string commandText) => Log($"[ActCommands] {commandText}");
 
-        // --- Combat pipeline (S2: count + raise events; real aggregation lands in S5) ---
+        // --- Combat pipeline: feed the clean-room aggregation engine ---
         public void AddCombatAction(MasterSwing action)
         {
             AddCombatActionCount++;
             LastKnownTime = action.Time;
             LastEstimatedTime = action.Time;
             BeforeCombatAction?.Invoke(false, new CombatActionEventArgs(action));
+            ActiveZone.ActiveEncounter?.AddCombatAction(action);
             AfterCombatAction?.Invoke(false, new CombatActionEventArgs(action));
         }
 
         public bool SetEncounter(DateTime time, string attacker, string victim)
         {
             SetEncounterCount++;
-            if (!InCombat)
+            LastKnownTime = time;
+            if (!InCombat || ActiveZone.ActiveEncounter == null || !ActiveZone.ActiveEncounter.Active)
             {
+                var enc = new EncounterData(ActGlobals.charName, CurrentZone, ActiveZone) { Active = true };
+                enc.StartTimes.Add(time);
+                ActiveZone.ActiveEncounter = enc;
+                ActiveZone.Items.Add(enc);
                 InCombat = true;
-                ActiveZone.ActiveEncounter.Active = true;
-                ActiveZone.ActiveEncounter.StartTime = time;
-                OnCombatStart?.Invoke(false, new CombatToggleEventArgs(0, 0, ActiveZone.ActiveEncounter));
+                OnCombatStart?.Invoke(false, new CombatToggleEventArgs(0, ActiveZone.Items.Count - 1, enc));
             }
             return true;
         }
@@ -139,11 +147,21 @@ namespace Advanced_Combat_Tracker
             if (InCombat)
             {
                 InCombat = false;
-                ActiveZone.ActiveEncounter.Active = false;
-                ActiveZone.ActiveEncounter.EndTime = LastKnownTime;
-                OnCombatEnd?.Invoke(false, new CombatToggleEventArgs(0, 0, ActiveZone.ActiveEncounter));
+                var enc = ActiveZone.ActiveEncounter;
+                if (enc != null)
+                {
+                    enc.EndCombat(actExport);
+                    OnCombatEnd?.Invoke(false, new CombatToggleEventArgs(0, 0, enc));
+                }
             }
         }
+
+        // EncounterData.AddCombatAction tracks every combatant in this slice.
+        public bool SelectiveListGetSelected(string name) => true;
+
+        // ACT table-UI refresh hooks (no UI table here).
+        public void ValidateLists() { }
+        public void ValidateTableSetup() { }
 
         // Suppress unused-event warnings for events wired only via the public API.
         private void TouchEvents()

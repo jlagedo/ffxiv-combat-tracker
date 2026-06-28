@@ -12,13 +12,6 @@ namespace Advanced_Combat_Tracker
         void DeInitPlugin();
     }
 
-    // NullDelegate and AttackTypeGraphGenerator are nested in FormActMain (see FormActMain.cs);
-    // AttackType is a namespace-level type referenced by that delegate's signature.
-    public class AttackType
-    {
-        public string Name { get; set; }
-    }
-
     // Per-plugin record ACT keeps. OverlayPlugin reflects over cbEnabled/lblPluginTitle/
     // pluginObj for discovery; FFXIV_ACT_Plugin reads pluginFile.DirectoryName.
     public class ActPluginData

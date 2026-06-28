@@ -3,96 +3,100 @@ using System.Collections.Generic;
 
 namespace Advanced_Combat_Tracker
 {
-    // ACT's damage number wrapper. Carries either a real number or a sentinel
-    // (miss/death/no-damage). Implicitly converts to long.
-    public class Dnum : IComparable, IComparable<Dnum>
+    // ACT's damage-number wrapper. Sentinels match ACT: NoDamage=0, Miss=-1, Unknown=-9,
+    // Death=-10, ThreatPosition=-11. Implicitly converts to long.
+    public class Dnum : IComparable
     {
-        public static readonly Dnum NoDamage = new Dnum(long.MinValue + 1, "NoDamage");
-        public static readonly Dnum Miss = new Dnum(long.MinValue + 2, "Miss");
-        public static readonly Dnum Death = new Dnum(long.MinValue + 3, "Death");
-        public static readonly Dnum Unknown = new Dnum(long.MinValue + 4, "Unknown");
+        private string damageString;
 
-        public long Number;
-        public string DamageString;
-        public string DamageString2;
+        public static Dnum NoDamage => 0L;
+        public static Dnum Miss => -1L;
+        public static Dnum Unknown => -9L;
+        public static Dnum Death => -10L;
+        public static Dnum ThreatPosition => -11L;
 
-        public Dnum(long number) { Number = number; DamageString = number.ToString(); }
-        public Dnum(long number, string damageString) { Number = number; DamageString = damageString; }
+        public long Number { get; }
+        public string DamageString
+        {
+            get => string.IsNullOrEmpty(damageString) ? ToString() : damageString;
+            set => damageString = value;
+        }
+        public string DamageString2 { get; set; }
 
-        public static implicit operator long(Dnum d) => d?.Number ?? 0L;
+        public Dnum(long number) { Number = number; damageString = string.Empty; }
+        public Dnum(long number, string customDamageString) { Number = number; damageString = customDamageString; }
 
-        public int CompareTo(object obj) => CompareTo(obj as Dnum);
-        public int CompareTo(Dnum other) => other == null ? 1 : Number.CompareTo(other.Number);
-        public override string ToString() => DamageString ?? Number.ToString();
+        public static implicit operator long(Dnum val) => val.Number;
+        public static implicit operator Dnum(long val) => val >= -10 ? new Dnum(val) : new Dnum(-9L);
+
+        public static bool operator ==(Dnum a, Dnum b) => a.Equals(b);
+        public static bool operator !=(Dnum a, Dnum b) => !a.Equals(b);
+
+        public override string ToString() => Number > 0 ? Number.ToString() : (damageString ?? Number.ToString());
+        public int CompareTo(object obj) => Number.CompareTo(((Dnum)obj).Number);
+        public override bool Equals(object obj) => obj is Dnum d && d.Number == Number;
+        public override int GetHashCode() => Number.GetHashCode();
     }
 
-    // A single combat action (swing). Fed into the aggregation pipeline via
-    // FormActMain.AddCombatAction.
+    // A single combat action. Special defaults to the "none" term.
     public class MasterSwing : IComparable, IComparable<MasterSwing>
     {
-        public int SwingType { get; set; }
+        public delegate string StringDataCallback(MasterSwing Data);
+        public delegate System.Drawing.Color ColorDataCallback(MasterSwing Data);
+
+        public class ColumnDef
+        {
+            public StringDataCallback GetCellData;
+            public StringDataCallback GetSqlData;
+            public Comparison<MasterSwing> SortComparer;
+            public ColorDataCallback GetCellForeColor = _ => System.Drawing.Color.Transparent;
+            public ColorDataCallback GetCellBackColor = _ => System.Drawing.Color.Transparent;
+            public string SqlDataType { get; }
+            public string SqlDataName { get; }
+            public bool DefaultVisible { get; }
+            public string Label { get; }
+            public ColumnDef(string Label, bool DefaultVisible, string SqlDataType, string SqlDataName,
+                StringDataCallback CellDataCallback, StringDataCallback SqlDataCallback, Comparison<MasterSwing> SortComparer)
+            { this.Label = Label; this.DefaultVisible = DefaultVisible; this.SqlDataType = SqlDataType;
+              this.SqlDataName = SqlDataName; GetCellData = CellDataCallback; GetSqlData = SqlDataCallback; this.SortComparer = SortComparer; }
+        }
+
+        public static Dictionary<string, ColumnDef> ColumnDefs = new Dictionary<string, ColumnDef>();
+
+        public string GetColumnByName(string name) => ColumnDefs.ContainsKey(name) ? ColumnDefs[name].GetCellData(this) : string.Empty;
+
+        public int SwingType { get; }
         public bool Critical { get; set; }
-        public string Special { get; set; }
-        public Dnum Damage { get; set; }
-        public DateTime Time { get; set; }
-        public int TimeSorter { get; set; }
-        public string AttackType { get; set; }
-        public string Attacker { get; set; }
-        public string DamageType { get; set; }
-        public string Victim { get; set; }
+        public string Special { get; }
+        public Dnum Damage { get; }
+        public DateTime Time { get; }
+        public int TimeSorter { get; }
+        public string AttackType { get; }
+        public string Attacker { get; }
+        public string DamageType { get; }
+        public string Victim { get; }
+        public EncounterData ParentEncounter { get; set; }
         public Dictionary<string, object> Tags { get; set; } = new Dictionary<string, object>();
 
-        public MasterSwing(int SwingType, bool Critical, string Special, Dnum damage, DateTime Time,
-            int TimeSorter, string theAttackType, string Attacker, string theDamageType, string Victim)
+        public MasterSwing(int swingType, bool critical, string special, Dnum damage, DateTime time,
+            int timeSorter, string theAttackType, string attacker, string theDamageType, string victim)
         {
-            this.SwingType = SwingType;
-            this.Critical = Critical;
-            this.Special = Special ?? "";
-            Damage = damage;
-            this.Time = Time;
-            this.TimeSorter = TimeSorter;
-            AttackType = theAttackType;
-            this.Attacker = Attacker;
-            DamageType = theDamageType;
-            this.Victim = Victim;
+            SwingType = swingType; Critical = critical; Special = special ?? "none";
+            Damage = damage; Time = time; TimeSorter = timeSorter;
+            AttackType = theAttackType; Attacker = attacker; DamageType = theDamageType; Victim = victim;
         }
 
-        public MasterSwing(int SwingType, bool Critical, Dnum damage, DateTime Time, int TimeSorter,
-            string theAttackType, string Attacker, string theDamageType, string Victim)
-            : this(SwingType, Critical, "", damage, Time, TimeSorter, theAttackType, Attacker, theDamageType, Victim)
-        {
-        }
+        public MasterSwing(int swingType, bool critical, Dnum damage, DateTime time, int timeSorter,
+            string theAttackType, string attacker, string theDamageType, string victim)
+            : this(swingType, critical, "none", damage, time, timeSorter, theAttackType, attacker, theDamageType, victim) { }
 
         public int CompareTo(object obj) => CompareTo(obj as MasterSwing);
         public int CompareTo(MasterSwing other) => other == null ? 1 : TimeSorter.CompareTo(other.TimeSorter);
-    }
-
-    // Minimal aggregation shells for S2/S3. The real DPS aggregation (CombatantData
-    // ExportVariables, encounter accumulation) lands in S5.
-    public class ZoneData
-    {
-        public string ZoneName = "";
-        public EncounterData ActiveEncounter = new EncounterData();
-        public List<EncounterData> Items = new List<EncounterData>();
-    }
-
-    public class EncounterData
-    {
-        public bool Active;
-        public string ZoneName = "";
-        public string Title = "";
-        public DateTime StartTime = DateTime.MaxValue;
-        public DateTime EndTime = DateTime.MinValue;
-        public readonly Dictionary<string, CombatantData> Items =
-            new Dictionary<string, CombatantData>(StringComparer.OrdinalIgnoreCase);
-
-        public List<CombatantData> GetAllies() => new List<CombatantData>(Items.Values);
-    }
-
-    public class CombatantData
-    {
-        public string Name = "";
-        public EncounterData Parent;
-        public CombatantData(string name, EncounterData parent) { Name = name; Parent = parent; }
+        internal static int CompareTime(MasterSwing l, MasterSwing r)
+        {
+            int n = l.TimeSorter.CompareTo(r.TimeSorter);
+            return n != 0 ? n : l.Time.CompareTo(r.Time);
+        }
+        public override string ToString() => $"{Time:s}|{Damage}|{Attacker}|{AttackType}|{Victim}";
     }
 }
