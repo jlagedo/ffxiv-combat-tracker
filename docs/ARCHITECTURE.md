@@ -124,11 +124,28 @@ Fct.Parser.Legacy  net48        wraps the real FFXIV_ACT_Plugin as an IGameDataS
 Fct.Parser.Native  net10        clean-room source-gen capture+opcodes+memory. Later,
                                 its own per-patch cadence, hot-swapped in its own ALC.
 
+Fct.App            net10        Avalonia control panel + shell (MVVM). The net10
+                                user-facing UI. See §4a.
 Fct.Overlays       net10        native overlay layer (WebView2 + WS hub + addon host).
                                 Replaces CEF. Later.
 
 Fct.Compat.Act     net48        the ACT facade surface (lives in LegacyHost).
 ```
+
+### 4a. UI framework
+
+- **net10 control panel + shell → Avalonia (XAML + MVVM).** A native .NET desktop app:
+  modern, themeable, no packaging/runtime friction. The user-facing face of `Fct.Host`.
+- **Overlays remain web** (HTML/JS served by Kestrel, rendered in WebView2). Avalonia
+  hosts the WebView2 surface for native overlay windows (transparent, click-through).
+  This is the deliberate two-rendering-stack split: **Avalonia for app chrome, web for
+  overlays** (overlays must stay web for cactbot/ecosystem compatibility).
+- **net48 legacy UI is WinForms** — forced, not a choice: `IActPluginV1.InitPlugin`
+  hands each legacy plugin a WinForms `TabPage`. It is quarantined in `Fct.LegacyHost`.
+
+**Open sub-decision — native plugin config UI:** Avalonia controls shipped as a Razor
+Class Library (couples authors to Avalonia) **vs.** web config pages loaded in a WebView
+(decoupled, matches overlay skillset). Defer until the first native plugin needs config.
 
 ---
 

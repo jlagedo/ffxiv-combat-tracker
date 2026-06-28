@@ -48,8 +48,18 @@ swappable, independently-released component.
 | `Fct.Bridge` | net48;net10 | IPC transport + versioned wire protocol. |
 | `Fct.Parser.Legacy` | net48 | wraps real FFXIV_ACT_Plugin as `IGameDataSource`. |
 | `Fct.Parser.Native` | net10 | clean-room capture+opcodes+memory (later). |
+| `Fct.App` | net10 | Avalonia control panel + shell (MVVM). |
 | `Fct.Overlays` | net10 | native WebView2 overlay layer (later). |
 | `Fct.Compat.Act` | net48 | the ACT facade surface (in LegacyHost). |
+
+## UI frameworks
+
+- **net10 control panel/shell → Avalonia** (XAML + MVVM). Native desktop app.
+- **Overlays → web** (HTML/JS via Kestrel, rendered in WebView2 hosted inside Avalonia).
+  Two deliberate rendering stacks: Avalonia for app chrome, web for overlays (overlay
+  web rendering is required for cactbot/ecosystem compatibility).
+- **net48 legacy UI → WinForms**, forced by `IActPluginV1.InitPlugin(TabPage, Label)`;
+  quarantined in `Fct.LegacyHost`.
 
 ## Reference sources (read-only)
 
