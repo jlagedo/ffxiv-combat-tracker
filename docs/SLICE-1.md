@@ -126,6 +126,37 @@ handshake (ready + HWND) over IPC. The full typed-event bridge is **not** needed
 
 ---
 
+## Results (as built)
+
+All phases build, were tested via run logs, and are committed.
+
+| Phase | Result |
+|---|---|
+| S0 | net10 host launches net48 satellite; `READY x64=True` over named pipe. |
+| S1 | `EmbeddedSatelliteView : NativeControlHost` reparents the satellite window under the host window (`parentPid==ourPid`). |
+| S2 | Facade `Advanced Combat Tracker` **public-signed with ACT's public key** → exact token `a946b61e93d97868`; `AssemblyResolve` supplies it. Real FFXIV_ACT_Plugin v3.0.2.3 → **"FFXIV_ACT_Plugin Started."** |
+| S3 | Real OverlayPlugin v0.18.2 hosted; reaches init Phase 2 (⇒ FFXIVRepository discovery works); CEF runs (2 `CefSharp.BrowserSubprocess`). |
+| S4 | Embedded TabControl shows 3 tabs: *FFXIV ACT Plugin*, *OverlayPlugin*, *OverlayPlugin WSServer*. |
+| S5 | Self-test through the facade: 10×1000 dmg over 9s ⇒ `Damage=10000 Hits=10 Crit%=40 EncDPS=1111.1`; `ExportVariables: encdps=1111 damage=10000 name=Player One crithit%=40%`. |
+
+### Key technical resolutions
+- **Strong-name impersonation:** the plugins reference ACT by strong name; `AssemblyResolve`
+  requires the returned assembly be strong-named *and* token-matching. Solved by **public
+  signing** the facade with ACT's extracted public key (`act.publickey`) — no private key
+  needed; .NET Framework's strong-name bypass skips signature verification for full-trust
+  local assemblies.
+- **Nested ACT types:** `NullDelegate`, `AttackTypeGraphGenerator`, `DateTimeLogParser` are
+  nested in `FormActMain`; `GetDateTimeFromLog` is a delegate **field**, not a method.
+- **Init pulls the aggregation surface:** the plugin populates `CombatantData`/`EncounterData`
+  tables at startup, so S2 completion required the S5 model (the two merged).
+
+### Remaining
+- **Live capture:** with FFXIV running, confirm `AddCombatAction` count > 0 and an overlay
+  shows live DPS. Data source (FFXIV plugin) is Started; the rest of the path is verified.
+- **Debt:** the aggregation is a simplified clean-room slice impl (no threat / personal-
+  duration splits / full column set); OverlayPlugin 0.18.2 is old; satellite paths are
+  hard-coded; IPC is the S0/S1 handshake only (no typed event bridge yet).
+
 ## Risks
 - Cross-process HWND `SetParent` — focus/DPI/input/lifetime quirks across processes.
 - `AssemblyResolve` facade fidelity — type/member shape must match what the plugins' IL

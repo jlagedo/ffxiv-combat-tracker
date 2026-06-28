@@ -117,5 +117,25 @@ the satellite output to `bin\<cfg>\net10.0\satellite\`. At runtime the host laun
 Toolchain present: .NET 10 SDK (10.0.301), net48 targeting pack, WindowsDesktop runtime,
 VS 2026 / MSBuild.
 
-Status: **S0 done** (two-process launch + IPC handshake verified). Next: S1 (cross-process
-`SetParent` window embedding). See `docs/SLICE-1.md`.
+Run the slice end-to-end (launches host → satellite → loads real plugins):
+
+```powershell
+dotnet build src\Fct.App\Fct.App.csproj
+.\src\Fct.App\bin\Debug\net10.0\Fct.App.exe   # verification logs land in
+                                              # bin\Debug\net10.0\satellite\s2-ffxiv.log
+```
+
+Status: **Slice 1 complete (S0–S5), pending live-game capture.** All phases built,
+tested via run logs, committed:
+- S0 two-process launch + IPC handshake — verified.
+- S1 cross-process `SetParent` embedding — verified (child reparented under host window).
+- S2 facade + public-signed `Advanced Combat Tracker` (token a946…) + `AssemblyResolve`;
+  real FFXIV_ACT_Plugin reaches **"Started"**.
+- S3 real OverlayPlugin hosted; FFXIVRepository discovery works; CEF runs (overlays created).
+- S4 both plugin config tabs embedded in the Avalonia window (3 tabs).
+- S5 clean-room aggregation verified deterministically (self-test: 10×1000/9s →
+  encdps=1111, damage=10000, crithit%=40%, exact).
+
+**Remaining live check:** with FFXIV running, confirm `AddCombatAction` count > 0 and an
+overlay shows live DPS. The data source (FFXIV plugin) is Started; the rest of the path is
+verified. See `docs/SLICE-1.md`.
