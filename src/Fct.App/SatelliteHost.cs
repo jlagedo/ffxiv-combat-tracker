@@ -45,11 +45,11 @@ internal sealed class SatelliteHost
         string? line;
         while ((line = await reader.ReadLineAsync(ct).ConfigureAwait(false)) != null)
         {
-            if (line.StartsWith("READY", StringComparison.Ordinal))
+            if (SatelliteProtocol.IsReady(line))
                 result.Handshake = line;
-            else if (line.StartsWith("HWND ", StringComparison.Ordinal))
+            else if (SatelliteProtocol.TryParseHwnd(line, out var hwnd))
             {
-                result.WindowHandle = new IntPtr(Convert.ToInt64(line.Substring(5).Trim(), 16));
+                result.WindowHandle = hwnd;
                 break;
             }
         }
