@@ -1,0 +1,17 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!--
+    Clean-room, structure-level parser for ACT's decoded FFXIV network-log lines
+    (the "Network_*.log" pipe-delimited format). It identifies line types and extracts
+    the unambiguous fields (timestamp, source/target/zone names and ids). It deliberately
+    does NOT decode damage/heal amounts yet — the FFXIV effect encoding is the job of the
+    full native parser and is tracked separately, so nothing here certifies damage numbers.
+  -->
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <Nullable>enable</Nullable>
+    <LangVersion>latest</LangVersion>
+    <ImplicitUsings>enable</ImplicitUsings>
+  </PropertyGroup>
+
+</Project>
