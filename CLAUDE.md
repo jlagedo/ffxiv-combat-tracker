@@ -87,6 +87,20 @@ signature/shape there, not an approximation.
 - **This file is a facts document.** Present-tense state only — no change history or
   rationale-for-past-decisions. Design rationale belongs in `docs/ARCHITECTURE.md`.
 
+## Active work — Slice 1
+
+Loading the real FFXIV_ACT_Plugin + OverlayPlugin in the two-process host. Full plan +
+verified findings: [`docs/SLICE-1.md`](docs/SLICE-1.md). Key locked facts:
+
+- **Real binaries:** FFXIV_ACT_Plugin.dll at `%APPDATA%\Advanced Combat Tracker\Plugins\`;
+  ACT install + OverlayPlugin 0.16.5 at `E:\dev\Advanced Combat Tracker\`.
+- **ACT is strong-named** (`PublicKeyToken=a946b61e93d97868`); plugins reference it by
+  strong name. The facade is supplied via `AppDomain.AssemblyResolve` (token/version not
+  re-checked on that path); keep the real ACT.exe out of the satellite probe path.
+- **Live DPS requires ACT's full aggregation engine** — FFXIV_ACT_Plugin calls
+  `AddCombatAction`/`SetEncounter`/`ChangeZone`; ACT aggregates; OverlayPlugin MiniParse
+  reads `ActiveZone.ActiveEncounter` + `CombatantData.ExportVariables`. Not just plugin loading.
+
 ## Build
 
 No solution or projects exist yet. This section is updated when scaffolding lands.
