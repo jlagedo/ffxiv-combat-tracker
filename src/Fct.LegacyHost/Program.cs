@@ -1,6 +1,7 @@
 using System;
 using System.IO;
 using System.IO.Pipes;
+using System.Linq;
 using System.Windows.Forms;
 using Advanced_Combat_Tracker;
 
@@ -58,7 +59,7 @@ namespace Fct.LegacyHost
 
             // Load plugins once the message loop is running (some plugins poll via timers).
             ScheduleOnce(250, LoadPlugins);
-            ScheduleOnce(40000, WriteSummary);
+            ScheduleOnce(12000, WriteSummary);
 
             if (pipeName != null)
                 Application.Run(new ApplicationContext());
@@ -76,6 +77,34 @@ namespace Fct.LegacyHost
             Log("loading OverlayPlugin from: " + FacadeHost.OverlayPluginPath);
             _overlay = FacadeHost.LoadPlugin(_tabs, "OverlayPlugin",
                 FacadeHost.OverlayPluginPath, null);
+            Log($"embedded TabControl now has {_tabs.TabPages.Count} tab(s): " +
+                string.Join(", ", _tabs.TabPages.Cast<TabPage>().Select(t => t.Text)));
+            SelfTestAggregation();
+        }
+
+        // Deterministic S5 check: drive synthetic combat through the facade and read back
+        // the clean-room aggregation + the export formatters OverlayPlugin/cactbot consume.
+        private static void SelfTestAggregation()
+        {
+            try
+            {
+                var act = ActGlobals.oFormActMain;
+                var t0 = new DateTime(2026, 1, 1, 12, 0, 0);
+                act.ChangeZone("Self-Test Zone");
+                act.SetEncounter(t0, "Player One", "Striking Dummy");
+                for (int i = 0; i < 10; i++) // 10 skill hits of 1000 over 9s; every 3rd crits
+                    act.AddCombatAction(new MasterSwing(2, i % 3 == 0, "none", new Dnum(1000),
+                        t0.AddSeconds(i), i, "Attack", "Player One", "physical", "Striking Dummy"));
+
+                var enc = act.ActiveZone.ActiveEncounter;
+                var cd = enc.GetCombatant("Player One");
+                Log($"[SelfTest] Damage={cd.Damage} Hits={cd.Hits} Crit%={cd.CritDamPerc:0} " +
+                    $"Duration={enc.Duration.TotalSeconds:0}s EncDPS={cd.EncDPS:0.0}");
+                string Ev(string k) => CombatantData.ExportVariables.TryGetValue(k, out var f) ? f.GetExportString(cd, "") : "(missing)";
+                Log($"[SelfTest] ExportVariables: encdps={Ev("encdps")} damage={Ev("damage")} " +
+                    $"name={Ev("name")} crithit%={Ev("crithit%")}");
+            }
+            catch (Exception ex) { Log("[SelfTest] FAILED: " + ex); }
         }
 
         private static bool IsPortOpen(int port)
