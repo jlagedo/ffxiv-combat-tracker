@@ -18,6 +18,7 @@ namespace Fct.LegacyHost
 
         private static TabControl _tabs;
         private static ActPluginData _ffxiv;
+        private static ActPluginData _overlay;
 
         [STAThread]
         private static void Main(string[] args)
@@ -57,7 +58,7 @@ namespace Fct.LegacyHost
 
             // Load plugins once the message loop is running (some plugins poll via timers).
             ScheduleOnce(250, LoadPlugins);
-            ScheduleOnce(6000, WriteSummary);
+            ScheduleOnce(40000, WriteSummary);
 
             if (pipeName != null)
                 Application.Run(new ApplicationContext());
@@ -72,6 +73,22 @@ namespace Fct.LegacyHost
             Log("loading FFXIV_ACT_Plugin from: " + FacadeHost.FfxivPluginPath);
             _ffxiv = FacadeHost.LoadPlugin(_tabs, "FFXIV_ACT_Plugin",
                 FacadeHost.FfxivPluginPath, "FFXIV_ACT_Plugin.FFXIV_ACT_Plugin");
+            Log("loading OverlayPlugin from: " + FacadeHost.OverlayPluginPath);
+            _overlay = FacadeHost.LoadPlugin(_tabs, "OverlayPlugin",
+                FacadeHost.OverlayPluginPath, null);
+        }
+
+        private static bool IsPortOpen(int port)
+        {
+            try
+            {
+                using var c = new System.Net.Sockets.TcpClient();
+                var ar = c.BeginConnect("127.0.0.1", port, null, null);
+                var ok = ar.AsyncWaitHandle.WaitOne(500);
+                if (ok) c.EndConnect(ar);
+                return ok && c.Connected;
+            }
+            catch { return false; }
         }
 
         private static void WriteSummary()
@@ -86,6 +103,8 @@ namespace Fct.LegacyHost
 
             Log("==== SUMMARY ====");
             Log($"FFXIV status: '{_ffxiv?.lblPluginStatus?.Text}'");
+            Log($"OverlayPlugin status: '{_overlay?.lblPluginStatus?.Text}'");
+            Log($"WS server (10501) open: {IsPortOpen(10501)}");
             Log($"AddCombatAction={act.AddCombatActionCount} SetEncounter={act.SetEncounterCount} " +
                 $"ChangeZone={act.ChangeZoneCount} InCombat={act.InCombat} Zone='{act.CurrentZone}'");
             Log($"Network_*.log count={networkLogs.Length} latest={today}");

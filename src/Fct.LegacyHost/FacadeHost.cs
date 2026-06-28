@@ -18,6 +18,9 @@ namespace Fct.LegacyHost
 
         public static string FfxivPluginPath => Path.Combine(AppData, "Plugins", "FFXIV_ACT_Plugin.dll");
 
+        public static string OverlayPluginPath =>
+            @"E:\dev\Advanced Combat Tracker\OverlayPlugin-0.16.5\OverlayPlugin.dll";
+
         // Resolve the plugins' strong-named reference to "Advanced Combat Tracker" to our
         // facade. The strong name/version are not re-checked on the AssemblyResolve path.
         public static void InstallAssemblyResolver()
@@ -67,7 +70,7 @@ namespace Fct.LegacyHost
                 }
 
                 var asm = Assembly.LoadFrom(dllPath);
-                var type = asm.GetType(knownTypeName) ?? FindPluginType(asm);
+                var type = (knownTypeName != null ? asm.GetType(knownTypeName) : null) ?? FindPluginType(asm);
                 if (type == null) { Log($"[{title}] no IActPluginV1 type found"); return data; }
 
                 var plugin = (IActPluginV1)Activator.CreateInstance(type);
