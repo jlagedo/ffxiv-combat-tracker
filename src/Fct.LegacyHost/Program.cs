@@ -107,6 +107,17 @@ namespace Fct.LegacyHost
                 FacadeHost.OverlayPluginPath, null);
             Log($"embedded TabControl now has {_tabs.TabPages.Count} tab(s): " +
                 string.Join(", ", _tabs.TabPages.Cast<TabPage>().Select(t => t.Text)));
+
+            // Drive ACT's idle-end off the live log stream: the FFXIV plugin raises OnLogLineRead for
+            // every parsed line, so advancing the clock per line splits combat into per-pull
+            // encounters (matching ACT). OverlayPlugin reads ActiveZone.ActiveEncounter, so this is
+            // what gives a live, per-encounter DPS instead of one ever-growing all-time encounter.
+            ActGlobals.oFormActMain.OnLogLineRead += (isImport, args) =>
+            {
+                if (args.detectedTime > DateTime.MinValue)
+                    ActGlobals.oFormActMain.AdvanceClock(args.detectedTime);
+            };
+
             SelfTestAggregation();
         }
 
