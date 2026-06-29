@@ -103,6 +103,14 @@ OverlayPlugin/cactbot read. `Fct.Compat.Act` is our clean-room rebuild of that e
   over two independent real slices (`combat-slice`, a 2-ally mixed pull; `combat-slice2`, an 8-ally
   full-party burst with heavy healing), both bit-for-bit exact.
 
+On top of the aggregates, `ExportVarsCompatTests` holds the **`ExportVariables` strings** themselves
+— the exact text OverlayPlugin/cactbot read per combatant — to ACT. The oracle dumps ACT's own
+`FormActMain.CombatantFormatSwitch` output for every key into `combat-slice*.exportvars.tsv`, and the
+test asserts our `CombatTables` formatters reproduce each one (24 keys × 11 combatants per slice).
+That pinned ACT's exact formatting: `encdps` is `EncDPS.ToString("F")` (`1144.65`), `ENCDPS` rounds
+(`1145`), `crithit%` uses `"0'%"`, `maxhit` is `"AttackType-Damage"` (e.g. `Primal Rend-89674`), and
+a zero-duration combatant's `dps` is verbatim `NaN`.
+
 This pinned several behaviours our first-cut engine got wrong, each now matched exactly: `blockIsHit`
 defaults **true**; per-combatant `StartTime`/`EndTime` span all outgoing swings via the
 "`All … (Ref)`" bucket (not just damage); the encounter's allied party comes from ACT's friend/foe

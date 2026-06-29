@@ -182,6 +182,35 @@ internal static class ActOracle
                     I(enc.NumCombatants), I(enc.NumAllies),
                 }));
             }
+            // Optional: dump the real ACT ExportVariables strings OverlayPlugin/cactbot read. The
+            // ExportVariables formatters are thin wrappers over FormActMain.CombatantFormatSwitch,
+            // which we call directly (the full env-setup method touches UI state and can't run on an
+            // uninitialized form). These are the exact strings cactbot would receive.
+            if (argv.Length >= 3)
+            {
+                var fmt = typeof(FormActMain).GetMethod("CombatantFormatSwitch",
+                    BindingFlags.NonPublic | BindingFlags.Instance);
+                string[] keys =
+                {
+                    "name", "duration", "DURATION", "encdps", "ENCDPS", "dps", "DPS",
+                    "damage", "damage%", "healed", "healed%", "enchps", "ENCHPS",
+                    "hits", "crithits", "crithit%", "critheal%", "critheals", "heals",
+                    "misses", "swings", "maxhit", "deaths", "kills",
+                };
+                using (var w = new StreamWriter(argv[2]))
+                {
+                    w.WriteLine("name\tkey\tvalue");
+                    foreach (var cd in enc.Items.Values)
+                        foreach (var key in keys)
+                        {
+                            string val;
+                            try { val = (string)fmt.Invoke(ActGlobals.oFormActMain, new object[] { cd, key, "" }); }
+                            catch (Exception ex) { var x = ex; while (x.InnerException != null) x = x.InnerException; val = "<EX:" + x.GetType().Name + ">"; }
+                            w.WriteLine(cd.Name + "\t" + key + "\t" + val);
+                        }
+                }
+            }
+
             _result = "OK combatants=" + enc.Items.Count + " swings=" + n;
         }
         catch (Exception ex)

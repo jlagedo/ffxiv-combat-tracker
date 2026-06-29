@@ -13,3 +13,6 @@ artifacts/
 # Tooling
 *.binlog
 TestResults/
+
+# Raw personal FFXIV network logs (never commit; copied here only as a local capture source)
+tests/fixtures/FFXIVLogs/

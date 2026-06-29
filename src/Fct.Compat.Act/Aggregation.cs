@@ -271,10 +271,12 @@ namespace Advanced_Combat_Tracker
         public DateTime ShortEndTime => D(DamageTypeDataOutgoingDamage)?.EndTime ?? DateTime.MinValue;
         public TimeSpan Duration => EndTime > StartTime ? EndTime - StartTime : TimeSpan.Zero;
         public string DurationS => Duration.Hours == 0 ? $"{Duration.Minutes:00}:{Duration.Seconds:00}" : $"{Duration.Hours:00}:{Duration.Minutes:00}:{Duration.Seconds:00}";
-        public double DPS => Duration.TotalSeconds > 0 ? (double)Damage / Duration.TotalSeconds : 0.0;
-        public double EncDPS { get { var d = Parent?.Duration.TotalSeconds ?? 0; return d > 0 ? (double)Damage / d : 0.0; } }
+        // Unguarded like ACT: a zero personal/encounter duration yields NaN/Infinity, which ACT's
+        // ExportVariables surface verbatim (e.g. "dps=NaN" for a combatant with one instant of data).
+        public double DPS => (double)Damage / Duration.TotalSeconds;
+        public double EncDPS => (double)Damage / (Parent?.Duration.TotalSeconds ?? 0.0);
         public double ExtDPS => EncDPS;
-        public double EncHPS { get { var d = Parent?.Duration.TotalSeconds ?? 0; return d > 0 ? (double)Healed / d : 0.0; } }
+        public double EncHPS => (double)Healed / (Parent?.Duration.TotalSeconds ?? 0.0);
         public double ExtHPS => EncHPS;
         public int Deaths { get { var at = incAll != null && incAll.Items.TryGetValue("All", out var v) ? v : null; return at?.Items.Count(s => s.Damage == Dnum.Death) ?? 0; } }
         public int Kills { get { var at = outAll != null && outAll.Items.TryGetValue("All", out var v) ? v : null; return at?.Items.Count(s => s.Damage == Dnum.Death) ?? 0; } }
@@ -308,8 +310,30 @@ namespace Advanced_Combat_Tracker
 
         public AttackType GetAttackType(string attackTypeName, string type) => items.TryGetValue(type, out var d) && d.Items.TryGetValue(attackTypeName, out var at) ? at : null;
         public string GetColumnByName(string name) => ColumnDefs.ContainsKey(name) ? ColumnDefs[name].GetCellData(this) : string.Empty;
-        public string GetMaxHit(bool showType = true, bool useSuffix = true) => MaxHit;
-        public string GetMaxHeal(bool showType = true, bool countWards = false, bool useSuffix = true) { var at = GetAttackType("All", DamageTypeDataOutgoingHealing); return (at?.MaxHit ?? 0).ToString(); }
+
+        // ACT's maxhit string: the top outgoing-damage swing as "AttackType-Damage" (ShowType) or
+        // just the number, empty when there are no damaging hits. (Our CreateDamageString renders
+        // the raw number, so the UseSuffix flag is a no-op here, as in the facade FormActMain.)
+        public string GetMaxHit(bool showType = true, bool useSuffix = true)
+        {
+            var at = GetAttackType("All", DamageTypeDataOutgoingDamage);
+            MasterSwing max = null;
+            if (at != null)
+                foreach (var s in at.Items)
+                    if (max == null || (long)s.Damage > (long)max.Damage) max = s;
+            if (max == null) return string.Empty;
+            return showType ? $"{max.AttackType}-{(long)max.Damage}" : $"{(long)max.Damage}";
+        }
+        public string GetMaxHeal(bool showType = true, bool countWards = false, bool useSuffix = true)
+        {
+            var at = GetAttackType("All", DamageTypeDataOutgoingHealing);
+            MasterSwing max = null;
+            if (at != null)
+                foreach (var s in at.Items)
+                    if (max == null || (long)s.Damage > (long)max.Damage) max = s;
+            if (max == null) return string.Empty;
+            return showType ? $"{max.AttackType}-{(long)max.Damage}" : $"{(long)max.Damage}";
+        }
 
         public int CompareTo(object obj) => CompareTo(obj as CombatantData);
         public int CompareTo(CombatantData other) => other == null ? 1 : other.Damage.CompareTo(Damage);

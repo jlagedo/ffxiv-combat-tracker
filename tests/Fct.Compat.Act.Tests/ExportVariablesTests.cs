@@ -33,8 +33,11 @@ namespace Fct.Compat.Act.Tests
             return f.GetExportString(ed, null, "");
         }
 
+        // Formats mirror ACT's CombatantFormatSwitch: lower-case per-second keys carry two decimals
+        // ("F"), upper-case round to integer ("0"), percentages round via "0'%", and maxhit is the
+        // "AttackType-Damage" string. (10 hits of 1000 over 9 s ⇒ EncDPS = 1111.11; every 3rd a crit.)
         [Theory]
-        [InlineData("encdps", "1111")]
+        [InlineData("encdps", "1111.11")]
         [InlineData("ENCDPS", "1111")]
         [InlineData("damage", "10000")]
         [InlineData("name", "Player One")]
@@ -42,10 +45,11 @@ namespace Fct.Compat.Act.Tests
         [InlineData("crithit%", "40%")]
         [InlineData("hits", "10")]
         [InlineData("crithits", "4")]
-        [InlineData("maxhit", "1000")]
+        [InlineData("maxhit", "Attack-1000")]
         [InlineData("healed", "0")]
         public void Combatant_export_vars_match_known_vector(string key, string expected)
         {
+            System.Threading.Thread.CurrentThread.CurrentCulture = System.Globalization.CultureInfo.InvariantCulture;
             var (_, pc) = BuildKnownEncounter();
             Assert.Equal(expected, Combatant(key, pc));
         }
@@ -58,11 +62,13 @@ namespace Fct.Compat.Act.Tests
         }
 
         [Theory]
-        [InlineData("encdps", "1111")]
+        [InlineData("encdps", "1111.11")]
+        [InlineData("ENCDPS", "1111")]
         [InlineData("damage", "10000")]
         [InlineData("CurrentZoneName", "Self-Test Zone")]
         public void Encounter_export_vars_match_known_vector(string key, string expected)
         {
+            System.Threading.Thread.CurrentThread.CurrentCulture = System.Globalization.CultureInfo.InvariantCulture;
             var (enc, _) = BuildKnownEncounter();
             Assert.Equal(expected, Encounter(key, enc));
         }
