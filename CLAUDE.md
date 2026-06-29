@@ -11,15 +11,17 @@ phase**: no application code yet. The full design lives in
 [`docs/DATA-FLOW.md`](docs/DATA-FLOW.md) is the authoritative map of how data flows
 through the real upstream stack (FFXIV_ACT_Plugin → ACT → OverlayPlugin) and the exact
 compat seams we must reproduce to make the unmodified plugins work — the build target.
+[`docs/ACT-INTERFACE-MAP.md`](docs/ACT-INTERFACE-MAP.md) is the host↔plugin contract: every
+`Advanced_Combat_Tracker` member each supported plugin consumes, why, and the facade gaps.
 
 The product is a host that runs the **existing plugin ecosystem unmodified**
-(FFXIV_ACT_Plugin, OverlayPlugin/cactbot, Triggernometry, Discord triggers) while
-exposing a typed, future-facing plugin API, with the network/opcode parser as a
+(FFXIV_ACT_Plugin, OverlayPlugin/cactbot, Triggernometry, ACT-Discord-Triggers, ACT.Hojoring)
+while exposing a typed, future-facing plugin API, with the network/opcode parser as a
 swappable, independently-released component.
 
 ## Two hard directives (these gate every decision)
 
-1. The first version must run the four legacy plugins above by **drop-in, unmodified**.
+1. The first version must run the five legacy plugins above by **drop-in, unmodified**.
 2. Built for the future with a **clear legacy → native migration path**, opt-in and
    incremental — never a flag day.
 
@@ -29,7 +31,7 @@ swappable, independently-released component.
   events. A game patch ships a new parser plugin only; the host and other plugins are
   untouched. One opt-in escape hatch (`IRawPacketSource`) exposes raw packets for legacy
   `RegisterNetworkParser` consumers.
-- **Two runtimes, two processes.** net48 and net10 cannot share a process, and the four
+- **Two runtimes, two processes.** net48 and net10 cannot share a process, and the five
   legacy plugins cannot load unmodified on .NET 10 (CefSharp's net48 build alone settles
   it). Legacy plugins run in a **real .NET Framework 4.8 satellite process**
   (`Fct.LegacyHost`); the **.NET 10 host** (`Fct.Host`) runs new plugins; they bridge over
@@ -47,7 +49,7 @@ swappable, independently-released component.
 |---|---|---|
 | `Fct.Abstractions` | net48;net10 | the plugin SDK: contracts + domain records. No opcodes. |
 | `Fct.Host` | net10 | microkernel: ALC plugin loader, typed bus, Generic Host. |
-| `Fct.LegacyHost` | net48 | clean-room ACT engine; hosts the four real plugins. |
+| `Fct.LegacyHost` | net48 | clean-room ACT engine; hosts the five real plugins. |
 | `Fct.Bridge` | net48;net10 | IPC transport + versioned wire protocol. |
 | `Fct.Parser.Legacy` | net48 | wraps the real FFXIV_ACT_Plugin. `WrappedFfxivPlugin` sits in `pluginObj` (forwards `DataRepository`/`_iocContainer`/lifecycle to the real instance) and exposes `RingBufferDataSubscription` (`IDataSubscription` + `IRawPacketSource`): a bounded ring + single dispatch thread that replaces the plugin's per-subscriber `BeginInvoke` fan-out so OverlayPlugin's ~20 handlers cost one in-order dispatch. ~250× faster on the dispatch stage. |
 | `Fct.Parser.Native` | net10 | clean-room parser. `NetworkLogLine` (structure) + `ActionEffectDecoder` (effect byte decode) + `CombatLogParser` (stateful: names, combat window, all swing types) + `PotencySimulator` (ACT's simulated DoT/HoT/shield amounts). Reproduces every swing type ACT emits; deterministic log-derived types are bit-exact. The simulator mirrors ACT's `DoTSimulator`/`DamageShieldSimulator`/`PotencyStatusApplication` exactly — the per-source attack-power median (calibrated from primary-target hits only), the buff-multiplier engine, and the individual-crit tick branch (RNG crit/DH bits, `Random`-seeded). Simulated `(*)` DoT/HoT/shield amounts reach ~95.6% of ACT's damage sum (the DPS signal); per-tick bit-exact is bounded by ACT's RNG crits (~29% of ticks) and per-application buff-snapshot precision. Game-data tables (action categories, status names, DoT/heal potencies, shield/buff defs) are dumped from the real plugin via `--dump-tables`. See `docs/TESTING.md`. Live capture + memory later. |
@@ -70,6 +72,17 @@ Hard-linked Windows directory junctions under `reference/` — searchable in pla
 **Never modify anything under `reference/`**; these are external repos.
 
 - `reference/overlayplugin/` → `E:\dev\OverlayPlugin` (ngld OverlayPlugin, net48).
+
+**Supported-plugin source trees** (read-only, under `E:\dev`). The ACT members each consumes
+are mapped in [`docs/ACT-INTERFACE-MAP.md`](docs/ACT-INTERFACE-MAP.md):
+
+- `E:\dev\OverlayPlugin` — ngld OverlayPlugin / MiniParse / cactbot host (net48).
+- `E:\dev\Triggernometry` — advanced trigger engine (net48). ACT contact isolated in
+  `Source\TriggernometryProxy\ProxyPlugin.cs`.
+- `E:\dev\ACT-Discord-Triggers` — Discord audio/TTS bridge (net48). Hijacks ACT's
+  `PlayTtsMethod`/`PlaySoundMethod` delegates; consumes no combat data.
+- `E:\dev\ACT.Hojoring` — Japanese plugin suite (SpecialSpellTimer, TTSYukkuri, UltraScouter,
+  XIVLog; net48). Heaviest consumer; also drives ACT's built-in `oFormSpellTimers`.
 
 **ACT vs FFXIV_ACT_Plugin are two separate decompiles — do not conflate them:**
 
