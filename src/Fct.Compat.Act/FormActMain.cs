@@ -18,6 +18,14 @@ namespace Advanced_Combat_Tracker
         public delegate System.Drawing.Bitmap AttackTypeGraphGenerator(
             AttackType AttackTypeSource, int SizeX, int SizeY, string Sorting);
         public delegate DateTime DateTimeLogParser(string logLine);
+        public delegate void PlaySoundDelegate(string WavFilePath, int VolumePercent);
+        public delegate void PlayTtsDelegate(string TtsString);
+
+        // Audio/TTS playback hooks. Audio triggers are out of scope, so these are no-op sinks —
+        // but they exist with ACT's exact delegate types so trigger plugins (e.g. Discord-Triggers)
+        // that read and override them load and route their combat events normally.
+        public PlaySoundDelegate PlaySoundMethod = (wav, vol) => { };
+        public PlayTtsDelegate PlayTtsMethod = tts => { };
 
         // ACT exposes this as a public delegate FIELD (plugins assign their own parser).
         public DateTimeLogParser GetDateTimeFromLog;
