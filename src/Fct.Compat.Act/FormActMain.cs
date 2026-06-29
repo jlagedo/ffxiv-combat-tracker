@@ -60,6 +60,11 @@ namespace Advanced_Combat_Tracker
         public bool ReadThreadLock { get; set; }
         public DateTime LastKnownTime { get; set; } = DateTime.Now;
         public DateTime LastEstimatedTime { get; set; } = DateTime.Now;
+        public DateTime LastHostileTime { get; set; }
+
+        // Idle-end of combat (ACT CheckIdleEndCombat). nudIdleLimit_Value defaults to 6 s.
+        public bool IdleEndEnabled { get; set; } = true;
+        public double IdleLimitSeconds { get; set; } = 6;
         public string CurrentZone { get; set; } = "";
         public AttackTypeGraphGenerator GenerateAttackTypeGraph { get; set; }
         public List<ActPluginData> ActPlugins { get; } = new List<ActPluginData>();
@@ -107,6 +112,10 @@ namespace Advanced_Combat_Tracker
         public void FireLogLineRead(bool isImport, LogLineEventArgs args)
             => OnLogLineRead?.Invoke(isImport, args);
 
+        // Idle-end hook for the live log pump: the host calls AdvanceClock(lineTime) as lines are
+        // read so combat ends after a quiet gap. Not driven from the Fire* events here, because the
+        // oracle replays lines through them and must capture every swing regardless of InCombat.
+
         // --- Log file integration (plugin tails/writes Network_*.log) ---
         public void OpenLog(bool getCurrentZone, bool getCharNameFromFile)
         {
@@ -140,7 +149,30 @@ namespace Advanced_Combat_Tracker
                 InCombat = true;
                 OnCombatStart?.Invoke(false, new CombatToggleEventArgs(0, ActiveZone.Items.Count - 1, enc));
             }
+            // Every hostile action refreshes the idle clock (ACT SetEncounter tail).
+            LastHostileTime = time;
             return true;
+        }
+
+        // Advance the parse clock as log lines are read. Combat ends after an idle gap, matching
+        // ACT's CheckIdleEndCombat (LastKnownTime - LastHostileTime > nudIdleLimit). The FFXIV
+        // plugin reads InCombat back off this form to gate which heals it reports, so driving this
+        // from the host's log pump is what makes in-/out-of-combat heal attribution match ACT.
+        public bool AdvanceClock(DateTime time)
+        {
+            if (time > LastKnownTime) LastKnownTime = time;
+            return CheckIdleEndCombat();
+        }
+
+        public bool CheckIdleEndCombat()
+        {
+            if (InCombat && IdleEndEnabled &&
+                LastKnownTime - LastHostileTime > TimeSpan.FromSeconds(IdleLimitSeconds))
+            {
+                EndCombat(true);
+                return true;
+            }
+            return false;
         }
 
         public void ChangeZone(string zoneName)
