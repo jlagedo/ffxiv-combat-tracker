@@ -19,16 +19,18 @@ public partial class MainWindow : Window
     private readonly MainViewModel _vm;
     private readonly ILoggerFactory _loggerFactory;
     private readonly ILogger<MainWindow> _log;
+    private readonly SatelliteHost _satellite;
 
     // One embedded view per plugin window; the config slot shows whichever plugin is selected.
     private readonly Dictionary<IntPtr, EmbeddedSatelliteView> _embeds = new();
 
     // Parameterless path is for the XAML previewer only; the running app resolves the DI ctor.
-    public MainWindow() : this(new MainViewModel(), NullLoggerFactory.Instance) { }
+    public MainWindow() : this(new MainViewModel(), new SatelliteHost(NullLoggerFactory.Instance), NullLoggerFactory.Instance) { }
 
-    public MainWindow(MainViewModel vm, ILoggerFactory loggerFactory)
+    public MainWindow(MainViewModel vm, SatelliteHost satellite, ILoggerFactory loggerFactory)
     {
         _vm = vm;
+        _satellite = satellite;
         _loggerFactory = loggerFactory;
         _log = loggerFactory.CreateLogger<MainWindow>();
 
@@ -119,9 +121,8 @@ public partial class MainWindow : Window
         _vm.SetStarting();
         try
         {
-            var host = new SatelliteHost(_loggerFactory);
-            var result = await host.StartAsync();
-            var pid = host.Process?.Id ?? 0;
+            var result = await _satellite.StartAsync();
+            var pid = _satellite.Process?.Id ?? 0;
 
             _vm.SetOnline(result.Handshake, pid, result.Plugins);
             _log.LogInformation(LogEvents.SatelliteStarted,
@@ -156,6 +157,27 @@ public partial class MainWindow : Window
         => ToggleMaximize();
 
     private void OnClose(object? sender, Avalonia.Interactivity.RoutedEventArgs e) => Close();
+
+    // Drain the satellite (plugins DeInit -> persist state, then it exits) BEFORE this window is
+    // destroyed. The plugin config windows are SetParent-embedded into this window, so tearing it
+    // down first wedges the satellite's UI thread on cross-process window teardown and the deinit
+    // Invoke never runs. So cancel the first close, await the graceful shutdown, then close for real.
+    // SatelliteLifetime.StopAsync remains an idempotent backstop for non-window shutdown paths.
+    private bool _satelliteDrained;
+
+    protected override async void OnClosing(WindowClosingEventArgs e)
+    {
+        if (!_satelliteDrained)
+        {
+            e.Cancel = true;
+            try { await _satellite.ShutdownAsync(TimeSpan.FromSeconds(8)); }
+            catch (Exception ex) { _log.LogWarning(LogEvents.SatelliteShutdownTimeout, ex, "Satellite drain on close faulted"); }
+            _satelliteDrained = true;
+            Close();
+            return;
+        }
+        base.OnClosing(e);
+    }
 
     private void ToggleMaximize() =>
         WindowState = WindowState == WindowState.Maximized ? WindowState.Normal : WindowState.Maximized;

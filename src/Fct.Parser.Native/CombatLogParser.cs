@@ -36,10 +36,11 @@ public readonly record struct CombatAction(
 // does NOT end combat (ACT's ChangeZone leaves InCombat untouched — the idle gap at any zone change
 // closes the window first). Action(1) and Status(8) are gated on InCombat (they cannot start combat,
 // since ACT could not AddCombatAction them while out of combat) but, once emitted, they extend it.
-// Real ground-AoE DoT/HoT ticks (24, statusId != 0) carry log amounts and are emitted here.
-// Personal (statusId == 0) DoT/HoT and damage shields are NOT in the log and are synthesized
-// upstream by the plugin, not by ACT — so they are out of scope (see ACT-OUTPUT-PARITY-GAPS.md).
-// We do not reproduce them; the unattributed tick still keeps ACT's combat window alive.
+// DoT/HoT ticks (24) carry their real amount and source in the log, so they are emitted here
+// using the log's own values and summed into the combatant totals as ACT does. We do NOT
+// reproduce the plugin's potency *estimate* (the "(*)" per-status split) — that value is not in
+// the log and is plugin logic (see ACT-OUTPUT-PARITY-GAPS.md). Damage shields (11) are plugin
+// synthesis (no absorbed-amount line in the log) and are not emitted.
 public sealed partial class CombatLogParser
 {
     private readonly Dictionary<uint, string> _names = new();
@@ -56,6 +57,11 @@ public sealed partial class CombatLogParser
     private long _lastKnownTicks = long.MinValue;
     private long _lastHostileTicks;
     private const long IdleLimitTicks = 6 * TimeSpan.TicksPerSecond;
+
+    // UTC ticks of the log line currently being processed. Stable for the duration of one line's
+    // swings, so a consumer reading it right after each yielded CombatAction recovers that swing's
+    // time — used to feed the aggregation harness (encounter splitting needs per-swing time).
+    public long CurrentLineTicks { get; private set; }
 
     public string CharName { get; init; } = "YOU";
 
@@ -89,6 +95,10 @@ public sealed partial class CombatLogParser
             // LastKnownTime advances monotonically with each line; idle-end is checked before
             // the line is parsed (ACT runs CheckIdleEndCombat at the top of ParseRawLogLine).
             long t = line.Timestamp.UtcTicks;
+            // The timestamp of the line currently being processed. Every swing yielded while this
+            // line is handled shares this time, so a consumer can read it right after each yield to
+            // recover the swing's time (used to drive the aggregation harness's encounter splitting).
+            CurrentLineTicks = t;
             if (t > _lastKnownTicks) _lastKnownTicks = t;
             if (_inCombat && _lastKnownTicks - _lastHostileTicks > IdleLimitTicks) _inCombat = false;
 
@@ -141,11 +151,17 @@ public sealed partial class CombatLogParser
                     TryId(line.Field(6), out var dAmount);
                     TryId(line.Field(17), out var dsrc);
 
-                    if (dStatus != 0 && dsrc != 0)
+                    if (dsrc != 0)
                     {
-                        // Real ground-AoE tick (Salted Earth, party regen HoTs, …): the log carries
-                        // the true amount and source, which ACT emits verbatim. HoT ticks are
-                        // in-combat-gated; DoT ticks are not (a DoT can start/continue combat).
+                        // Every tick in the log carries its real amount (field 6) AND its source
+                        // (field 17), whether or not a specific status id is present. ACT sums these
+                        // into the combatant damage/healed totals, so we emit them from the log's own
+                        // values — the source attributes them correctly per combatant. We do NOT
+                        // reproduce the plugin's potency *estimate* (its "(*)" per-status split): that
+                        // value is not in the log, is less accurate than the logged tick, and is plugin
+                        // logic. The status name (when statusId != 0) is the AttackType; statusId 0 ticks
+                        // carry no name in the log, so AttackType is left empty. HoT ticks are
+                        // in-combat-gated; DoT ticks can start/continue combat.
                         if (isHoT && !_inCombat) break;
                         yield return new CombatAction(isHoT, isHoT ? 5 : 3, false, dAmount, "",
                             ResolveName(dsrc), ResolveName(dtgt), ResolveStatus(dStatus, ""), "Unknown", true);
@@ -153,10 +169,9 @@ public sealed partial class CombatLogParser
                     }
                     else
                     {
-                        // Combined, unattributed personal tick (statusId == 0): not in the log
-                        // per-source, and ACT's per-source split is synthesized upstream by the
-                        // plugin — out of scope, not emitted. The tick is still a combat event, so it
-                        // keeps ACT's window alive (a DoT can hold it open; a HoT only while in combat).
+                        // Sourceless tick (environmental): cannot attribute, not emitted. Still a combat
+                        // event, so it keeps ACT's window alive (a DoT can hold it open; a HoT only while
+                        // in combat).
                         if (!isHoT || _inCombat) RefreshCombat(t);
                     }
                     break;

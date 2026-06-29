@@ -26,6 +26,8 @@ namespace Fct.Logging
         public static readonly EventId SatelliteExited = new EventId(1104, nameof(SatelliteExited));
         public static readonly EventId SatelliteNotStaged = new EventId(1105, nameof(SatelliteNotStaged));
         public static readonly EventId JobObjectUnavailable = new EventId(1106, nameof(JobObjectUnavailable));
+        public static readonly EventId SatelliteShutdownRequested = new EventId(1107, nameof(SatelliteShutdownRequested));
+        public static readonly EventId SatelliteShutdownTimeout = new EventId(1108, nameof(SatelliteShutdownTimeout));
 
         // -- 12xx bridge / IPC (host side) --
         public static readonly EventId BridgeConnected = new EventId(1200, nameof(BridgeConnected));
@@ -51,6 +53,7 @@ namespace Fct.Logging
         public static readonly EventId PluginLoadFailed = new EventId(2103, nameof(PluginLoadFailed));
         public static readonly EventId PluginNotFound = new EventId(2104, nameof(PluginNotFound));
         public static readonly EventId PluginsReady = new EventId(2105, nameof(PluginsReady));
+        public static readonly EventId PluginDeInit = new EventId(2106, nameof(PluginDeInit));
 
         // -- 22xx dispatch / ring buffer (satellite side) --
         public static readonly EventId RealPluginBound = new EventId(2200, nameof(RealPluginBound));

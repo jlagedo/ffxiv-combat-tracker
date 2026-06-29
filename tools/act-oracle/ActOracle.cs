@@ -130,11 +130,15 @@ internal static class ActOracle
             ActGlobals.oFormActMain = (FormActMain)FormatterServices.GetUninitializedObject(typeof(FormActMain));
             ActGlobals.charName = "YOU";
 
-            // Seed ACT's default English localization (Trans["attackTypeTerm-all"] = "All", etc.).
-            // Without it the "All" AttackType bucket is keyed by the fallback string and the
-            // literal-"All" lookups (CritHits, Deaths, Kills, MaxHit) silently return 0.
+            // Seed ACT's default English localization. Init() clears the table and loads one set
+            // (helpPanel + attackTypeTerm-all, so the merged "All" AttackType bucket is keyed right);
+            // AddPrebuild() loads the disjoint set the aggregation path looks up (data-dnum*,
+            // encounterData-defaultEncounterName for the EncounterData ctor, specialAttackTerm*). BOTH
+            // are required — any missing key makes ACT's localization get_Item warn via NotificationAdd,
+            // which NREs on the uninitialized form. The two key sets are disjoint (no duplicate throw).
             var loc = typeof(ActGlobals).GetNestedType("ActLocalization");
             loc.GetMethod("Init", BindingFlags.NonPublic | BindingFlags.Static).Invoke(null, null);
+            loc.GetMethod("AddPrebuild", BindingFlags.NonPublic | BindingFlags.Static).Invoke(null, null);
 
             RegisterTables();
 

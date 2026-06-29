@@ -16,7 +16,7 @@ namespace Fct.LegacyHost
     // s2-ffxiv.log verification artifact); see SatelliteLogging.
     internal static class Program
     {
-        private static NamedPipeClientStream _bridge;
+        private static NamedPipeClientStream _bridge;     // satellite -> host: handshake + logs
         private static StreamWriter _writer;
         private static readonly object _sendLock = new object();
 
@@ -313,6 +313,8 @@ namespace Fct.LegacyHost
                          $"x64={Environment.Is64BitProcess} clr={Environment.Version}");
                 // The pipe is up: start forwarding log records to the host's pipeline.
                 BridgeLogSink.Sender = SendLine;
+                // Wait on the host's cross-process graceful-shutdown signal (best effort).
+                StartShutdownWaiter(pipeName + "-shutdown");
                 _log.LogInformation(LogEvents.SatelliteBridgeConnected, "Bridge connected on {Pipe}", pipeName);
             }
             catch (Exception ex)
@@ -320,6 +322,71 @@ namespace Fct.LegacyHost
                 _bridge = null; _writer = null;
                 _log.LogWarning(LogEvents.SatelliteBridgeConnectFailed, ex,
                     "Bridge connect failed on {Pipe}; running detached", pipeName);
+            }
+        }
+
+        // Wait on the host's named graceful-shutdown event. A cross-process EventWaitHandle (not a
+        // pipe) needs no connection rendezvous and never contends with the log pipe; the host opens
+        // the same name and Sets it on close. Best effort: if the event can't be opened we simply
+        // forgo graceful shutdown (the host's kill-on-close job still reaps us). The wait lives on a
+        // background thread so it never stalls boot or the message loop.
+        private static void StartShutdownWaiter(string eventName)
+        {
+            System.Threading.EventWaitHandle evt;
+            try
+            {
+                evt = new System.Threading.EventWaitHandle(
+                    false, System.Threading.EventResetMode.ManualReset, eventName);
+            }
+            catch (Exception ex)
+            {
+                _log.LogWarning(LogEvents.SatelliteBridgeConnectFailed, ex,
+                    "Could not open shutdown event {Event}; graceful shutdown disabled", eventName);
+                return;
+            }
+
+            var t = new System.Threading.Thread(() =>
+            {
+                try
+                {
+                    evt.WaitOne();
+                    OnShutdownCommand();
+                }
+                catch { /* host gone; the message loop ends on its own */ }
+            })
+            { IsBackground = true, Name = "shutdown-waiter" };
+            t.Start();
+        }
+
+        private static volatile bool _shuttingDown;
+
+        // Drain the plugins (each persists its state in DeInitPlugin) on the UI thread, then end the
+        // message loop so the process exits cleanly. Runs once; the host waits for our exit.
+        private static void OnShutdownCommand()
+        {
+            if (_shuttingDown) return;
+            _shuttingDown = true;
+            _log.LogInformation(LogEvents.PluginDeInit, "SHUTDOWN received; de-initialising plugins");
+
+            var act = ActGlobals.oFormActMain;
+            Action drainAndExit = () =>
+            {
+                try { FacadeHost.DeInitPlugins(); }
+                catch (Exception ex) { _log.LogError(LogEvents.PluginDeInit, ex, "Plugin de-init failed"); }
+                finally { Application.Exit(); }
+            };
+
+            try
+            {
+                if (act != null && act.IsHandleCreated)
+                    act.Invoke(drainAndExit);   // plugins were Init'd on the UI thread; de-init there too
+                else
+                    drainAndExit();
+            }
+            catch (Exception ex)
+            {
+                _log.LogError(LogEvents.PluginDeInit, ex, "Shutdown dispatch failed");
+                Application.Exit();
             }
         }
 

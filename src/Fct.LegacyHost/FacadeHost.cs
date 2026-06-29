@@ -210,6 +210,35 @@ namespace Fct.LegacyHost
             }
         }
 
+        // De-initialise every loaded plugin so it persists its state, mirroring ACT's shutdown
+        // (FormActMain.SaveXmlActPlugins): set IsActClosing, then walk ActPlugins in load order
+        // calling DeInitPlugin on each, swallowing per-plugin failures so one bad plugin can't
+        // block the rest. For the FFXIV plugin, pluginObj is the WrappedFfxivPlugin, whose
+        // DeInitPlugin de-inits the real plugin then disposes the ring; for OverlayPlugin it is the
+        // real loader, whose DeInitPlugin force-saves its config (overlay positions, toggles).
+        public static void DeInitPlugins()
+        {
+            var act = ActGlobals.oFormActMain;
+            if (act == null) return;
+
+            act.IsActClosing = true;
+            foreach (var data in act.ActPlugins)
+            {
+                if (data?.pluginObj == null) continue;
+                var name = data.lblPluginTitle?.Text ?? "(plugin)";
+                try
+                {
+                    Log($"[Info] Calling deinit for {name}...");
+                    data.pluginObj.DeInitPlugin();
+                }
+                catch (Exception ex)
+                {
+                    Log($"[Exception] DeInit {name}: {ex}");
+                }
+            }
+            Log("[Info] Plugin deinit complete.");
+        }
+
         private static Type FindPluginType(Assembly asm)
         {
             Type[] types;

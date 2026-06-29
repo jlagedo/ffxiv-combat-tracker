@@ -13,6 +13,18 @@ using Fct.Parser.Native;
 // (swingType, crit, amount, special, attackType, attacker, damageType, victim). The headline is
 // total swings reproduced; a per-swingType table shows exactly which categories still diverge.
 
+// Timed single-log emit: write our parser's swings WITH a timestamp column (ISO 8601, col 8) in
+// the exact format the net48 ActOracle harness consumes, so our swing stream can be aggregated
+// through the REAL ACT EncounterData/CombatantData engine for a DPS-output diff against ACT's own
+// (plugin) swings run through the same engine.
+//   MassCompare --timed <logPath> <oracleFolder> <outTsv>
+if (args.Length >= 1 && args[0] == "--timed")
+{
+    if (args.Length < 4) { Console.Error.WriteLine("usage: MassCompare --timed <logPath> <oracleFolder> <outTsv>"); return 2; }
+    RunTimed(args[1], args[2], args[3]);
+    return 0;
+}
+
 if (args.Length < 3)
 {
     Console.Error.WriteLine("usage: MassCompare <logFolder> <oracleFolder> <outFolder>");
@@ -196,6 +208,33 @@ static List<Row> ReadOracle(string path)
             long.Parse(c[2], CultureInfo.InvariantCulture), c[3], c[4], c[5], c[6], c[7]));
     }
     return rows;
+}
+
+// Emit one log's swings with a per-swing timestamp (read from parser.CurrentLineTicks right after
+// each yield — stable for the duration of one line's swings) in ActOracle's 9-column format.
+static void RunTimed(string logPath, string oracleFolder, string outTsv)
+{
+    var (sk, cat) = LoadActions(Path.Combine(oracleFolder, "actions.full.tsv"));
+    if (sk.Count == 0) sk = LoadSkills(Path.Combine(oracleFolder, "skills.full.tsv"));
+    var st = LoadStatuses(Path.Combine(oracleFolder, "statuses.full.tsv"));
+    Console.WriteLine($"skills: {sk.Count}  categories: {cat.Count}  statuses: {st.Count}");
+    var p = new CombatLogParser
+    {
+        Skills = sk.Count > 0 ? sk : null,
+        ActionCategories = cat.Count > 0 ? cat : null,
+        Statuses = st.Count > 0 ? st : null,
+    };
+    using var w = new StreamWriter(outTsv);
+    w.WriteLine("swingType\tcrit\tdamage\tspecial\tattackType\tattacker\tdamageType\tvictim\ttime");
+    long n = 0;
+    foreach (var a in p.Process(ReadLinesShared(logPath)))
+    {
+        var iso = new DateTime(p.CurrentLineTicks, DateTimeKind.Utc).ToString("o", CultureInfo.InvariantCulture);
+        w.WriteLine(string.Join('\t', a.SwingType, a.IsCritical ? "1" : "0", a.Amount,
+            a.Special, a.AttackType, a.Attacker, a.DamageType, a.Victim, iso));
+        n++;
+    }
+    Console.WriteLine($"timed: wrote {n} swings -> {outTsv}");
 }
 
 static void WriteOurs(string path, List<CombatAction> actions)

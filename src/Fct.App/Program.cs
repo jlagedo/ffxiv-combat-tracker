@@ -62,8 +62,12 @@ class Program
         builder.Logging.ClearProviders();
         builder.Services.AddSerilog(Log.Logger, dispose: false);
 
+        builder.Services.AddSingleton<SatelliteHost>();
         builder.Services.AddSingleton<MainViewModel>();
         builder.Services.AddSingleton<MainWindow>();
+
+        // Gracefully de-init the satellite's plugins on host shutdown (persists their state).
+        builder.Services.AddHostedService<SatelliteLifetime>();
 
         return builder.Build();
     }

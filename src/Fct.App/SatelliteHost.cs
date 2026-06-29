@@ -10,7 +10,7 @@ using Microsoft.Extensions.Logging;
 
 namespace Fct.App;
 
-internal sealed class SatellitePlugin
+public sealed class SatellitePlugin
 {
     public string Key = "";
     public string Title = "";
@@ -18,7 +18,7 @@ internal sealed class SatellitePlugin
     public IntPtr Hwnd = IntPtr.Zero;
 }
 
-internal sealed class SatelliteStartResult
+public sealed class SatelliteStartResult
 {
     public string Handshake = "";
     public IntPtr WindowHandle = IntPtr.Zero;
@@ -30,7 +30,7 @@ internal sealed class SatelliteStartResult
 // open for the host lifetime and becomes the live log channel: after startup the satellite
 // forwards its Serilog records as LOG frames, which we re-emit into the host's logging
 // pipeline so the whole stack logs to one place.
-internal sealed class SatelliteHost
+public sealed class SatelliteHost
 {
     // A single kill-on-close job for the host process: any satellite enrolled here (and the CEF
     // subprocesses it spawns) is terminated by the OS when the host exits or is killed, so no
@@ -42,7 +42,8 @@ internal sealed class SatelliteHost
     private readonly ILogger<SatelliteHost> _log;
     private readonly ILogger _satelliteLog;   // category for records forwarded from the satellite
 
-    private NamedPipeServerStream? _server;
+    private NamedPipeServerStream? _server;     // satellite -> host: handshake + forwarded logs
+    private EventWaitHandle? _shutdownEvent;    // host -> satellite: graceful-shutdown signal
     public Process? Process { get; private set; }
 
     public SatelliteHost(ILoggerFactory loggerFactory)
@@ -64,6 +65,11 @@ internal sealed class SatelliteHost
 
         _server = new NamedPipeServerStream(
             pipeName, PipeDirection.In, 1, PipeTransmissionMode.Byte, PipeOptions.Asynchronous);
+
+        // Cross-process graceful-shutdown signal. A named event (not a second pipe) avoids any
+        // connection rendezvous or stream contention — it is one bit the satellite waits on. Created
+        // before launch so the satellite always finds it; the satellite opens the same name.
+        _shutdownEvent = new EventWaitHandle(false, EventResetMode.ManualReset, pipeName + "-shutdown");
 
         _log.LogInformation(LogEvents.SatelliteLaunching, "Launching satellite {Exe} on bridge {Pipe}", exe, pipeName);
         Process = Process.Start(new ProcessStartInfo
@@ -174,6 +180,49 @@ internal sealed class SatelliteHost
         catch (Exception ex)
         {
             _log.LogWarning(LogEvents.BridgeReaderStopped, ex, "Bridge reader faulted");
+        }
+    }
+
+    // Ask the satellite to drain its plugins (DeInitPlugin -> each plugin saves its state) and
+    // exit cleanly, then wait for it to do so. Process exit is the completion signal: the
+    // satellite runs the deinit loop synchronously before Application.Exit(), so once the process
+    // is gone the plugins have persisted. On timeout we return and let the kill-on-close job reap
+    // the (still-running) satellite at host exit, as before — state may be lost in that case, but
+    // the host is not blocked. Idempotent and safe if the satellite never started.
+    public async Task ShutdownAsync(TimeSpan timeout)
+    {
+        var process = Process;
+        if (process is null || _shutdownEvent is null) return;
+        try { if (process.HasExited) return; } catch { return; }
+
+        _log.LogInformation(LogEvents.SatelliteShutdownRequested,
+            "Requesting graceful satellite shutdown (pid {Pid}, timeout {Timeout:0.#}s)",
+            SafePid(process), timeout.TotalSeconds);
+        try
+        {
+            _shutdownEvent.Set();
+        }
+        catch (Exception ex)
+        {
+            _log.LogWarning(LogEvents.SatelliteShutdownTimeout, ex,
+                "Could not signal SHUTDOWN to satellite; leaving it for the kill-on-close job");
+            return;
+        }
+
+        try
+        {
+            using var cts = new CancellationTokenSource(timeout);
+            await process.WaitForExitAsync(cts.Token).ConfigureAwait(false);
+        }
+        catch (OperationCanceledException)
+        {
+            _log.LogWarning(LogEvents.SatelliteShutdownTimeout,
+                "Satellite did not exit within {Timeout:0.#}s of SHUTDOWN; the kill-on-close job will reap it",
+                timeout.TotalSeconds);
+        }
+        catch (Exception ex)
+        {
+            _log.LogWarning(LogEvents.SatelliteShutdownTimeout, ex, "Waiting for satellite exit faulted");
         }
     }
 

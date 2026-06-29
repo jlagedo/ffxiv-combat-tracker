@@ -51,7 +51,7 @@ if (-not $SkipOracle) {
     Write-Host "oracle exit=$($p.ExitCode)"
     Get-Content "$OutFolder\_mass-oracle.log" -Tail 6 -ErrorAction SilentlyContinue
 
-    Write-Host "==> dumping game-data tables (action categories, status names, DoT/shield defs)" -ForegroundColor Cyan
+    Write-Host "==> dumping game-data tables (action categories, status names)" -ForegroundColor Cyan
     $d = New-Object System.Diagnostics.Process
     $d.StartInfo.FileName = $satellite
     $d.StartInfo.UseShellExecute = $false
