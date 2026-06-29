@@ -58,7 +58,7 @@
             <SolidColorBrush x:Key="ToggleSwitchKnobFillOnPressed" Color="{StaticResource AbyssColor}"/>
 
             <conv:StatusToBrushConverter x:Key="StatusToBrush"/>
-            <conv:StringEqualsConverter x:Key="StringEquals"/>
+            <conv:EnumEqualsConverter x:Key="EnumEquals"/>
             <conv:InverseBoolConverter x:Key="InverseBool"/>
         </ResourceDictionary>
     </Application.Resources>

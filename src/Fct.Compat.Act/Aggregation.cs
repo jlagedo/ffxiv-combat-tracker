@@ -526,6 +526,23 @@ namespace Advanced_Combat_Tracker
         public long Healed => GetAllies().Sum(c => c.Healed);
         public int AlliedKills => GetAllies().Sum(c => c.Kills);
         public int AlliedDeaths => GetAllies().Sum(c => c.Deaths);
+        // Encounter-level rollups: ACT's EncounterFormatSwitch sums each CombatantData field over the
+        // allied party, exactly as these getters do. Surfaced for the ExportVariables encounter keys
+        // OverlayPlugin reads (the cactbot "Encounter" object) and for live consumers.
+        public int Hits => GetAllies().Sum(c => c.Hits);
+        public int CritHits => GetAllies().Sum(c => c.CritHits);
+        public int Misses => GetAllies().Sum(c => c.Misses);
+        public int Swings => GetAllies().Sum(c => c.Swings);
+        public int Blocked => GetAllies().Sum(c => c.Blocked);
+        public int Heals => GetAllies().Sum(c => c.Heals);
+        public int CritHeals => GetAllies().Sum(c => c.CritHeals);
+        public int CureDispels => GetAllies().Sum(c => c.CureDispels);
+        public long DamageTaken => GetAllies().Sum(c => c.DamageTaken);
+        public long HealsTaken => GetAllies().Sum(c => c.HealsTaken);
+        public long PowerDamage => GetAllies().Sum(c => c.PowerDamage);
+        public long PowerReplenish => GetAllies().Sum(c => c.PowerReplenish);
+        public int Kills => AlliedKills;
+        public int Deaths => AlliedDeaths;
         public double DPS => Duration.TotalSeconds > 0 ? (double)Damage / Duration.TotalSeconds : 0.0;
         public int NumCombatants => combatants.Count;
         public int NumAllies => GetAllies().Count;
@@ -538,8 +555,37 @@ namespace Advanced_Combat_Tracker
             if (StartTimes.Count > EndTimes.Count) EndTimes.Add(EndTime > DateTime.MinValue ? EndTime : DateTime.Now);
         }
 
-        public string GetMaxHit(bool showType = true, bool useSuffix = true) => "";
-        public string GetMaxHeal(bool showType = true, bool countWards = true, bool useSuffix = true) => "";
+        public string GetMaxHit(bool showType = true, bool useSuffix = true)
+            => MaxSwingAcrossAllies(CombatantData.DamageTypeDataOutgoingDamage, showType, useSuffix, true);
+        public string GetMaxHeal(bool showType = true, bool countWards = true, bool useSuffix = true)
+            => MaxSwingAcrossAllies(CombatantData.DamageTypeDataOutgoingHealing, showType, useSuffix, countWards);
+
+        // ACT's "Absorption" term: GetMaxHeal excludes ward-absorb swings when CountWards is false.
+        private const string WardAbsorbDamageType = "Absorption";
+
+        // ACT's encounter max-swing (EncounterData.GetMaxHit/GetMaxHeal): the single highest swing
+        // across all allies in the given bucket, rendered "{owner}-{attackType}-{dmg}" (ShowType) or
+        // "{owner}-{dmg}", empty when none. UseDecimals follows ShowType; the first swing seen seeds
+        // the max (so an all-miss bucket still reports its first swing) — matching ACT bit-for-bit.
+        private string MaxSwingAcrossAllies(string bucket, bool showType, bool useSuffix, bool countWards)
+        {
+            MasterSwing max = null;
+            string owner = string.Empty;
+            foreach (var cd in GetAllies())
+            {
+                var at = cd.GetAttackType("All", bucket);
+                if (at == null) continue;
+                foreach (var s in at.Items)
+                {
+                    if (!countWards && s.DamageType == WardAbsorbDamageType) continue;
+                    if (max == null || (long)s.Damage > (long)max.Damage) { max = s; owner = cd.Name; }
+                }
+            }
+            if (max == null) return string.Empty;
+            var cds = ActGlobals.oFormActMain.CreateDamageString((long)max.Damage, useSuffix, showType);
+            return showType ? $"{owner}-{max.AttackType}-{cds}" : $"{owner}-{cds}";
+        }
+
         public override string ToString() => $"{Title} - [{DurationS}]";
     }
 }

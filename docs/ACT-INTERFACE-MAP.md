@@ -10,9 +10,9 @@ layer, Discord audio bridge) are the last sections.
 This document is the authority for the **surface/binding axis** (making the unmodified plugins load
 and run). Companion docs:
 - [`DATA-FLOW.md`](DATA-FLOW.md) — the data-flow narrative through the upstream stack.
-- [`ACT-OUTPUT-PARITY-GAPS.md`](ACT-OUTPUT-PARITY-GAPS.md) — the independent **output-value axis**:
-  the native parser's per-combatant damage/healed vs ACT's output (the parser emits DoT/HoT from the
-  log's own per-tick values; the plugin's `(*)` potency estimate and damage shields are the residual).
+- [`TESTING.md`](TESTING.md) — the **output-value axis**: our ACT engine's `ExportVariables` held to
+  the real ACT binary, both fed the same plugin-produced swings (`AggregateCompatTests`/
+  `ExportVarsCompatTests` on fixtures; `tools/mass-compare` corpus-wide).
 
 ## Status legend
 
@@ -147,9 +147,9 @@ model so the rollup exposes the FFXIV columns + the `ExportVariables` keys OP la
 | ✅ | `ActLocalization.LocalizationStrings["attackTypeTerm-all"]` | FFXIV | localized "All" bucket key |
 
 **Strategy.** Done — verified bit-for-bit on captured combat (`Aggregation.cs` + `CombatTables.cs`;
-Slice 1 S5; TESTING.md "Differential ACT-engine compat"). The per-combatant DoT/HoT/shield output gap
-(the plugin's `(*)` potency estimate and damage shields) is the separate value axis in
-[`ACT-OUTPUT-PARITY-GAPS.md`](ACT-OUTPUT-PARITY-GAPS.md) — not an interface concern.
+Slice 1 S5; TESTING.md "Differential ACT-engine compat"), and corpus-wide by `tools/mass-compare`
+(our engine vs real ACT, identical plugin swings). DoT/HoT/shield *values* are the plugin's synthesis,
+baked into the swings both engines receive — not an interface concern.
 
 ## 3. Inbound log seam — ✅ DONE (🟡 1 VERIFY)
 

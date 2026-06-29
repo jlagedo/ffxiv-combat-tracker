@@ -1,287 +1,149 @@
 using System.Globalization;
 using System.Text;
-using Fct.Parser.Native;
 
-// Mass parse-compat run: diff our clean-room native parser against ACT's authoritative parse
-// (captured by the satellite's --mass-oracle) over a whole folder of decoded Network_*.log files.
+// Corpus-scale ACT-engine parity diff. The real FFXIV_ACT_Plugin (the sole parser) has already
+// turned every Network_*.log into a MasterSwing stream (<name>.oracle.tsv, via the satellite's
+// --mass-oracle). Those SAME swings are then aggregated two ways:
+//   * real ACT engine  (tools/act-oracle)              -> <name>.oracle.exports.tsv   [baseline]
+//   * our Fct.Compat.Act engine (--mass-engine-exports) -> <name>.engine.exports.tsv  [under test]
+// This tool joins the two ExportVariables payloads per file, per combatant, per key, and reports how
+// often our engine's string matches real ACT exactly. It is the corpus version of
+// Fct.Compat.Act.Tests/ExportVarsCompatTests — the actual overlay drop-in contract, end to end.
 //
-//   MassCompare <logFolder> <oracleFolder> <outFolder>
-//
-// For each Network_*.log (chronological, one parser instance so name/combat state carries across
-// day-boundary rotations exactly as the oracle saw it) we write <name>.ours.tsv and bag-diff
-// EVERY swing against <name>.oracle.tsv using the full MasterSwing tuple
-// (swingType, crit, amount, special, attackType, attacker, damageType, victim). The headline is
-// total swings reproduced; a per-swingType table shows exactly which categories still diverge.
+//   MassCompare <folder>
 
-// Timed single-log emit: write our parser's swings WITH a timestamp column (ISO 8601, col 8) in
-// the exact format the net48 ActOracle harness consumes, so our swing stream can be aggregated
-// through the REAL ACT EncounterData/CombatantData engine for a DPS-output diff against ACT's own
-// (plugin) swings run through the same engine.
-//   MassCompare --timed <logPath> <oracleFolder> <outTsv>
-if (args.Length >= 1 && args[0] == "--timed")
+if (args.Length < 1)
 {
-    if (args.Length < 4) { Console.Error.WriteLine("usage: MassCompare --timed <logPath> <oracleFolder> <outTsv>"); return 2; }
-    RunTimed(args[1], args[2], args[3]);
-    return 0;
-}
-
-if (args.Length < 3)
-{
-    Console.Error.WriteLine("usage: MassCompare <logFolder> <oracleFolder> <outFolder>");
+    Console.Error.WriteLine("usage: MassCompare <folder>");
     return 2;
 }
+return ExportsDiff(args[0]);
 
-string logFolder = args[0], oracleFolder = args[1], outFolder = args[2];
-Directory.CreateDirectory(outFolder);
-
-// actions.full.tsv (id, name, category) supersedes skills.full.tsv; fall back if absent.
-var (skills, categories) = LoadActions(Path.Combine(oracleFolder, "actions.full.tsv"));
-if (skills.Count == 0) skills = LoadSkills(Path.Combine(oracleFolder, "skills.full.tsv"));
-var statuses = LoadStatuses(Path.Combine(oracleFolder, "statuses.full.tsv"));
-Console.WriteLine($"skills: {skills.Count}  categories: {categories.Count}  statuses: {statuses.Count}");
-
-// One parser instance: combatant-name and combat state persist across files, matching the
-// oracle's single continuous plugin session.
-var parser = new CombatLogParser
+// Compare our-engine vs real-ACT ExportVariables per file, per combatant, per key.
+static int ExportsDiff(string folder)
 {
-    Skills = skills.Count > 0 ? skills : null,
-    ActionCategories = categories.Count > 0 ? categories : null,
-    Statuses = statuses.Count > 0 ? statuses : null,
-};
-
-var files = Directory.GetFiles(logFolder, "Network_*.log")
-                     .OrderBy(f => Path.GetFileName(f), StringComparer.Ordinal).ToArray();
-Console.WriteLine($"files: {files.Length}");
-
-var report = new StringBuilder();
-report.AppendLine(string.Join('\t', "file", "oracle", "ours", "missing", "extra"));
-var details = new StringBuilder();
-
-long tOracle = 0, tOurs = 0, tMissing = 0, tExtra = 0;
-int filesPerfect = 0, filesWithOracle = 0;
-
-// Per-swingType accounting: oracle count, ours count, and the missing/extra attributable to it.
-var byType = new SortedDictionary<int, long[]>(); // [oracle, ours, missing, extra]
-long[] Slot(int t) => byType.TryGetValue(t, out var a) ? a : (byType[t] = new long[4]);
-var sampleByType = new Dictionary<int, List<string>>();
-
-foreach (var file in files)
-{
-    string name = Path.GetFileNameWithoutExtension(file);
-    var ours = parser.Process(ReadLinesShared(file)).ToList();
-    WriteOurs(Path.Combine(outFolder, name + ".ours.tsv"), ours);
-
-    string oraclePath = Path.Combine(oracleFolder, name + ".oracle.tsv");
-    if (!File.Exists(oraclePath))
+    var baselineFiles = Directory.GetFiles(folder, "*.oracle.exports.tsv")
+                                 .OrderBy(f => Path.GetFileName(f), StringComparer.Ordinal).ToArray();
+    // per key: [comparedPairs, exactMatches, numericPairs]; numeric sums kept separately.
+    var keyStats = new SortedDictionary<string, long[]>(StringComparer.Ordinal);
+    var keyNum = new Dictionary<string, double[]>();          // key -> [baselineSum, oursSum]
+    var keySamples = new Dictionary<string, List<string>>();
+    long[] KS(string k) => keyStats.TryGetValue(k, out var a) ? a : (keyStats[k] = new long[3]);
+    double[] KN(string k) => keyNum.TryGetValue(k, out var a) ? a : (keyNum[k] = new double[2]);
+    void Sample(string k, string s)
     {
-        report.AppendLine($"{name}\t(no oracle)\t{ours.Count}");
-        Console.WriteLine($"{name}: no oracle tsv, skipped diff");
-        continue;
-    }
-    filesWithOracle++;
-
-    var oracle = ReadOracle(oraclePath);
-    var oursRows = ours.Select(ToRow);
-
-    foreach (var r in oracle) Slot(r.SwingType)[0]++;
-    foreach (var r in oursRows) Slot(r.SwingType)[1]++;
-
-    var (missing, extra) = BagDiff(oursRows, oracle);
-    foreach (var r in missing) { Slot(r.SwingType)[2]++; Sample(sampleByType, r, "MISS"); }
-    foreach (var r in extra) { Slot(r.SwingType)[3]++; Sample(sampleByType, r, "EXTRA"); }
-
-    int oc = oracle.Count, uc = ours.Count;
-    report.AppendLine(string.Join('\t', name, oc, uc, missing.Count, extra.Count));
-    tOracle += oc; tOurs += uc; tMissing += missing.Count; tExtra += extra.Count;
-    if (missing.Count == 0 && extra.Count == 0) filesPerfect++;
-
-    if (missing.Count > 0 || extra.Count > 0)
-    {
-        details.AppendLine($"== {name} ==  missing={missing.Count} extra={extra.Count}");
-        SampleFile(details, "MISSING (in ACT, not ours)", missing);
-        SampleFile(details, "EXTRA (ours, not ACT)", extra);
+        var l = keySamples.TryGetValue(k, out var x) ? x : (keySamples[k] = new List<string>());
+        if (l.Count < 12) l.Add(s);
     }
 
-    Console.WriteLine($"{name}: oracle={oc} ours={uc} miss={missing.Count} extra={extra.Count}");
-}
+    int filesCompared = 0, combatBoth = 0, combatOnlyBaseline = 0, combatOnlyOurs = 0;
+    long totalPairs = 0, totalExact = 0;
 
-File.WriteAllText(Path.Combine(outFolder, "report.tsv"), report.ToString());
-File.WriteAllText(Path.Combine(outFolder, "details.txt"), details.ToString());
-
-var summary = new StringBuilder();
-void S(string s) { summary.AppendLine(s); Console.WriteLine(s); }
-S("");
-S("==================== MASS PARSE COMPAT SUMMARY ====================");
-S($"files compared (with oracle): {filesWithOracle}/{files.Length}");
-S($"files BIT-PERFECT (all swing types): {filesPerfect}/{filesWithOracle}");
-S($"total swings   ACT={tOracle:N0}  ours={tOurs:N0}  missing={tMissing:N0}  extra={tExtra:N0}");
-double pct = tOracle == 0 ? 100 : 100.0 * (tOracle - tMissing) / tOracle;
-S($"TOTAL reproduced: {pct:0.0000}% of ACT's swings  (extras: {tExtra:N0})");
-S("");
-S("per-swingType  [oracle  ours  missing  extra  reproduced%]");
-foreach (var kv in byType)
-{
-    var a = kv.Value;
-    double p = a[0] == 0 ? 100 : 100.0 * (a[0] - a[2]) / a[0];
-    S($"  type {kv.Key,2} [{SwingName(kv.Key),12}]  o={a[0],10:N0}  u={a[1],10:N0}  miss={a[2],8:N0}  extra={a[3],8:N0}  {p,8:0.000}%");
-}
-S("==================================================================");
-File.WriteAllText(Path.Combine(outFolder, "summary.txt"), summary.ToString());
-
-// per-type sample dump for diagnosis
-var stb = new StringBuilder();
-foreach (var kv in sampleByType.OrderBy(k => k.Key))
-{
-    stb.AppendLine($"== type {kv.Key} ({SwingName(kv.Key)}) ==");
-    foreach (var s in kv.Value.Take(40)) stb.AppendLine("  " + s);
-}
-File.WriteAllText(Path.Combine(outFolder, "type-samples.txt"), stb.ToString());
-
-return (tMissing == 0 && tExtra == 0) ? 0 : 1;
-
-// ---- helpers ----
-
-// Read with FileShare.ReadWrite so a log the game is still writing to (the live file) doesn't
-// lock us out — we just read what's there.
-static IEnumerable<string> ReadLinesShared(string path)
-{
-    using var fs = new FileStream(path, FileMode.Open, FileAccess.Read, FileShare.ReadWrite);
-    using var sr = new StreamReader(fs);
-    string? l;
-    while ((l = sr.ReadLine()) != null) yield return l;
-}
-
-static Row ToRow(CombatAction a) => new(a.SwingType, a.IsCritical, a.Amount, a.Special ?? "",
-    a.AttackType ?? "", a.Attacker ?? "", a.DamageType ?? "", a.Victim ?? "");
-
-static Dictionary<uint, string> LoadSkills(string path)
-{
-    var map = new Dictionary<uint, string>();
-    if (!File.Exists(path)) return map;
-    foreach (var line in File.ReadLines(path).Skip(1))
+    foreach (var bf in baselineFiles)
     {
-        var c = line.Split('\t');
-        if (c.Length >= 2 && uint.TryParse(c[0], NumberStyles.HexNumber, CultureInfo.InvariantCulture, out var id))
-            map[id] = c[1];
-    }
-    return map;
-}
+        string baseName = Path.GetFileName(bf);
+        baseName = baseName.Substring(0, baseName.Length - ".oracle.exports.tsv".Length);
+        string of = Path.Combine(folder, baseName + ".engine.exports.tsv");
+        if (!File.Exists(of)) continue;
+        filesCompared++;
 
-static (Dictionary<uint, string> names, Dictionary<uint, string> categories) LoadActions(string path)
-{
-    var names = new Dictionary<uint, string>();
-    var cats = new Dictionary<uint, string>();
-    if (!File.Exists(path)) return (names, cats);
-    foreach (var line in File.ReadLines(path).Skip(1))
-    {
-        var c = line.Split('\t');
-        if (c.Length >= 3 && uint.TryParse(c[0], NumberStyles.HexNumber, CultureInfo.InvariantCulture, out var id))
+        var b = ReadExports(bf);   // real ACT
+        var o = ReadExports(of);   // our engine
+
+        foreach (var name in b.Keys.Union(o.Keys))
         {
-            names[id] = c[1];
-            if (c[2].Length > 0) cats[id] = c[2];
+            bool inB = b.TryGetValue(name, out var bk), inO = o.TryGetValue(name, out var ok);
+            if (inB && inO) combatBoth++;
+            else if (inB) { combatOnlyBaseline++; continue; }  // real ACT shows a row we never emit
+            else { combatOnlyOurs++; continue; }               // we emit a row real ACT never had
+
+            foreach (var key in bk!.Keys.Union(ok!.Keys))
+            {
+                bk.TryGetValue(key, out var bv);
+                ok.TryGetValue(key, out var ov);
+                var a = KS(key); a[0]++; totalPairs++;
+                bool exact = bv != null && ov != null && bv == ov;
+                if (exact) { a[1]++; totalExact++; }
+                else Sample(key, $"{baseName}/{name}: act={bv ?? "<none>"} ours={ov ?? "<none>"}");
+
+                if (bv != null && ov != null && TryNum(bv, out var bd) && TryNum(ov, out var od2))
+                {
+                    a[2]++; var n = KN(key); n[0] += bd; n[1] += od2;
+                }
+            }
         }
     }
-    return (names, cats);
+
+    var sb = new StringBuilder();
+    void S(string s) { sb.AppendLine(s); Console.WriteLine(s); }
+    S("");
+    S("======== ACT-ENGINE PARITY (ExportVariables) — OURS vs REAL ACT ========");
+    S("identical plugin swings into both engines; per file, per combatant, per key");
+    S($"files compared: {filesCompared}");
+    S($"combatant rows: matched={combatBoth}  act-only={combatOnlyBaseline}  ours-only={combatOnlyOurs}");
+    double tp = totalPairs == 0 ? 100 : 100.0 * totalExact / totalPairs;
+    S($"key/value pairs: {totalPairs:N0}  exact string match: {totalExact:N0}  ({tp:0.000}%)");
+    S("");
+    S("per-key  [pairs  exact  exact%   numericΣact  numericΣours  ratio%]");
+    foreach (var kv in keyStats.OrderBy(k => (double)k.Value[1] / Math.Max(1, k.Value[0])).ThenBy(k => k.Key, StringComparer.Ordinal))
+    {
+        var a = kv.Value;
+        double ex = a[0] == 0 ? 100 : 100.0 * a[1] / a[0];
+        string numCol = "";
+        if (keyNum.TryGetValue(kv.Key, out var n) && a[2] > 0)
+        {
+            double ratio = n[0] == 0 ? (n[1] == 0 ? 100 : double.PositiveInfinity) : 100.0 * n[1] / n[0];
+            numCol = $"   Σact={n[0],16:N0}  Σours={n[1],16:N0}  {ratio,8:0.000}%";
+        }
+        S($"  {kv.Key,-16} {a[0],7:N0} {a[1],7:N0} {ex,8:0.00}%{numCol}");
+    }
+    S("=======================================================================");
+    File.WriteAllText(Path.Combine(folder, "exports-summary.txt"), sb.ToString());
+
+    var db = new StringBuilder();
+    foreach (var kv in keySamples.OrderBy(k => k.Key, StringComparer.Ordinal))
+    {
+        db.AppendLine($"== {kv.Key} ==");
+        foreach (var s in kv.Value) db.AppendLine("  " + s);
+    }
+    File.WriteAllText(Path.Combine(folder, "exports-diff.txt"), db.ToString());
+    Console.WriteLine($"\nWrote {Path.Combine(folder, "exports-summary.txt")} and exports-diff.txt");
+    return totalExact == totalPairs ? 0 : 1;
 }
 
-static Dictionary<uint, string> LoadStatuses(string path)
+static Dictionary<string, Dictionary<string, string>> ReadExports(string path)
 {
-    var map = new Dictionary<uint, string>();
-    if (!File.Exists(path)) return map;
+    var m = new Dictionary<string, Dictionary<string, string>>(StringComparer.Ordinal);
     foreach (var line in File.ReadLines(path).Skip(1))
     {
         var c = line.Split('\t');
-        if (c.Length >= 2 && uint.TryParse(c[0], NumberStyles.HexNumber, CultureInfo.InvariantCulture, out var id))
-            map[id] = c[1];
+        if (c.Length < 3) continue;
+        var d = m.TryGetValue(c[0], out var x) ? x : (m[c[0]] = new Dictionary<string, string>(StringComparer.Ordinal));
+        d[c[1]] = c[2];
     }
-    return map;
+    return m;
 }
 
-static List<Row> ReadOracle(string path)
+// Parse a leading numeric value (handles trailing %, thousands commas, and k/m/b suffixes ACT's
+// CreateDamageString emits). Returns false for non-numeric strings like "Skill-12345".
+static bool TryNum(string s, out double v)
 {
-    var rows = new List<Row>();
-    foreach (var line in File.ReadLines(path).Skip(1))
-    {
-        var c = line.Split('\t');
-        if (c.Length < 8) continue;
-        rows.Add(new Row(int.Parse(c[0], CultureInfo.InvariantCulture), c[1] == "1",
-            long.Parse(c[2], CultureInfo.InvariantCulture), c[3], c[4], c[5], c[6], c[7]));
-    }
-    return rows;
-}
-
-// Emit one log's swings with a per-swing timestamp (read from parser.CurrentLineTicks right after
-// each yield — stable for the duration of one line's swings) in ActOracle's 9-column format.
-static void RunTimed(string logPath, string oracleFolder, string outTsv)
-{
-    var (sk, cat) = LoadActions(Path.Combine(oracleFolder, "actions.full.tsv"));
-    if (sk.Count == 0) sk = LoadSkills(Path.Combine(oracleFolder, "skills.full.tsv"));
-    var st = LoadStatuses(Path.Combine(oracleFolder, "statuses.full.tsv"));
-    Console.WriteLine($"skills: {sk.Count}  categories: {cat.Count}  statuses: {st.Count}");
-    var p = new CombatLogParser
-    {
-        Skills = sk.Count > 0 ? sk : null,
-        ActionCategories = cat.Count > 0 ? cat : null,
-        Statuses = st.Count > 0 ? st : null,
-    };
-    using var w = new StreamWriter(outTsv);
-    w.WriteLine("swingType\tcrit\tdamage\tspecial\tattackType\tattacker\tdamageType\tvictim\ttime");
-    long n = 0;
-    foreach (var a in p.Process(ReadLinesShared(logPath)))
-    {
-        var iso = new DateTime(p.CurrentLineTicks, DateTimeKind.Utc).ToString("o", CultureInfo.InvariantCulture);
-        w.WriteLine(string.Join('\t', a.SwingType, a.IsCritical ? "1" : "0", a.Amount,
-            a.Special, a.AttackType, a.Attacker, a.DamageType, a.Victim, iso));
-        n++;
-    }
-    Console.WriteLine($"timed: wrote {n} swings -> {outTsv}");
-}
-
-static void WriteOurs(string path, List<CombatAction> actions)
-{
-    using var w = new StreamWriter(path);
-    w.WriteLine("swingType\tcrit\tamount\tspecial\tattackType\tattacker\tdamageType\tvictim");
-    foreach (var a in actions)
-        w.WriteLine(string.Join('\t', a.SwingType, a.IsCritical ? "1" : "0", a.Amount,
-            a.Special, a.AttackType, a.Attacker, a.DamageType, a.Victim));
-}
-
-static (List<Row> missing, List<Row> extra) BagDiff(IEnumerable<Row> ours, IEnumerable<Row> oracle)
-{
-    var a = new Dictionary<Row, int>();
-    var b = new Dictionary<Row, int>();
-    foreach (var x in ours) a[x] = a.GetValueOrDefault(x) + 1;
-    foreach (var x in oracle) b[x] = b.GetValueOrDefault(x) + 1;
-    var missing = new List<Row>();
-    var extra = new List<Row>();
-    foreach (var kv in b) for (int i = 0; i < kv.Value - a.GetValueOrDefault(kv.Key); i++) missing.Add(kv.Key);
-    foreach (var kv in a) for (int i = 0; i < kv.Value - b.GetValueOrDefault(kv.Key); i++) extra.Add(kv.Key);
-    return (missing, extra);
-}
-
-static void Sample(Dictionary<int, List<string>> store, Row r, string tag)
-{
-    var list = store.TryGetValue(r.SwingType, out var l) ? l : (store[r.SwingType] = new());
-    if (list.Count < 40) list.Add($"[{tag}] {r}");
-}
-
-static void SampleFile(StringBuilder sb, string label, List<Row> items)
-{
-    if (items.Count == 0) return;
-    sb.AppendLine($"  {label}: {items.Count}");
-    foreach (var s in items.Take(12)) sb.AppendLine("    " + s);
-}
-
-static string SwingName(int t) => t switch
-{
-    0 => "auto", 1 => "action", 2 => "ability", 3 => "DoT", 4 => "heal", 5 => "HoT",
-    6 => "powerDrain", 7 => "powerHeal", 8 => "status", 9 => "dispel", 10 => "threat",
-    11 => "shield", _ => "?",
-};
-
-readonly record struct Row(int SwingType, bool Crit, long Amount,
-    string Special, string AttackType, string Attacker, string DamageType, string Victim)
-{
-    public override string ToString() =>
-        $"t{SwingType} {(Crit ? "C" : " ")} {Amount,8} {Special,-10} {AttackType,-22} {Attacker,-18} {DamageType,-12} -> {Victim}";
+    v = 0;
+    if (string.IsNullOrEmpty(s)) return false;
+    s = s.Trim();
+    if (s.Length == 0) return false;
+    if (s.EndsWith("%")) s = s[..^1];
+    if (s.Length == 0) return false;
+    double mult = 1;
+    char last = char.ToLowerInvariant(s[^1]);
+    if (last == 'k') { mult = 1e3; s = s[..^1]; }
+    else if (last == 'm') { mult = 1e6; s = s[..^1]; }
+    else if (last == 'b') { mult = 1e9; s = s[..^1]; }
+    s = s.Replace(",", "");
+    // NumberStyles.Any parses "NaN"/"Infinity" (literal strings ACT emits for 0/0 DPS on a
+    // zero-duration combatant) as non-finite doubles — exclude them so they don't poison the sums.
+    if (double.TryParse(s, NumberStyles.Any, CultureInfo.InvariantCulture, out v) && double.IsFinite(v))
+    { v *= mult; return true; }
+    v = 0;
+    return false;
 }

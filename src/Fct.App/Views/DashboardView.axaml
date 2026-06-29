@@ -1,0 +1,57 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:vm="using:Fct.App.ViewModels"
+             xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+             xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+             mc:Ignorable="d" d:DesignWidth="820" d:DesignHeight="620"
+             x:Class="Fct.App.Views.DashboardView"
+             x:DataType="vm:DashboardViewModel">
+
+    <ScrollViewer>
+        <StackPanel Spacing="18">
+            <Grid ColumnDefinitions="*,16,*,16,*,16,*">
+                <Border Grid.Column="0" Classes="card" Padding="18,16">
+                    <StackPanel Spacing="7">
+                        <TextBlock Text="HOST" Classes="eyebrow"/>
+                        <TextBlock Text=".NET 10" Classes="h2" FontSize="24"/>
+                        <TextBlock Text="Avalonia shell" Classes="meta" FontSize="11"/>
+                    </StackPanel>
+                </Border>
+                <Border Grid.Column="2" Classes="card" Padding="18,16">
+                    <StackPanel Spacing="7">
+                        <TextBlock Text="SATELLITE" Classes="eyebrow"/>
+                        <TextBlock Text="{Binding Shell.SatelliteState}" Classes="h2" FontSize="24"
+                                   Foreground="{Binding Shell.SatelliteState, Converter={StaticResource StatusToBrush}}"/>
+                        <TextBlock Text="{Binding Shell.SatelliteSummary}" Classes="meta" FontSize="11"
+                                   TextTrimming="CharacterEllipsis"/>
+                    </StackPanel>
+                </Border>
+                <Border Grid.Column="4" Classes="card" Padding="18,16">
+                    <StackPanel Spacing="7">
+                        <TextBlock Text="PLUGINS" Classes="eyebrow"/>
+                        <TextBlock Text="{Binding Shell.LoadedCount}" Classes="h2" FontSize="24"/>
+                        <TextBlock Text="{Binding Shell.LoadedSummary}" Classes="meta" FontSize="11"/>
+                    </StackPanel>
+                </Border>
+                <Border Grid.Column="6" Classes="card" Padding="18,16">
+                    <StackPanel Spacing="7">
+                        <TextBlock Text="DATA SOURCE" Classes="eyebrow"/>
+                        <TextBlock Text="{Binding Shell.SelectedPlugin.StatusLabel}" Classes="h2" FontSize="24"/>
+                        <TextBlock Text="FFXIV_ACT_Plugin" Classes="meta" FontSize="11"/>
+                    </StackPanel>
+                </Border>
+            </Grid>
+
+            <Border Classes="card" Padding="26,24">
+                <StackPanel Spacing="14">
+                    <TextBlock Text="Welcome to the host" Classes="h2"/>
+                    <Border Classes="rule" Width="64" HorizontalAlignment="Left"/>
+                    <TextBlock Classes="body" MaxWidth="720" HorizontalAlignment="Left"
+                               Text="The host runs the legacy plugin ecosystem unmodified — FFXIV_ACT_Plugin, OverlayPlugin, Triggernometry, and Discord triggers — inside a .NET Framework 4.8 satellite, while the shell you're looking at runs on .NET 10. Head to Plugins to enable each one and open its configuration in place."/>
+                    <Button Classes="ghost" Content="Configure plugins" HorizontalAlignment="Left"
+                            Command="{Binding Shell.SelectPageCommand}" CommandParameter="Plugins"/>
+                </StackPanel>
+            </Border>
+        </StackPanel>
+    </ScrollViewer>
+</UserControl>

@@ -54,13 +54,14 @@ public sealed class StatusToBrushConverter : IValueConverter
             ? b : Brushes.Gray;
 }
 
-// True when the bound string equals the ConverterParameter — drives section visibility.
-public sealed class StringEqualsConverter : IValueConverter
+// True when the bound enum value's name equals the ConverterParameter — drives the nav
+// rail's active styling against MainViewModel.CurrentPage.Section.
+public sealed class EnumEqualsConverter : IValueConverter
 {
-    public static readonly StringEqualsConverter Instance = new();
+    public static readonly EnumEqualsConverter Instance = new();
 
     public object Convert(object? value, Type targetType, object? parameter, CultureInfo culture)
-        => string.Equals(value as string, parameter as string, StringComparison.Ordinal);
+        => string.Equals(value?.ToString(), parameter as string, StringComparison.Ordinal);
 
     public object ConvertBack(object? value, Type targetType, object? parameter, CultureInfo culture)
         => throw new NotSupportedException();

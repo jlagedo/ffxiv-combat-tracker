@@ -40,13 +40,24 @@ namespace Fct.Compat.Act.Tests
                 if (line.StartsWith("name\tkey")) continue;
                 var c = line.Split('\t');
                 string name = c[0], key = c[1], want = c.Length > 2 ? c[2] : "";
-                var cd = enc.GetCombatant(name);
-                if (cd == null) { mismatches.Add($"{name}: combatant missing in ours"); continue; }
-                if (!CombatantData.ExportVariables.TryGetValue(key, out var fmt))
-                    { mismatches.Add($"{name}.{key}: key not registered in ours"); continue; }
                 string got;
-                try { got = fmt.GetExportString(cd, ""); }
-                catch (Exception ex) { mismatches.Add($"{name}.{key}: THREW {ex.GetType().Name}: {ex.Message}"); continue; }
+                if (name == "*ENCOUNTER*")
+                {
+                    // The encounter-level "Encounter" object cactbot reads off EncounterData.ExportVariables.
+                    if (!EncounterData.ExportVariables.TryGetValue(key, out var encFmt))
+                        { mismatches.Add($"*ENCOUNTER*.{key}: key not registered in ours"); continue; }
+                    try { got = encFmt.GetExportString(enc, enc.GetAllies(), ""); }
+                    catch (Exception ex) { mismatches.Add($"*ENCOUNTER*.{key}: THREW {ex.GetType().Name}: {ex.Message}"); continue; }
+                }
+                else
+                {
+                    var cd = enc.GetCombatant(name);
+                    if (cd == null) { mismatches.Add($"{name}: combatant missing in ours"); continue; }
+                    if (!CombatantData.ExportVariables.TryGetValue(key, out var fmt))
+                        { mismatches.Add($"{name}.{key}: key not registered in ours"); continue; }
+                    try { got = fmt.GetExportString(cd, ""); }
+                    catch (Exception ex) { mismatches.Add($"{name}.{key}: THREW {ex.GetType().Name}: {ex.Message}"); continue; }
+                }
                 checked_++;
                 if (got != want) mismatches.Add($"{name}.{key}: ours='{got}' oracle='{want}'");
             }

@@ -35,7 +35,7 @@ namespace Fct.Integration.Tests
             string config = AppContext.BaseDirectory.Contains($"{Path.DirectorySeparatorChar}Release{Path.DirectorySeparatorChar}")
                 ? "Release" : "Debug";
             var exe = Path.Combine(root!, "src", "Fct.App", "bin", config, "net10.0", "satellite", "Fct.LegacyHost.exe");
-            var slice = Path.Combine(root!, "tests", "Fct.Parser.Native.Tests", "fixtures", "combat-slice.log");
+            var slice = Path.Combine(root!, "tests", "Fct.Compat.Act.Tests", "fixtures", "combat-slice.log");
             Skip.IfNot(File.Exists(exe), $"satellite not staged at {exe}");
             Skip.IfNot(File.Exists(slice), $"slice fixture missing at {slice}");
             Skip.IfNot(File.Exists(SatelliteRunFixture.FfxivPluginPath),

@@ -109,7 +109,9 @@ namespace Fct.LegacyHost
             FormActMain.Log = Log;
             var act = new FormActMain();
             ActGlobals.oFormActMain = act;
-            _ = act.Handle; // realize the handle on this (WinForms) thread
+            // Show (off-screen, transparent, non-activating) so Control.Visible is true: the plugin's
+            // ScanMemory/LogOutput threads gate on IsMainFormVisible() before emitting combat data.
+            act.Show();
             return act;
         }
 

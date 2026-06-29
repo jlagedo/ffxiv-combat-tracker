@@ -54,11 +54,10 @@ This is a prototype; the table below reflects what exists in the tree, not a fin
 | `Fct.App` | net10 | Avalonia control panel + shell (MVVM); launches and embeds the satellite. |
 | `Fct.LegacyHost` | net48 | clean-room ACT engine; hosts the real plugins; bridge client. |
 | `Fct.Compat.Act` | net48 | the ACT facade surface — `EncounterData`/`CombatantData` aggregation reproducing real ACT's binary output bit-for-bit on captured combat. |
-| `Fct.Parser.Legacy` | net48 | wraps the real FFXIV_ACT_Plugin; ring-buffered single-dispatch `IDataSubscription`/`IRawPacketSource`. |
-| `Fct.Parser.Native` | net10 | clean-room parser experiment: log-line structure, effect-byte decode, stateful combat parser, and ACT's simulated DoT/HoT/shield amounts. |
+| `Fct.Parser.Legacy` | net48 | wraps the real FFXIV_ACT_Plugin (the sole parser); ring-buffered single-dispatch `IDataSubscription`/`IRawPacketSource`. |
 
-Plus `tools/mass-compare/` — a differential harness comparing the native parser against the
-real-plugin oracle on recorded logs.
+Plus `tools/mass-compare/` — a corpus-scale differential harness holding our ACT engine to the real
+ACT binary, both fed the same plugin-produced swings, on recorded logs.
 
 ## Status
 

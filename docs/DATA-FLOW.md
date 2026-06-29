@@ -271,8 +271,8 @@ damage from raw packets.** Two facts settle ARCHITECTURE open-question #1:
    decode lives in the plugin, not in ACT.**
 
 Consequence for us: we reproduce the *aggregation* and the *event/encounter lifecycle*; we do
-not reimplement damage decode in the ACT layer. (`Fct.Parser.Native`'s `ActionEffectDecoder`
-is the separate, future, opcode-side path — not the ACT engine.)
+not reimplement damage decode at all. Decode is the plugin's job, permanently — reimplementing
+the FFXIV parser natively is an explicit non-goal.
 
 ### 3.3 The hub surface other plugins bind to — `ActGlobals.oFormActMain`
 

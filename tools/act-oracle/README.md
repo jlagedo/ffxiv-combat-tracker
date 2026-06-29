@@ -11,7 +11,7 @@ damage-type routing tables the FFXIV plugin installs at runtime (`ACT_UIMods`), 
 per-combatant + encounter aggregates to a TSV. That TSV is the **gold baseline**.
 
 The input stream is the real plugin's own authoritative parse, captured separately by the
-satellite's `--parse-oracle` mode (`tests/Fct.Parser.Native.Tests/fixtures/combat-slice.oracle.tsv`).
+satellite's `--parse-oracle`/`--mass-oracle` mode (`tests/Fct.Compat.Act.Tests/fixtures/combat-slice.oracle.tsv`).
 So the pipeline under test is end-to-end real:
 
 ```

@@ -122,26 +122,100 @@ internal static class ActOracle
     private static string F(double d) { return d.ToString("0.##", CultureInfo.InvariantCulture); }
     private static string I(long d) { return d.ToString(CultureInfo.InvariantCulture); }
 
+    private static MethodInfo _fmt;
+    private static MethodInfo _encFmt;
+
+    // The ACT-core encounter ExportVariables keys that produce a real value (the cactbot "Encounter"
+    // object). The full registered set minus the control chars (n/t) and the two keys ACT registers
+    // but whose switch echoes their own name (dps-*, DPS-m). Kept identical to
+    // Fct.LegacyHost EngineAggregator.EncounterExportKeys so the two payloads join 1:1 in the diff.
+    private static readonly string[] EncounterKeys =
+    {
+        "title", "duration", "DURATION",
+        "damage", "damage-m", "damage-*", "DAMAGE-k", "DAMAGE-m", "DAMAGE-b", "DAMAGE-*",
+        "dps", "DPS", "DPS-k", "DPS-*", "encdps", "encdps-*", "ENCDPS", "ENCDPS-k", "ENCDPS-m", "ENCDPS-*",
+        "hits", "crithits", "crithit%", "misses", "hitfailed", "swings", "tohit", "TOHIT",
+        "maxhit", "MAXHIT", "maxhit-*", "MAXHIT-*",
+        "healed", "enchps", "enchps-*", "ENCHPS", "ENCHPS-k", "ENCHPS-m", "ENCHPS-*",
+        "heals", "critheals", "critheal%", "cures",
+        "maxheal", "MAXHEAL", "maxhealward", "MAXHEALWARD", "maxheal-*", "MAXHEAL-*", "maxhealward-*", "MAXHEALWARD-*",
+        "damagetaken", "damagetaken-*", "healstaken", "healstaken-*", "powerdrain", "powerdrain-*", "powerheal", "powerheal-*",
+        "kills", "deaths",
+    };
+
+    // One-time ACT setup: the uninitialized FormActMain sink, default English localization, the
+    // FFXIV damage-type routing tables, and the CombatantFormatSwitch handle for ExportVariables.
+    private static void SetupAct()
+    {
+        ActGlobals.oFormActMain = (FormActMain)FormatterServices.GetUninitializedObject(typeof(FormActMain));
+        ActGlobals.charName = "YOU";
+        // The encounter duration/DURATION arms take a wall-clock branch that dereferences the
+        // uninitialized form's LastEstimatedTime (NRE headless). Our facade always renders the
+        // swing-span duration (DurationS); pin ACT to the same non-wall-clock path for a clean,
+        // deterministic baseline.
+        ActGlobals.wallClockDuration = false;
+
+        // Seed ACT's default English localization. Init() clears the table and loads one set
+        // (helpPanel + attackTypeTerm-all, so the merged "All" AttackType bucket is keyed right);
+        // AddPrebuild() loads the disjoint set the aggregation path looks up (data-dnum*,
+        // encounterData-defaultEncounterName for the EncounterData ctor, specialAttackTerm*). BOTH
+        // are required — any missing key makes ACT's localization get_Item warn via NotificationAdd,
+        // which NREs on the uninitialized form. The two key sets are disjoint (no duplicate throw).
+        var loc = typeof(ActGlobals).GetNestedType("ActLocalization");
+        loc.GetMethod("Init", BindingFlags.NonPublic | BindingFlags.Static).Invoke(null, null);
+        loc.GetMethod("AddPrebuild", BindingFlags.NonPublic | BindingFlags.Static).Invoke(null, null);
+
+        RegisterTables();
+        _fmt = typeof(FormActMain).GetMethod("CombatantFormatSwitch",
+            BindingFlags.NonPublic | BindingFlags.Instance);
+        _encFmt = typeof(FormActMain).GetMethod("EncounterFormatSwitch",
+            BindingFlags.NonPublic | BindingFlags.Instance);
+    }
+
     private static void Body(string[] argv)
     {
         try
         {
-            string inTsv = argv[0], outTsv = argv[1];
-            ActGlobals.oFormActMain = (FormActMain)FormatterServices.GetUninitializedObject(typeof(FormActMain));
-            ActGlobals.charName = "YOU";
+            SetupAct();
+            if (argv[0] == "--folder")
+            {
+                // Batch: aggregate every captured plugin swing stream (*.oracle.tsv) through the real
+                // ACT engine and dump each one's ExportVariables to <base>.oracle.exports.tsv — the
+                // baseline our engine's <base>.engine.exports.tsv (satellite --mass-engine-exports) is
+                // diffed against. The glob excludes the *.exports.tsv outputs themselves.
+                string dir = argv[1];
+                var files = new List<string>(Directory.GetFiles(dir, "*.oracle.tsv"));
+                files.Sort(StringComparer.Ordinal);
+                int done = 0;
+                foreach (var f in files)
+                {
+                    string exportsOut = f.Substring(0, f.Length - 4) + ".exports.tsv";
+                    int sw = AggregateAndDump(f, null, exportsOut);
+                    Console.WriteLine("  [" + (++done) + "/" + files.Count + "] " +
+                        Path.GetFileName(f) + " swings=" + sw);
+                }
+                _result = "OK files=" + files.Count;
+            }
+            else
+            {
+                int sw = AggregateAndDump(argv[0], argv[1], argv.Length >= 3 ? argv[2] : null);
+                _result = "OK swings=" + sw;
+            }
+        }
+        catch (Exception ex)
+        {
+            var x = ex;
+            while (x.InnerException != null) x = x.InnerException;
+            _result = "EX=" + x.GetType().FullName + ": " + x.Message + "\n" + x.StackTrace;
+        }
+    }
 
-            // Seed ACT's default English localization. Init() clears the table and loads one set
-            // (helpPanel + attackTypeTerm-all, so the merged "All" AttackType bucket is keyed right);
-            // AddPrebuild() loads the disjoint set the aggregation path looks up (data-dnum*,
-            // encounterData-defaultEncounterName for the EncounterData ctor, specialAttackTerm*). BOTH
-            // are required — any missing key makes ACT's localization get_Item warn via NotificationAdd,
-            // which NREs on the uninitialized form. The two key sets are disjoint (no duplicate throw).
-            var loc = typeof(ActGlobals).GetNestedType("ActLocalization");
-            loc.GetMethod("Init", BindingFlags.NonPublic | BindingFlags.Static).Invoke(null, null);
-            loc.GetMethod("AddPrebuild", BindingFlags.NonPublic | BindingFlags.Static).Invoke(null, null);
-
-            RegisterTables();
-
+    // Replay one 9-col timed swing TSV through a fresh real-ACT encounter; optionally dump the
+    // per-combatant aggregate (aggOut) and the full ExportVariables payload (exportsOut). Returns
+    // the swing count.
+    private static int AggregateAndDump(string inTsv, string outTsv, string exportsOut)
+    {
+        {
             var zone = new ZoneData(DateTime.Now, "", true, false, false);
             var enc = new EncounterData("YOU", "", zone);
             enc.Active = true;
@@ -165,6 +239,7 @@ internal static class ActOracle
                 n++;
             }
 
+            if (outTsv != null)
             using (var w = new StreamWriter(outTsv))
             {
                 w.WriteLine("name\tDamage\tHealed\tDamageTaken\tHealsTaken\tHits\tCritHits\tSwings\tMisses\tCritDamPerc\tCritHealPerc\tHeals\tCritHeals\tEncDPS\tEncHPS\tMaxHit\tDeaths\tKills\tDamagePercent\tHealedPercent\tDurationSec");
@@ -187,40 +262,39 @@ internal static class ActOracle
                     I(enc.NumCombatants), I(enc.NumAllies),
                 }));
             }
-            // Optional: dump the real ACT ExportVariables strings OverlayPlugin/cactbot read. The
-            // ExportVariables formatters are thin wrappers over FormActMain.CombatantFormatSwitch,
-            // which we call directly (the full env-setup method touches UI state and can't run on an
-            // uninitialized form). These are the exact strings cactbot would receive.
-            if (argv.Length >= 3)
+            // Dump the real ACT ExportVariables strings OverlayPlugin/cactbot read. The ExportVariables
+            // formatters are thin wrappers over FormActMain.CombatantFormatSwitch, which we call
+            // directly (the full env-setup method touches UI state and can't run on an uninitialized
+            // form). These are the exact strings cactbot would receive.
+            if (exportsOut != null)
             {
-                var fmt = typeof(FormActMain).GetMethod("CombatantFormatSwitch",
-                    BindingFlags.NonPublic | BindingFlags.Instance);
-                // The full ExportVariables key set OverlayPlugin's MiniParse iterates (ACT defaults).
+                // The ExportVariables key set OverlayPlugin's MiniParse iterates (ACT defaults). The
+                // NAME{n}/crittypes/threat* keys are omitted: they call helpers that need a live
+                // FormActMain and always throw on this headless harness (ACT logs the exception via
+                // WriteExceptionLog), so they carry no comparable value and only add noise.
                 string[] keys =
                 {
-                    "n", "t", "name", "NAME", "duration", "DURATION",
+                    "name", "duration", "DURATION",
                     "damage", "damage-m", "damage-b", "damage-*", "DAMAGE-k", "DAMAGE-m", "DAMAGE-b", "DAMAGE-*", "damage%",
                     "dps", "dps-*", "DPS", "DPS-k", "DPS-m", "DPS-*",
                     "encdps", "encdps-*", "ENCDPS", "ENCDPS-k", "ENCDPS-m", "ENCDPS-*",
-                    "hits", "crithits", "crithit%", "crittypes", "misses", "hitfailed", "swings", "tohit", "TOHIT",
+                    "hits", "crithits", "crithit%", "misses", "hitfailed", "swings", "tohit", "TOHIT",
                     "maxhit", "MAXHIT", "maxhit-*", "MAXHIT-*",
                     "healed", "healed%", "enchps", "enchps-*", "ENCHPS", "ENCHPS-k", "ENCHPS-m", "ENCHPS-*",
                     "critheals", "critheal%", "heals", "cures",
                     "maxheal", "MAXHEAL", "maxhealward", "MAXHEALWARD", "maxheal-*", "MAXHEAL-*", "maxhealward-*", "MAXHEALWARD-*",
                     "damagetaken", "damagetaken-*", "healstaken", "healstaken-*",
                     "powerdrain", "powerdrain-*", "powerheal", "powerheal-*",
-                    "kills", "deaths", "threatstr", "threatdelta",
-                    "NAME3", "NAME4", "NAME5", "NAME6", "NAME7", "NAME8", "NAME9",
-                    "NAME10", "NAME11", "NAME12", "NAME13", "NAME14", "NAME15",
+                    "kills", "deaths",
                 };
-                using (var w = new StreamWriter(argv[2]))
+                using (var w = new StreamWriter(exportsOut))
                 {
                     w.WriteLine("name\tkey\tvalue");
                     foreach (var cd in enc.Items.Values)
                         foreach (var key in keys)
                         {
                             string val;
-                            try { val = (string)fmt.Invoke(ActGlobals.oFormActMain, new object[] { cd, key, "" }); }
+                            try { val = (string)_fmt.Invoke(ActGlobals.oFormActMain, new object[] { cd, key, "" }); }
                             catch (Exception ex) { var x = ex; while (x.InnerException != null) x = x.InnerException; val = "<EX:" + x.GetType().Name + ">"; }
                             // Skip keys that error in this headless harness (NAME/crittypes/threat*
                             // call helpers that need a live form / threat data) — a harness artifact,
@@ -231,16 +305,24 @@ internal static class ActOracle
                             if (val.IndexOf('\n') >= 0 || val.IndexOf('\t') >= 0 || val.IndexOf('\r') >= 0) continue;
                             w.WriteLine(cd.Name + "\t" + key + "\t" + val);
                         }
+
+                    // The encounter-level ExportVariables (the "Encounter" object OverlayPlugin builds),
+                    // produced by ACT's EncounterFormatSwitch over the encounter's allies — emitted under
+                    // the *ENCOUNTER* sentinel row so the diff treats them like any other row.
+                    var allies = enc.GetAllies();
+                    foreach (var key in EncounterKeys)
+                    {
+                        string val;
+                        try { val = (string)_encFmt.Invoke(ActGlobals.oFormActMain, new object[] { enc, allies, key, "" }); }
+                        catch (Exception ex) { var x = ex; while (x.InnerException != null) x = x.InnerException; val = "<EX:" + x.GetType().Name + ">"; }
+                        if (val == "ERROR" || val.StartsWith("<EX:")) continue;
+                        if (val.IndexOf('\n') >= 0 || val.IndexOf('\t') >= 0 || val.IndexOf('\r') >= 0) continue;
+                        w.WriteLine("*ENCOUNTER*\t" + key + "\t" + val);
+                    }
                 }
             }
 
-            _result = "OK combatants=" + enc.Items.Count + " swings=" + n;
-        }
-        catch (Exception ex)
-        {
-            var x = ex;
-            while (x.InnerException != null) x = x.InnerException;
-            _result = "EX=" + x.GetType().FullName + ": " + x.Message + "\n" + x.StackTrace;
+            return n;
         }
     }
 

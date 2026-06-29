@@ -1,4 +1,0 @@
-21:21:41.138 [FFXIV_ACT_Plugin] instantiated FFXIV_ACT_Plugin.FFXIV_ACT_Plugin v3.0.2.3; calling InitPlugin…
-21:21:46.067 [FFXIV_ACT_Plugin] InitPlugin returned. status='FFXIV_ACT_Plugin Started.'
-21:21:46.067 plugin status='FFXIV_ACT_Plugin Started.'
-21:21:46.644 dumped 122 skill names -> E:\dev\ffxiv-combat-tracker\tests\Fct.Parser.Native.Tests\fixtures\skills.tsv

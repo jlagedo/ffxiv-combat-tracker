@@ -21,97 +21,8 @@ namespace Fct.LegacyHost
         public static void Run(string logPath, int maxLines, string outPath) =>
             RunPumped(outPath, Log => Capture(logPath, maxLines, outPath, Log));
 
-        public static void DumpSkills(string sliceLog, string outPath) =>
-            RunPumped(outPath, Log => DumpSkillsImpl(sliceLog, outPath, Log));
-
         public static void Introspect(string outPath) =>
             RunPumped(outPath, Log => IntrospectImpl(outPath, Log));
-
-        public static void DumpTables(string outFolder) =>
-            RunPumped(Path.Combine(outFolder, "_dump-tables"), Log => DumpTablesImpl(outFolder, Log));
-
-        // Resolve a plugin-internal service from its MinIoC container by interface name. The
-        // service interfaces live across several costura-packed assemblies, so the Type is taken
-        // from the container's own registration keys (the exact Types it can construct).
-        private static object Resolve(object container, string typeName)
-        {
-            const System.Reflection.BindingFlags BF = System.Reflection.BindingFlags.Instance |
-                System.Reflection.BindingFlags.Public | System.Reflection.BindingFlags.NonPublic;
-            var reg = container.GetType().GetField("_registeredTypes", BF)?.GetValue(container)
-                      as System.Collections.IDictionary;
-            Type t = null;
-            if (reg != null)
-                foreach (System.Collections.DictionaryEntry e in reg)
-                    if (e.Key is Type kt && kt.FullName == typeName) { t = kt; break; }
-            if (t == null) return null;
-            if (container is IServiceProvider sp) { var s = sp.GetService(t); if (s != null) return s; }
-            var resolve = container.GetType().GetMethod("Resolve", new[] { typeof(Type) });
-            return resolve?.Invoke(container, new object[] { t });
-        }
-
-        // Export the FFXIV game-data tables the native parser needs but the public DataRepository
-        // does not expose: action id -> category (auto-attack / limit-break / spell / ability), and
-        // status id -> name. Resolved from the plugin's internal IActionList / BuffList resources.
-        private static void DumpTablesImpl(string outFolder, Action<string> Log)
-        {
-            Directory.CreateDirectory(outFolder);
-            var ffxiv = LoadStartedPlugin(Log);
-            var plugin = ffxiv.pluginObj;
-            var repo = plugin.GetType().GetProperty("DataRepository")?.GetValue(plugin);
-            var grd = repo.GetType().GetMethod("GetResourceDictionary");
-            var rtType = grd.GetParameters()[0].ParameterType;
-
-            System.Collections.IDictionary Res(string n) =>
-                (System.Collections.IDictionary)grd.Invoke(repo, new[] { Enum.Parse(rtType, n) });
-
-            var skills = Res("SkillList_EN");
-            var buffs = Res("BuffList_EN");
-
-            // statuses.full.tsv — id -> name (the AddStatusEffect attackType source).
-            var statusRows = new List<string> { "statusId\tname" };
-            foreach (System.Collections.DictionaryEntry de in buffs)
-                statusRows.Add($"{Convert.ToUInt32(de.Key):X}\t{Clean(de.Value?.ToString() ?? "")}");
-            File.WriteAllLines(Path.Combine(outFolder, "statuses.full.tsv"), statusRows);
-            Log($"dumped {statusRows.Count - 1} statuses");
-
-            // actions.full.tsv — id -> name + ActionCategory (for auto-attack/limit-break swing typing).
-            var container = plugin.GetType().GetField("_iocContainer",
-                System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.NonPublic)?.GetValue(plugin);
-            var actionList = Resolve(container, "FFXIV_ACT_Plugin.Resource.IActionList");
-            Log($"IActionList resolved: {actionList?.GetType().FullName}");
-            var getCat = actionList?.GetType().GetMethod("GetActionCategory");
-
-            string Cat(uint id)
-            {
-                try { return getCat?.Invoke(actionList, new object[] { id })?.ToString() ?? ""; }
-                catch { return ""; }
-            }
-
-            var names = new Dictionary<uint, string>();
-            var cats = new Dictionary<uint, string>();
-            foreach (System.Collections.DictionaryEntry de in skills)
-            {
-                uint id = Convert.ToUInt32(de.Key);
-                names[id] = Clean(de.Value?.ToString() ?? "");
-                cats[id] = Cat(id);
-            }
-            // NPC auto-attacks and some abilities carry high action ids that are absent from the
-            // display-name SkillList but still resolve a category (AutoAttack / LimitBreak) — those
-            // drive swing typing, so scan the full id space and capture every typing-relevant one.
-            for (uint id = 0; id < 0x80000u; id++)
-            {
-                if (cats.ContainsKey(id)) continue;
-                var c = Cat(id);
-                if (c == "AutoAttack" || c == "LimitBreak") cats[id] = c;
-            }
-
-            var allIds = new SortedSet<uint>(cats.Keys);
-            var actionRows = new List<string> { "actionId\tname\tcategory" };
-            foreach (var id in allIds)
-                actionRows.Add($"{id:X}\t{(names.TryGetValue(id, out var nm) ? nm : "")}\t{cats[id]}");
-            File.WriteAllLines(Path.Combine(outFolder, "actions.full.tsv"), actionRows);
-            Log($"dumped {actionRows.Count - 1} actions ({cats.Values.Count(v => v == "AutoAttack")} auto) -> {outFolder}");
-        }
 
         // Survey the plugin's IDataRepository: its public methods, the ResourceType enum values,
         // and the type/size of every GetResourceDictionary(enum) — so we can find the FFXIV game-data
@@ -196,9 +107,10 @@ namespace Fct.LegacyHost
         // Batch oracle: load the real plugin ONCE, then run ACT's parse over every Network_*.log
         // in a folder, in chronological (filename) order, as one continuous stream — the plugin's
         // name/combat state carries across day-boundary log rotations exactly as ACT sees it. Each
-        // file's captured MasterSwing stream is written to <outFolder>/<name>.oracle.tsv, plus the
-        // full skill table (skills.full.tsv) and a manifest. This is ACT's authoritative parse of
-        // months of logs, the ground truth the native parser is diffed against at scale.
+        // file's captured MasterSwing stream is written to <outFolder>/<name>.oracle.tsv, plus a
+        // manifest. This is the plugin's authoritative parse of months of logs — the shared input
+        // both the real ACT binary and our engine aggregate for the corpus-scale parity diff
+        // (tools/mass-compare).
         public static void MassOracle(string logFolder, string outFolder, int maxLines) =>
             RunPumped(Path.Combine(outFolder, "_mass-oracle"),
                 Log => MassOracleImpl(logFolder, outFolder, maxLines, Log));
@@ -245,39 +157,6 @@ namespace Fct.LegacyHost
             }
             Log($"plugin status='{ffxiv.lblPluginStatus?.Text}'");
             return ffxiv;
-        }
-
-        // Dump the plugin's skill (action id -> name) table, filtered to the action ids that
-        // appear in the slice, via reflection over IDataRepository.GetResourceDictionary. This is
-        // FFXIV game data, independent of the oracle capture.
-        private static void DumpSkillsImpl(string sliceLog, string outPath, Action<string> Log)
-        {
-            var ffxiv = LoadStartedPlugin(Log);
-
-            var ids = new HashSet<uint>();
-            foreach (var raw in File.ReadLines(sliceLog))
-            {
-                var f = raw.Split('|');
-                if (f.Length > 5 && (f[0] == "21" || f[0] == "22") &&
-                    uint.TryParse(f[4], NumberStyles.HexNumber, CultureInfo.InvariantCulture, out var id))
-                    ids.Add(id);
-            }
-
-            var plugin = ffxiv.pluginObj;
-            var repo = plugin.GetType().GetProperty("DataRepository")?.GetValue(plugin);
-            var method = repo?.GetType().GetMethod("GetResourceDictionary");
-            var rtType = method?.GetParameters()[0].ParameterType;
-            var skillList = rtType != null ? Enum.Parse(rtType, "SkillList_EN") : null;
-            var dict = (System.Collections.IDictionary)method.Invoke(repo, new[] { skillList });
-
-            var rows = new List<string>();
-            foreach (var id in ids.OrderBy(x => x))
-            {
-                var name = dict.Contains(id) ? dict[id]?.ToString() : null;
-                rows.Add($"{id:X}\t{(name ?? "")}");
-            }
-            File.WriteAllLines(outPath, new[] { "actionId\tname" }.Concat(rows));
-            Log($"dumped {rows.Count} skill names -> {outPath}");
         }
 
         private static void Capture(string logPath, int maxLines, string outPath, Action<string> Log)
@@ -363,30 +242,30 @@ namespace Fct.LegacyHost
         {
             Directory.CreateDirectory(outFolder);
             var act = ActGlobals.oFormActMain;
-            var ffxiv = LoadStartedPlugin(Log); // plugin subscribes BeforeLogLineRead; state persists across files
-
-            // Full skill (action id -> name) table — FFXIV game data the native side uses to
-            // resolve ability names for the damage-type/attack-type comparison.
-            try { DumpFullSkills(ffxiv, Path.Combine(outFolder, "skills.full.tsv"), Log); }
-            catch (Exception ex) { Log("skill dump failed: " + ex.Message); }
+            LoadStartedPlugin(Log); // plugin subscribes BeforeLogLineRead; state persists across files
 
             var rows = new List<string>(1 << 16);
             CombatActionDelegate handler = (isImport, info) =>
             {
                 var s = info.combatAction;
+                // 9th column (time) makes each oracle.tsv a valid ActOracle 9-col timed stream, so the
+                // SAME real-ACT EncounterData/CombatantData aggregation that produced these swings can be
+                // re-run for the overlay-payload (ExportVariables) diff. MassCompare's bag-diff reads only
+                // the first 8 columns, so the extra column is inert there.
                 rows.Add(string.Join("\t",
                     s.SwingType.ToString(CultureInfo.InvariantCulture),
                     s.Critical ? "1" : "0",
                     ((long)s.Damage).ToString(CultureInfo.InvariantCulture),
                     Clean(s.Special), Clean(s.AttackType), Clean(s.Attacker),
-                    Clean(s.DamageType), Clean(s.Victim)));
+                    Clean(s.DamageType), Clean(s.Victim),
+                    s.Time.ToString("o", CultureInfo.InvariantCulture)));
             };
             act.AfterCombatAction += handler;
 
             var files = Directory.GetFiles(logFolder, "Network_*.log")
                                  .OrderBy(f => Path.GetFileName(f), StringComparer.Ordinal).ToArray();
             Log($"mass-oracle: {files.Length} file(s) from {logFolder}");
-            const string header = "swingType\tcrit\tdamage\tspecial\tattackType\tattacker\tdamageType\tvictim";
+            const string header = "swingType\tcrit\tdamage\tspecial\tattackType\tattacker\tdamageType\tvictim\ttime";
             var manifest = new List<string> { "file\tlines\tswings" };
 
             foreach (var file in files)
@@ -410,24 +289,6 @@ namespace Fct.LegacyHost
             act.AfterCombatAction -= handler;
             File.WriteAllLines(Path.Combine(outFolder, "manifest.tsv"), manifest);
             Log("mass-oracle done");
-        }
-
-        // Dump the plugin's ENTIRE SkillList_EN (action id -> name) via reflection over
-        // IDataRepository.GetResourceDictionary. Independent of the oracle capture (game data).
-        private static void DumpFullSkills(ActPluginData ffxiv, string outPath, Action<string> Log)
-        {
-            var plugin = ffxiv.pluginObj;
-            var repo = plugin.GetType().GetProperty("DataRepository")?.GetValue(plugin);
-            var method = repo?.GetType().GetMethod("GetResourceDictionary");
-            var rtType = method?.GetParameters()[0].ParameterType;
-            var skillList = rtType != null ? Enum.Parse(rtType, "SkillList_EN") : null;
-            var dict = (System.Collections.IDictionary)method.Invoke(repo, new[] { skillList });
-
-            var rows = new List<string> { "actionId\tname" };
-            foreach (System.Collections.DictionaryEntry de in dict)
-                rows.Add($"{Convert.ToUInt32(de.Key):X}\t{Clean(de.Value?.ToString() ?? "")}");
-            File.WriteAllLines(outPath, rows);
-            Log($"dumped {rows.Count - 1} skills -> {outPath}");
         }
 
         private static DateTime ParseTimestamp(string raw)

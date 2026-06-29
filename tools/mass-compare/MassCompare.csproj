@@ -1,10 +1,11 @@
 <Project Sdk="Microsoft.NET.Sdk">
 
   <!--
-    Dev tool (not in the solution). Runs the clean-room native parser over a whole folder of
-    decoded Network_*.log files and diffs the result, file by file, against ACT's authoritative
-    parse captured by the satellite's mass-oracle mode. Emits per-file ours TSVs, a report,
-    and an aggregate summary. See tools/mass-compare/README.md.
+    Dev tool (not in the solution). Joins the two ExportVariables payloads produced over a folder of
+    captured plugin swing streams: the real-ACT baseline (name.oracle.exports.tsv, from
+    tools/act-oracle) and our Fct.Compat.Act engine's output (name.engine.exports.tsv, from the
+    satellite's mass-engine-exports mode), and reports how often our engine matches real ACT exactly.
+    See tools/mass-compare/README.md and run.ps1.
   -->
   <PropertyGroup>
     <OutputType>Exe</OutputType>
@@ -15,9 +16,5 @@
     <AssemblyName>MassCompare</AssemblyName>
     <RootNamespace>Fct.MassCompare</RootNamespace>
   </PropertyGroup>
-
-  <ItemGroup>
-    <ProjectReference Include="..\..\src\Fct.Parser.Native\Fct.Parser.Native.csproj" />
-  </ItemGroup>
 
 </Project>

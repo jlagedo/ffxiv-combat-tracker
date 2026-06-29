@@ -1,8 +1,11 @@
 using System;
 using System.Collections.Generic;
+using System.Globalization;
 using System.IO;
 using System.Linq;
+using System.Text;
 using System.Text.RegularExpressions;
+using System.Threading;
 using System.Windows.Forms;
 
 namespace Advanced_Combat_Tracker
@@ -49,11 +52,16 @@ namespace Advanced_Combat_Tracker
 
         public FormActMain()
         {
-            // Never shown; exists for its handle + message pump + Invoke marshaling.
+            // Off-screen + fully transparent + non-activating: invisible to the user, but a genuinely
+            // shown window so Control.Visible is true. FFXIV_ACT_Plugin's ScanMemory and LogOutput
+            // threads park on ACTWrapper.IsMainFormVisible() (which reads this form's Visible) before
+            // producing any combat data or writing the network log — a hidden form freezes them.
             ShowInTaskbar = false;
             FormBorderStyle = FormBorderStyle.None;
-            WindowState = FormWindowState.Minimized;
-            Visible = false;
+            StartPosition = FormStartPosition.Manual;
+            Location = new System.Drawing.Point(-32000, -32000);
+            Size = new System.Drawing.Size(1, 1);
+            Opacity = 0;
             AppDataFolder = new DirectoryInfo(Path.Combine(
                 Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData),
                 "Advanced Combat Tracker"));
@@ -91,7 +99,9 @@ namespace Advanced_Combat_Tracker
             return $"{damage}";
         }
 
-        protected override void SetVisibleCore(bool value) => base.SetVisibleCore(false);
+        // Show without taking focus, so realizing this off-screen form never pulls the foreground
+        // away from the game.
+        protected override bool ShowWithoutActivation => true;
 
         // --- State the shims read/write ---
         public DirectoryInfo AppDataFolder { get; set; }
@@ -213,10 +223,117 @@ namespace Advanced_Combat_Tracker
         // oracle replays lines through them and must capture every swing regardless of InCombat.
 
         // --- Log file integration (plugin tails/writes Network_*.log) ---
+        // The FFXIV plugin formats decoded packets into pipe-delimited lines and appends them to
+        // Network_*.log, then calls OpenLog to have ACT tail that file. ACT's log reader fires
+        // BeforeLogLineRead per line; the plugin's ParseStrategy pipeline (subscribed to it) turns
+        // each line into AddCombatAction. That tail IS the live combat path — without it the file
+        // grows but no combat reaches the engine. We start a background tail that does exactly this.
         public void OpenLog(bool getCurrentZone, bool getCharNameFromFile)
         {
-            Log($"[OpenLog] path={LogFilePath} filter={LogFileFilter}");
+            Log($"[OpenLog] path={LogFilePath} filter={LogFileFilter} getZone={getCurrentZone}");
             LogFileChanged?.Invoke(false, LogFilePath);
+            StartLogTail(LogFilePath);
+        }
+
+        private readonly object _tailGate = new object();
+        private Thread _tailThread;
+        private CancellationTokenSource _tailCts;
+        private string _tailingPath;
+
+        private void StartLogTail(string path)
+        {
+            if (string.IsNullOrEmpty(path)) return;
+            lock (_tailGate)
+            {
+                if (string.Equals(_tailingPath, path, StringComparison.OrdinalIgnoreCase) &&
+                    _tailThread != null && _tailThread.IsAlive)
+                    return; // already tailing this file (OpenLog can be called repeatedly)
+                _tailCts?.Cancel();
+                _tailingPath = path;
+                var cts = new CancellationTokenSource();
+                _tailCts = cts;
+                _tailThread = new Thread(() => TailLoop(path, cts.Token))
+                { IsBackground = true, Name = "act-logtail" };
+                _tailThread.Start();
+            }
+        }
+
+        public void StopLogTail()
+        {
+            lock (_tailGate) { _tailCts?.Cancel(); }
+        }
+
+        // Tail the live log: start at the current end (so the day's existing history is not replayed
+        // as a bogus encounter) and feed only newly-appended lines. Split on newline at the byte level
+        // so a partially-written line is never fed until it is complete, and so multi-byte UTF-8 names
+        // never split across reads.
+        private void TailLoop(string path, CancellationToken ct)
+        {
+            try
+            {
+                for (int i = 0; i < 200 && !File.Exists(path); i++)
+                    if (ct.WaitHandle.WaitOne(100)) return;
+
+                using (var fs = new FileStream(path, FileMode.Open, FileAccess.Read,
+                           FileShare.ReadWrite | FileShare.Delete))
+                {
+                    long pos = fs.Length;             // live: only lines appended from now on
+                    var line = new List<byte>(512);
+                    var chunk = new byte[16384];
+                    while (!ct.IsCancellationRequested)
+                    {
+                        fs.Seek(pos, SeekOrigin.Begin);
+                        int read, any = 0;
+                        while ((read = fs.Read(chunk, 0, chunk.Length)) > 0)
+                        {
+                            any += read;
+                            pos += read;
+                            for (int i = 0; i < read; i++)
+                            {
+                                byte b = chunk[i];
+                                if (b == (byte)'\n')
+                                {
+                                    int len = line.Count;
+                                    if (len > 0 && line[len - 1] == (byte)'\r') len--;
+                                    if (len > 0) FeedLine(Encoding.UTF8.GetString(line.ToArray(), 0, len));
+                                    line.Clear();
+                                }
+                                else line.Add(b);
+                            }
+                        }
+                        if (any == 0 && ct.WaitHandle.WaitOne(50)) break;
+                    }
+                }
+            }
+            catch (Exception ex) { Log($"[LogTail] {Path.GetFileName(path)} error: {ex.Message}"); }
+        }
+
+        // Replay one tailed line through the plugin's parser, mirroring the proven oracle pump:
+        // advance the idle clock by the line's timestamp, then raise BeforeLogLineRead (drives the
+        // plugin's ParseStrategy → AddCombatAction) and OnLogLineRead (cactbot/triggers).
+        private void FeedLine(string raw)
+        {
+            var ts = ParseLineTimestamp(raw);
+            if (ts > DateTime.MinValue) AdvanceClock(ts);
+            var args = new LogLineEventArgs(raw, 0, ts, CurrentZone ?? "", InCombat);
+            try
+            {
+                FireBeforeLogLineRead(false, args);
+                FireLogLineRead(false, args);
+            }
+            catch (Exception ex) { Log($"[LogTail] parse error: {ex.Message}"); }
+        }
+
+        // FFXIV log lines are "<type>|<ISO-8601 timestamp>|...": the timestamp is the second field.
+        private static DateTime ParseLineTimestamp(string raw)
+        {
+            int p = raw.IndexOf('|');
+            int p2 = p >= 0 ? raw.IndexOf('|', p + 1) : -1;
+            if (p >= 0 && p2 > p &&
+                DateTime.TryParse(raw.Substring(p + 1, p2 - p - 1), CultureInfo.InvariantCulture,
+                    DateTimeStyles.RoundtripKind, out var ts))
+                return ts;
+            return DateTime.MinValue;
         }
 
         public void ActCommands(string commandText) => Log($"[ActCommands] {commandText}");

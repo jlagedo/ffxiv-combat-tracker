@@ -40,36 +40,27 @@ swappable, independently-released component.
 - **We build only the ACT engine.** The FFXIV SDK and the OverlayPlugin/cactbot surface
   self-host by loading the real plugins; hosting the real FFXIV_ACT_Plugin inherits its
   per-patch opcode cadence for free.
-- **What we replicate — and what "parity" means** (read this before touching the parser).
-  **We replicate Advanced Combat Tracker (`E:\dev\ACT-decompiled`)**: how ACT reads `Network_*.log`
-  lines, collects `MasterSwing`s, runs its combat window, and aggregates encounters/DPS. **We never
-  read, mirror, or port logic from FFXIV_ACT_Plugin.** There are exactly two legitimate ground truths:
-  `ACT-decompiled` (ACT's own host / log-reading / aggregation behavior) and the **empirical oracle**
-  — ACT's actual captured output (`--mass-oracle`), in which the real plugin is used as an *opaque
-  producer* to generate reference output, never as source to copy.
-  - In the live stack FFXIV_ACT_Plugin is the **producer** (packets → `Network_*.log` lines, plus the
-    `MasterSwing`s it feeds ACT directly); ACT is the **consumer/aggregator** (→ encounters/DPS). Our
-    native parser re-reads the log and reproduces **ACT's consumer behavior**. For nearly every swing
-    the value is already in the log line, so it is parse-the-line + aggregate.
-  - **ACT does not parse or estimate DoTs — the producer does; so DoT/HoT/shield values are not an ACT
-    gap.** `ACT-decompiled` has no DoT/potency/tick logic (`"Simulated"` appears nowhere; the bucket
-    name is registered by the plugin) and `FormActMain.AddCombatAction` applies no filter — it sums
-    every swing it is handed. Every DoT/HoT/shield *value* in the live output is the **producer's**
-    (the plugin's potency estimate), never ACT's. Our native parser is a different producer: it emits
-    each type-`24` tick from the log's own combined amount (one tick per target per server tick;
-    statusId `0` ticks carry a single rotating source over the combined value — the per-source split is
-    not in the log). A tick is **not** player-outgoing damage and is dropped when its source is the
-    `0xE0000000` null actor, when it is sourceless, or when it is a **DoT on a player victim**
-    (`0x10xxxxxx` target — incoming enemy/environment damage whose combined-tick source is an unreliable
-    rotating player id; the plugin attributes none of these — 109 such swings corpus-wide out of
-    millions). **Damage shields** (type `11`) are `maxHP × potency` (maxHP is in the log; the potency
-    table is the plugin's) and are not logged, so not emitted. Validated corpus-wide (68 logs): auto
-    **100.000%**, ability **99.993%**, **`Damage` bucket (auto+ability+DoT = player DPS) 99.917%**, heal
-    **100.258%**, HoT total **99.681%**, **healed-excl-shields 99.975%**, DoT **97.327%**. The residual
-    DoT value is per-tick log-real-amount vs the plugin's flat potency estimate — small producer noise
-    centered on parity (52/53 files 80–110%; where they diverge the plugin's simulation usually
-    *under*-counts fast multi-source ticks, so our log value is the more accurate one).
-    (Proof + numbers: [`docs/ACT-OUTPUT-PARITY-GAPS.md`](docs/ACT-OUTPUT-PARITY-GAPS.md).)
+- **What we build, and what "parity" means** (read this before touching aggregation).
+  **We build only the ACT engine** (`Fct.Compat.Act`) — the consumer/aggregator that turns
+  `MasterSwing`s into encounters / DPS / `ExportVariables`. **The real FFXIV_ACT_Plugin is the sole
+  parser**: it decodes `Network_*.log` lines (and live packets) into `MasterSwing`s. **Reproducing the
+  plugin's parse is an explicit non-goal** — we host the real plugin for it, unmodified, and inherit its
+  per-patch opcode cadence for free. We **never** read, mirror, or port logic from FFXIV_ACT_Plugin, and
+  we **never** decode log lines ourselves.
+  - **Data flow.** Live: the plugin (packets → `MasterSwing`s, plus the `Network_*.log` record) →
+    **our ACT engine** aggregates → OverlayPlugin/cactbot read `CombatantData.ExportVariables`. The
+    plugin is the producer; our engine is the consumer. Every DoT/HoT/shield value is the **plugin's**
+    synthesis (potency estimates not present in the log); our engine sums whatever swings it is handed
+    and applies no filter — exactly as `ACT-decompiled`'s `FormActMain.AddCombatAction` does.
+  - **Two ground truths**, both treating the plugin/ACT as opaque producers, never as source to copy:
+    `ACT-decompiled` (ACT's own aggregation behavior) and the **empirical oracle** — the real ACT
+    binary's captured output (`tools/act-oracle`).
+  - **Parity = our engine == real ACT, fed identical plugin swings.** The satellite's `--mass-oracle`
+    captures the real plugin's `MasterSwing` stream per log; both the real ACT binary (`tools/act-oracle`)
+    and our `Fct.Compat.Act` engine (`--mass-engine-exports`) aggregate that *same* stream; `tools/mass-compare`
+    diffs the `ExportVariables` payload OverlayPlugin reads. Validated bit-for-bit by
+    `AggregateCompatTests`/`ExportVarsCompatTests` (fixtures) and corpus-scale by `tools/mass-compare`
+    (**100.000%** exact on the fixture corpus). See [`docs/TESTING.md`](docs/TESTING.md).
 - **`Fct.Abstractions` multi-targets `net48;net10`** so the same record/interface types
   exist on both sides of the bridge.
 
@@ -82,9 +73,8 @@ swappable, independently-released component.
 | `Fct.LegacyHost` | net48 | clean-room ACT engine; hosts the five real plugins. |
 | `Fct.Bridge` | net48;net10 | IPC transport + versioned wire protocol. |
 | `Fct.Parser.Legacy` | net48 | wraps the real FFXIV_ACT_Plugin. `WrappedFfxivPlugin` sits in `pluginObj` (forwards `DataRepository`/`_iocContainer`/lifecycle to the real instance) and exposes `RingBufferDataSubscription` (`IDataSubscription` + `IRawPacketSource`): a bounded ring + single dispatch thread that replaces the plugin's per-subscriber `BeginInvoke` fan-out so OverlayPlugin's ~20 handlers cost one in-order dispatch. ~250× faster on the dispatch stage. |
-| `Fct.Parser.Native` | net10 | clean-room parser. `NetworkLogLine` (structure) + `ActionEffectDecoder` (decodes the FFXIV log/packet effect-byte layout) + `CombatLogParser` (stateful: names, ACT's combat window, every log-derived swing type). Reproduces, bit-exact, every swing whose value is present in the log, plus ACT's consumer/combat-window behavior — all derived from `ACT-decompiled` + the empirical oracle. FFXIV **game-data** tables (action id→name, action category, status names) are dumped from the real plugin's resources via `--dump-tables` — that is *data*, not logic. The parser emits a DoT/HoT swing per type-`24` tick from the log's own combined amount + source (all status ids), dropping ticks that are not player-outgoing damage: the `0xE0000000` null actor, sourceless ticks, and **DoTs on a player victim** (incoming enemy/environment damage the combined-tick's rotating source field would misattribute). The plugin's per-status potency *estimate* (the `(*)` value) and damage shields (type `11`, `maxHP × potency`) are producer synthesis, not in the log, and not reproduced — ACT itself computes none of it. Corpus-validated output parity (68 logs): auto/ability exact, **`Damage` bucket (player DPS) 99.917%**, heal/HoT/healed-excl-shields ~100%, DoT 97.3% (residual is per-tick log-real-amount vs the plugin's flat estimate — small noise centered on parity). See `docs/ACT-OUTPUT-PARITY-GAPS.md`, `docs/TESTING.md`. Live capture + memory later. |
 | `Fct.App` | net10 | Avalonia control panel + shell (MVVM). |
-| `Fct.Compat.Act` | net48 | the ACT facade surface (in LegacyHost). Its `EncounterData`/`CombatantData`/`AttackType` aggregation reproduces the real ACT binary bit-for-bit on captured combat (see Differential ACT-engine compat in `docs/TESTING.md`). |
+| `Fct.Compat.Act` | net48 | **the ACT engine** (the facade surface, hosted in LegacyHost). Its `EncounterData`/`CombatantData`/`AttackType` aggregation + `ExportVariables` reproduce the real ACT binary bit-for-bit when fed the real plugin's `MasterSwing` stream. Held to that baseline by `AggregateCompatTests`/`ExportVarsCompatTests` (fixtures) and corpus-scale by `tools/mass-compare` — the satellite's `--mass-engine-exports` aggregates each captured `oracle.tsv` through this engine, diffed against the real-ACT baseline. See `docs/TESTING.md`. |
 
 ## UI frameworks
 
@@ -154,8 +144,6 @@ as the backend, so one API and one `EventId` taxonomy span both sides of the bri
 - **Taxonomy:** `shared/Logging/` (linked into both processes) holds the `EventId` registry
   (`LogEvents`: 1xxx host, 2xxx satellite, 3xxx parser), the bridge wire format (`BridgeLogRecord`),
   and the shared log path (`LogPaths`).
-- **Native parser (`Fct.Parser.Native`):** optional `ILogger` seam (`CombatLogParser.Log`, default
-  `NullLogger`) with source-gen `LoggerMessage`; emits nothing unless a consumer supplies a logger.
 - **Level:** default Information (Debug in `DEBUG`); `FCT_LOG_LEVEL` env var overrides.
 - **Packages** are centrally pinned in `Directory.Packages.props` (so the Serilog stack is identical
   on net48 and net10).
@@ -205,11 +193,10 @@ VS 2026 / MSBuild.
 
 `./test.ps1` builds + stages the satellite, then runs all suites under `tests/`
 (`Fct.Compat.Act.Tests` + `Fct.Parser.Legacy.Tests` net48, `Fct.App.Tests`,
-`Fct.Parser.Native.Tests`, `Fct.Integration.Tests` net10). 103 tests. Data-dependent tests skip when their
-prerequisites are absent: the real-log smoke needs a `Network_*.log` (`%APPDATA%\Advanced
-Combat Tracker\FFXIVLogs`, or `FCT_FFXIV_LOGS`); the satellite integration's plugin/self-test
-assertions need `FFXIV_ACT_Plugin.dll` installed. CI (`.github/workflows/ci.yml`) runs the
-suite on `windows-latest`. Full details: [`docs/TESTING.md`](docs/TESTING.md).
+`Fct.Integration.Tests` net10). Data-dependent tests skip when their prerequisites are absent: the
+satellite integration's plugin/self-test assertions and the replay-route test need
+`FFXIV_ACT_Plugin.dll` installed. CI (`.github/workflows/ci.yml`) runs the suite on
+`windows-latest`. Full details: [`docs/TESTING.md`](docs/TESTING.md).
 
 Run the slice end-to-end (launches host → satellite → loads real plugins):
 

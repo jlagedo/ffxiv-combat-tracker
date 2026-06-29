@@ -78,7 +78,9 @@ Directive 1 requires honoring **three** legacy contracts, but we only *build* on
 | 3 | **OverlayPlugin surface** (WebSocket protocol, `IOverlayAddonV2`, cactbot) | the **real OverlayPlugin**, hosted unmodified | ~0 |
 
 Hosting the real FFXIV_ACT_Plugin means we **inherit Ravahn's per-patch cadence for
-free** in v1 — we sign up for zero opcode maintenance until the native parser exists.
+free** — we sign up for **zero opcode maintenance, permanently**. Reimplementing the FFXIV
+parser natively is an explicit **non-goal**: the real plugin is the parser for good. We build
+only the consume/aggregate side (the ACT engine).
 
 ---
 
@@ -90,7 +92,7 @@ free** in v1 — we sign up for zero opcode maintenance until the native parser 
 │                                  │◄──────►│                                  │
 │  • clean-room ACT engine         │ pipe / │  • typed bus (Fct.Abstractions)   │
 │  • real FFXIV_ACT_Plugin         │ shared │  • ALC-isolated NEW plugins       │
-│  • real OverlayPlugin + CEF      │ memory │  • native parser (later)          │
+│  • real OverlayPlugin + CEF      │ memory │  • typed game-data API            │
 │  • Triggernometry, Discord       │        │  • Avalonia shell + control panel │
 │  • ACT.Hojoring                  │        │                                   │
 │  ← all net48, runs natively      │        │  ← all net10, runs natively       │
@@ -122,9 +124,7 @@ Fct.Bridge         net48;net10  IPC transport + wire protocol (named pipe +
                                 shared-memory ring for the combat hot path).
 
 Fct.Parser.Legacy  net48        wraps the real FFXIV_ACT_Plugin as an IGameDataSource
-                                (+ IRawPacketSource). Ships day one.
-Fct.Parser.Native  net10        clean-room source-gen capture+opcodes+memory. Later,
-                                its own per-patch cadence, hot-swapped in its own ALC.
+                                (+ IRawPacketSource). The parser, permanently.
 
 Fct.App            net10        Avalonia control panel + shell (MVVM). The net10
                                 user-facing UI. See §4a.
@@ -221,19 +221,17 @@ CEDirector, FateWatcher) so routine packet variety never forces a contract chang
 
 ---
 
-## 8. Pluggable parser — two implementations, one contract
+## 8. The parser slots behind one contract
 
-| | `Fct.Parser.Legacy` | `Fct.Parser.Native` |
-|---|---|---|
-| what | wraps the **real FFXIV_ACT_Plugin** | clean-room source-gen capture+opcodes+memory |
-| ships | day one — inherits Ravahn's cadence | later, **its own per-patch cadence** |
-| isolation | the net48 satellite process | own collectible `AssemblyLoadContext` |
-| opcodes | hidden inside | hidden inside; raw via `IRawPacketSource` |
+The parser is pluggable behind `IGameDataSource`: nothing downstream knows or cares how
+`MasterSwing`s are produced. In practice that slot is filled by the **real FFXIV_ACT_Plugin**
+(`Fct.Parser.Legacy`), wrapped as an `IGameDataSource` (+ `IRawPacketSource` for raw consumers) and
+swapped per patch by dropping in the new DLL — we inherit Ravahn's cadence for free.
 
-Both satisfy `IGameDataSource`; nothing downstream can tell which is loaded. Native can
-take over packet-by-packet during migration. OverlayPlugin's `NetworkProcessors/`
-(custom opcode parsing) eventually folds **into** `Fct.Parser.Native` as typed events,
-collapsing the triplicate opcode tables into one.
+**Reimplementing the FFXIV parser natively is an explicit non-goal.** Opcode/packet/memory decode
+stays the plugin's job, permanently; we never read, mirror, or port its logic. We build only the
+**consume/aggregate** side — the ACT engine (`Fct.Compat.Act`) — held to the real ACT binary
+corpus-wide (see `docs/TESTING.md`).
 
 ---
 
@@ -272,7 +270,6 @@ satellite is empty, delete it.
 - High-resolution sequence + sub-frame timestamps.
 - Plugins publishing their *own* typed events for other plugins.
 - Direct state queries with no string parsing; no 6× round-trip per action.
-- Hot-swap native parser on patch day, no host restart.
 
 ---
 
@@ -295,9 +292,9 @@ satellite is empty, delete it.
 
 1. **The MasterSwing boundary (settled).** For FFXIV the **plugin** builds the `MasterSwing`s
    (`Parse.dll`, via `AddCombatAction`) and feeds them to ACT; ACT's `FormActMain` does the combat
-   window + encounter aggregation. So we **host the plugin** for that, and **replicate ACT** for the
-   consume/aggregate side. The clean-room native parser re-reads the log to reproduce **ACT's
-   output**, derived from `ACT-decompiled` + the empirical oracle — never by porting plugin logic.
+   window + encounter aggregation. So we **host the plugin** for that, and **replicate only ACT** for
+   the consume/aggregate side — derived from `ACT-decompiled` + the empirical oracle, never by porting
+   plugin logic.
 2. **`FFXIVRepository` reflection shape.** OverlayPlugin discovers the parser by
    reflecting over `ActGlobals.oFormActMain.ActPlugins` and into plugin-instance fields.
    The facade must match the shape it reflects against, not just the public API.

@@ -65,6 +65,7 @@ namespace Fct.Logging
         public static readonly EventId SelfTest = new EventId(2300, nameof(SelfTest));
         public static readonly EventId DispatcherDiagnostics = new EventId(2301, nameof(DispatcherDiagnostics));
         public static readonly EventId Summary = new EventId(2302, nameof(Summary));
+        public static readonly EventId CaptureHeartbeat = new EventId(2303, nameof(CaptureHeartbeat));
 
         // -- 24xx ACT facade surfaces (satellite side; routed from the legacy plugins) --
         public static readonly EventId ActInfo = new EventId(2400, nameof(ActInfo));

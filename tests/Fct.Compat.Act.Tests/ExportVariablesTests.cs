@@ -30,7 +30,9 @@ namespace Fct.Compat.Act.Tests
         private static string Encounter(string key, EncounterData ed)
         {
             Assert.True(EncounterData.ExportVariables.TryGetValue(key, out var f), $"missing encounter export var '{key}'");
-            return f.GetExportString(ed, null, "");
+            // OverlayPlugin always passes the encounter's allies as SelectiveAllies; the numeric
+            // encounter formatters sum over that list (exactly as ACT's EncounterFormatSwitch does).
+            return f.GetExportString(ed, ed.GetAllies(), "");
         }
 
         // Formats mirror ACT's CombatantFormatSwitch: lower-case per-second keys carry two decimals

@@ -1,46 +1,54 @@
 # mass-compare
 
-Massive differential parse test: runs our clean-room native parser (`Fct.Parser.Native`) against
-ACT's authoritative parse over an **entire folder of decoded `Network_*.log` files** (months of
-logs), file by file, and reports bit-level parity.
+Corpus-scale **ACT-engine parity**: proves our clean-room ACT engine (`Fct.Compat.Act`) reproduces
+the real Advanced Combat Tracker binary's aggregation — the `ExportVariables` payload OverlayPlugin/
+cactbot read — over an **entire folder of `Network_*.log` files** (months of logs), fed the identical
+plugin-produced swings.
 
-The `Network_*.log` files are ACT's *decoded, pipe-delimited* log text — not raw packets — so both
-ACT's plugin and our parser re-parse the same lines. There is no game-version skew: the opcode
-decode already happened at capture time.
+The real `FFXIV_ACT_Plugin` is the **sole parser**. We never re-parse the logs ourselves; parsing is
+the plugin's job. This harness exercises only the **consumer** (our engine) and holds it to real ACT.
+It is the corpus version of `Fct.Compat.Act.Tests/ExportVarsCompatTests`.
 
 ## How it runs
 
 ```powershell
 ./tools/mass-compare/run.ps1                      # all logs in %APPDATA%\...\FFXIVLogs
 ./tools/mass-compare/run.ps1 -MaxLines 200000     # quick: cap lines per file
-./tools/mass-compare/run.ps1 -SkipOracle          # re-diff using existing oracle TSVs
+./tools/mass-compare/run.ps1 -SkipOracle          # reuse existing oracle.tsv captures
 ```
 
-Two stages:
+Pipeline (one continuous plugin session, then two aggregations of the same swings):
 
-1. **Oracle** — `Fct.LegacyHost.exe --mass-oracle <logFolder> <outFolder> [maxLines]` loads the
-   real `FFXIV_ACT_Plugin` **once** and feeds every log through `FormActMain.BeforeLogLineRead`,
+1. **Capture the plugin's parse** — `Fct.LegacyHost.exe --mass-oracle <logFolder> <outFolder>` loads
+   the real `FFXIV_ACT_Plugin` **once** and feeds every log through `FormActMain.BeforeLogLineRead`,
    in chronological filename order, as one continuous stream (combatant-name/combat state carries
-   across day-boundary rotations, exactly as ACT sees it). Every `MasterSwing` the plugin produces
-   is written to `<name>.oracle.tsv`. Also dumps the full skill table (`skills.full.tsv`).
-2. **Diff** — `MassCompare <logFolder> <oracleFolder> <outFolder>` parses the same logs with our
-   parser (one instance, same continuous state) and bag-diffs each file:
-   - **damage** on `(crit, amount, special, attacker, victim, attackType, damageType)` — parity
-     requires 0 missing **and** 0 extra;
-   - **heals** on `(crit, amount)` — headlined on *missing* (ACT-reported heals we failed to
-     reproduce); extras are expected (ACT reports only in-combat heals, and exact heal counts need
-     combat-end detection, so our in-combat set is a superset).
-   - swing-types ACT emits that the parser doesn't model yet (DoT/HoT ticks, etc.) are counted as
-     `otherOracle`.
+   across day-boundary rotations, exactly as ACT sees it live). Every `MasterSwing` the plugin
+   produces is written to `<name>.oracle.tsv`.
+2. **Real-ACT baseline** — `tools/act-oracle ActOracle --folder <outFolder>` aggregates each
+   `<name>.oracle.tsv` through the **real ACT binary**'s `EncounterData`/`CombatantData` and dumps its
+   `ExportVariables` to `<name>.oracle.exports.tsv`. Needs the ACT install (default
+   `E:\dev\Advanced Combat Tracker`; set `-ActDir`/`$env:ACT_DIR`).
+3. **Our engine** — `Fct.LegacyHost.exe --mass-engine-exports <outFolder>` aggregates the **same**
+   `<name>.oracle.tsv` swings through our `Fct.Compat.Act` engine and dumps its `ExportVariables` to
+   `<name>.engine.exports.tsv`. The plugin is not loaded here — parsing already happened.
+4. **Diff** — `MassCompare <outFolder>` joins the two `ExportVariables` payloads per file, per
+   combatant, per key, and reports how often our engine's string matches real ACT exactly, plus the
+   summed numeric magnitude per key.
+
+```
+plugin swings  ->  real ACT engine     ->  <name>.oracle.exports.tsv   (baseline)
+plugin swings  ->  our Fct.Compat.Act  ->  <name>.engine.exports.tsv   (under test)
+                                           \__ MassCompare diffs these __/
+```
 
 ## Outputs (`tmp/mass-compare/`, gitignored)
 
 | file | contents |
 |---|---|
-| `<name>.oracle.tsv` | ACT's parse of that log (ground truth) |
-| `<name>.ours.tsv` | our parse of that log |
-| `report.tsv` | one row per file: damage/heal counts, missing, extra |
-| `details.txt` | sample mismatches per imperfect file |
-| `summary.txt` | aggregate parity across all logs |
+| `<name>.oracle.tsv` | the plugin's `MasterSwing` parse of that log (the shared input) |
+| `<name>.oracle.exports.tsv` | real ACT's `ExportVariables` for those swings (baseline) |
+| `<name>.engine.exports.tsv` | our engine's `ExportVariables` for the same swings (under test) |
+| `exports-summary.txt` | per-key exact-match % and numeric totals, corpus-wide |
+| `exports-diff.txt` | sample mismatches per key |
 
 Outputs carry real combatant names; they are local-only and never committed.

@@ -66,21 +66,14 @@ namespace Fct.LegacyHost
                 return;
             }
 
-            // Dump the plugin's skill (action id -> name) table for a slice's action ids:
-            //   --dump-skills <sliceLog> <outPath>
-            int di = Array.IndexOf(args, "--dump-skills");
-            if (di >= 0 && args.Length >= di + 3)
+            // Corpus-scale ACT-engine parity: aggregate every captured plugin swing stream
+            // (<name>.oracle.tsv) through OUR Fct.Compat.Act engine and dump its ExportVariables to
+            // <name>.engine.exports.tsv. Diffed against the real-ACT baseline (tools/act-oracle) by
+            // the MassCompare comparer.  --mass-engine-exports <oracleFolder>
+            int me = Array.IndexOf(args, "--mass-engine-exports");
+            if (me >= 0 && args.Length >= me + 2)
             {
-                ParseOracle.DumpSkills(args[di + 1], args[di + 2]);
-                return;
-            }
-
-            // Dump the internal game-data tables (action categories, status names) the native
-            // parser needs:  --dump-tables <outFolder>
-            int dt = Array.IndexOf(args, "--dump-tables");
-            if (dt >= 0 && args.Length >= dt + 2)
-            {
-                ParseOracle.DumpTables(args[dt + 1]);
+                EngineAggregator.Run(args[me + 1]);
                 return;
             }
 
@@ -114,6 +107,7 @@ namespace Fct.LegacyHost
             ScheduleOnce(250, LoadPlugins);
             ScheduleOnce(3000, StartDispatcherDiagnostics);
             ScheduleOnce(12000, WriteSummary);
+            ScheduleOnce(12500, StartCaptureHeartbeat);
 
             try
             {
@@ -192,8 +186,69 @@ namespace Fct.LegacyHost
                 _log.LogInformation(LogEvents.SelfTest,
                     "[SelfTest] ExportVariables: encdps={Encdps} damage={Dmg} name={Name} crithit%={Crithit}",
                     Ev("encdps"), Ev("damage"), Ev("name"), Ev("crithit%"));
+                // Anything the heartbeat sees above this baseline is real game-driven capture, not the
+                // synthetic self-test swings.
+                _captureBaseline = act.AddCombatActionCount;
             }
             catch (Exception ex) { _log.LogError(LogEvents.SelfTest, ex, "[SelfTest] FAILED"); }
+        }
+
+        // AddCombatActionCount immediately after the self-test; the live delta over it is real capture.
+        private static int _captureBaseline;
+        private static int _lastHeartbeatCount = int.MinValue;
+
+        // Rolling live-capture readout. The one-shot WriteSummary fires before you are ever in combat,
+        // so it can't show capture working; this ticks every few seconds while you play. The signal to
+        // watch is `live` climbing above 0 (AddCombatAction past the self-test baseline) — that is the
+        // Slice-1 acceptance bar (real MasterSwings reaching ACT). NetworkReceived is game-gated, so it
+        // stays idle until FFXIV is running.
+        private static void StartCaptureHeartbeat()
+        {
+            var t = new Timer { Interval = 5000 };
+            t.Tick += (s, e) =>
+            {
+                try
+                {
+                    var act = ActGlobals.oFormActMain;
+                    int total = act.AddCombatActionCount;
+                    int live = total - _captureBaseline;
+                    var wrapper = _ffxiv?.Data?.pluginObj as Fct.Parser.Legacy.WrappedFfxivPlugin;
+
+                    // Quiet the log once capture is steady-idle: only emit when something changed or
+                    // combat is live, so a long pre-pull wait doesn't spam identical lines.
+                    bool changed = total != _lastHeartbeatCount;
+                    _lastHeartbeatCount = total;
+                    if (!changed && !act.InCombat) return;
+
+                    _log.LogInformation(LogEvents.CaptureHeartbeat,
+                        "[Capture] live AddCombatAction={Live} (total={Total}) SetEncounter={Enc} ChangeZone={Zones} " +
+                        "InCombat={InCombat} Zone '{Zone}'; NetworkReceived subscribers={Nr} dropped={Dropped}{Dps}",
+                        live, total, act.SetEncounterCount, act.ChangeZoneCount, act.InCombat, act.CurrentZone,
+                        wrapper?.NetworkReceivedSubscriberCount ?? 0, wrapper?.RawPackets?.DroppedCount ?? 0,
+                        DescribeActiveEncounter(act));
+                }
+                catch (Exception ex) { _log.LogError(LogEvents.CaptureHeartbeat, ex, "[Capture] heartbeat failed"); }
+            };
+            t.Start();
+        }
+
+        // The live DPS the overlay reads: the active encounter's aggregate damage/duration plus its
+        // top combatant, formatted through the exact CombatantData.ExportVariables OverlayPlugin/cactbot
+        // consume. Empty when idle so the heartbeat stays compact out of combat.
+        private static string DescribeActiveEncounter(Advanced_Combat_Tracker.FormActMain act)
+        {
+            try
+            {
+                var enc = act.ActiveZone?.ActiveEncounter;
+                if (enc == null || enc.Items.Count == 0) return "";
+                string Ev(Advanced_Combat_Tracker.CombatantData cd, string k) =>
+                    Advanced_Combat_Tracker.CombatantData.ExportVariables.TryGetValue(k, out var f)
+                        ? f.GetExportString(cd, "") : "";
+                var top = enc.Items.Values.OrderByDescending(c => c.Damage).First();
+                return $"; EncDmg={enc.Damage} Dur={enc.Duration.TotalSeconds:0}s top='{top.Name}' " +
+                       $"encdps={Ev(top, "encdps")} dmg={Ev(top, "damage")} crit%={Ev(top, "crithit%")}";
+            }
+            catch { return ""; }
         }
 
         // Ring-buffer dispatcher health, asserted by the Tier 2 integration test. Proves the
