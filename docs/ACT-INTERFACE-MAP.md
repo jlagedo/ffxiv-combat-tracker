@@ -5,6 +5,9 @@ Authoritative map of every member each supported legacy plugin touches on the **
 why it's used, and where our compatibility facade (`src/Fct.Compat.Act`) stands against it.
 
 This is the **host↔plugin contract** our facade must impersonate. It complements:
+- [`ACT-INTERFACE-IMPLEMENTATION.md`](ACT-INTERFACE-IMPLEMENTATION.md) — the *why + what-to-build*
+  companion: per-interface implementation guidance, the audio-stack decision, and the non-ACT
+  integration surfaces (FFXIV SDK seam, OverlayPlugin web layer, Discord audio bridge).
 - [`DATA-FLOW.md`](DATA-FLOW.md) — the data-flow narrative.
 - [`COMPAT-GAPS.md`](COMPAT-GAPS.md) — the phased backlog (this document corrects two errors in it; see
   *Corrections* at the end).
