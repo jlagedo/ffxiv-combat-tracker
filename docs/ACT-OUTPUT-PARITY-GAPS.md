@@ -92,6 +92,28 @@ got there by understanding the producer instead of declaring it unreachable. The
   split or its exact estimate needs its potency model — plugin logic, not in the log — but the residual
   is now small and centered on parity, not a 1.5–5× gap.
 
+### HoT (99.681%) — we emit the log's ground truth; the plugin's estimate swings by patch
+
+The HoT residual is the same producer difference as DoT, and measuring against the raw log proves the
+0.3% is the **plugin's** error, not ours. Summing every type-24 `HoT` line in the log and comparing:
+
+- **ours / log = 99.897%** — rock-stable, every file 99.7–100.0%. We emit each real combined tick once
+  (no double-count: when the log carries both a per-status tick, e.g. statusId `777`, and a combined
+  statusId `0` tick at the same instant, they are *distinct* heals and both are summed). The only loss
+  is ~0.1% to combat-window gating (HoT ticks outside ACT's encounter window).
+- **plugin / log = 100.217%** — but it oscillates by **game patch**: ~104% on 30101–30104 (the plugin
+  *over*-estimates), ~96–98% on 30108+ (it *under*-estimates). The plugin emits ~40% more swings than
+  the log has ticks (22,492 vs 16,031 lines on `Network_30101_20260316`) by splitting each combined
+  tick into per-status potency-estimate swings whose synthesized amounts don't equal the real ticks.
+
+So `ours / plugin = 99.681%` is just `99.897 / 100.217` — our log-faithful total divided by the
+plugin's patch-variable estimate. Nothing to fix: we already track the log's real HoT more closely than
+the plugin does; matching its number would mean adopting its (less accurate, patch-dependent) synthesis.
+The lone micro-outlier `Network_30202_20260621` (430%, 22 swings) is a healer booking ~10,000-HP
+self-overheal ticks (`curHP == maxHP`) that the plugin recorded as `Regen` at its flat ~260 estimate —
+a ~38× per-status miss invisible in any normal-length file. Unlike DoT, no attribution fix applies:
+HoT victims are always players, so there is no wrong-victim-class tick to drop.
+
 ### Shields — `maxHP × potency`, synthesized, not logged
 
 Every type-11 shield carries the `(*)` marker and a **constant-per-status** amount (Radiant Aegis
