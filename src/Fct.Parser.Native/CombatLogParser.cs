@@ -151,17 +151,17 @@ public sealed partial class CombatLogParser
                     TryId(line.Field(6), out var dAmount);
                     TryId(line.Field(17), out var dsrc);
 
-                    if (dsrc != 0)
+                    if (dsrc != 0 && dsrc != EnvironmentId)
                     {
-                        // Every tick in the log carries its real amount (field 6) AND its source
-                        // (field 17), whether or not a specific status id is present. ACT sums these
-                        // into the combatant damage/healed totals, so we emit them from the log's own
-                        // values — the source attributes them correctly per combatant. We do NOT
-                        // reproduce the plugin's potency *estimate* (its "(*)" per-status split): that
-                        // value is not in the log, is less accurate than the logged tick, and is plugin
-                        // logic. The status name (when statusId != 0) is the AttackType; statusId 0 ticks
-                        // carry no name in the log, so AttackType is left empty. HoT ticks are
-                        // in-combat-gated; DoT ticks can start/continue combat.
+                        // The log carries one combined tick per target per server tick (field 6 =
+                        // amount, field 17 = a source). The status name (when statusId != 0) is the
+                        // AttackType; statusId 0 ticks carry no name. We emit the logged amount as a
+                        // single swing; HoT ticks are in-combat-gated, DoT ticks can start/continue
+                        // combat. NOTE: for overlapping personal DoTs/HoTs the field-17 source is a
+                        // single (rotating) stamp over the *combined* amount, and ACT's per-combatant
+                        // value is the plugin's per-status potency estimate — neither the correct
+                        // per-source split nor that estimate is in the log, so per-combatant DoT/HoT
+                        // is not bit-reproducible (producer synthesis). See ACT-OUTPUT-PARITY-GAPS.md.
                         if (isHoT && !_inCombat) break;
                         yield return new CombatAction(isHoT, isHoT ? 5 : 3, false, dAmount, "",
                             ResolveName(dsrc), ResolveName(dtgt), ResolveStatus(dStatus, ""), "Unknown", true);
@@ -169,9 +169,10 @@ public sealed partial class CombatLogParser
                     }
                     else
                     {
-                        // Sourceless tick (environmental): cannot attribute, not emitted. Still a combat
-                        // event, so it keeps ACT's window alive (a DoT can hold it open; a HoT only while
-                        // in combat).
+                        // Sourceless (id 0) or environment (id 0xE0000000, the FFXIV null actor): not a
+                        // combatant's damage, so not emitted — matching the plugin, which attributes no
+                        // such tick to a player. Still a combat event, so it keeps ACT's window alive
+                        // (a DoT can hold it open; a HoT only while in combat).
                         if (!isHoT || _inCombat) RefreshCombat(t);
                     }
                     break;
@@ -283,6 +284,10 @@ public sealed partial class CombatLogParser
     // an "unowned NPC" if it is in the NPC range and has no recorded owner (so not an owned pet).
     private bool IsUnownedNpc(uint id) =>
         id >= 0x40000000u && !(_hasPlayer && id == _playerId) && !_owners.ContainsKey(id);
+
+    // FFXIV's reserved "null actor" entity id (no source/target). A combined DoT/HoT tick stamped
+    // with this id is environmental, not a combatant's damage, and is not attributed to a player.
+    private const uint EnvironmentId = 0xE0000000u;
 
     // The LimitBreak damage-type nibble (FFXIV action-effect Param1 low nibble == 8) — the
     // log-derivable fallback when no ActionCategory table is supplied.

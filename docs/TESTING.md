@@ -124,14 +124,16 @@ names, never committed.
 - **Pet/summon owner attribution** — `03` field 6 `OwnerID`, field 4 `Job`: a true pet (job 0)
   collapses to the bare owner name, an owned non-pet (e.g. `G'raha Tia`) renders `"name (owner)"`.
 
-**DoT/HoT come from the log; only the plugin's `(*)` potency estimate does not.** Every DoT/HoT tick
-line (`24`) carries a per-tick amount and a source for every tick (incl. status id `0`), so the parser
-emits a DoT/HoT swing per sourced tick from the log's own values. The plugin's per-status potency
-*estimate* (the `(*)` value) is plugin logic, not in the log, and not reproduced; judged at ACT's DPS
-output (where DoT/HoT swings sum into combatant damage/healed totals) the two net out — damage parity
-is exact to ~0.05% end to end through the real ACT engine. **Damage shields** (`11`, routed into
-"Healed (Out)") are still plugin synthesis and not yet emitted — the main healing residual. Per-swing
-bag-diff is the wrong yardstick for DoT/HoT; use the output comparison
+**ACT does not parse or estimate DoTs — the producer does.** `ACT-decompiled` has no DoT/potency/tick
+logic and `FormActMain.AddCombatAction` filters nothing; it sums every swing. Every DoT/HoT/shield
+*value* in the live output is the plugin's (producer) synthesis, not ACT's — so those divergences are
+producer differences, not ACT gaps. Our parser emits each type-`24` tick from the log's own combined
+amount (one tick per target per server tick; the `0xE0000000` null actor dropped). Corpus output
+parity (68 logs): auto **100.000%**, ability **99.993%**, heal **100.258%**, HoT total **99.681%**,
+healed-excl-shields **99.975%**. The DoT value diverges from the plugin's per-status estimate and the
+divergence tracks game patch (producer difference, not a parse bug); **damage shields** (`11`,
+`maxHP × potency`) are not logged and not emitted (the entire healing residual). Per-swing bag-diff is
+the wrong yardstick for DoT/HoT/shield; use the output comparison
 (see [`ACT-OUTPUT-PARITY-GAPS.md`](ACT-OUTPUT-PARITY-GAPS.md)). The old `PotencySimulator.cs` (a port
 of the plugin's DoT/shield synthesis) stays removed.
 
