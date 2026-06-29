@@ -6,10 +6,11 @@ impersonate: every member each supported legacy plugin touches on the **ACT host
 *why* it's used, *what we must build* given our philosophy, the gaps, and the **non-ACT integration
 surfaces** (FFXIV SDK seam, OverlayPlugin web layer, Discord audio bridge).
 
-Companion docs:
+This document is the authority for the **surface/binding axis** (making the unmodified plugins load
+and run); its gap IDs (G‑1…, M4) are the surface backlog. Companion docs:
 - [`DATA-FLOW.md`](DATA-FLOW.md) — the data-flow narrative through the upstream stack.
-- [`COMPAT-GAPS.md`](COMPAT-GAPS.md) — the phased implementation backlog (M0–M4 surface phases + the
-  independent Parser-calculation **P** axis). The gap IDs here (G‑1…, M4) map onto its phases.
+- [`DPS-CALCULATION-GAPS.md`](DPS-CALCULATION-GAPS.md) — the independent **calculation axis**:
+  divergences in the native parser's combat-value calculation (simulated DoT/HoT/shield values).
 
 ---
 
@@ -309,7 +310,8 @@ The only writer into ACT. FFXIV_ACT_Plugin converts each parsed entry to a `Mast
 so the rollup exposes the FFXIV columns + the `ExportVariables` keys OverlayPlugin later reads.
 **What to do:** nothing — verified bit-for-bit on captured combat (`Aggregation.cs` + `CombatTables.cs`;
 TESTING.md "Differential ACT-engine compat"). (The clean-room *value calculation* of simulated
-DoT/HoT/shield amounts is a separate axis — Phase **P** in COMPAT-GAPS — not an interface concern.)
+DoT/HoT/shield amounts is a separate axis — [`DPS-CALCULATION-GAPS.md`](DPS-CALCULATION-GAPS.md) —
+not an interface concern.)
 
 ## 8C. The inbound log seam — **DONE** (1 VERIFY)
 
@@ -560,13 +562,3 @@ Discord-Triggers, which is why making it the official audio stack costs essentia
   plugins + facade) and the net10 host exchange typed domain events. Plugins never see it.
 - **`IRawPacketSource`** (`Fct.Abstractions`): the one opt-in escape hatch exposing raw packets to
   net10 consumers / legacy `RegisterNetworkParser`, fed by `RingBufferDataSubscription`.
-
----
-
-## Corrections to COMPAT-GAPS.md (reconciled)
-
-This audit corrected two earlier inaccuracies, now reflected in COMPAT-GAPS.md:
-1. **`oFormSpellTimers` is consumed** (OverlayPlugin `SpellTimerOverlay.cs` + Hojoring) — was wrongly
-   listed as a phantom with "no consumer." Now **G‑2** / COMPAT-GAPS M1‑4 + M4.
-2. **`TTS`/`PlaySound` methods are a gap** — the delegate *fields* (DONE) cover the Discord/TTSYukkuri
-   hijack, but OP/cactbot call the **methods**, which the facade lacked. Now **G‑1** / COMPAT-GAPS M1‑3.
