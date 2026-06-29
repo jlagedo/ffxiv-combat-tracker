@@ -51,12 +51,16 @@ swappable, independently-released component.
     `MasterSwing`s it feeds ACT directly); ACT is the **consumer/aggregator** (→ encounters/DPS). Our
     native parser re-reads the log and reproduces **ACT's consumer behavior**. For nearly every swing
     the value is already in the log line, so it is parse-the-line + aggregate.
-  - **Out of scope — personal DoT/HoT ticks and damage shields.** The game sends one *combined,
-    unattributed* DoT tick per target (log type `24`, status id `0` — no per-source breakdown). The
-    per-source split that appears in ACT's output is **not ACT's work**: `ACT-decompiled` contains no
-    DoT/HoT/shield simulation — the plugin synthesizes those upstream and feeds them to ACT. That
-    synthesis is plugin logic and the values are not in the log, so **we do not replicate it**. (Gaps
-    /status: [`docs/ACT-OUTPUT-PARITY-GAPS.md`](docs/ACT-OUTPUT-PARITY-GAPS.md).)
+  - **DoT/HoT ticks come from the log; only the plugin's potency *estimate* does not.** Every DoT/HoT
+    tick line (log type `24`) carries both its source (field 17/18) and a real per-tick amount (field
+    6) — including personal ticks where status id is `0`. The parser emits a DoT/HoT swing for every
+    sourced tick from those log values. What ACT's output shows instead is the plugin's per-status
+    potency *estimate* (the `(*)` value: flat per status, crit-independent) — that estimate is plugin
+    logic, not in the log, and we do not reproduce it. Judged at ACT's actual output (the DPS table,
+    where DoT/HoT swings sum into each combatant's damage/healed totals) the two net out: damage parity
+    is exact to ~0.05% end to end through the real ACT engine. **Damage shields** (log type `11`, which
+    ACT routes into "Healed (Out)") are still synthesized by the plugin and not yet emitted — the main
+    residual on the healing axis. (Parity yardstick + status: [`docs/ACT-OUTPUT-PARITY-GAPS.md`](docs/ACT-OUTPUT-PARITY-GAPS.md).)
 - **`Fct.Abstractions` multi-targets `net48;net10`** so the same record/interface types
   exist on both sides of the bridge.
 
@@ -69,7 +73,7 @@ swappable, independently-released component.
 | `Fct.LegacyHost` | net48 | clean-room ACT engine; hosts the five real plugins. |
 | `Fct.Bridge` | net48;net10 | IPC transport + versioned wire protocol. |
 | `Fct.Parser.Legacy` | net48 | wraps the real FFXIV_ACT_Plugin. `WrappedFfxivPlugin` sits in `pluginObj` (forwards `DataRepository`/`_iocContainer`/lifecycle to the real instance) and exposes `RingBufferDataSubscription` (`IDataSubscription` + `IRawPacketSource`): a bounded ring + single dispatch thread that replaces the plugin's per-subscriber `BeginInvoke` fan-out so OverlayPlugin's ~20 handlers cost one in-order dispatch. ~250× faster on the dispatch stage. |
-| `Fct.Parser.Native` | net10 | clean-room parser. `NetworkLogLine` (structure) + `ActionEffectDecoder` (decodes the FFXIV log/packet effect-byte layout) + `CombatLogParser` (stateful: names, ACT's combat window, every log-derived swing type). Reproduces, bit-exact, every swing whose value is present in the log, plus ACT's consumer/combat-window behavior — all derived from `ACT-decompiled` + the empirical oracle. FFXIV **game-data** tables (action id→name, action category, status names) are dumped from the real plugin's resources via `--dump-tables` — that is *data*, not logic. Per-source personal DoT/HoT/shield synthesis is plugin logic and **out of scope** (see the parser bullet above) — the parser emits only the DoT/HoT ticks the log carries (real ground-AoE, status id ≠ 0). See `docs/TESTING.md`. Live capture + memory later. |
+| `Fct.Parser.Native` | net10 | clean-room parser. `NetworkLogLine` (structure) + `ActionEffectDecoder` (decodes the FFXIV log/packet effect-byte layout) + `CombatLogParser` (stateful: names, ACT's combat window, every log-derived swing type). Reproduces, bit-exact, every swing whose value is present in the log, plus ACT's consumer/combat-window behavior — all derived from `ACT-decompiled` + the empirical oracle. FFXIV **game-data** tables (action id→name, action category, status names) are dumped from the real plugin's resources via `--dump-tables` — that is *data*, not logic. The parser emits a DoT/HoT swing for every sourced tick from the log's own amount + source (type `24`, all status ids); the plugin's per-status potency *estimate* (the `(*)` value) is plugin logic and not reproduced — at ACT's DPS output the two net out (damage exact to ~0.05% end to end). Damage shields (type `11`) remain plugin synthesis and are not yet emitted (see the parser bullet above). See `docs/TESTING.md`. Live capture + memory later. |
 | `Fct.App` | net10 | Avalonia control panel + shell (MVVM). |
 | `Fct.Compat.Act` | net48 | the ACT facade surface (in LegacyHost). Its `EncounterData`/`CombatantData`/`AttackType` aggregation reproduces the real ACT binary bit-for-bit on captured combat (see Differential ACT-engine compat in `docs/TESTING.md`). |
 

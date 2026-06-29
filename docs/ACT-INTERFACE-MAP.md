@@ -11,8 +11,8 @@ This document is the authority for the **surface/binding axis** (making the unmo
 and run). Companion docs:
 - [`DATA-FLOW.md`](DATA-FLOW.md) — the data-flow narrative through the upstream stack.
 - [`ACT-OUTPUT-PARITY-GAPS.md`](ACT-OUTPUT-PARITY-GAPS.md) — the independent **output-value axis**:
-  divergences in the native parser's `(*)` DoT/HoT/shield values vs ACT's output (the values ACT
-  synthesizes from a combined log tick, not present in the log).
+  the native parser's per-combatant damage/healed vs ACT's output (the parser emits DoT/HoT from the
+  log's own per-tick values; the plugin's `(*)` potency estimate and damage shields are the residual).
 
 ## Status legend
 
@@ -147,8 +147,8 @@ model so the rollup exposes the FFXIV columns + the `ExportVariables` keys OP la
 | ✅ | `ActLocalization.LocalizationStrings["attackTypeTerm-all"]` | FFXIV | localized "All" bucket key |
 
 **Strategy.** Done — verified bit-for-bit on captured combat (`Aggregation.cs` + `CombatTables.cs`;
-Slice 1 S5; TESTING.md "Differential ACT-engine compat"). Reproducing the *values* ACT synthesizes
-for simulated DoT/HoT/shield swings is the separate axis in
+Slice 1 S5; TESTING.md "Differential ACT-engine compat"). The per-combatant DoT/HoT/shield output gap
+(the plugin's `(*)` potency estimate and damage shields) is the separate value axis in
 [`ACT-OUTPUT-PARITY-GAPS.md`](ACT-OUTPUT-PARITY-GAPS.md) — not an interface concern.
 
 ## 3. Inbound log seam — ✅ DONE (🟡 1 VERIFY)

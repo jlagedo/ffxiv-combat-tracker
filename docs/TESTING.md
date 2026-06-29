@@ -84,8 +84,9 @@ table is dumped from the plugin's resource via `Fct.LegacyHost.exe --dump-skills
 `DamageType`/`ElementType` enums are read from `ffxiv_act_plugin.resource.dll`.
 
 Remaining toward full parity (tracked): ACT's **action-category** data (NPC auto-attack
-swing-type), **combat-end detection** for exact heal/shield/resource counts, **proc-source**
-decoding, and DoT/HoT simulation. The differential harness measures each as it lands.
+swing-type), **combat-end detection** for exact heal/resource counts, **proc-source** decoding, and
+**damage shields** (log type `11`, routed into "Healed (Out)" — not yet emitted). The differential
+harness measures each as it lands.
 
 ## Massive parse compat (every log, ACT vs ours)
 
@@ -123,12 +124,16 @@ names, never committed.
 - **Pet/summon owner attribution** — `03` field 6 `OwnerID`, field 4 `Job`: a true pet (job 0)
   collapses to the bare owner name, an owned non-pet (e.g. `G'raha Tia`) renders `"name (owner)"`.
 
-**Simulated `(*)` DoT/HoT/shields are out of scope.** ACT's per-source personal DoT/HoT ticks and
-damage shields are synthesized upstream by the plugin — not by ACT, and the inputs are not present in
-the log (see [`ACT-OUTPUT-PARITY-GAPS.md`](ACT-OUTPUT-PARITY-GAPS.md)). We do not reproduce plugin
-logic, so the parser emits only the DoT/HoT ticks the log actually carries (real ground-AoE ticks,
-`24` with status id ≠ 0 — bit-exact). The old `PotencySimulator.cs` (a port of that synthesis) has
-been removed.
+**DoT/HoT come from the log; only the plugin's `(*)` potency estimate does not.** Every DoT/HoT tick
+line (`24`) carries a per-tick amount and a source for every tick (incl. status id `0`), so the parser
+emits a DoT/HoT swing per sourced tick from the log's own values. The plugin's per-status potency
+*estimate* (the `(*)` value) is plugin logic, not in the log, and not reproduced; judged at ACT's DPS
+output (where DoT/HoT swings sum into combatant damage/healed totals) the two net out — damage parity
+is exact to ~0.05% end to end through the real ACT engine. **Damage shields** (`11`, routed into
+"Healed (Out)") are still plugin synthesis and not yet emitted — the main healing residual. Per-swing
+bag-diff is the wrong yardstick for DoT/HoT; use the output comparison
+(see [`ACT-OUTPUT-PARITY-GAPS.md`](ACT-OUTPUT-PARITY-GAPS.md)). The old `PotencySimulator.cs` (a port
+of the plugin's DoT/shield synthesis) stays removed.
 
 Over the local corpus (67 logs, ~5.9M swings) the parser reproduces ACT's output, bit-for-bit on the
 strict tuple: auto **99.98%**, ability **99.85%**, power **99.9%**, status **99.4%**, heal **95.1%**,
