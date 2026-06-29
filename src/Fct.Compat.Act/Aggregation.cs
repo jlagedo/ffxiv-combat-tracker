@@ -364,9 +364,12 @@ namespace Advanced_Combat_Tracker
 
     public class ZoneData
     {
-        public string ZoneName = "";
-        public EncounterData ActiveEncounter;
-        public List<EncounterData> Items = new List<EncounterData>();
+        // ACT exposes these as properties; plugins (OverlayPlugin/cactbot) call the property
+        // getters (e.g. get_ActiveEncounter), so they must be properties here, not fields, or
+        // those calls fail to bind with MissingMethodException.
+        public string ZoneName { get; set; } = "";
+        public EncounterData ActiveEncounter { get; set; }
+        public List<EncounterData> Items { get; set; } = new List<EncounterData>();
         public ZoneData() { ActiveEncounter = new EncounterData(ActGlobals.charName, "", this); }
     }
 

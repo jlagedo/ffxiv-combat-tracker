@@ -102,6 +102,9 @@ public sealed partial class CombatLogParser
     private readonly Dictionary<uint, SimC> _sc = new();
     private readonly Dictionary<(uint recipient, uint statusId), (byte P0, byte P1, byte P2)> _applyParams = new();
     private readonly Dictionary<(uint recipient, uint statusId), long> _shieldHeal = new(); // heal-percent shield base
+    // Per-tick crit/DH draw, exactly as DoTSimulator: an unseeded, time-seeded Random. The crit bit is
+    // genuinely stochastic in ACT, so simulated crit ticks cannot be reproduced bit-for-bit by design.
+    private readonly Random _simRandom = new();
 
     private SimC GetSC(uint id) => _sc.TryGetValue(id, out var c) ? c : (_sc[id] = new SimC());
 
@@ -115,25 +118,32 @@ public sealed partial class CombatLogParser
 
     // --- direct-hit calibration: build the per-source attack-power proxy median ------------------
 
-    private void SimCalibrateDamage(uint srcId, uint tgtId, uint actionId, in CombatEffect e, long t)
+    private void SimCalibrateDamage(uint srcId, uint tgtId, uint actionId, int targetIndex, in CombatEffect e, long t)
     {
         if (e.Amount <= 0) return;
+        var sc = GetSC(srcId);
+
+        // CriticalHitDamage / SourceDirectHit: maintain the source's running crit & DH means on every
+        // hit (ACT updates these on all damage effects). CriticalDamageRate is the crit fraction;
+        // DirectHitRate is the 1.25-scaled DH mean (ACT stores 1.25 per direct hit, not 1.0).
+        sc.Track.CritRate = (sc.Track.CritRate * sc.Track.CritSwings + (e.IsCritical ? 1.0 : 0.0)) / (sc.Track.CritSwings + 1);
+        sc.Track.CritSwings++;
+        sc.Track.DhRate = (sc.Track.DhRate * sc.Track.DhSwings + (e.IsDirectHit ? 1.25 : 0.0)) / (sc.Track.DhSwings + 1);
+        sc.Track.DhSwings++;
+
+        // PotencyMultiplierDamage: store the attack-power proxy only from primary-target hits — a
+        // secondary AoE target carries a falloff potency we don't have, which would bias the median.
+        if (targetIndex != 0) return;
         if (ActionPotency == null || !ActionPotency.TryGetValue(actionId, out var pot)) return;
         double potency = e.Combo != 0 ? pot.PotCombo : pot.Pot;
         if (potency <= 0) return;
 
-        var sc = GetSC(srcId);
-        // Crit rate (CriticalHitDamage): running mean of crit, then this hit's source rate.
-        sc.Track.CritRate = (sc.Track.CritRate * sc.Track.CritSwings + (e.IsCritical ? 1.0 : 0.0)) / (sc.Track.CritSwings + 1);
-        sc.Track.CritSwings++;
-        double critRate = sc.Track.CritSwings > 10 ? sc.Track.CritRate : 0.15;
-        if (critRate < 0.05) critRate = 0.05;
-        // DH rate (SourceDirectHit): running mean of 1.25*dh.
-        sc.Track.DhRate = (sc.Track.DhRate * sc.Track.DhSwings + (e.IsDirectHit ? 1.25 : 0.0)) / (sc.Track.DhSwings + 1);
-        sc.Track.DhSwings++;
-
         double mult = DamageBuffMult(srcId, tgtId, actionId, e.DamageTypeId, t);
         if (mult == 0) return;
+
+        // SourceCritRate (CriticalHitDamage): tracked mean after 10 swings, else 0.15, floored 0.05.
+        double critRate = sc.Track.CritSwings > 10 ? sc.Track.CritRate : 0.15;
+        if (critRate < 0.05) critRate = 0.05;
 
         double am = e.Amount;
         if (e.EntryType == EffectEntryType.ParriedDamage) am /= 1 + e.Combo / 100; // integer combo (block %)
@@ -142,6 +152,28 @@ public sealed partial class CombatLogParser
         am /= potency;
         am /= mult;
         sc.Track.Store(sc.Track.Dmg, ref sc.Track.DmgIdx, am);
+    }
+
+    // SourcePotencyHeal: the heal-potency analogue of SimCalibrateDamage. Heals have no DH and no
+    // parry; the crit divisor is the same (1.35 + SourceCritRate). Primary-target hits only.
+    private void SimCalibrateHeal(uint srcId, uint tgtId, uint actionId, int targetIndex, in CombatEffect e, long t)
+    {
+        if (e.Amount <= 0 || targetIndex != 0) return;
+        if (ActionPotency == null || !ActionPotency.TryGetValue(actionId, out var pot)) return;
+        double potency = pot.HealPot;
+        if (potency <= 0) return;
+
+        var sc = GetSC(srcId);
+        double mult = HealBuffMult(srcId, tgtId, t);
+        if (mult == 0) return;
+        double critRate = sc.Track.CritSwings > 10 ? sc.Track.CritRate : 0.15;
+        if (critRate < 0.05) critRate = 0.05;
+
+        double am = e.Amount;
+        if (e.IsCritical) am /= 1.35 + critRate;
+        am /= potency;
+        am /= mult;
+        sc.Track.Store(sc.Track.Heal, ref sc.Track.HealIdx, am);
     }
 
     // CalculatedPotencyMultiplier: 1 + sum of source damage-done buffs + target damage-received
@@ -166,6 +198,27 @@ public sealed partial class CombatLogParser
                 foreach (var p in st.Def.Potencies)
                     if (p.Type == "DamageReceivedMultiplier" && BuffApplies(p, actionId, dmgType))
                         m += BuffAmount(p, st) / 100.0;
+            }
+        return m < 0 ? 1.0 : m;
+    }
+
+    // CalculatedPotencyMultiplier for heals: 1 + source HealDoneMultiplier + target HealReceiveMultiplier.
+    private double HealBuffMult(uint srcId, uint tgtId, long t)
+    {
+        double m = 1.0;
+        if (_sc.TryGetValue(srcId, out var s))
+            foreach (var st in s.Statuses)
+            {
+                if (Expired(st, t)) continue;
+                foreach (var p in st.Def.Potencies)
+                    if (p.Type == "HealDoneMultiplier") m += BuffAmount(p, st) / 100.0;
+            }
+        if (_sc.TryGetValue(tgtId, out var g))
+            foreach (var st in g.Statuses)
+            {
+                if (Expired(st, t)) continue;
+                foreach (var p in st.Def.Potencies)
+                    if (p.Type == "HealReceiveMultiplier") m += BuffAmount(p, st) / 100.0;
             }
         return m < 0 ? 1.0 : m;
     }
@@ -230,10 +283,24 @@ public sealed partial class CombatLogParser
             var src = GetSC(srcId);
             double appliedMult = (isHoT ? src.Track.HealMedian : src.Track.DmgMedian)
                                  ?? (isHoT ? src.Track.DmgMedian : src.Track.HealMedian) ?? 1.0;
-            double potMult = DamageBuffMult(srcId, tgtId, 0, DamageId(def.DamageType), t);
-            byte? lowAmt = _applyParams.ContainsKey((tgtId, statusId)) ? pp.P0 : (byte?)null;
+            double potMult = isHoT ? HealBuffMult(srcId, tgtId, t)
+                                   : DamageBuffMult(srcId, tgtId, 0, DamageId(def.DamageType), t);
+            bool hasParams = _applyParams.ContainsKey((tgtId, statusId));
+            byte? lowAmt = hasParams ? pp.P0 : (byte?)null;
             long simAmount = ComputeSimAmount(def.Potency, potMult, appliedMult, lowAmt);
-            double critRate = pp.P1 != 0 ? pp.P1 / 1000.0 : (src.Track.CritSwings > 10 ? src.Track.CritRate : 0.0);
+
+            // CalculateCritDh: the low byte (EffectByte1 = apply-status Param1) carries the crit-rate
+            // fraction; the source's observed crit rate supplies the integer part via the +0.255 bumps.
+            // CalculateCrit yields 0 until the source has >10 tracked swings.
+            double observedCrit = src.Track.CritSwings > 10 ? src.Track.CritRate : 0.0;
+            double critRate;
+            if (hasParams)
+            {
+                critRate = pp.P1 / 1000.0;
+                while (observedCrit - critRate > 0.125) critRate += 0.255;
+            }
+            else critRate = observedCrit;
+            if (critRate > 1.0) critRate = hasParams ? pp.P1 / 1000.0 : 0.00005;
             double dhRate = src.Track.DhSwings > 10 ? src.Track.DhRate : 0.05;
 
             tc.Sims.RemoveAll(x => x.StatusId == statusId && x.SourceId == srcId);
@@ -303,11 +370,19 @@ public sealed partial class CombatLogParser
 
         foreach (var sim in matches)
         {
+            // DoTSimulator.SimulateTicks, individual-crit branch (ACT's default). The crit/DH bits are
+            // RNG draws against the tick's stored rates; non-crit/non-DH ticks emit SimAmount verbatim,
+            // so they reproduce ACT exactly. The crit ticks are stochastic and cannot bit-match.
+            double num = sim.SimAmount;
+            bool crit = _simRandom.Next(1000) < sim.CritRate * 1000.0;
+            bool dh = !isHoT && _simRandom.Next(1000) < sim.DhRate * 1000.0;
             double critMult = sim.CritRate - sim.CritBuff / 100.0 + 1.35;
             if (critMult < 1.4) critMult = 1.4;
-            double num3 = sim.SimAmount * (1.0 + (critMult - 1.0) * sim.CritRate) * (1.0 + 0.25 * sim.DhRate);
-            long amount = logAmount == 0 ? 0 : (long)Math.Floor(num3);
-            yield return new CombatAction(isHoT, isHoT ? 5 : 3, false, amount, "",
+            if (crit && dh) num = (int)(num * critMult * 1.25);
+            else if (crit) num = (int)(num * critMult);
+            else if (dh) num = (int)(num * 1.25);
+            long amount = logAmount == 0 ? 0 : (long)num;
+            yield return new CombatAction(isHoT, isHoT ? 5 : 3, crit, amount, "",
                 ResolveName(sim.SourceId), ResolveName(targetId), ResolveStatus(sim.StatusId, "") + " (*)", "Unknown", true);
             sim.UsedTicks++;
             sim.LastTick = t;
@@ -387,9 +462,9 @@ public sealed partial class CombatLogParser
         return list;
     }
 
-    public static Dictionary<uint, (int Pot, int PotCombo)> LoadActionPotency(string path)
+    public static Dictionary<uint, (int Pot, int PotCombo, int HealPot)> LoadActionPotency(string path)
     {
-        var map = new Dictionary<uint, (int, int)>();
+        var map = new Dictionary<uint, (int, int, int)>();
         if (!File.Exists(path)) return map;
         foreach (var line in File.ReadLines(path).Skip(1))
         {
@@ -398,7 +473,8 @@ public sealed partial class CombatLogParser
                 continue;
             int p0 = int.TryParse(c[1], out var a) ? a : 0;
             int p0c = int.TryParse(c[2], out var b) ? b : 0;
-            map[id] = (p0, p0c == 0 ? p0 : p0c);
+            int hp0 = c.Length > 3 && int.TryParse(c[3], out var h) ? h : 0;
+            map[id] = (p0, p0c == 0 ? p0 : p0c, hp0);
         }
         return map;
     }

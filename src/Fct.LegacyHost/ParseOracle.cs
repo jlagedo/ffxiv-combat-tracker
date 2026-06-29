@@ -187,8 +187,10 @@ namespace Fct.LegacyHost
             File.WriteAllLines(Path.Combine(outFolder, "status-defs.tsv"), statusRows);
             Log($"dumped {statusRows.Count - 1} status defs");
 
-            // Per-action base potency for the per-hit calibration: GetDamagePotency(targetIndex, combo).
-            var actionRows = new List<string> { "actionId\tpot0\tpot0combo" };
+            // Per-action base potency for the per-hit calibration: GetDamagePotency(targetIndex, combo)
+            // and GetHealPotency(targetIndex) at the primary target (index 0). The native simulator
+            // divides observed primary-target hits by these to recover the source attack-power proxy.
+            var actionRows = new List<string> { "actionId\tpot0\tpot0combo\thealPot0" };
             if (getAction != null)
             {
                 foreach (System.Collections.DictionaryEntry de in skills)
@@ -197,12 +199,13 @@ namespace Fct.LegacyHost
                     object adef = null; try { adef = getAction.Invoke(defRepo, new object[] { aid }); } catch { }
                     if (adef == null) continue;
                     var gdp = adef.GetType().GetMethod("GetDamagePotency");
-                    if (gdp == null) continue;
-                    object p0 = null, p0c = null;
-                    try { p0 = gdp.Invoke(adef, new object[] { 0, false }); } catch { }
-                    try { p0c = gdp.Invoke(adef, new object[] { 0, true }); } catch { }
-                    if (p0 == null && p0c == null) continue;
-                    actionRows.Add($"{aid:X}\t{S(p0)}\t{S(p0c)}");
+                    var ghp = adef.GetType().GetMethod("GetHealPotency");
+                    object p0 = null, p0c = null, hp0 = null;
+                    try { p0 = gdp?.Invoke(adef, new object[] { 0, false }); } catch { }
+                    try { p0c = gdp?.Invoke(adef, new object[] { 0, true }); } catch { }
+                    try { hp0 = ghp?.Invoke(adef, new object[] { 0 }); } catch { }
+                    if (p0 == null && p0c == null && hp0 == null) continue;
+                    actionRows.Add($"{aid:X}\t{S(p0)}\t{S(p0c)}\t{S(hp0)}");
                 }
             }
             File.WriteAllLines(Path.Combine(outFolder, "action-potency.tsv"), actionRows);

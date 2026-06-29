@@ -71,7 +71,7 @@ public sealed partial class CombatLogParser
     // Optional status/action potency definitions (ACT's IDefinitionRepository data). When both are
     // set, the potency simulator reproduces ACT's simulated DoT/HoT amounts and damage shields.
     public IReadOnlyDictionary<uint, StatusDef>? StatusDefs { get; init; }
-    public IReadOnlyDictionary<uint, (int Pot, int PotCombo)>? ActionPotency { get; init; }
+    public IReadOnlyDictionary<uint, (int Pot, int PotCombo, int HealPot)>? ActionPotency { get; init; }
     private bool SimEnabled => StatusDefs != null && ActionPotency != null;
 
     public IEnumerable<CombatAction> Process(IEnumerable<string> lines)
@@ -189,6 +189,8 @@ public sealed partial class CombatLogParser
                     if (!TryId(line.Field(2), out var src) || !TryId(line.Field(6), out var tgt)) break;
                     TryId(line.Field(4), out var actionId);
                     string ability = ResolveAction(actionId, line.Field(5));
+                    // Field 45 = TargetIndex (the AoE target ordinal); only index 0 carries full potency.
+                    int targetIndex = int.TryParse(line.Field(45), NumberStyles.Integer, CultureInfo.InvariantCulture, out var ti) ? ti : 0;
                     bool meaningful = false;
                     Dictionary<uint, long>? lineHeals = null; // heals this line, for heal-percent shields
                     foreach (var e in ActionEffectDecoder.DecodeFull(line))
@@ -208,12 +210,13 @@ public sealed partial class CombatLogParser
                                 yield return new CombatAction(false, swing, e.IsCritical, e.Amount, e.Special,
                                     attacker, victim, ability, ActionEffectDecoder.DamageTypeText(e.DamageTypeId, e.ElementId), true);
                                 _actionIsDamage[actionId] = true;
-                                if (SimEnabled) SimCalibrateDamage(src, victimId, actionId, e, t);
+                                if (SimEnabled) SimCalibrateDamage(src, victimId, actionId, targetIndex, e, t);
                                 RefreshCombat(t); // damage starts/continues combat (SetEncounter)
                                 break;
 
                             case EffectKind.Heal:
-                                if (SimEnabled) (lineHeals ??= new())[victimId] = e.Amount;
+                                if (SimEnabled) { (lineHeals ??= new())[victimId] = e.Amount;
+                                    SimCalibrateHeal(src, victimId, actionId, targetIndex, e, t); }
                                 if (!_inCombat) break;
                                 string healer = IsLimitBreak(actionId, -1) ? "Limit Break" : ResolveName(src);
                                 yield return new CombatAction(true, 4, e.IsCritical, e.Amount, "",

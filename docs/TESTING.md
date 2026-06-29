@@ -127,25 +127,30 @@ names, never committed.
 **Potency simulator** (`PotencySimulator.cs`) reproduces ACT's *simulated* `(*)` swings — the ones
 the plugin synthesizes from bundled potency data rather than the log. It mirrors `DoTSimulator` +
 `DamageShieldSimulator` + `PotencyStatusApplication`: it calibrates a per-source attack-power proxy
-from observed direct hits (median of `amount / (crit·dh) / actionPotency / buffMult`), tracks active
-buffs for the damage-done multiplier, and multiplies the DoT/HoT/shield potency by both, anchoring
-the low byte to the status-application packet. Damage shields of `HealPercent` / `TargetHpPercent`
+from observed **primary-target** hits (median of `amount / (crit·dh) / actionPotency / buffMult`,
+indexed off field-45 `TargetIndex == 0` so AoE-falloff hits don't bias the median), tracks active
+buffs for the damage-done / heal-done multiplier, and multiplies the DoT/HoT/shield potency by
+both, anchoring the low byte to the status-application packet. The tick itself runs ACT's
+**individual-crit branch** (`SimulateIndividualDoTCrits`, the plugin default): each tick draws a
+crit and direct-hit bit against the source's tracked rates, so non-crit/non-DH ticks emit the base
+amount verbatim while crit ticks are boosted. Damage shields of `HealPercent` / `TargetHpPercent`
 type are fully log-derived (companion heal × %, or max-HP × %) and reproduced bit-exact.
 
 Over the local corpus (67 logs, ~5.9M swings) the parser reproduces, bit-for-bit on the strict
 tuple: auto **99.98%**, ability **99.85%**, power **99.90%**, status **97.6%**, heal **91%**,
 action **91%**, and the real (log-amount) ground-AoE DoT/HoT exactly. The simulated `(*)` DoT/HoT
-and shields reach **~94% aggregate value-parity** (sum of amounts vs ACT) with shields **60%
+and shields reach **~95.6% of ACT's damage sum** (the DPS-relevant signal) with shields **60%
 bit-exact**.
 
 **Hard limit on the simulated ticks.** ACT's `DoTSimulator.SimulateTicks` decides each simulated
-tick's crit flag with `_random.Next(1000) < critRate·1000` and its ±1 rounding with
-`_random.NextDouble()` — `_random` is a time-seeded `new Random()`. So **21% of the 1.18M simulated
-ticks carry a crit bit ACT itself would not reproduce on a second run**, and amounts jitter ±1.
-Bit-identical parity on those is impossible by construction; the simulator targets **value-parity**
-(the DPS-relevant amount) instead, measured crit-excluded and as an aggregate damage sum. The
-remaining value gap is incomplete buff modeling (zone/category-limited multipliers, heal-potency
-calibration for HoTs) and shield special cases — refinement, not a structural limit.
+tick's crit/DH bits with `_random.Next(1000) < rate·1000` (and, in the smoothed mode, ±1 rounding
+with `_random.NextDouble()`) — `_random` is a time-seeded `new Random()`. So **~29% of the 1.18M
+simulated ticks carry a crit/DH bit ACT itself would not reproduce on a second run**. Bit-identical
+parity on those is impossible by construction; the deterministic non-crit ticks bit-match only when
+the attack-power median **and** the per-application buff-snapshot multiplier both match ACT exactly.
+The residual gap is per-application buff-snapshot precision (zone/category-limited multipliers, crit-
+buff exclusion from rate tracking, snapshot timing) — refinement, not a structural limit. The DPS
+sum is the parity metric that matters for fflogs/ranks, and it sits at ~95.6%.
 
 ## End-to-end live route (recorded logs)
 

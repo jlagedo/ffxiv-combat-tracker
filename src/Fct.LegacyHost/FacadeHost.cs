@@ -155,11 +155,11 @@ namespace Fct.LegacyHost
 
         // A borderless, off-screen WinForms window with a docked TabControl, ready to host one
         // plugin's configuration tabs. Each plugin gets its own so the Avalonia host can embed
-        // them independently. The handle is realized here (off-screen) so it never flashes before
-        // it's reparented into the host; NativeControlHost shows + positions it on embed.
+        // them independently. The window is shown off-screen so WinForms runs a real layout pass
+        // before it's reparented into the host; NativeControlHost re-positions it on embed.
         private static Form CreateHostWindow(out TabControl tabs)
         {
-            var form = new Form
+            var form = new HostForm
             {
                 Text = "Fct.PluginHost",
                 FormBorderStyle = FormBorderStyle.None,
@@ -173,7 +173,33 @@ namespace Fct.LegacyHost
             tabs = new TabControl { Dock = DockStyle.Fill };
             form.Controls.Add(tabs);
             _ = form.Handle; // realize the HWND on this WinForms thread
+
+            // Show it (off-screen, without stealing foreground) so WinForms performs a genuine
+            // layout pass against a real client size. Plugin panels built on SplitContainer /
+            // percentage-row TableLayoutPanel (e.g. OverlayPlugin's ControlPanel) collapse to
+            // zero height if they're only ever laid out while the host window is hidden. Once the
+            // window is visible, controls the plugin adds afterward lay out live.
+            form.Show();
             return form;
+        }
+
+        // The off-screen plugin host window: shown before embedding to force a layout pass, but
+        // kept out of the foreground (ShowWithoutActivation) and the Alt-Tab list (WS_EX_TOOLWINDOW)
+        // so the user never sees a stray window in the moment before it's reparented.
+        private sealed class HostForm : Form
+        {
+            protected override bool ShowWithoutActivation => true;
+
+            protected override CreateParams CreateParams
+            {
+                get
+                {
+                    const int WS_EX_TOOLWINDOW = 0x00000080;
+                    var cp = base.CreateParams;
+                    cp.ExStyle |= WS_EX_TOOLWINDOW;
+                    return cp;
+                }
+            }
         }
 
         private static Type FindPluginType(Assembly asm)

@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Collections.ObjectModel;
+using System.IO;
 using System.Linq;
 
 namespace Fct.App.ViewModels;
@@ -72,32 +73,115 @@ public sealed class MainViewModel : ObservableObject
         });
 
         _selectedPlugin = Plugins[0];
+        _selectedPlugin.IsSelected = true;
 
         SelectSectionCommand = new RelayCommand(p => SelectedSection = p as string ?? SelectedSection);
         RetryCommand = new RelayCommand(() => RetryRequested?.Invoke());
+
+        ManageCommand = new RelayCommand(() => PluginsMode = "Manage");
+        ConfigureCommand = new RelayCommand(() => PluginsMode = "Configure");
+        AddPluginCommand = new RelayCommand(() => AddPluginRequested?.Invoke());
+        RemovePluginCommand = new RelayCommand(p => RemovePlugin(p as PluginViewModel));
+        MoveUpCommand = new RelayCommand(p => Move(p as PluginViewModel, -1));
+        MoveDownCommand = new RelayCommand(p => Move(p as PluginViewModel, +1));
 
         SetStarting();
     }
 
     public RelayCommand SelectSectionCommand { get; }
     public RelayCommand RetryCommand { get; }
+    public RelayCommand ManageCommand { get; }
+    public RelayCommand ConfigureCommand { get; }
+    public RelayCommand AddPluginCommand { get; }
+    public RelayCommand RemovePluginCommand { get; }
+    public RelayCommand MoveUpCommand { get; }
+    public RelayCommand MoveDownCommand { get; }
 
     // Raised when the user asks to relaunch the host after a failed start; the window
     // owns the satellite lifecycle and wires this up.
     public event Action? RetryRequested;
 
+    // Raised when the user clicks "Add plugin"; the window owns the file picker.
+    public event Action? AddPluginRequested;
+
     private string _selectedSection = "Plugins";
     public string SelectedSection
     {
         get => _selectedSection;
-        set => SetField(ref _selectedSection, value);
+        set { if (SetField(ref _selectedSection, value)) Raise(nameof(ShowGenericHeader)); }
     }
 
-    private PluginViewModel _selectedPlugin;
-    public PluginViewModel SelectedPlugin
+    // The shared content header is replaced by the Plugins page's own rail/bay chrome.
+    public bool ShowGenericHeader => SelectedSection != "Plugins";
+
+    // The Plugins page has two surfaces in the same space: "Configure" (the embedded
+    // plugin tabs) and "Manage" (add / remove / enable / reorder the roster).
+    private string _pluginsMode = "Configure";
+    public string PluginsMode
+    {
+        get => _pluginsMode;
+        set { if (SetField(ref _pluginsMode, value)) { Raise(nameof(IsConfigure)); Raise(nameof(IsManage)); } }
+    }
+
+    public bool IsConfigure => _pluginsMode == "Configure";
+    public bool IsManage => _pluginsMode == "Manage";
+
+    private PluginViewModel? _selectedPlugin;
+    public PluginViewModel? SelectedPlugin
     {
         get => _selectedPlugin;
-        set => SetField(ref _selectedPlugin, value);
+        set
+        {
+            var old = _selectedPlugin;
+            if (!SetField(ref _selectedPlugin, value)) return;
+            if (old is not null) old.IsSelected = false;
+            if (value is not null) value.IsSelected = true;
+        }
+    }
+
+    // Reorder the roster in place (the channel rail and rack both reflect the order).
+    private void Move(PluginViewModel? p, int dir)
+    {
+        if (p is null) return;
+        var i = Plugins.IndexOf(p);
+        var j = i + dir;
+        if (i < 0 || j < 0 || j >= Plugins.Count) return;
+        Plugins.Move(i, j);
+    }
+
+    // Remove an added/loaded plugin; keep a sensible selection on whatever remains.
+    private void RemovePlugin(PluginViewModel? p)
+    {
+        if (p is null) return;
+        var i = Plugins.IndexOf(p);
+        if (i < 0) return;
+        Plugins.Remove(p);
+        if (ReferenceEquals(SelectedPlugin, p))
+            SelectedPlugin = Plugins.Count > 0 ? Plugins[Math.Min(i, Plugins.Count - 1)] : null;
+        Refresh();
+    }
+
+    // Add a plugin by file. The satellite owns plugin loading, so a freshly added plugin
+    // reads as "Not loaded" until the host relaunches and hosts it.
+    public void AddPlugin(string path)
+    {
+        var name = Path.GetFileNameWithoutExtension(path);
+        var vm = new PluginViewModel
+        {
+            Name = name,
+            Role = "Added · hosted on next launch",
+            Version = "—",
+            Kind = PluginKind.Legacy,
+            FilePath = path,
+            BaseStatus = PluginStatus.NotLoaded,
+            Description =
+                $"Added from {path}. The .NET 4.8 satellite loads plugins when the host starts, " +
+                "so this plugin's configuration tabs appear here after the next relaunch.",
+        };
+        Plugins.Add(vm);
+        SelectedPlugin = vm;
+        PluginsMode = "Manage";
+        Refresh();
     }
 
     private HostState _host = HostState.Starting;

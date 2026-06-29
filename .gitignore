@@ -13,6 +13,10 @@ obj/
 .vs/
 artifacts/
 
+# Release output from release.ps1
+/dist/
+/dist.zip
+
 # Tooling
 *.binlog
 TestResults/

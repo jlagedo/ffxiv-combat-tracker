@@ -2,9 +2,12 @@ using System;
 using System.Collections.Generic;
 using System.ComponentModel;
 using System.IO;
+using System.Linq;
 using System.Threading.Tasks;
 using Avalonia.Controls;
 using Avalonia.Input;
+using Avalonia.Interactivity;
+using Avalonia.Platform.Storage;
 using Fct.App.ViewModels;
 
 namespace Fct.App;
@@ -22,6 +25,7 @@ public partial class MainWindow : Window
         DataContext = _vm;
         _vm.PropertyChanged += OnViewModelChanged;
         _vm.RetryRequested += () => _ = StartSatelliteAsync();
+        _vm.AddPluginRequested += () => _ = PickPluginAsync();
         UpdateHeader();
 
         _ = StartSatelliteAsync();
@@ -33,21 +37,44 @@ public partial class MainWindow : Window
         {
             case nameof(MainViewModel.SelectedSection):
                 UpdateHeader();
+                UpdateEmbed();
                 break;
             case nameof(MainViewModel.SelectedPlugin):
             case nameof(MainViewModel.ConfigReady):
+            case nameof(MainViewModel.PluginsMode):
                 UpdateEmbed();
                 break;
         }
     }
 
-    // Show the selected plugin's own configuration window in the config slot (or nothing).
+    // Show the selected plugin's own configuration window in the bay — but only on the
+    // Plugins page in Configure mode. The embedded HWND paints over Avalonia content, so we
+    // detach it whenever the Manage rack or another section needs that space.
     private void UpdateEmbed()
     {
         var p = _vm.SelectedPlugin;
-        EmbedSlot.Child = _vm.ConfigReady && p is { Hwnd: var h } && h != IntPtr.Zero
+        var canEmbed = _vm.SelectedSection == "Plugins" && _vm.IsConfigure && _vm.ConfigReady;
+        EmbedSlot.Child = canEmbed && p is { Hwnd: var h } && h != IntPtr.Zero
             ? GetEmbed(h)
             : null;
+    }
+
+    // Tapping a channel in the rail patches that plugin into the bay (leaving Manage).
+    private void OnRailTapped(object? sender, TappedEventArgs e) => _vm.PluginsMode = "Configure";
+
+    private async Task PickPluginAsync()
+    {
+        var files = await StorageProvider.OpenFilePickerAsync(new FilePickerOpenOptions
+        {
+            Title = "Add a plugin",
+            AllowMultiple = false,
+            FileTypeFilter = new[]
+            {
+                new FilePickerFileType(".NET plugin") { Patterns = new[] { "*.dll", "*.exe" } },
+            },
+        });
+        if (files.FirstOrDefault() is { } f)
+            _vm.AddPlugin(f.Path.LocalPath);
     }
 
     private EmbeddedSatelliteView GetEmbed(IntPtr hwnd)

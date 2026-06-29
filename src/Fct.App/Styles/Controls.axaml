@@ -184,6 +184,142 @@
         <Setter Property="BorderBrush" Value="{StaticResource FrostBrush}"/>
     </Style>
 
+    <!-- ============================ Channel rail ============================ -->
+    <Style Selector="ListBox.rail">
+        <Setter Property="Background" Value="Transparent"/>
+        <Setter Property="Padding" Value="0"/>
+        <Setter Property="BorderThickness" Value="0"/>
+    </Style>
+    <Style Selector="ListBox.rail ListBoxItem">
+        <Setter Property="Padding" Value="0"/>
+        <Setter Property="Margin" Value="0,0,0,6"/>
+        <Setter Property="CornerRadius" Value="10"/>
+    </Style>
+    <Style Selector="ListBox.rail ListBoxItem /template/ ContentPresenter#PART_ContentPresenter">
+        <Setter Property="Background" Value="Transparent"/>
+    </Style>
+    <Style Selector="ListBox.rail ListBoxItem:selected /template/ ContentPresenter#PART_ContentPresenter">
+        <Setter Property="Background" Value="Transparent"/>
+    </Style>
+    <Style Selector="ListBox.rail ListBoxItem:pointerover /template/ ContentPresenter#PART_ContentPresenter">
+        <Setter Property="Background" Value="Transparent"/>
+    </Style>
+    <Style Selector="Border.railcard">
+        <Setter Property="Background" Value="Transparent"/>
+        <Setter Property="BorderBrush" Value="Transparent"/>
+        <Setter Property="BorderThickness" Value="1"/>
+        <Setter Property="CornerRadius" Value="10"/>
+        <Setter Property="Padding" Value="10,9"/>
+        <Setter Property="Transitions">
+            <Transitions>
+                <BrushTransition Property="Background" Duration="0:0:0.15"/>
+                <BrushTransition Property="BorderBrush" Duration="0:0:0.15"/>
+            </Transitions>
+        </Setter>
+    </Style>
+    <Style Selector="ListBox.rail ListBoxItem:pointerover Border.railcard">
+        <Setter Property="Background" Value="{StaticResource RimeBrush}"/>
+    </Style>
+    <Style Selector="ListBox.rail ListBoxItem:selected Border.railcard">
+        <Setter Property="Background" Value="{StaticResource RimeHiBrush}"/>
+        <Setter Property="BorderBrush" Value="{StaticResource FrostDimBrush}"/>
+    </Style>
+    <Style Selector="Rectangle.railbar">
+        <Setter Property="Opacity" Value="0"/>
+    </Style>
+    <Style Selector="ListBox.rail ListBoxItem:selected Rectangle.railbar">
+        <Setter Property="Opacity" Value="1"/>
+    </Style>
+
+    <!-- Manage button at the foot of the rail -->
+    <Style Selector="Button.railmanage">
+        <Setter Property="Background" Value="Transparent"/>
+        <Setter Property="BorderBrush" Value="{StaticResource HairlineBrush}"/>
+        <Setter Property="BorderThickness" Value="1"/>
+        <Setter Property="CornerRadius" Value="10"/>
+        <Setter Property="Padding" Value="0"/>
+        <Setter Property="Height" Value="40"/>
+        <Setter Property="HorizontalAlignment" Value="Stretch"/>
+        <Setter Property="HorizontalContentAlignment" Value="Left"/>
+    </Style>
+    <Style Selector="Button.railmanage /template/ ContentPresenter">
+        <Setter Property="Background" Value="Transparent"/>
+        <Setter Property="Transitions">
+            <Transitions><BrushTransition Property="Background" Duration="0:0:0.15"/></Transitions>
+        </Setter>
+    </Style>
+    <Style Selector="Button.railmanage TextBlock">
+        <Setter Property="Foreground" Value="{StaticResource HoarfrostBrush}"/>
+        <Setter Property="FontSize" Value="13"/>
+    </Style>
+    <Style Selector="Button.railmanage Path">
+        <Setter Property="Stroke" Value="{StaticResource HoarfrostBrush}"/>
+    </Style>
+    <Style Selector="Button.railmanage:pointerover /template/ ContentPresenter">
+        <Setter Property="Background" Value="{StaticResource RimeBrush}"/>
+    </Style>
+    <Style Selector="Button.railmanage:pointerover TextBlock">
+        <Setter Property="Foreground" Value="{StaticResource GlintBrush}"/>
+    </Style>
+    <Style Selector="Button.railmanage:pointerover Path">
+        <Setter Property="Stroke" Value="{StaticResource FrostBrush}"/>
+    </Style>
+    <Style Selector="Button.railmanage.active">
+        <Setter Property="BorderBrush" Value="{StaticResource FrostDimBrush}"/>
+    </Style>
+    <Style Selector="Button.railmanage.active /template/ ContentPresenter">
+        <Setter Property="Background" Value="{StaticResource RimeHiBrush}"/>
+    </Style>
+    <Style Selector="Button.railmanage.active TextBlock">
+        <Setter Property="Foreground" Value="{StaticResource GlintBrush}"/>
+    </Style>
+    <Style Selector="Button.railmanage.active Path">
+        <Setter Property="Stroke" Value="{StaticResource FrostBrush}"/>
+    </Style>
+
+    <!-- ============================ Manage rack ============================ -->
+    <Style Selector="Border.rackrow">
+        <Setter Property="Background" Value="#0E1620"/>
+        <Setter Property="BorderBrush" Value="{StaticResource HairlineBrush}"/>
+        <Setter Property="BorderThickness" Value="1"/>
+        <Setter Property="CornerRadius" Value="12"/>
+        <Setter Property="Padding" Value="14,12"/>
+        <Setter Property="Margin" Value="0,0,0,10"/>
+        <Setter Property="Transitions">
+            <Transitions><BrushTransition Property="Background" Duration="0:0:0.15"/></Transitions>
+        </Setter>
+    </Style>
+    <Style Selector="Border.rackrow:pointerover">
+        <Setter Property="Background" Value="{StaticResource RimeBrush}"/>
+    </Style>
+
+    <!-- Small icon buttons (reorder / remove) -->
+    <Style Selector="Button.iconbtn">
+        <Setter Property="Background" Value="Transparent"/>
+        <Setter Property="Width" Value="26"/>
+        <Setter Property="Height" Value="22"/>
+        <Setter Property="Padding" Value="0"/>
+        <Setter Property="CornerRadius" Value="6"/>
+    </Style>
+    <Style Selector="Button.iconbtn /template/ ContentPresenter">
+        <Setter Property="Background" Value="Transparent"/>
+    </Style>
+    <Style Selector="Button.iconbtn Path">
+        <Setter Property="Stroke" Value="{StaticResource HoarfrostBrush}"/>
+    </Style>
+    <Style Selector="Button.iconbtn:pointerover /template/ ContentPresenter">
+        <Setter Property="Background" Value="{StaticResource RimeHiBrush}"/>
+    </Style>
+    <Style Selector="Button.iconbtn:pointerover Path">
+        <Setter Property="Stroke" Value="{StaticResource GlintBrush}"/>
+    </Style>
+    <Style Selector="Button.iconbtn.danger:pointerover /template/ ContentPresenter">
+        <Setter Property="Background" Value="#3A1B1E"/>
+    </Style>
+    <Style Selector="Button.iconbtn.danger:pointerover Path">
+        <Setter Property="Stroke" Value="{StaticResource WarnBrush}"/>
+    </Style>
+
     <!-- ============================ Status orb pulse ============================ -->
     <Style Selector="Border.pulse">
         <Style.Animations>

@@ -30,8 +30,19 @@ public sealed class PluginViewModel : ObservableObject
     // Matches the satellite's PLUGIN key; links a roster row to its embeddable window.
     public string Key { get; init; } = "";
 
+    // Set when a plugin is added by browsing for a DLL; the satellite hosts it on next launch.
+    public string? FilePath { get; init; }
+
     // The satellite window to embed when this plugin is selected (zero until reported).
     public IntPtr Hwnd { get; set; }
+
+    // Drives the channel rail's active styling; the MainViewModel keeps exactly one set.
+    private bool _isSelected;
+    public bool IsSelected
+    {
+        get => _isSelected;
+        set => SetField(ref _isSelected, value);
+    }
 
     private bool _hasNativeConfig;
     public bool HasNativeConfig
