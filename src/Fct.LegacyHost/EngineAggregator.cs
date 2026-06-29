@@ -25,7 +25,6 @@ namespace Fct.LegacyHost
         {
             string logPath = Path.Combine(folder, "_mass-engine-exports.log");
             void Log(string s) { try { File.AppendAllText(logPath, $"{DateTime.Now:HH:mm:ss.fff} {s}\n"); } catch { } }
-            AppDomain.CurrentDomain.UnhandledException += (s, e) => Log($"UNHANDLED (terminating={e.IsTerminating}): {e.ExceptionObject}");
             try
             {
                 InstallTables();

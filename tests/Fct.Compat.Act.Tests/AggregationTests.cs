@@ -49,7 +49,9 @@ namespace Fct.Compat.Act.Tests
             var at = WithSwings();
             Assert.Equal(0L, at.Damage);
             Assert.Equal(0, at.Hits);
-            Assert.Equal(0f, at.CritPerc);
+            // 0 crits / 0 hits = NaN, unguarded exactly as ACT's AttackType.CritPerc (the
+            // DamageTypeData level guards the no-"All" case, so this only surfaces for all-miss buckets).
+            Assert.True(float.IsNaN(at.CritPerc));
             Assert.Equal(0L, at.MaxHit);
             Assert.Equal(TimeSpan.Zero, at.Duration);
         }

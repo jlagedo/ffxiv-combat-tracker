@@ -66,6 +66,58 @@ and exercised through run logs and tests, pending a live-game capture. Everythin
 subject to change. See [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md) §11 for the milestone
 map.
 
+## Validation — ACT-engine output parity
+
+The one hard, measurable claim this prototype makes: **our clean-room ACT aggregation engine
+(`Fct.Compat.Act`) reproduces the real ACT binary's output bit-for-bit**, given the same
+plugin-produced swings. "Output" means `ExportVariables` — the exact per-combatant and
+per-encounter dictionaries OverlayPlugin builds and cactbot/overlays read.
+
+### How the test works (`tools/mass-compare`)
+
+The real **FFXIV_ACT_Plugin is the sole parser** — this project never decodes a log line itself.
+The pipeline feeds **one** plugin-produced swing stream into **two** aggregators and diffs the
+result:
+
+1. Load the **real FFXIV_ACT_Plugin** once and capture its `MasterSwing` parse of every
+   `Network_*.log` → `<name>.oracle.tsv` (the producer's output, captured once).
+2. Aggregate that stream through the **real ACT binary** → `<name>.oracle.exports.tsv` (the gold
+   baseline).
+3. Aggregate the **same** stream through **our engine** → `<name>.engine.exports.tsv`.
+4. Diff the two `ExportVariables` payloads, per file × per row × per key.
+
+Identical input into both engines, so any difference is purely *our aggregation vs ACT's*.
+
+### The corpus
+
+| | |
+|---|---|
+| Real `Network_*.log` files | **68** (54 with combat) |
+| Swings parsed by the plugin | **5,875,218** |
+| Span | 2026-03-16 → 2026-06-29 (~3.5 months) |
+| Game-client builds covered | 8 |
+| Rows compared | **1,561** (1,493 combatants + 68 encounters) |
+| Key/value pairs | **102,686** |
+
+### Result
+
+**100.000% exact** — all 102,686 string values identical, **0 ours-only, 0 act-only**. Every
+export key OverlayPlugin reads matches, for both the `Combatant` object (per-player
+DPS/HPS/crit%/max-hit/deaths/…) and the raid-wide `Encounter` object. Independent numeric
+cross-checks agree too — e.g. Σ damage `147,357,922,640`; Σ healed `54,251,599,282`;
+`3,799,748` hits; `24,841` deaths — identical on both sides.
+
+The fixture-level version of the same check (`AggregateCompatTests` / `ExportVarsCompatTests`)
+runs in CI on two committed slices. Full method: [`docs/TESTING.md`](docs/TESTING.md).
+
+### What this does and doesn't prove
+
+- **It does:** an overlay (cactbot, MiniParse, …) reading combat data off this host would see the
+  same numbers it sees off real ACT, to the character.
+- **It doesn't:** validate *parsing* — that is the plugin's job, hosted unmodified. DoT/HoT/shield
+  values are the plugin's own estimates, baked into the swings both engines receive; we sum
+  whatever we are handed, exactly as ACT does. And this is still a prototype (see the banner above).
+
 ## Building (for the curious only)
 
 Requires the .NET 10 SDK, the net48 targeting pack, and the WindowsDesktop runtime on

@@ -47,7 +47,10 @@ namespace Advanced_Combat_Tracker
         public long Damage => Items.Where(s => (long)s.Damage > 0).Sum(s => (long)s.Damage);
         public int Hits => Items.Count(s => ActGlobals.blockIsHit ? (long)s.Damage >= 0 : (long)s.Damage > 0);
         public int CritHits => Items.Count(s => s.Critical && (ActGlobals.blockIsHit ? (long)s.Damage >= 0 : (long)s.Damage > 0));
-        public float CritPerc => Hits == 0 ? 0f : (float)CritHits / Hits * 100f;
+        // Unguarded like ACT (AttackType.CritPerc): 0 crits / 0 hits → NaN, which ACT surfaces as
+        // "NaN" for an attack-type that recorded only misses. The DamageTypeData level still guards the
+        // no-swing case (no "All" attack-type → 0), so only an all-miss bucket yields NaN.
+        public float CritPerc => (float)CritHits / Hits * 100f;
         public int Swings => Items.Count(s => s.Damage != Dnum.Death);
         public int Misses => Items.Count(s => s.Damage == Dnum.Miss);
         public int Blocked => 0;
@@ -209,6 +212,13 @@ namespace Advanced_Combat_Tracker
         }
 
         public Dictionary<string, DamageTypeData> Items { get => items; set { } }
+
+        // The per-attack-type swing lists of the reference outgoing/incoming buckets, projected
+        // exactly as ACT does (CombatantData.AllOut => outAll.Items). The FFXIV plugin's
+        // CombatantDataExtension.Job() walks AllOut.Values to read the "Job" tag off each attack
+        // type's first swing; OverlayPlugin/cactbot resolve the per-combatant job icon through it.
+        public SortedList<string, AttackType> AllOut => outAll.Items;
+        public SortedList<string, AttackType> AllInc => incAll.Items;
 
         public void AddCombatAction(MasterSwing action)
         {

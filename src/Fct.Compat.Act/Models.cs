@@ -34,7 +34,24 @@ namespace Advanced_Combat_Tracker
         public static bool operator ==(Dnum a, Dnum b) => a.Equals(b);
         public static bool operator !=(Dnum a, Dnum b) => !a.Equals(b);
 
-        public override string ToString() => Number > 0 ? Number.ToString() : (damageString ?? Number.ToString());
+        // Sentinel values render as ACT's localized terms (data-dnum* in English), so a maxhit/maxheal
+        // whose top swing is a Miss/Death/etc. shows "Miss"/"Death" rather than an empty number —
+        // matching ACT's Dnum.ToString. Positive numbers render plainly; -6..-9 fall back to damageString.
+        public override string ToString()
+        {
+            if (Number > 0) return Number.ToString();
+            switch (Number)
+            {
+                case 0L: return "No Damage";
+                case -1L: return "Miss";
+                case -2L: return "Resist";
+                case -3L: return "Parry";
+                case -4L: return "Riposte";
+                case -5L: return "Block";
+                case -10L: return "Death";
+            }
+            return damageString + DamageString2;
+        }
         public int CompareTo(object obj) => Number.CompareTo(((Dnum)obj).Number);
         public override bool Equals(object obj) => obj is Dnum d && d.Number == Number;
         public override int GetHashCode() => Number.GetHashCode();
