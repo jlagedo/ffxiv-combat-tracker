@@ -26,7 +26,7 @@ damageType, victim)`:
 | Status (8) | `26` status-add | **99.4%** |
 | Action (1) | `21`/`22` with no effect | **92.4%** (combat-window boundary residue) |
 | Cancelled cast (2/4/1) | `23` | log-derived |
-| DoT/HoT ticks (3/5) | `24` — one combined tick per target per server tick (real amount; rotating source) | emitted from the log; **value is a producer difference** vs the plugin's estimate (see below) |
+| DoT/HoT ticks (3/5) | `24` — one combined tick per target per server tick (real amount; rotating source) | emitted from the log for **enemy** victims; player-victim DoTs dropped (incoming, not outgoing). `Damage` bucket **99.917%**; residual value is producer estimate noise (see below) |
 
 The residual on heals/action(1)/status(8) is **combat-window boundary** precision (exactly when ACT's
 idle-end opens/closes the encounter), which is `ACT-decompiled` behavior — that is where the remaining
@@ -58,24 +58,39 @@ status, crit-independent), while the log carries one real combined tick. They di
 | ACT aggregation engine | — | bit-exact | ✓ replicated (Slice 1 S5) |
 | auto-attack damage (0) | log `21/22` | **100.000%** | ✓ in the log |
 | ability damage (2) | log `21/22` | **99.993%** | ✓ in the log |
+| **DAMAGE bucket (0+2+3) = player DPS** | — | **99.917%** | ✓ |
 | direct heals (4) | log `21/22` | **100.258%** | ✓ in the log |
 | HoT total (5) | log `24` | **99.681%** | ✓ nets out |
 | **Healed excl. shields** | — | **99.975%** | ✓ |
-| DoT value (3) | log `24` vs estimate | 146% corpus (see below) | producer, not ACT |
+| DoT value (3) | log `24` vs estimate | **97.327%** corpus (see below) | ✓ small producer noise |
 | shields (11) | not in log | 0 vs 20.28% of Healed | producer, not ACT |
 
-### DoT — producer difference, content-correlated (not a parse bug)
+### DoT — the big divergence was a fixable attribution bug, now fixed
 
-The DoT ratio (ours/plugin) tracks **game patch**, not a fixed offset: 30101–30107 ≈ **100–102%**, then
-30108 **201%**, 30109 **205%**, 30201 **320%**, 30202 **391%**, 30203 **347%**. Our per-tick value is
-stable (~31k, the real combined-tick total); the plugin's per-swing estimate falls (9.2k → 6.0k) and
-it emits relatively fewer of them. Proven structure: FFXIV emits **one combined DoT tick per target
-per server tick**, stamped with a single *rotating* source over the combined amount (e.g. Enuo: 179
-lines / 179 timestamps / 8 sources / 1 line per instant). Newer Ultimate content (e.g. Futures
-Rewritten) adds large volumes of status-0 **PC→PC** ticks that our parser emits verbatim but the
-plugin does not emit at all — ACT's consumer does not filter them (it has no such filter), so the
-difference is entirely the producer choosing what to emit. Reproducing the plugin's per-source split
-or its selective emission requires its potency model + status tracking — plugin logic, not in the log.
+The headline `Damage` bucket (auto+ability+DoT, what feeds player DPS) is **99.917%** corpus-wide. It
+got there by understanding the producer instead of declaring it unreachable. The earlier corpus DoT of
+~146% looked content-correlated (a few files at 400–510%), but the cause was concrete, not synthesis:
+
+- **Player-victim DoT ticks (the dominant error).** A type-`24` DoT tick whose *victim* is a player
+  (entity id `0x10xxxxxx`) is an enemy/environment DoT ticking **on** a player — incoming damage, never
+  a player's outgoing DoT. The log gives no real source for the combined (statusId `0`) tick: field 17
+  holds a single **rotating player id**, so trusting it credits a random player with the boss's damage.
+  On Futures Rewritten phase 1 (Fatebreaker) this was **73% of the file's DoT** — e.g. 54.2M wrongly
+  credited to players on `Network_30108_20260501`, inflating it to 462%. The plugin attributes none of
+  these (corpus-wide it emits **109** player-victim DoT swings out of millions). The parser now drops
+  DoT ticks with a player victim, exactly as the plugin does. This alone collapsed the 400–510% files
+  to ~100% and took corpus DoT from 146% → 97.3%, the `Damage` bucket to 99.917%.
+
+- **Residual ±a few %: log-real value vs the plugin's estimate.** What remains is the per-tick value:
+  the log carries one combined tick per target per server tick (Enuo: 179 lines / 179 timestamps / 8
+  sources / 1 line per instant); we emit that real amount, the plugin substitutes a flat per-status
+  **potency estimate**. These differ swing by swing but net to ~100% per file (52/53 files land
+  80–110%). In fast multi-source farming the plugin's simulation actually **under**-counts — e.g. on a
+  dungeon farm (`Network_30109_20260509`) the log holds 8.14M of DoT on the boss across 11 pulls, which
+  we sum exactly, while the plugin attributes only 0.90M (its per-status estimate × fewer attributed
+  ticks). There our log-real value is the *more* accurate one. Reproducing the plugin's per-source
+  split or its exact estimate needs its potency model — plugin logic, not in the log — but the residual
+  is now small and centered on parity, not a 1.5–5× gap.
 
 ### Shields — `maxHP × potency`, synthesized, not logged
 
@@ -85,10 +100,13 @@ log, but the 20% potency and the shield synthesis are the plugin's. The shield v
 log; grep confirms 33889/`0x8461` never appears on any Radiant Aegis line. Shields are 20.28% of ACT's
 `Healed` and are the entire healing residual (heal+HoT alone is 99.975%).
 
-### Environment ticks (fixed)
+### Ticks the parser drops (matching the plugin)
 
-The parser drops type-24 ticks whose source is FFXIV's null actor `0xE0000000` (the source/target the
-log leaves unattributed), matching the plugin, which attributes none of them to a combatant.
+A type-24 tick is **not** a player's outgoing damage — and is dropped — when its source is FFXIV's null
+actor `0xE0000000` (the source/target the log leaves unattributed), when it is sourceless (id `0`), or
+when it is a **DoT on a player victim** (`0x10xxxxxx` target — incoming enemy/environment damage whose
+combined-tick source field is an unreliable rotating player id). The plugin attributes none of these to
+a combatant; dropping them is what brings the `Damage` bucket to 99.917% corpus-wide.
 
 The plugin's per-status potency *estimate* (the `(*)` value) is plugin logic and not in the log, so it
 is never reproduced; we emit the log's real combined-tick amounts and judge parity at the output. The

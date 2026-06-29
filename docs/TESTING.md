@@ -128,14 +128,18 @@ names, never committed.
 logic and `FormActMain.AddCombatAction` filters nothing; it sums every swing. Every DoT/HoT/shield
 *value* in the live output is the plugin's (producer) synthesis, not ACT's — so those divergences are
 producer differences, not ACT gaps. Our parser emits each type-`24` tick from the log's own combined
-amount (one tick per target per server tick; the `0xE0000000` null actor dropped). Corpus output
-parity (68 logs): auto **100.000%**, ability **99.993%**, heal **100.258%**, HoT total **99.681%**,
-healed-excl-shields **99.975%**. The DoT value diverges from the plugin's per-status estimate and the
-divergence tracks game patch (producer difference, not a parse bug); **damage shields** (`11`,
-`maxHP × potency`) are not logged and not emitted (the entire healing residual). Per-swing bag-diff is
-the wrong yardstick for DoT/HoT/shield; use the output comparison
-(see [`ACT-OUTPUT-PARITY-GAPS.md`](ACT-OUTPUT-PARITY-GAPS.md)). The old `PotencySimulator.cs` (a port
-of the plugin's DoT/shield synthesis) stays removed.
+amount (one tick per target per server tick), dropping ticks that are not player-outgoing: the
+`0xE0000000` null actor, sourceless ticks, and **DoTs on a player victim** (`0x10xxxxxx` target —
+incoming enemy/environment damage whose combined-tick source is a misleading rotating player id; the
+plugin attributes 109 such swings out of millions). Corpus output parity (68 logs): auto **100.000%**,
+ability **99.993%**, **`Damage` bucket (auto+ability+DoT = player DPS) 99.917%**, heal **100.258%**,
+HoT total **99.681%**, healed-excl-shields **99.975%**, DoT **97.327%**. The residual DoT value is
+per-tick log-real-amount vs the plugin's flat potency estimate — small noise centered on parity (where
+they diverge the plugin usually *under*-counts fast multi-source ticks, so our log value is the more
+accurate one). **Damage shields** (`11`, `maxHP × potency`) are not logged and not emitted (the entire
+healing residual). Per-swing bag-diff is the wrong yardstick for DoT/HoT/shield; use the output
+comparison (see [`ACT-OUTPUT-PARITY-GAPS.md`](ACT-OUTPUT-PARITY-GAPS.md)). The old `PotencySimulator.cs`
+(a port of the plugin's DoT/shield synthesis) stays removed.
 
 Over the local corpus (67 logs, ~5.9M swings) the parser reproduces ACT's output, bit-for-bit on the
 strict tuple: auto **99.98%**, ability **99.85%**, power **99.9%**, status **99.4%**, heal **95.1%**,

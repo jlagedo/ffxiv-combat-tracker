@@ -151,7 +151,17 @@ public sealed partial class CombatLogParser
                     TryId(line.Field(6), out var dAmount);
                     TryId(line.Field(17), out var dsrc);
 
-                    if (dsrc != 0 && dsrc != EnvironmentId)
+                    // A DoT tick whose victim is a player (entity id 0x10xxxxxx) is an enemy/
+                    // environment DoT ticking *on* a player — incoming damage, never a player's
+                    // outgoing DoT (players deal offensive DoTs only to enemies). The log gives no
+                    // real source for the combined (statusId 0) tick: field 17 holds a single
+                    // *rotating* player id, so emitting it would credit a random player with the
+                    // boss's damage. The plugin attributes none of these to a combatant (corpus-
+                    // wide it emits 109 player-victim DoT swings out of millions), so they are
+                    // dropped — this is what collapses the inflated DoT total back to parity.
+                    bool isPlayerVictimDoT = !isHoT && IsPlayerId(dtgt);
+
+                    if (dsrc != 0 && dsrc != EnvironmentId && !isPlayerVictimDoT)
                     {
                         // The log carries one combined tick per target per server tick (field 6 =
                         // amount, field 17 = a source). The status name (when statusId != 0) is the
@@ -169,10 +179,11 @@ public sealed partial class CombatLogParser
                     }
                     else
                     {
-                        // Sourceless (id 0) or environment (id 0xE0000000, the FFXIV null actor): not a
-                        // combatant's damage, so not emitted — matching the plugin, which attributes no
-                        // such tick to a player. Still a combat event, so it keeps ACT's window alive
-                        // (a DoT can hold it open; a HoT only while in combat).
+                        // Not a player's outgoing damage, so not emitted — matching the plugin, which
+                        // attributes none of these to a combatant: a sourceless (id 0) or environment
+                        // (id 0xE0000000, the FFXIV null actor) tick, or a DoT ticking on a player
+                        // victim (incoming boss/environment damage). Still a combat event, so it keeps
+                        // ACT's window alive (a DoT can hold it open; a HoT only while in combat).
                         if (!isHoT || _inCombat) RefreshCombat(t);
                     }
                     break;
@@ -284,6 +295,9 @@ public sealed partial class CombatLogParser
     // an "unowned NPC" if it is in the NPC range and has no recorded owner (so not an owned pet).
     private bool IsUnownedNpc(uint id) =>
         id >= 0x40000000u && !(_hasPlayer && id == _playerId) && !_owners.ContainsKey(id);
+
+    // A player character entity id (the 0x10xxxxxx range). Pets/summons (0x40xxxxxx) are not players.
+    private static bool IsPlayerId(uint id) => (id & 0xF0000000u) == 0x10000000u;
 
     // FFXIV's reserved "null actor" entity id (no source/target). A combined DoT/HoT tick stamped
     // with this id is environmental, not a combatant's damage, and is not attributed to a player.
