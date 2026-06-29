@@ -14,6 +14,52 @@ and run); its gap IDs (G‑1…, M4) are the surface backlog. Companion docs:
 
 ---
 
+## Status legend
+
+Every interface row in Part 1 carries a status glyph; Part 2 sections and the board below use the same:
+
+| Glyph | Meaning |
+|:--:|---|
+| ✅ | **DONE** — implemented + functional |
+| 🟡 | **STUB / VERIFY** — present but inert *by design*, or present but untested on the live path |
+| ❌ | **GAP** — missing; must build for the four-plugin target |
+| ⬜ | **M4** — Hojoring-only batch; not yet built |
+
+## Status board — remaining work (the trackable checklist)
+
+**Four-plugin target — must build:**
+- [ ] **G‑1** ❌ `TTS(string)` / `PlaySound(string)` **methods** → route to the delegate fields (§8F) — BREAK
+- [ ] **G‑2** ❌ `ActGlobals.oFormSpellTimers` + inert `FormSpellTimers` (2 events) (§8G) — BREAK
+- [ ] **G‑3** ❌ `FormActMain.DpiScale` property → `1f` (§8J) — MINOR
+- [ ] **VERIFY** 🟡 `BeforeLogLineRead` reflectable multicast field; exact "…Started" status string set before Trig/OP/Hojoring init (§8A/§8C)
+- [ ] **G‑4** 🟡 `TraySlider` / `ButtonLayoutEnum` inert stubs — only if a bind throws (§8K)
+
+**M4 — Hojoring (not yet built):**
+- [ ] **M4‑2** ⬜ working `FormSpellTimers` (`TimerDefs` + add/remove/rebuild/notify) + the `TimerData`/`SpellTimer`/`TimelineEvent`/`TimerMod`/`TimerFrame` model family (§8G)
+- [ ] **M4‑3** ⬜ real `CornerControlAdd`/`CornerControlRemove` methods (§8J)
+- [ ] **M4‑4** ⬜ `Form` lifecycle members `WindowState`/`CanFocus`/`IsHandleCreated`/`IsDisposed` (§8J)
+- [ ] **M4‑1** ⬜ Hojoring audio — closed automatically by **G‑1** (same methods)
+
+**Done — no action (checked = implemented):**
+- [x] 8A Plugin lifecycle, identity & discovery
+- [x] 8B Producer write-path (verified bit-for-bit)
+- [x] 8C Inbound log seam *(pending the VERIFY above)*
+- [x] 8D Consumer read-path (MiniParse / cactbot CombatData)
+- [x] 8E Combat-state events
+- [x] 8H Custom-trigger import
+- [x] 8I Encounter text export & encounter log
+- [x] 8K Self-update plumbing (inert stubs, by design)
+- [x] 8L Error / diagnostic logging
+- [x] 8M Cross-cutting shape (consumed subset)
+- [x] §9 FFXIV_ACT_Plugin SDK seam (`WrappedFfxivPlugin`)
+- [x] §10 OverlayPlugin web surface (self-hosted by unmodified OP — non-goal for us)
+
+> **Net:** the four-plugin interface work is **G‑1 + G‑2 + G‑3** (three small facade additions) plus
+> verification. M4 (Hojoring spell-timer subsystem) is the larger batch on top. Everything else is
+> DONE or STUB-by-design.
+
+---
+
 ## Guiding principles (these decide how much of each interface we build)
 
 1. **Impersonate ACT only enough to make the plugins bind and run.** We are *not* reproducing ACT's
@@ -35,9 +81,6 @@ and run); its gap IDs (G‑1…, M4) are the surface backlog. Companion docs:
    consumer guards them (`GetMethod(...) != null`, try/catch, `FailsafeRegisterHook`). We build them
    only when a consumer calls them *unguarded*.
 
-Status legend used throughout: **DONE** implemented + functional · **GAP** missing, must build ·
-**STUB** present but inert (intended) · **VERIFY** present, untested on the live path.
-
 ## Method
 
 Each plugin source tree was swept for references into the `Advanced_Combat_Tracker` namespace
@@ -56,7 +99,9 @@ surface (chiefly the full spell-timer subsystem) is the larger, not-yet-built ba
 
 ---
 
-# Part 1 — The map (what each plugin consumes, and why)
+# Part 1 — The map (what each plugin consumes, why, and its status)
+
+The leftmost **St** column is the facade status of that member (see legend).
 
 ## 1. FFXIV_ACT_Plugin — the producer
 
@@ -64,40 +109,40 @@ surface (chiefly the full spell-timer subsystem) is the larger, not-yet-built ba
 engine calls funnel through `FFXIV_ACT_Plugin.Common.ACTWrapper`; `ACT_UIMods` reconfigures ACT's
 static table/export model; the root type implements `IActPluginV1`.
 
-| ACT member | dir | purpose |
-|---|---|---|
-| `IActPluginV1.{InitPlugin,DeInitPlugin}` | implement | plugin load contract |
-| `ActGlobals.oFormActMain` | read | root host handle; every call below dereferences it |
-| `ActGlobals.charName` | read | local player display name for swing source/target naming |
-| `FormActMain.AddCombatAction(MasterSwing)` | call | **core write path** — pushes every parsed swing into aggregation |
-| `FormActMain.SetEncounter(DateTime,attacker,victim)→bool` | call | opens/continues the encounter; gates each `AddCombatAction` |
-| `FormActMain.ChangeZone(string)` | call | zone transitions |
-| `FormActMain.EndCombat(bool)` | call | ends encounter (guarded by `InCombat`) |
-| `FormActMain.InCombat` | read | gates heal/DoT/HoT/shield/status/death/resource emit |
-| `FormActMain.OpenLog(bool,bool)` | call | points ACT at the plugin's `Network_*.log` and (re)opens it |
-| `FormActMain.{LogFilePath,LogFileFilter}` | r/w | redirect ACT's active log to the network log |
-| `FormActMain.GlobalTimeSorter` | read | stable per-timestamp swing ordering |
-| `FormActMain.{TimeStampLen,LogPathHasCharName,ZoneChangeRegex}` | write | configure ACT's line parsing |
-| `FormActMain.GetDateTimeFromLog` (`DateTimeLogParser`) | override | plugin owns timestamp parsing; saved + restored |
-| `FormActMain.BeforeLogLineRead` (event) | subscribe | rewrites `logLine`/`detectedType` through ParseMediator (inbound hook) |
-| `FormActMain.LogFileChanged` (event) | subscribe | import-vs-live handling |
-| `FormActMain.LastKnownTime` | read | rolling-window `LastNDPS` export calc |
-| `FormActMain.ActCommands(string)` | call | `/echo`-style passthrough |
-| `FormActMain.{WriteExceptionLog,WriteDebugLog,RestartACT}` | call | error/debug logging, version-mismatch abort |
-| `FormActMain.ReadThreadLock`, `.Visible` | read | gate log-writer thread startup |
-| `FormActMain.{ValidateLists,ValidateTableSetup}` | call | commit after mutating columns/exports |
-| `FormActMain.GenerateAttackTypeGraph` (`AttackTypeGraphGenerator`) | override | plugin's graph generator; restored on unload |
-| `FormActMain.FindControl<Button>("…btnClear")` | call | hook ACT's Clear button → `OnClear` |
-| `FormActMain.{AppDataFolder,PluginGetSelfData}` | read/call | install dir + self-data |
-| `FormActMain.{PluginGetRemoteVersion,PluginDownload,PluginDownloadMem,UnZip,GetAutomaticUpdatesAllowed}` + `UpdateCheckClicked` event | call/subscribe | self-update (plugin id 73) |
-| `MasterSwing` (10-arg ctor, `.Tags/.Damage/.Time/.Special/.DamageType/.AttackType/.Critical`) + `MasterSwing.ColumnDefs` (static) | construct/r/w | every swing; registers FFXIV columns |
-| `Dnum` (`.NoDamage/.Miss/.Death`, ctor, implicit `long`) | construct | damage sentinels + wrap |
-| `CombatantData` (static `ColumnDefs`/`ExportVariables`/`OutgoingDamageTypeDataObjects`; consts `DamageTypeDataOutgoing*`) | r/w | registers Job/DirectHit/CritDirectHit/OverHeal/potency/Last-N-DPS columns + exports |
-| `EncounterData` (static `ExportVariables`; `.ZoneName/.Duration/.LastNDPS`) | r/w | registers `CurrentZoneName`, `Last{10,30,60}DPS` — **the keys OverlayPlugin reads** |
-| `AttackType` (static `ColumnDefs`; `.Items/.Special/.Critical/.Tags`) | r/w | Parry/Block/OverHeal/DirectHit columns |
-| `DamageTypeData`, `DamageTypeDef` (ctor `(string,int,Color)`), `ColumnDef`, `TextExportFormatter` | construct | damage-type groupings + column/export wrappers |
-| `ActLocalization.LocalizationStrings["attackTypeTerm-all"].DisplayedText` | read | localized "All" bucket key |
-| `TraySlider`, `ButtonLayoutEnum`, `PluginDownloadData` | construct | update-notification UI |
+| St | ACT member | dir | purpose |
+|:--:|---|---|---|
+| ✅ | `IActPluginV1.{InitPlugin,DeInitPlugin}` | implement | plugin load contract |
+| ✅ | `ActGlobals.oFormActMain` | read | root host handle; every call below dereferences it |
+| ✅ | `ActGlobals.charName` | read | local player display name for swing source/target naming |
+| ✅ | `FormActMain.AddCombatAction(MasterSwing)` | call | **core write path** — pushes every parsed swing into aggregation |
+| ✅ | `FormActMain.SetEncounter(DateTime,attacker,victim)→bool` | call | opens/continues the encounter; gates each `AddCombatAction` |
+| ✅ | `FormActMain.ChangeZone(string)` | call | zone transitions |
+| ✅ | `FormActMain.EndCombat(bool)` | call | ends encounter (guarded by `InCombat`) |
+| ✅ | `FormActMain.InCombat` | read | gates heal/DoT/HoT/shield/status/death/resource emit |
+| ✅ | `FormActMain.OpenLog(bool,bool)` | call | points ACT at the plugin's `Network_*.log` and (re)opens it |
+| ✅ | `FormActMain.{LogFilePath,LogFileFilter}` | r/w | redirect ACT's active log to the network log |
+| ✅ | `FormActMain.GlobalTimeSorter` | read | stable per-timestamp swing ordering |
+| ✅ | `FormActMain.{TimeStampLen,LogPathHasCharName,ZoneChangeRegex}` | write | configure ACT's line parsing |
+| ✅ | `FormActMain.GetDateTimeFromLog` (`DateTimeLogParser`) | override | plugin owns timestamp parsing; saved + restored |
+| ✅ | `FormActMain.BeforeLogLineRead` (event) | subscribe | rewrites `logLine`/`detectedType` through ParseMediator (inbound hook) |
+| ✅ | `FormActMain.LogFileChanged` (event) | subscribe | import-vs-live handling |
+| ✅ | `FormActMain.LastKnownTime` | read | rolling-window `LastNDPS` export calc |
+| 🟡 | `FormActMain.ActCommands(string)` | call | `/echo`-style passthrough (stub: logs only) |
+| ✅ | `FormActMain.{WriteExceptionLog,WriteDebugLog}` (+ `RestartACT` 🟡) | call | error/debug logging (RestartACT is a self-update stub) |
+| ✅ | `FormActMain.ReadThreadLock`, `.Visible` | read | gate log-writer thread startup |
+| ✅ | `FormActMain.{ValidateLists,ValidateTableSetup}` | call | commit after mutating columns/exports |
+| 🟡 | `FormActMain.GenerateAttackTypeGraph` (`AttackTypeGraphGenerator`) | override | plugin's graph generator (stub property, never invoked) |
+| 🟡 | `FormActMain.FindControl<Button>("…btnClear")` | call | hook ACT's Clear button (stub/diagnostic) |
+| ✅ | `FormActMain.{AppDataFolder,PluginGetSelfData}` | read/call | install dir + self-data |
+| 🟡 | `FormActMain.{PluginGetRemoteVersion,PluginDownload,PluginDownloadMem,UnZip,GetAutomaticUpdatesAllowed}` + `UpdateCheckClicked` | call/subscribe | self-update (plugin id 73) — inert stubs by design |
+| ✅ | `MasterSwing` (10-arg ctor, `.Tags/.Damage/.Time/.Special/.DamageType/.AttackType/.Critical`) + `MasterSwing.ColumnDefs` (static) | construct/r/w | every swing; registers FFXIV columns |
+| ✅ | `Dnum` (`.NoDamage/.Miss/.Death`, ctor, implicit `long`) | construct | damage sentinels + wrap |
+| ✅ | `CombatantData` (static `ColumnDefs`/`ExportVariables`/`OutgoingDamageTypeDataObjects`; consts `DamageTypeDataOutgoing*`) | r/w | registers Job/DirectHit/CritDirectHit/OverHeal/potency/Last-N-DPS columns + exports |
+| ✅ | `EncounterData` (static `ExportVariables`; `.ZoneName/.Duration/.LastNDPS`) | r/w | registers `CurrentZoneName`, `Last{10,30,60}DPS` — **the keys OverlayPlugin reads** |
+| ✅ | `AttackType` (static `ColumnDefs`; `.Items/.Special/.Critical/.Tags`) | r/w | Parry/Block/OverHeal/DirectHit columns |
+| ✅ | `DamageTypeData`, `DamageTypeDef` (ctor `(string,int,Color)`), `ColumnDef`, `TextExportFormatter` | construct | damage-type groupings + column/export wrappers |
+| ✅ | `ActLocalization.LocalizationStrings["attackTypeTerm-all"].DisplayedText` | read | localized "All" bucket key |
+| 🟡 | `TraySlider`, `ButtonLayoutEnum`, `PluginDownloadData` | construct | update-notification UI (G‑4 — add only if a bind throws) |
 
 **Pattern.** A single wrapper seam (`ACTWrapper`) fronts the engine; parsing emits typed entries →
 `MasterSwing` → `AddCombatAction` (gated by `SetEncounter`/`InCombat`). `ACT_UIMods` rewrites ACT's
@@ -109,37 +154,37 @@ It is a **pure producer** — it never reads `ActiveZone`/`GetCombatants` back o
 `E:\dev\OverlayPlugin`. Implements `IActPluginV1`; **reads** aggregated encounter data each tick and
 serves it to web overlays. Discovers FFXIV_ACT_Plugin *through* ACT's plugin list.
 
-| ACT member | dir | purpose |
-|---|---|---|
-| `IActPluginV1.{InitPlugin,DeInitPlugin}` | implement | load contract |
-| `ActGlobals.oFormActMain` | read | root handle; null-checked readiness gate |
-| `FormActMain.GetVersion()` | call | gate: requires ACT ≥ 3.8.0.281 |
-| `FormActMain.NotificationAdd(string,string)` | call | version-too-old error |
-| `FormActMain.{Invoke,InvokeRequired}` | call | marshal to ACT UI thread |
-| `FormActMain.{IsActClosing,InitActDone,Handle}` | read | init / teardown phase gates |
-| `FormActMain.AppDataFolder` | read | CEF / ngrok / error-report / tech-support paths |
-| `FormActMain.DpiScale` | read | config-tab DPI scaling (try/catch → default 1) |
-| `FormActMain.ActPlugins` (`List<ActPluginData>`) | enumerate | **discovery** — find self, FFXIV plugin, Triggernometry, addons |
-| `FormActMain.PluginGetRemoteVersion(int)` | call | self-update version check |
-| **`FormActMain.TTS(string)`** | call | cactbot `say` (`MiniParseEventSource.cs:65`, `AddonExample:34`) |
-| **`FormActMain.PlaySound(string)`** | call | cactbot `play_sound` (`MiniParseEventSource.cs:75`) |
-| `FormActMain.EndCombat(bool)` | call | force-end encounter from JS/WS/event sources |
-| `FormActMain.InCombat` | read | compare ACT combat state vs memory |
-| `FormActMain.CurrentZone` | read | synthetic zone log line |
-| `FormActMain.ActiveZone` (`ZoneData`) | read | **gateway to encounter data** |
-| `FormActMain.BeforeLogLineRead` (event) | subscribe + **reflect** | primary log tap; `LogParseOverlay` reflects the backing field, unhooks all, inserts itself first |
-| `ZoneData.ActiveEncounter` (`EncounterData`) | read | the live encounter — MiniParse read root |
-| `EncounterData.GetAllies()→List<CombatantData>` | call | combatants to export |
-| `EncounterData.{Active,EncId,EndTime}` | read | `isActive` flag + change-detection cache keys |
-| `EncounterData.ExportVariables` (static) + `TextExportFormatter.GetExportString(enc,allies,"")` | enumerate/call | build the `Encounter` JSON dict |
-| `CombatantData.ExportVariables` (static) + `TextExportFormatter.GetExportString(combatant,"")` | enumerate/**write**/call | build each `Combatant` dict; **OP adds 3 keys** (`overHeal`,`damageShield`,`absorbHeal`) |
-| `CombatantData.{Name,Items,DamageTypeDataOutgoing{Damage,Healing}}` | read | JSON key + `Last*DPS` "All"-bucket guard + custom formatters |
-| `AttackType.Items` (`List<MasterSwing>`) | read | custom formatters iterate swings |
-| `MasterSwing.{Tags["overheal"],Special,Damage,DamageType}` | read | the 3 custom export formatters |
-| `oFormImportProgress.Visible` | read | detect log-import in progress (`MiniParseEventSource:189`) |
-| **`ActGlobals.oFormSpellTimers.{OnSpellTimerNotify,OnSpellTimerRemoved}`** | subscribe | `SpellTimerOverlay.cs:25/50` — spell-timer overlay feed |
-| `ActPluginData.{pluginObj,cbEnabled,lblPluginTitle,pluginFile,tpPluginSpace}` | read | FFXIVRepository discovery + reflection seam |
-| `LogLineEventArgs.{logLine,originalLogLine,detectedType,detectedTime}` | read | log-line fields |
+| St | ACT member | dir | purpose |
+|:--:|---|---|---|
+| ✅ | `IActPluginV1.{InitPlugin,DeInitPlugin}` | implement | load contract |
+| ✅ | `ActGlobals.oFormActMain` | read | root handle; null-checked readiness gate |
+| ✅ | `FormActMain.GetVersion()` | call | gate: requires ACT ≥ 3.8.0.281 |
+| 🟡 | `FormActMain.NotificationAdd(string,string)` | call | version-too-old error (stub: logs only) |
+| ✅ | `FormActMain.{Invoke,InvokeRequired}` | call | marshal to ACT UI thread |
+| ✅ | `FormActMain.{IsActClosing,InitActDone,Handle}` | read | init / teardown phase gates |
+| ✅ | `FormActMain.AppDataFolder` | read | CEF / ngrok / error-report / tech-support paths |
+| ❌ | `FormActMain.DpiScale` | read | config-tab DPI scaling (try/catch → default 1) — **G‑3** |
+| ✅ | `FormActMain.ActPlugins` (`List<ActPluginData>`) | enumerate | **discovery** — find self, FFXIV plugin, Triggernometry, addons |
+| 🟡 | `FormActMain.PluginGetRemoteVersion(int)` | call | self-update version check (stub) |
+| ❌ | **`FormActMain.TTS(string)`** | call | cactbot `say` (`MiniParseEventSource.cs:65`, `AddonExample:34`) — **G‑1** |
+| ❌ | **`FormActMain.PlaySound(string)`** | call | cactbot `play_sound` (`MiniParseEventSource.cs:75`) — **G‑1** |
+| ✅ | `FormActMain.EndCombat(bool)` | call | force-end encounter from JS/WS/event sources |
+| ✅ | `FormActMain.InCombat` | read | compare ACT combat state vs memory |
+| ✅ | `FormActMain.CurrentZone` | read | synthetic zone log line |
+| ✅ | `FormActMain.ActiveZone` (`ZoneData`) | read | **gateway to encounter data** |
+| 🟡 | `FormActMain.BeforeLogLineRead` (event) | subscribe + **reflect** | primary log tap; `LogParseOverlay` reflects the backing field, unhooks all, inserts itself first — VERIFY reflection shape |
+| ✅ | `ZoneData.ActiveEncounter` (`EncounterData`) | read | the live encounter — MiniParse read root |
+| ✅ | `EncounterData.GetAllies()→List<CombatantData>` | call | combatants to export |
+| ✅ | `EncounterData.{Active,EncId,EndTime}` | read | `isActive` flag + change-detection cache keys |
+| ✅ | `EncounterData.ExportVariables` (static) + `TextExportFormatter.GetExportString(enc,allies,"")` | enumerate/call | build the `Encounter` JSON dict |
+| ✅ | `CombatantData.ExportVariables` (static) + `TextExportFormatter.GetExportString(combatant,"")` | enumerate/**write**/call | build each `Combatant` dict; **OP adds 3 keys** (`overHeal`,`damageShield`,`absorbHeal`) |
+| ✅ | `CombatantData.{Name,Items,DamageTypeDataOutgoing{Damage,Healing}}` | read | JSON key + `Last*DPS` "All"-bucket guard + custom formatters |
+| ✅ | `AttackType.Items` (`List<MasterSwing>`) | read | custom formatters iterate swings |
+| ✅ | `MasterSwing.{Tags["overheal"],Special,Damage,DamageType}` | read | the 3 custom export formatters |
+| ✅ | `oFormImportProgress.Visible` | read | detect log-import in progress (`MiniParseEventSource:189`) |
+| ❌ | **`ActGlobals.oFormSpellTimers.{OnSpellTimerNotify,OnSpellTimerRemoved}`** | subscribe | `SpellTimerOverlay.cs:25/50` — spell-timer overlay feed — **G‑2** |
+| ✅ | `ActPluginData.{pluginObj,cbEnabled,lblPluginTitle,pluginFile,tpPluginSpace}` | read | FFXIVRepository discovery + reflection seam |
+| ✅ | `LogLineEventArgs.{logLine,originalLogLine,detectedType,detectedTime}` | read | log-line fields |
 
 **Pattern.** `CheckIsActReady` gates on `oFormActMain?.ActiveZone?.ActiveEncounter` +
 `EncounterData.ExportVariables` + `CombatantData.ExportVariables` non-null. Each tick it walks
@@ -156,26 +201,26 @@ satisfies (see §9).
 forwards to the ACT-free core (`Triggernometry.RealPlugin`). Missing hooks are swallowed
 (`FailsafeRegisterHook`), so absent members degrade gracefully.
 
-| ACT member | dir | purpose |
-|---|---|---|
-| `IActPluginV1.{InitPlugin,DeInitPlugin}` | implement | shim entry point |
-| `ActGlobals.oFormActMain` | read | cached into `RealPlugin.mainform` |
-| `FormActMain.{BeforeLogLineRead,OnLogLineRead}` (events) | subscribe | **central trigger feed** |
-| `FormActMain.{OnCombatStart,OnCombatEnd}` (events) | subscribe | fire Trig's combat events |
-| `FormActMain.{InCombat,CurrentZone,InitActDone}` | read | state hooks |
-| `FormActMain.{SetEncounter,EndCombat}` | call | manual combat-state control |
-| `FormActMain.{AppDataFolder,ActPlugins,PluginGetSelfData}` | read/call | config path + self/FFXIV-plugin discovery |
-| `FormActMain.{ActiveZone,ZoneList}` → `EncounterData.{Duration,LogLines,Items}` | read/mutate | active/last-encounter export + encounter-log append |
-| `FormActMain.GetTextExport(EncounterData,TextExportFormat)` + private `defaultTextFormat` field | call/**reflect** | render encounter to text |
-| `FormActMain.GlobalTimeSorter` + `LogLineEntry` ctor | read/construct | append a log line to `ActiveEncounter.LogLines` |
-| `FormActMain.{PlayTtsMethod,PlaySoundMethod}` (delegate props) | call | route TTS/sound through ACT |
-| `FormActMain.CustomTriggers` (Dictionary) + `CustomTrigger.{Category,RestrictToCategoryZone,Active,ShortRegexString,SoundData,SoundType,TimerName,Tabbed,Timer}` | read | one-way import of ACT-native custom triggers |
-| `FormActMain.{InvokeRequired,Invoke}` | call | UI-thread marshalling |
-| `FormActMain.CornerControlAdd/Remove` | **reflect-invoke** (GetMethod, may be absent) | corner notification popups |
-| `FormActMain` private field `tc1` (TabControl) | **reflect** | `LocateTab` selects Trig's tab |
-| `FormActMain.{PluginGetRemoteVersion,PluginDownload,UnZip,RestartACT,WriteExceptionLog}` + `TraySlider` | call/construct | self-update (plugin id 87) + update toast |
-| `ActPluginData.{pluginObj,pluginFile,lblPluginStatus,lblPluginTitle,cbEnabled,tpPluginSpace}` | read | identity / FFXIV-plugin status + checkbox scan |
-| `LogLineEventArgs.{originalLogLine,logLine,detectedZone}`, `CombatToggleEventArgs` | read | event payloads |
+| St | ACT member | dir | purpose |
+|:--:|---|---|---|
+| ✅ | `IActPluginV1.{InitPlugin,DeInitPlugin}` | implement | shim entry point |
+| ✅ | `ActGlobals.oFormActMain` | read | cached into `RealPlugin.mainform` |
+| ✅ | `FormActMain.{BeforeLogLineRead,OnLogLineRead}` (events) | subscribe | **central trigger feed** |
+| ✅ | `FormActMain.{OnCombatStart,OnCombatEnd}` (events) | subscribe | fire Trig's combat events |
+| ✅ | `FormActMain.{InCombat,CurrentZone,InitActDone}` | read | state hooks |
+| ✅ | `FormActMain.{SetEncounter,EndCombat}` | call | manual combat-state control |
+| ✅ | `FormActMain.{AppDataFolder,ActPlugins,PluginGetSelfData}` | read/call | config path + self/FFXIV-plugin discovery |
+| ✅ | `FormActMain.{ActiveZone,ZoneList}` → `EncounterData.{Duration,LogLines,Items}` | read/mutate | active/last-encounter export + encounter-log append |
+| ✅ | `FormActMain.GetTextExport(EncounterData,TextExportFormat)` + private `defaultTextFormat` field | call/**reflect** | render encounter to text (minimal impl) |
+| ✅ | `FormActMain.GlobalTimeSorter` + `LogLineEntry` ctor | read/construct | append a log line to `ActiveEncounter.LogLines` |
+| ✅ | `FormActMain.{PlayTtsMethod,PlaySoundMethod}` (delegate props) | call | route TTS/sound through ACT (fields present; sink = Discord) |
+| ✅ | `FormActMain.CustomTriggers` (Dictionary) + `CustomTrigger.{Category,RestrictToCategoryZone,Active,ShortRegexString,SoundData,SoundType,TimerName,Tabbed,Timer}` | read | one-way import of ACT-native custom triggers (empty set) |
+| ✅ | `FormActMain.{InvokeRequired,Invoke}` | call | UI-thread marshalling |
+| 🟡 | `FormActMain.CornerControlAdd/Remove` | **reflect-invoke** (GetMethod, may be absent) | corner notification popups — OMITTED (null-guarded) |
+| 🟡 | `FormActMain` private field `tc1` (TabControl) | **reflect** | `LocateTab` selects Trig's tab — OMITTED (null-guarded) |
+| 🟡 | `FormActMain.{PluginGetRemoteVersion,PluginDownload,UnZip,RestartACT,WriteExceptionLog}` + `TraySlider` | call/construct | self-update (plugin id 87) — inert stubs (`TraySlider` = G‑4) |
+| ✅ | `ActPluginData.{pluginObj,pluginFile,lblPluginStatus,lblPluginTitle,cbEnabled,tpPluginSpace}` | read | identity / FFXIV-plugin status + checkbox scan |
+| ✅ | `LogLineEventArgs.{originalLogLine,logLine,detectedZone}`, `CombatToggleEventArgs` | read | event payloads |
 
 **Pattern.** Triggers run off the `BeforeLogLineRead`/`OnLogLineRead` stream — Trig ships its own
 engine and needs ACT only as a *log feed + TTS/sound output + config/discovery host*. The facade's
@@ -187,21 +232,21 @@ FFXIV plugin's `DataRepository` (via `BridgeFFXIV.cs`), **not** from ACT.
 `E:\dev\ACT-Discord-Triggers`. Smallest, purely host-services surface. Consumes **zero** combat /
 encounter / log-line data. Its product is hijacking ACT's global TTS/sound delegates to reroute audio
 to a Discord voice channel via an out-of-process Node/ONNX bridge. **In our host this is the official
-audio stack** (see §8F).
+audio stack** (see §8F). All members **DONE**.
 
-| ACT member | dir | purpose |
-|---|---|---|
-| `IActPluginV1.{InitPlugin,DeInitPlugin}` | implement | bootstrap (then byte-loads its real closure) |
-| `ActGlobals.oFormActMain` | read | root handle |
-| `FormActMain.AppDataFolder` | read | install/bridge/config paths |
-| `FormActMain.PluginGetSelfData(this)→ActPluginData` | call | self-locate own install dir |
-| `ActPluginData.pluginFile` (`.DirectoryName`/`.FullName`) | read | install dir + config name |
-| **`FormActMain.PlayTtsMethod`** (`PlayTtsDelegate` field) | read + **write** | save original, swap to `SpeakText`, restore on deinit |
-| **`FormActMain.PlaySoundMethod`** (`PlaySoundDelegate` field) | read + **write** | save original, swap to `SpeakSoundFile`, restore |
-| `FormActMain.{PlayTtsDelegate,PlaySoundDelegate}` (delegate types) | reference | field types / handler signatures |
-| `FormActMain.WriteExceptionLog(Exception,string)` | call | fallback error sink in every teardown path |
-| `FormActMain.RestartACT(bool,string)` | **reflect-call** | post-update restart (degrades if absent) |
-| `FormActMain` as `Form`: `Handle`, `InvokeRequired`, `Invoke`, `ShowDialog(IWin32Window)` | call/read | WPF `ElementHost` tab + dialog parenting + UI marshal |
+| St | ACT member | dir | purpose |
+|:--:|---|---|---|
+| ✅ | `IActPluginV1.{InitPlugin,DeInitPlugin}` | implement | bootstrap (then byte-loads its real closure) |
+| ✅ | `ActGlobals.oFormActMain` | read | root handle |
+| ✅ | `FormActMain.AppDataFolder` | read | install/bridge/config paths |
+| ✅ | `FormActMain.PluginGetSelfData(this)→ActPluginData` | call | self-locate own install dir |
+| ✅ | `ActPluginData.pluginFile` (`.DirectoryName`/`.FullName`) | read | install dir + config name |
+| ✅ | **`FormActMain.PlayTtsMethod`** (`PlayTtsDelegate` field) | read + **write** | save original, swap to `SpeakText`, restore on deinit |
+| ✅ | **`FormActMain.PlaySoundMethod`** (`PlaySoundDelegate` field) | read + **write** | save original, swap to `SpeakSoundFile`, restore |
+| ✅ | `FormActMain.{PlayTtsDelegate,PlaySoundDelegate}` (delegate types) | reference | field types / handler signatures |
+| ✅ | `FormActMain.WriteExceptionLog(Exception,string)` | call | fallback error sink in every teardown path |
+| 🟡 | `FormActMain.RestartACT(bool,string)` | **reflect-call** | post-update restart (stub; degrades if absent) |
+| ✅ | `FormActMain` as `Form`: `Handle`, `InvokeRequired`, `Invoke`, `ShowDialog(IWin32Window)` | call/read | WPF `ElementHost` tab + dialog parenting + UI marshal |
 
 **Pattern.** Delegate hijack is the whole product. The facade must expose `PlayTtsMethod`/
 `PlaySoundMethod` as **public mutable fields** of the exact delegate types, and ACT's own playback
@@ -214,61 +259,62 @@ to be a real WinForms `Form` (handle, `Invoke`, dialog owner).
 XIVLog). Uses ACT as a **service bus + UI host**, not a data source (combat data comes from
 FFXIV_ACT_Plugin's `DataRepository` via `pluginObj` reflection).
 
-| ACT member | dir | purpose |
-|---|---|---|
-| `IActPluginV1.{InitPlugin,DeInitPlugin}` ×4 | implement | four plugin entry points |
-| `ActGlobals.oFormActMain` | read | central handle (~130 sites) |
-| `FormActMain.InitActDone` | read | busy-wait gate before init/work |
-| `FormActMain.ActPlugins` | enumerate | locate FFXIV/Overlay plugins + validate load order |
-| `FormActMain.{OnLogLineRead,BeforeLogLineRead}` (events) | subscribe + **reflect** | log feed; `LogBuffer` reorders the `BeforeLogLineRead` handler list to run first |
-| `FormActMain.{CurrentZone,InCombat,EndCombat(bool)}` | read/call | zone + combat state/forced wipe-end |
-| `FormActMain.PlaySound(string)`, `FormActMain.TTS(string)` | call | sound/TTS output (method form) |
-| `FormActMain.{PlayTtsMethod,PlaySoundMethod}` (delegate fields) | read + **write** | TTSYukkuri swaps both wholesale (save/`.Clone()`/restore) |
-| `FormActMain.CornerControlAdd/Remove(Control)` | call | title-bar corner toggle button |
-| `FormActMain.{WriteExceptionLog,RestartACT(reflect),WindowState(write)}` | call | host control / updater |
-| `FormActMain` as `Form`: `Invoke`,`InvokeRequired`,`IsHandleCreated`,`IsDisposed`,`CanFocus`,`Visible`, `IWin32Window` owner | call/read | UI marshal + lifecycle guards + dialog parenting |
-| `FormActMain.PluginGetSelfData(this)` → `ActPluginData.{pluginFile,pluginObj,lblPluginStatus}` | call/read | self-locate + FFXIV "Started" check + `pluginObj` reflection |
-| **`ActGlobals.oFormSpellTimers` + `FormSpellTimers.{RebuildSpellTreeView,TimerDefs,RemoveTimerDef,AddEditTimerDef(TimerData),NotifySpell}`** | call/read | drive ACT's **built-in** spell-timer subsystem |
-| `LogLineEventArgs.{logLine,detectedType}`, `LogLineEventDelegate` | read/reflect | log payloads + handler-list surgery |
+| St | ACT member | dir | purpose |
+|:--:|---|---|---|
+| ✅ | `IActPluginV1.{InitPlugin,DeInitPlugin}` ×4 | implement | four plugin entry points |
+| ✅ | `ActGlobals.oFormActMain` | read | central handle (~130 sites) |
+| ✅ | `FormActMain.InitActDone` | read | busy-wait gate before init/work |
+| ✅ | `FormActMain.ActPlugins` | enumerate | locate FFXIV/Overlay plugins + validate load order |
+| 🟡 | `FormActMain.{OnLogLineRead,BeforeLogLineRead}` (events) | subscribe + **reflect** | log feed; `LogBuffer` reorders the `BeforeLogLineRead` handler list to run first — VERIFY reflection shape |
+| ✅ | `FormActMain.{CurrentZone,InCombat,EndCombat(bool)}` | read/call | zone + combat state/forced wipe-end |
+| ❌ | `FormActMain.PlaySound(string)`, `FormActMain.TTS(string)` | call | sound/TTS output (method form) — **G‑1** (also closes M4‑1) |
+| ✅ | `FormActMain.{PlayTtsMethod,PlaySoundMethod}` (delegate fields) | read + **write** | TTSYukkuri swaps both wholesale (save/`.Clone()`/restore) |
+| ⬜ | `FormActMain.CornerControlAdd/Remove(Control)` | call | title-bar corner toggle button — **M4‑3** (must be real methods) |
+| ⬜ | `FormActMain.WindowState (write)` (+ `WriteExceptionLog` ✅, `RestartACT` 🟡) | call | host control / updater — `WindowState` is **M4‑4** |
+| ⬜ | `FormActMain` as `Form`: `IsHandleCreated`,`IsDisposed`,`CanFocus` (`Invoke`/`InvokeRequired`/`Visible` ✅) | call/read | lifecycle guards — **M4‑4** (verify the headless form reports sane values) |
+| ✅ | `FormActMain.PluginGetSelfData(this)` → `ActPluginData.{pluginFile,pluginObj,lblPluginStatus}` | call/read | self-locate + FFXIV "Started" check + `pluginObj` reflection |
+| ⬜ | **`ActGlobals.oFormSpellTimers` + `FormSpellTimers.{RebuildSpellTreeView,TimerDefs,RemoveTimerDef,AddEditTimerDef(TimerData),NotifySpell}`** | call/read | drive ACT's **built-in** spell-timer subsystem — **M4‑2** (largest item) |
+| ✅ | `LogLineEventArgs.{logLine,detectedType}`, `LogLineEventDelegate` | read/reflect | log payloads + handler-list surgery |
 
 **Unusual uses no other plugin needs:** the full `oFormSpellTimers`/`FormSpellTimers` API (OverlayPlugin
 touches it only lightly), `BeforeLogLineRead` handler-list reflection surgery,
 `WindowState`/`CanFocus`/`IsHandleCreated`/`IsDisposed`, direct `CornerControlAdd/Remove`.
 
-## 6. Consolidated surface matrix
+## 6. Consolidated usage matrix
 
 Which plugin touches which ACT member (● = uses, blank = does not). `FFXIV` = FFXIV_ACT_Plugin,
 `OP` = OverlayPlugin, `Trig` = Triggernometry, `Disc` = Discord-Triggers, `Hojo` = Hojoring (M4).
+The **St** column is the facade status (see legend); per-plugin detail is in the tables above.
 
-| ACT member | FFXIV | OP | Trig | Disc | Hojo |
-|---|:--:|:--:|:--:|:--:|:--:|
-| `IActPluginV1` | ● | ● | ● | ● | ● |
-| `ActGlobals.oFormActMain` | ● | ● | ● | ● | ● |
-| `ActGlobals.charName` | ● | | | | |
-| `AddCombatAction` / `SetEncounter` / `ChangeZone` | ● | | ●¹ | | |
-| `EndCombat` / `InCombat` | ● | ● | ● | | ● |
-| `OnLogLineRead` / `BeforeLogLineRead` | ● | ● | ● | | ● |
-| `OnCombatStart` / `OnCombatEnd` | | | ● | | |
-| `LogFileChanged` / `GetDateTimeFromLog` / `OpenLog` / `LogFile*` | ● | | | | |
-| `ActiveZone` → `ActiveEncounter` | | ● | ● | | |
-| `EncounterData.ExportVariables` / `GetAllies` | ●² | ● | | | |
-| `CombatantData.ExportVariables` / `Items` | ●² | ● | | | |
-| `MasterSwing` / `Dnum` / `AttackType` / `DamageTypeData` | ● | ●³ | | | |
-| `CustomTriggers` + `CustomTrigger` | | | ● | | |
-| `GetTextExport` + `defaultTextFormat` | | | ● | | |
-| `TTS(string)` / `PlaySound(string)` (methods) | | ● | | | ● |
-| `PlayTtsMethod` / `PlaySoundMethod` (delegate fields) | | | ● | ● | ● |
-| `oFormSpellTimers` / `FormSpellTimers` | | ●⁴ | | | ● |
-| `CornerControlAdd/Remove` | | | ●⁵ | | ● |
-| `ActPlugins` enumerate | ● | ● | ● | | ● |
-| `PluginGetSelfData` / `ActPluginData.*` | ● | ● | ● | ● | ● |
-| `AppDataFolder` | ● | ● | ● | ● | ● |
-| `Invoke` / `InvokeRequired` / `Handle` (`Form`) | ● | ● | ● | ● | ● |
-| `WriteExceptionLog` | ● | | ● | ● | ● |
-| `RestartACT` | ● | | ● | ●⁵ | ●⁵ |
-| `GetVersion` / `NotificationAdd` / `DpiScale` | | ● | | | |
-| self-update (`PluginGetRemoteVersion`/`PluginDownload`/`UnZip`/`TraySlider`) | ● | ● | ● | ● | |
-| `WindowState` / `CanFocus` / `IsHandleCreated` / `IsDisposed` | | | | | ● |
+| St | ACT member | FFXIV | OP | Trig | Disc | Hojo |
+|:--:|---|:--:|:--:|:--:|:--:|:--:|
+| ✅ | `IActPluginV1` | ● | ● | ● | ● | ● |
+| ✅ | `ActGlobals.oFormActMain` | ● | ● | ● | ● | ● |
+| ✅ | `ActGlobals.charName` | ● | | | | |
+| ✅ | `AddCombatAction` / `SetEncounter` / `ChangeZone` | ● | | ●¹ | | |
+| ✅ | `EndCombat` / `InCombat` | ● | ● | ● | | ● |
+| 🟡 | `OnLogLineRead` / `BeforeLogLineRead` | ● | ● | ● | | ● |
+| ✅ | `OnCombatStart` / `OnCombatEnd` | | | ● | | |
+| ✅ | `LogFileChanged` / `GetDateTimeFromLog` / `OpenLog` / `LogFile*` | ● | | | | |
+| ✅ | `ActiveZone` → `ActiveEncounter` | | ● | ● | | |
+| ✅ | `EncounterData.ExportVariables` / `GetAllies` | ●² | ● | | | |
+| ✅ | `CombatantData.ExportVariables` / `Items` | ●² | ● | | | |
+| ✅ | `MasterSwing` / `Dnum` / `AttackType` / `DamageTypeData` | ● | ●³ | | | |
+| ✅ | `CustomTriggers` + `CustomTrigger` | | | ● | | |
+| ✅ | `GetTextExport` + `defaultTextFormat` | | | ● | | |
+| ❌ | `TTS(string)` / `PlaySound(string)` (methods) — **G‑1** | | ● | | | ● |
+| ✅ | `PlayTtsMethod` / `PlaySoundMethod` (delegate fields) | | | ● | ● | ● |
+| ❌⬜ | `oFormSpellTimers` / `FormSpellTimers` — **G‑2** (OP inert) / **M4‑2** (Hojo full) | | ●⁴ | | | ● |
+| 🟡⬜ | `CornerControlAdd/Remove` — Trig OMITTED / **M4‑3** (Hojo real) | | | ●⁵ | | ● |
+| ✅ | `ActPlugins` enumerate | ● | ● | ● | | ● |
+| ✅ | `PluginGetSelfData` / `ActPluginData.*` | ● | ● | ● | ● | ● |
+| ✅ | `AppDataFolder` | ● | ● | ● | ● | ● |
+| ✅ | `Invoke` / `InvokeRequired` / `Handle` (`Form`) | ● | ● | ● | ● | ● |
+| ✅ | `WriteExceptionLog` | ● | | ● | ● | ● |
+| 🟡 | `RestartACT` | ● | | ● | ●⁵ | ●⁵ |
+| ✅🟡❌ | `GetVersion` ✅ / `NotificationAdd` 🟡 / `DpiScale` ❌ **G‑3** | | ● | | | |
+| 🟡 | self-update (`PluginGetRemoteVersion`/`PluginDownload`/`UnZip`/`TraySlider`) | ● | ● | ● | ● | |
+| ⬜ | `WindowState` / `CanFocus` / `IsHandleCreated` / `IsDisposed` — **M4‑4** | | | | | ● |
 
 ¹ Trig uses `SetEncounter`/`EndCombat` for manual combat-state control, not swing production.
 ² registers the keys; does not read them back. ³ reads `MasterSwing` via custom export formatters
@@ -280,9 +326,10 @@ only. ⁴ optional `SpellTimerOverlay` only. ⁵ reflective / guarded — degrad
 
 Baseline: `src/Fct.Compat.Act`. Everything **FFXIV_ACT_Plugin** writes is present and verified
 bit-for-bit (Slice 1 S5); the open work is on the **consumer** side. Each group below states why the
-plugins use it and the smallest correct implementation under the principles above.
+plugins use it and the smallest correct implementation under the principles above. The glyph in each
+header is the group status.
 
-## 8A. Plugin lifecycle, identity & discovery — **DONE**
+## ✅ 8A. Plugin lifecycle, identity & discovery — DONE
 
 `IActPluginV1.{InitPlugin,DeInitPlugin}`, `oFormActMain`, `InitActDone`, `IsActClosing`, `Handle`,
 `Invoke`/`InvokeRequired`, `GetVersion()`, `AppDataFolder`, `ActPlugins`, `ActPluginData.*`,
@@ -294,10 +341,10 @@ registry**: consumers scan it to find themselves and the FFXIV plugin (by `lblPl
 starting `FFXIV_ACT_Plugin` + `cbEnabled.Checked` + non-null `pluginObj`). `Invoke`/`Handle` come
 free from `FormActMain : Form`. **What to do:** nothing — all present (Slice 1). The load-bearing
 requirement is that the host populates `ActPlugins` with the FFXIV entry whose `pluginObj` is our
-`WrappedFfxivPlugin` and whose `lblPluginStatus.Text` is the exact "Started" string (one **VERIFY**,
+`WrappedFfxivPlugin` and whose `lblPluginStatus.Text` is the exact "Started" string (one **🟡 VERIFY**,
 shared by Triggernometry init and Hojoring). `GetVersion()` returns `3.8.5.288` (OP gates ≥ 3.8.0.281).
 
-## 8B. The producer write-path — **DONE**
+## ✅ 8B. The producer write-path — DONE
 
 `charName`, `AddCombatAction`, `SetEncounter`, `ChangeZone`, `EndCombat`, `InCombat`,
 `GlobalTimeSorter`, `LastKnownTime`, `MasterSwing`+`Dnum`, the static model registration on
@@ -313,7 +360,7 @@ TESTING.md "Differential ACT-engine compat"). (The clean-room *value calculation
 DoT/HoT/shield amounts is a separate axis — [`DPS-CALCULATION-GAPS.md`](DPS-CALCULATION-GAPS.md) —
 not an interface concern.)
 
-## 8C. The inbound log seam — **DONE** (1 VERIFY)
+## ✅ 8C. The inbound log seam — DONE (🟡 1 VERIFY)
 
 `OpenLog`, `LogFilePath`/`Filter`, `TimeStampLen`, `LogPathHasCharName`, `ZoneChangeRegex`,
 `GetDateTimeFromLog`, `BeforeLogLineRead`, `OnLogLineRead`, `LogFileChanged`, `LogLineEventArgs.*`,
@@ -324,11 +371,11 @@ rewrites each line in `BeforeLogLineRead` before ACT rebroadcasts it as `OnLogLi
 OnLogLineRead` are the most important consumer surface after CombatData** — Triggernometry, Hojoring
 and OP's `LogParseOverlay` all tap it, and Hojoring/`LogParseOverlay` *reflect the event's backing
 field* to reorder handlers (run first). **What to do:** present + fired via `FireBeforeLogLineRead`/
-`FireLogLineRead`; **VERIFY** the multicast-field reflection shape (discoverable via
+`FireLogLineRead`; **🟡 VERIFY** the multicast-field reflection shape (discoverable via
 `GetField("BeforeLogLineRead", NonPublic|Instance|Public|Static)` and reassignable).
 `GenerateAttackTypeGraph`/`FindControl`/`ActCommands` are STUBs (UI/diagnostic) — keep inert.
 
-## 8D. The consumer read-path (MiniParse / cactbot CombatData) — **DONE**
+## ✅ 8D. The consumer read-path (MiniParse / cactbot CombatData) — DONE
 
 `ActiveZone` → `ZoneData.ActiveEncounter`, `EncounterData.{GetAllies,Active,EncId,EndTime,
 ExportVariables}`, `CombatantData.{ExportVariables,Name,Items,DamageTypeDataOutgoing*}`,
@@ -343,16 +390,16 @@ read the `MasterSwing` fields. **What to do:** nothing — the static dicts are 
 dictionaries (OP's `.Add` works), `MasterSwing` carries the fields, and `oFormImportProgress` is a
 null-default stub so `?.Visible` → "not importing".
 
-## 8E. Combat-state events — **DONE**
+## ✅ 8E. Combat-state events — DONE
 
 `OnCombatStart`, `OnCombatEnd`, `CombatToggleEventArgs`. Triggernometry (and some overlays) fire off
 these; raised by the facade inside `SetEncounter`/`EndCombat`. **What to do:** nothing.
 
-## 8F. Audio — TTS / PlaySound (the Discord-Triggers stack) — **GAP G‑1**
+## ❌ 8F. Audio — TTS / PlaySound (the Discord-Triggers stack) — GAP G‑1
 
-`TTS(string)` + `PlaySound(string)` **methods** (GAP); `PlayTtsMethod`/`PlaySoundMethod` delegate
-**fields** (DONE); delegate types `PlayTtsDelegate`(`void(string)`)/`PlaySoundDelegate`(`void(string,
-int)`) (DONE).
+`TTS(string)` + `PlaySound(string)` **methods** (❌ GAP); `PlayTtsMethod`/`PlaySoundMethod` delegate
+**fields** (✅ DONE); delegate types `PlayTtsDelegate`(`void(string)`)/`PlaySoundDelegate`(`void(string,
+int)`) (✅ DONE).
 
 **The architecture.** Real ACT exposes audio two ways that are *one mechanism*:
 - the **methods** `TTS(text)`/`PlaySound(file)` — what callers invoke (OP/cactbot `say`/`play_sound`
@@ -381,9 +428,9 @@ and TTS-to-WAV caching (all ACT-options state we don't reproduce). Keep the dele
 defaults** (`PlaySoundMethod = (w,v)=>{}` / `PlayTtsMethod = t=>{}`, already present): without
 Discord-Triggers, audio is silently dropped rather than throwing — the intended degrade. The fields
 are already public mutable fields of the exact delegate types. This one fix closes G‑1 **and**
-Hojoring's M4 audio need.
+Hojoring's M4 audio need (M4‑1).
 
-## 8G. Spell-timer subsystem — `oFormSpellTimers` / `FormSpellTimers` — **GAP G‑2 / M4**
+## ❌⬜ 8G. Spell-timer subsystem — `oFormSpellTimers` / `FormSpellTimers` — GAP G‑2 / M4‑2
 
 `ActGlobals.oFormSpellTimers` + `FormSpellTimers.{OnSpellTimerNotify,OnSpellTimerRemoved (events),
 RebuildSpellTreeView(), TimerDefs, RemoveTimerDef, AddEditTimerDef(TimerData), NotifySpell}`; model
@@ -396,22 +443,22 @@ ACT's *built-in* spell-timer engine (a second WinForms form). Two very different
   calls `NotifySpell` to push its own timers into ACT's native UI.
 
 **What to do — two tiers:**
-- **Supported stack (G‑2, BREAK):** add `ActGlobals.oFormSpellTimers` as a **non-null** stub
+- ❌ **Supported stack (G‑2, BREAK):** add `ActGlobals.oFormSpellTimers` as a **non-null** stub
   `FormSpellTimers` exposing the two events (never fired), so OP's `+=` binds inertly — the optional
   SpellTimer overlay shows nothing instead of NRE-ing. No timer engine. Correct altitude: we don't
   reproduce ACT's spell-timer feature, we just let the subscription resolve.
-- **Hojoring (M4):** a *working* `FormSpellTimers` (real `TimerDefs` + add/remove/rebuild/notify) plus
-  the `TimerData`/`SpellTimer`/`TimelineEvent`/`TimerMod`/`TimerFrame` model family — all absent
+- ⬜ **Hojoring (M4‑2):** a *working* `FormSpellTimers` (real `TimerDefs` + add/remove/rebuild/notify)
+  plus the `TimerData`/`SpellTimer`/`TimelineEvent`/`TimerMod`/`TimerFrame` model family — all absent
   today. The single largest M4 item; not yet built.
 
-## 8H. Custom-trigger import — `CustomTriggers` / `CustomTrigger` — **DONE**
+## ✅ 8H. Custom-trigger import — `CustomTriggers` / `CustomTrigger` — DONE
 
 Triggernometry offers a one-way *import* of ACT-native custom triggers (reads each `CustomTrigger`'s
 nine fields). It does not ask ACT to evaluate triggers. **What to do:** nothing — empty `SortedList`s
 + inert `CustomTrigger` model; `Count == 0` → nothing to import; Trig's own triggers still run. We
 never author ACT-native triggers, so empty is the correct permanent state.
 
-## 8I. Encounter text export & encounter log — **DONE (minimal)**
+## ✅ 8I. Encounter text export & encounter log — DONE (minimal)
 
 `GetTextExport(EncounterData,TextExportFormatOptions)` + private `defaultTextFormat` + the type;
 `ZoneList`→`Items`; `LogLineEntry` + `EncounterData.LogLines`.
@@ -422,7 +469,7 @@ Triggernometry's export/last-encounter actions render an encounter to text (refl
 engine), `defaultTextFormat` non-null so the reflection binds, `ZoneList` holds the live zone,
 `LogLineEntry` ctor present.
 
-## 8J. Host-window chrome — **mostly DONE / G‑3 / M4**
+## ❌⬜ 8J. Host-window chrome — mostly DONE / G‑3 / M4
 
 `CornerControlAdd`/`Remove`, private `tc1`, `WindowState`, `CanFocus`, `IsHandleCreated`,
 `IsDisposed`, `NotificationAdd`, `DpiScale`.
@@ -430,13 +477,13 @@ engine), `defaultTextFormat` non-null so the reflection binds, `ZoneList` holds 
 Cosmetic host-UI integration. Triggernometry *reflects* `CornerControlAdd/Remove` (null-guarded) and
 digs `tc1` for its tab. Hojoring calls `CornerControlAdd/Remove` *directly* and toggles `WindowState`.
 OP reads `DpiScale` (try/catch → 1) and calls `NotificationAdd` only on version-too-old. **What to do:**
-- Supported stack: `NotificationAdd` STUB; `DpiScale` → `1f` (**G‑3**, MINOR — removes OP's silent
-  catch). `CornerControlAdd/Remove`/`tc1` stay OMITTED (Trig guards them).
-- Hojoring (M4): real `CornerControlAdd/Remove` (no-op tracking the control); settable no-op
-  `WindowState`; sane `CanFocus`/`IsHandleCreated`/`IsDisposed` (inherited from `Form` — verify the
-  headless form reports `IsHandleCreated==true` once shown, `IsDisposed==false`).
+- ❌ Supported stack: `DpiScale` → `1f` (**G‑3**, MINOR — removes OP's silent catch). `NotificationAdd`
+  STUB; `CornerControlAdd/Remove`/`tc1` stay 🟡 OMITTED (Trig guards them).
+- ⬜ Hojoring (M4): real `CornerControlAdd/Remove` (no-op tracking the control, **M4‑3**); settable
+  no-op `WindowState` + sane `CanFocus`/`IsHandleCreated`/`IsDisposed` (**M4‑4**; inherited from
+  `Form` — verify the headless form reports `IsHandleCreated==true` once shown, `IsDisposed==false`).
 
-## 8K. Self-update plumbing — **STUB by design**
+## ✅ 8K. Self-update plumbing — STUB by design
 
 `PluginGetRemoteVersion`, `PluginDownload`, `PluginDownloadMem`, `UnZip`, `GetAutomaticUpdatesAllowed`,
 `UpdateCheckClicked`, `RestartACT`, `TraySlider`/`ButtonLayoutEnum`/`PluginDownloadData`.
@@ -444,16 +491,16 @@ OP reads `DpiScale` (try/catch → 1) and calls `NotificationAdd` only on versio
 Every plugin has an in-app updater (check remote version → download zip → unzip → restart, surfaced
 via `TraySlider`). **What to do (principle 4):** inert stubs — `PluginGetRemoteVersion`→`""`,
 `PluginDownload`→null, `GetAutomaticUpdatesAllowed`→false, `RestartACT`/`UnZip` no-op,
-`UpdateCheckClicked` never fired. Add inert `TraySlider`/`ButtonLayoutEnum` stubs (**G‑4**) only if a
+`UpdateCheckClicked` never fired. Add inert `TraySlider`/`ButtonLayoutEnum` stubs (🟡 **G‑4**) only if a
 construction throws at bind time (most are reflective / try-catch tolerant).
 
-## 8L. Error / diagnostic logging — **DONE**
+## ✅ 8L. Error / diagnostic logging — DONE
 
 `WriteExceptionLog`, `WriteDebugLog`, `WriteInfoLog` — universal fallback error sink in every plugin's
 catch paths. **What to do:** route to our `ILogger`; must exist (called unguarded inside catch) but
 the destination is ours.
 
-## 8M. Cross-cutting shape completeness — **DONE / lower-priority**
+## ✅ 8M. Cross-cutting shape completeness — DONE / lower-priority
 
 `FormActMain` events `ActLifecycleChanged`/`LogFileRenamed`/`XmlSnippetAdded`/`BeforeClipboardSet`/
 `UrlRequest` (DONE as bindable no-op publishers); `LogLineEventArgs.companionLogName` + 6-arg ctor
@@ -469,17 +516,17 @@ intended. **What to do:** build only when a real consumer appears (principle 1).
 
 ## 8N. Gap summary & net action list
 
-| # | Gap | Consumer | Sev | Action |
-|---|---|---|:--:|---|
-| **G‑1** | `TTS(string)`/`PlaySound(string)` **methods** missing | OP `MiniParseEventSource.cs:65/75` (cactbot say/play_sound); Hojoring | **BREAK** | Add the two methods routing to the delegate fields (§8F). Closes Hojoring audio too. |
-| **G‑2** | `oFormSpellTimers` + `FormSpellTimers` (2 events) missing | OP `SpellTimerOverlay.cs:25/50` | **BREAK** | Add non-null inert stub so `+=` binds (§8G). |
-| **G‑3** | `DpiScale` (float) missing | OP `TabControlExt.cs:17` | **MINOR** | Add property → `1f`. |
-| **G‑4** | `TraySlider`/`ButtonLayoutEnum` missing | Trig + FFXIV update toast | **MINOR** | Inert stubs only if a bind throws. |
-| **G‑5** | self-update returns inert | Trig/Disc/FFXIV | **MINOR** (by design) | Keep stubs inert. |
-| **G‑6** | `ActPluginData.btnXButton` + `IEquatable` missing | none reached | **MINOR** | Shape only. |
-| **G‑7** | `NotificationAdd` 2-arg only | OP (2-arg) | **none** | Matches consumer. |
-| **VERIFY** | `BeforeLogLineRead` reflectable multicast field; exact "Started" status string before Trig/OP/Hojoring init | OP/Trig/Hojoring | — | Test on the live path. |
-| **M4** | Hojoring: full `FormSpellTimers` + `TimerData` family; real `CornerControlAdd/Remove`; `Form` lifecycle members (`WindowState`/`CanFocus`/`IsHandleCreated`/`IsDisposed`) | Hojoring | — | Large; the M4 batch (not yet built). |
+| St | # | Gap | Consumer | Sev | Action |
+|:--:|---|---|---|:--:|---|
+| ❌ | **G‑1** | `TTS(string)`/`PlaySound(string)` **methods** missing | OP `MiniParseEventSource.cs:65/75` (cactbot say/play_sound); Hojoring | **BREAK** | Add the two methods routing to the delegate fields (§8F). Closes Hojoring audio too. |
+| ❌ | **G‑2** | `oFormSpellTimers` + `FormSpellTimers` (2 events) missing | OP `SpellTimerOverlay.cs:25/50` | **BREAK** | Add non-null inert stub so `+=` binds (§8G). |
+| ❌ | **G‑3** | `DpiScale` (float) missing | OP `TabControlExt.cs:17` | **MINOR** | Add property → `1f`. |
+| 🟡 | **G‑4** | `TraySlider`/`ButtonLayoutEnum` missing | Trig + FFXIV update toast | **MINOR** | Inert stubs only if a bind throws. |
+| 🟡 | **G‑5** | self-update returns inert | Trig/Disc/FFXIV | **MINOR** (by design) | Keep stubs inert. |
+| 🟡 | **G‑6** | `ActPluginData.btnXButton` + `IEquatable` missing | none reached | **MINOR** | Shape only. |
+| ✅ | **G‑7** | `NotificationAdd` 2-arg only | OP (2-arg) | **none** | Matches consumer. |
+| 🟡 | **VERIFY** | `BeforeLogLineRead` reflectable multicast field; exact "Started" status string before Trig/OP/Hojoring init | OP/Trig/Hojoring | — | Test on the live path. |
+| ⬜ | **M4** | Hojoring: full `FormSpellTimers` + `TimerData` family (M4‑2); real `CornerControlAdd/Remove` (M4‑3); `Form` lifecycle members `WindowState`/`CanFocus`/`IsHandleCreated`/`IsDisposed` (M4‑4) | Hojoring | — | Large; the M4 batch (not yet built). |
 
 **Priority order:** G‑1 → G‑2 → G‑3 → VERIFY → (G‑4 conditional) → M4 (Hojoring spell-timer
 subsystem — the larger batch). Everything else in this document is **DONE** or **STUB-by-design**.
@@ -499,18 +546,18 @@ the `MasterSwing` fields, `oFormImportProgress.Visible`, `ActPlugins` discovery,
 
 The ACT facade is only one seam. These three carry the data and features ACT structurally cannot.
 
-## 9. The FFXIV_ACT_Plugin SDK seam — the live data source — **DONE**
+## ✅ 9. The FFXIV_ACT_Plugin SDK seam — the live data source — DONE
 
 ACT is game-agnostic: it has the aggregated DPS rollup and nothing else. **Live combatant tables, raw
 + decoded packets, zone/process/player identity, and the skill/zone/world/buff name dictionaries do
 not exist on the ACT side at all** — they live on the FFXIV plugin. So every overlay/trigger pack
 pulls the FFXIV plugin's `pluginObj` from `ActPlugins` and reflects three members:
 
-| Member | Shape | Consumers | Purpose |
-|---|---|---|---|
-| `DataRepository` (property) | `IDataRepository` (pull API) | OP (~30 sites), Trig, Hojoring | `GetCombatantList()`, `GetCurrentPlayerID()`, `GetPlayer()`, `GetResourceDictionary(ResourceType)`, `GetSelectedLanguageID()`, `GetCurrentTerritoryID()`, `GetCurrentFFXIVProcess()`, `GetGameVersion()`, `GetServerTimestamp()` (+ `GetGameRegion`/`IsChatLogAvailable`/`GetAntiVirusNames`, unused). Live state — party panels, target info, name→id, zone/process gating. |
-| `DataSubscription` (property) | `IDataSubscription` (push API, 11 events) | OP, Trig, Hojoring | `NetworkReceived`/`NetworkSent` (raw packets — OP's ~20 custom packet-line decoders, FATE/CE/MapEffect watchers, the `RegisterNetworkParser` escape hatch), `LogLine`/`ParsedLogLine` (Trig's feed), `ZoneChanged`, `ProcessChanged` (the "no-game" liveness signal), `PartyListChanged`, `PrimaryPlayerChanged` (+ `Combatant{Added,Removed}`/`PlayerStatsChanged`, unwired). |
-| `_iocContainer` (private field, MinIoC) | `GetService`/`Resolve<T>` | OP, Hojoring | Resolves `FFXIV_ACT_Plugin.Logfile.ILogOutput` for the **custom-log round-trip**: OP injects its synthetic lines (custom IDs ≥ 256 — MapEffect/FateDirector/CEDirector/InCombat) via `ILogOutput.WriteLine(...)` so they flow through the FFXIV plugin's log pipeline and reach cactbot. Hojoring also resolves `ILogFormat`. |
+| St | Member | Shape | Consumers | Purpose |
+|:--:|---|---|---|---|
+| ✅ | `DataRepository` (property) | `IDataRepository` (pull API) | OP (~30 sites), Trig, Hojoring | `GetCombatantList()`, `GetCurrentPlayerID()`, `GetPlayer()`, `GetResourceDictionary(ResourceType)`, `GetSelectedLanguageID()`, `GetCurrentTerritoryID()`, `GetCurrentFFXIVProcess()`, `GetGameVersion()`, `GetServerTimestamp()` (+ unused `GetGameRegion`/`IsChatLogAvailable`/`GetAntiVirusNames`). Live state — party panels, target info, name→id, zone/process gating. |
+| ✅ | `DataSubscription` (property) | `IDataSubscription` (push API, 11 events) | OP, Trig, Hojoring | `NetworkReceived`/`NetworkSent` (raw packets — OP's ~20 packet-line decoders, FATE/CE/MapEffect watchers, the `RegisterNetworkParser` hatch), `LogLine`/`ParsedLogLine` (Trig's feed), `ZoneChanged`, `ProcessChanged` (no-game liveness), `PartyListChanged`, `PrimaryPlayerChanged` (+ unwired `Combatant{Added,Removed}`/`PlayerStatsChanged`). |
+| ✅ | `_iocContainer` (private field, MinIoC) | `GetService`/`Resolve<T>` | OP, Hojoring | Resolves `FFXIV_ACT_Plugin.Logfile.ILogOutput` for the **custom-log round-trip**: OP injects its synthetic lines (custom IDs ≥ 256 — MapEffect/FateDirector/CEDirector/InCombat) via `ILogOutput.WriteLine(...)` so they flow through the FFXIV plugin's log pipeline and reach cactbot. Hojoring also resolves `ILogFormat`. |
 
 **What our host provides — DONE.** `WrappedFfxivPlugin` (placed in `pluginObj`) forwards the real
 plugin's `DataRepository` unchanged (every `Get*` lands on the genuine repository), substitutes
@@ -522,7 +569,7 @@ upstream `BeginInvoke` hop, while legacy `RegisterNetworkParser` consumers still
 `NetworkReceived` events. **No gaps** against the observed consumer set. (Adjacent: OP also reflects
 the **Machina** assembly directly for region/opcodes — same discovery path, not part of this seam.)
 
-## 10. OverlayPlugin's web + extension surface — how cactbot integrates
+## ✅ 10. OverlayPlugin's web + extension surface — how cactbot integrates (non-goal for us)
 
 cactbot, ngld addons, and browser overlays do **not** talk to ACT — they talk to OverlayPlugin, which
 supplies the three things ACT cannot: a browser to run HTML/JS in, a typed FFXIV push stream
@@ -547,7 +594,7 @@ layer** — there is no `Fct.Overlays` / WebView2 / host-side WebSocket path, no
 surface is documented only to explain how cactbot reaches its data; reproducing it in the host is an
 explicit non-goal.
 
-## 11. The Discord-Triggers audio bridge — the official audio stack
+## ✅ 11. The Discord-Triggers audio bridge — the official audio stack
 
 Discord-Triggers' product is the §8F delegate hijack plus an out-of-process synthesis/transport chain:
 `vm.SpeakText`/`SpeakSoundFile` → `SpeakTextCoreAsync` → a named-pipe **bridge** to a Node/ONNX backend
