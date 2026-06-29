@@ -27,6 +27,15 @@ namespace Advanced_Combat_Tracker
         public PlaySoundDelegate PlaySoundMethod = (wav, vol) => { };
         public PlayTtsDelegate PlayTtsMethod = tts => { };
 
+        // ACT's audio entry points. Callers (cactbot say/play_sound, Hojoring) invoke these
+        // methods, which route to the swappable delegate fields above. Discord-Triggers (and
+        // TTSYukkuri) install the real sink by swapping those fields, so anything calling these
+        // lands in the installed audio stack. We skip ACT's speech-correction/volume/caching
+        // bookkeeping; the no-op delegate defaults degrade to silence without a sink. Volume is
+        // fixed at 100 (ACT's PlaySound(string) default).
+        public void TTS(string SpeechText) => PlayTtsMethod?.Invoke(SpeechText);
+        public void PlaySound(string WavFilePath) => PlaySoundMethod?.Invoke(WavFilePath, 100);
+
         // ACT exposes this as a public delegate FIELD (plugins assign their own parser).
         public DateTimeLogParser GetDateTimeFromLog;
 
@@ -160,6 +169,17 @@ namespace Advanced_Combat_Tracker
             Log($"[RestartACT] stopOnError={stopOnError} :: {message}");
 
         public void NotificationAdd(string title, string text) => Log($"[Notify] {title}: {text}");
+
+        // Host-window DPI scale. OP reads this to scale its config tab (in a try/catch → default 1);
+        // we render no ACT chrome, so a constant 1f is correct and removes OP's silent catch.
+        public float DpiScale => 1f;
+
+        // ACT's corner-button tray. We host no chrome to place the control in, but Hojoring calls
+        // these unguarded, so they must exist and survive add-then-remove. We track the controls in
+        // a list (never displayed) so the round-trip is real rather than throwing.
+        private readonly List<Control> cornerControls = new List<Control>();
+        public void CornerControlAdd(Control c) { if (c != null && !cornerControls.Contains(c)) cornerControls.Add(c); }
+        public void CornerControlRemove(Control c) { cornerControls.Remove(c); }
 
         // Encounter text export. Triggernometry/Discord call this for the active or a past encounter,
         // passing the reflected defaultTextFormat. We host no formatter engine, so this returns a
