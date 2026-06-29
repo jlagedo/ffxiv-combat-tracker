@@ -1,9 +1,10 @@
 #!/usr/bin/env pwsh
 # Build a distributable release of FFXIV Combat Tracker into a directory.
 #
-#   ./release.ps1                          # self-contained win-x64 -> .\dist
+#   ./release.ps1                          # self-contained single-file win-x64 -> .\dist
 #   ./release.ps1 -OutputDir C:\out\fct    # release into a specific directory
 #   ./release.ps1 -FrameworkDependent      # needs .NET 10 Desktop Runtime on the target
+#   ./release.ps1 -SingleFile:$false       # expand the host runtime into loose DLLs
 #   ./release.ps1 -Version 0.2.0           # stamp assembly/file version
 #   ./release.ps1 -Zip                     # also produce <OutputDir>.zip
 #
@@ -13,13 +14,22 @@
 # The host launches the satellite from satellite\ at runtime, so both halves are
 # published and assembled here. The real legacy plugins (FFXIV_ACT_Plugin,
 # OverlayPlugin, ...) are NOT bundled — they load from the user's ACT install.
+#
+# By default the .NET 10 host is published as a single compressed self-extracting
+# Fct.App.exe (no loose runtime DLLs). The net48 satellite has no single-file
+# option, so satellite\ stays a small set of DLLs regardless.
+#
+# Builds are Debug by default and ship full portable .pdb debug symbols alongside
+# the binaries so the distributed app is debuggable and produces symbolicated
+# stack traces. Pass -Configuration Release for an optimized build.
 
 [CmdletBinding()]
 param(
     [string]$OutputDir = "dist",
-    [ValidateSet("Release", "Debug")][string]$Configuration = "Release",
+    [ValidateSet("Release", "Debug")][string]$Configuration = "Debug",
     [string]$Runtime = "win-x64",
     [switch]$FrameworkDependent,
+    [bool]$SingleFile = $true,
     [string]$Version,
     [switch]$Zip,
     [switch]$NoClean
@@ -38,6 +48,25 @@ $satOut = Join-Path $OutputDir "satellite"
 # Version is optional; pass through to both publishes when given.
 $versionArgs = @()
 if ($Version) { $versionArgs = @("-p:Version=$Version") }
+
+# Always emit full portable debug symbols and keep the .pdb files in the output, so a
+# distributed build can be debugged and produces symbolicated stack traces.
+$symbolArgs = @(
+    "-p:DebugType=portable",
+    "-p:DebugSymbols=true"
+)
+
+# Single-file applies to the .NET 10 host only — net48 has no single-file publish. Bundle the
+# native libs into the self-extractor and compress so the output is one Fct.App.exe, not a tree
+# of runtime DLLs.
+$hostSingleFileArgs = @()
+if ($SingleFile) {
+    $hostSingleFileArgs = @(
+        "-p:PublishSingleFile=true",
+        "-p:IncludeNativeLibrariesForSelfExtract=true",
+        "-p:EnableCompressionInSingleFile=true"
+    )
+}
 
 $mode = if ($selfContained) { "self-contained" } else { "framework-dependent" }
 Write-Host "==> FFXIV Combat Tracker release" -ForegroundColor Cyan
@@ -68,7 +97,9 @@ try {
         --self-contained $selfContained `
         -o $OutputDir `
         --nologo `
-        @versionArgs
+        @versionArgs `
+        @symbolArgs `
+        @hostSingleFileArgs
     if ($LASTEXITCODE -ne 0) { throw "host publish failed" }
 
     # The host build stages the satellite into its own bin (not here); drop any copy that
@@ -81,7 +112,8 @@ try {
         -c $Configuration `
         -o $satOut `
         --nologo `
-        @versionArgs
+        @versionArgs `
+        @symbolArgs
     if ($LASTEXITCODE -ne 0) { throw "satellite publish failed" }
 
     # 4. Verify the two entry points exist.

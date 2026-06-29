@@ -15,11 +15,31 @@
     <Prefer32Bit>false</Prefer32Bit>
     <AssemblyName>Fct.LegacyHost</AssemblyName>
     <RootNamespace>Fct.LegacyHost</RootNamespace>
+    <!-- Serilog's net48 dependencies (System.Memory etc.) need redirects in a process that also
+         loads the legacy plugins. -->
+    <AutoGenerateBindingRedirects>true</AutoGenerateBindingRedirects>
+    <GenerateBindingRedirectsOutputType>true</GenerateBindingRedirectsOutputType>
   </PropertyGroup>
 
   <ItemGroup>
     <ProjectReference Include="..\Fct.Compat.Act\Fct.Compat.Act.csproj" />
     <ProjectReference Include="..\Fct.Parser.Legacy\Fct.Parser.Legacy.csproj" />
+  </ItemGroup>
+
+  <!-- Serilog backend behind the Microsoft.Extensions.Logging API (same ILogger surface the host
+       uses). Serilog.Extensions.Logging gives a SerilogLoggerFactory; the file sink is the local
+       fallback, and a custom sink forwards records to the host over the bridge. -->
+  <ItemGroup>
+    <PackageReference Include="Serilog" />
+    <PackageReference Include="Serilog.Extensions.Logging" />
+    <PackageReference Include="Serilog.Sinks.File" />
+  </ItemGroup>
+
+  <!-- Shared logging contract: same EventId taxonomy + bridge wire format compiled on both sides. -->
+  <ItemGroup>
+    <Compile Include="..\..\shared\Logging\LogEvents.cs" Link="Logging\LogEvents.cs" />
+    <Compile Include="..\..\shared\Logging\LogPaths.cs" Link="Logging\LogPaths.cs" />
+    <Compile Include="..\..\shared\Logging\BridgeLogRecord.cs" Link="Logging\BridgeLogRecord.cs" />
   </ItemGroup>
 
 </Project>

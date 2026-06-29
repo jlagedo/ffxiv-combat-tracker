@@ -39,7 +39,8 @@ internal static class ActOracle
         return new CombatantData.DamageTypeDef(label, ally, color);
     }
 
-    // Mirrors FFXIV_ACT_Plugin ACT_UIMods damage-type registration.
+    // Registers the damage-type routing tables the real ACT binary runs with for FFXIV, so the
+    // captured aggregate baseline reflects ACT's own behavior.
     private static void RegisterTables()
     {
         // ACT sets these in FormActMain environment setup (which GetUninitializedObject bypasses).

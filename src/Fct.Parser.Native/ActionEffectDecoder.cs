@@ -3,8 +3,8 @@ using System.Globalization;
 namespace Fct.Parser.Native;
 
 // Effect-entry types as they appear at byte offset 3 of each 8-byte effect slot in an
-// ActionEffect (21/22) line. Mirrors the FFXIV_ACT_Plugin EffectEntryType enum for the
-// values this decoder classifies.
+// ActionEffect (21/22) line — the FFXIV game's packet/log effect format. Only the values
+// this decoder classifies are named.
 public enum EffectEntryType : byte
 {
     Nothing = 0,
@@ -57,10 +57,10 @@ public readonly record struct CombatEffect(
     string Special,
     byte Combo = 0);
 
-// Clean-room decode of the 8 effect slots of an ActionEffect (21/22) line. The formulas mirror
-// FFXIV_ACT_Plugin's ParseStrategyActionEffect + DamageEffectEntry/HealEffectEntry/
-// ResourceEffectEntry: each slot is data[b].PadLeft(8,'0') + data[b+1].PadLeft(8,'0') (16 hex
-// chars), laid out Param2 Param1 Param0 EntryType | Value(2) Flags2 Flags1.
+// Clean-room decode of the 8 effect slots of an ActionEffect (21/22) line. The byte layout is the
+// FFXIV game's ActionEffect packet/log format (it appears verbatim in the log line): each slot is
+// data[b].PadLeft(8,'0') + data[b+1].PadLeft(8,'0') (16 hex chars), laid out Param2 Param1 Param0
+// EntryType | Value(2) Flags2 Flags1. Decoded values are validated against ACT's output (the oracle).
 public static class ActionEffectDecoder
 {
     public const int MinFieldCount = 46;
@@ -173,8 +173,8 @@ public static class ActionEffectDecoder
     }
 
     // ACT's damage-type display string: DamageType name, plus " (Element)" unless the element
-    // is Unknown(0) or Unaspected(7). Enum values are FFXIV_ACT_Plugin.Resource.DamageType /
-    // ElementType (read from the plugin's resource assembly, not guessed).
+    // is Unknown(0) or Unaspected(7). The DamageType / ElementType names are FFXIV game-data enums
+    // (read as data, not guessed); the rendered string matches ACT's output.
     public static string DamageTypeText(int damageType, int element)
     {
         string name = damageType switch

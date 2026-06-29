@@ -293,10 +293,11 @@ satellite is empty, delete it.
 
 ## 12. Open questions / first things to verify
 
-1. **The MasterSwing boundary (gates the engine design).** For FFXIV, who builds the
-   `MasterSwing`s — the FFXIV_ACT_Plugin (`Parse.dll`, via `AddCombatAction`) or ACT's
-   own regex in `FormActMain`? This decides how much encounter pipeline we reproduce vs.
-   inherit. The decompile is the oracle — confirm before designing the engine.
+1. **The MasterSwing boundary (settled).** For FFXIV the **plugin** builds the `MasterSwing`s
+   (`Parse.dll`, via `AddCombatAction`) and feeds them to ACT; ACT's `FormActMain` does the combat
+   window + encounter aggregation. So we **host the plugin** for that, and **replicate ACT** for the
+   consume/aggregate side. The clean-room native parser re-reads the log to reproduce **ACT's
+   output**, derived from `ACT-decompiled` + the empirical oracle — never by porting plugin logic.
 2. **`FFXIVRepository` reflection shape.** OverlayPlugin discovers the parser by
    reflecting over `ActGlobals.oFormActMain.ActPlugins` and into plugin-instance fields.
    The facade must match the shape it reflects against, not just the public API.
@@ -327,4 +328,6 @@ Hard-linked (Windows directory junctions) under `reference/` — searchable in-p
     `Forms/FormActMain.cs`, `ActGlobals.cs`, `IActPluginV1.cs`, `Models/`, `Events/`.
   - `.audit/ffxiv_act_plugin/decompiled/` — FFXIV_ACT_Plugin sub-assemblies
     (`...network`, `...parse`, `...memory`, `...common`, `...logfile`, `machina.ffxiv`).
+    **For understanding the legacy stack we host unmodified only — never a source to port
+    parsing, swing-production, or DoT/HoT/shield logic from.**
   - `FFXIV_ACT_Plugin_ARCHITECTURE.md` — narrative of how the parser feeds ACT.

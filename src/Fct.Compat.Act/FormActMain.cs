@@ -170,7 +170,11 @@ namespace Advanced_Combat_Tracker
         public void RestartACT(bool stopOnError, string message) =>
             Log($"[RestartACT] stopOnError={stopOnError} :: {message}");
 
-        public void NotificationAdd(string title, string text) => Log($"[Notify] {title}: {text}");
+        // ACT's signature is one method with optional trailing params; OverlayPlugin's CheckACTVersion
+        // binds to the 4-arg form, older callers to the 2-arg form. We host no notification tray, so
+        // the callback/sender are accepted and ignored (logged like the rest).
+        public void NotificationAdd(string title, string text, EventHandler showCallback = null, object senderObject = null) =>
+            Log($"[Notify] {title}: {text}");
 
         // Host-window DPI scale. OP reads this to scale its config tab (in a try/catch → default 1);
         // we render no ACT chrome, so a constant 1f is correct and removes OP's silent catch.

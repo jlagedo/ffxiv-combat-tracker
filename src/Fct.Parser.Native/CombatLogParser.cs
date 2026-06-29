@@ -1,4 +1,6 @@
 using System.Globalization;
+using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Logging.Abstractions;
 
 namespace Fct.Parser.Native;
 
@@ -18,8 +20,8 @@ public readonly record struct CombatAction(
     bool InCombat);
 
 // Stateful, pure-log parser. Tracks the primary player (02), combatant names/owners/jobs (03/04),
-// casts (20), and an ACT-faithful combat window, then emits resolved CombatActions mirroring
-// FFXIV_ACT_Plugin's ReportCombatData for the log-derivable swing types:
+// casts (20), and an ACT-faithful combat window, then emits resolved CombatActions matching ACT's
+// output (the empirical oracle) for the log-derivable swing types:
 //   0/2  Damage/Autoattack   (21/22 damage effects; ungated, start/extend combat)
 //   4    Heal                (21/22 heal effects; in-combat only)
 //   6/7  PowerDrain/Healing  (21/22 MP-loss/-gain effects; in-combat only)
@@ -27,15 +29,17 @@ public readonly record struct CombatAction(
 //   8    Status              (26 StatusAdd; in-combat only)
 //   2/4/1 Cancelled cast     (23; in-combat only)
 //
-// Combat window matches ACT's FormActMain idle-end model exactly: combat starts at the first
-// SetEncounter (damage), every emitted swing that runs through SetEncounter refreshes
-// LastHostileTime, and combat ends when LastKnownTime - LastHostileTime > 6s (the default
-// nudIdleLimit) or on a zone change (01). Action(1) and Status(8) are gated on InCombat but do
-// NOT refresh it (ACT reports them via _actWrapper.AddCombatAction directly, bypassing
-// SetEncounter). Real ground-AoE DoT/HoT ticks (24, statusId != 0) carry log amounts and are
-// emitted here; ACT's simulated (statusId == 0) DoT/HoT (3/5) and damage shields (11) are
-// reproduced by the potency simulator (PotencySimulator.cs), active when StatusDefs +
-// ActionPotency are supplied.
+// Combat window matches ACT's FormActMain idle-end model: combat starts at the first SetEncounter
+// (damage, heal, or a DoT tick — the swing types that can open an encounter), and because ACT calls
+// SetEncounter before every AddCombatAction, every emitted swing refreshes LastHostileTime. Combat
+// ends only when LastKnownTime - LastHostileTime > 6s (the default nudIdleLimit); a zone change (01)
+// does NOT end combat (ACT's ChangeZone leaves InCombat untouched — the idle gap at any zone change
+// closes the window first). Action(1) and Status(8) are gated on InCombat (they cannot start combat,
+// since ACT could not AddCombatAction them while out of combat) but, once emitted, they extend it.
+// Real ground-AoE DoT/HoT ticks (24, statusId != 0) carry log amounts and are emitted here.
+// Personal (statusId == 0) DoT/HoT and damage shields are NOT in the log and are synthesized
+// upstream by the plugin, not by ACT — so they are out of scope (see ACT-OUTPUT-PARITY-GAPS.md).
+// We do not reproduce them; the unattributed tick still keeps ACT's combat window alive.
 public sealed partial class CombatLogParser
 {
     private readonly Dictionary<uint, string> _names = new();
@@ -68,17 +72,19 @@ public sealed partial class CombatLogParser
     // otherwise the action-id/damage-type-nibble heuristics are used.
     public IReadOnlyDictionary<uint, string>? ActionCategories { get; init; }
 
-    // Optional status/action potency definitions (ACT's IDefinitionRepository data). When both are
-    // set, the potency simulator reproduces ACT's simulated DoT/HoT amounts and damage shields.
-    public IReadOnlyDictionary<uint, StatusDef>? StatusDefs { get; init; }
-    public IReadOnlyDictionary<uint, (int Pot, int PotCombo, int HealPot)>? ActionPotency { get; init; }
-    private bool SimEnabled => StatusDefs != null && ActionPotency != null;
+    // Optional logging seam. Defaults to NullLogger, so the parser is silent (and allocation-free on
+    // the logging path) unless a consumer supplies a logger. Unparseable lines log at Trace; a parse
+    // summary logs at Debug. Unhandled-but-well-formed line types are dropped by design and are not
+    // logged (they are not anomalies).
+    public ILogger Log { get; init; } = NullLogger.Instance;
 
     public IEnumerable<CombatAction> Process(IEnumerable<string> lines)
     {
+        long fed = 0, dropped = 0;
         foreach (var raw in lines)
         {
-            if (!NetworkLogLine.TryParse(raw, out var line)) continue;
+            fed++;
+            if (!NetworkLogLine.TryParse(raw, out var line)) { dropped++; LogLineDropped(Log, raw); continue; }
 
             // LastKnownTime advances monotonically with each line; idle-end is checked before
             // the line is parsed (ACT runs CheckIdleEndCombat at the top of ParseRawLogLine).
@@ -88,8 +94,10 @@ public sealed partial class CombatLogParser
 
             switch (line.TypeCode)
             {
-                case 1: // ChangeZone — the plugin calls StopCombat on every zone change.
-                    _inCombat = false;
+                case 1: // ChangeZone — ACT's FormActMain.ChangeZone records the zone but does NOT
+                        // end combat; combat ends only via the idle-end check (above). A zone change
+                        // always carries a multi-minute gap, so the idle check has already closed the
+                        // window by the time this line lands.
                     break;
                 case 2: // ChangePrimaryPlayer
                     if (TryId(line.Field(2), out var pid)) { _playerId = pid; _hasPlayer = true; SetName(pid, line.Field(3)); }
@@ -102,7 +110,6 @@ public sealed partial class CombatLogParser
                         else _owners.Remove(aid);
                         TryId(line.Field(4), out var job);
                         if (job == 0) _petLike.Add(aid); else _petLike.Remove(aid);
-                        if (SimEnabled) SimAddCombatant(aid, (byte)job, line.Field(5));
                     }
                     break;
                 case 4: // RemoveCombatant
@@ -126,7 +133,7 @@ public sealed partial class CombatLogParser
                         RefreshCombat(t);
                     }
                     break;
-                case 24: // NetworkDoT — a DoT/HoT tick (deferred in ACT; emitted here in order).
+                case 24: // NetworkDoT — a DoT/HoT tick in the log.
                 {
                     if (!TryId(line.Field(2), out var dtgt)) break;
                     bool isHoT = string.Equals(line.Field(4), "HoT", StringComparison.OrdinalIgnoreCase);
@@ -134,53 +141,38 @@ public sealed partial class CombatLogParser
                     TryId(line.Field(6), out var dAmount);
                     TryId(line.Field(17), out var dsrc);
 
-                    // ACT runs SetEncounter for every emitted tick, so the tick keeps the combat
-                    // window alive exactly like a damage/heal. HoT ticks are in-combat-gated; DoT
-                    // ticks are not (a DoT can start/continue combat).
                     if (dStatus != 0 && dsrc != 0)
                     {
                         // Real ground-AoE tick (Salted Earth, party regen HoTs, …): the log carries
-                        // the true amount, which ACT emits verbatim (no "(*)" estimate).
+                        // the true amount and source, which ACT emits verbatim. HoT ticks are
+                        // in-combat-gated; DoT ticks are not (a DoT can start/continue combat).
                         if (isHoT && !_inCombat) break;
                         yield return new CombatAction(isHoT, isHoT ? 5 : 3, false, dAmount, "",
                             ResolveName(dsrc), ResolveName(dtgt), ResolveStatus(dStatus, ""), "Unknown", true);
                         RefreshCombat(t);
                     }
-                    else if (SimEnabled)
-                    {
-                        // Simulated tick (statusId == 0): reproduce ACT's potency estimate.
-                        bool emitted = false;
-                        foreach (var s in SimTick(isHoT, dtgt, dAmount, t)) { emitted = true; yield return s; }
-                        if (emitted || !isHoT) RefreshCombat(t);
-                        else if (_inCombat) RefreshCombat(t);
-                    }
                     else
                     {
-                        // No simulator data: the tick still refreshed ACT's combat window.
+                        // Combined, unattributed personal tick (statusId == 0): not in the log
+                        // per-source, and ACT's per-source split is synthesized upstream by the
+                        // plugin — out of scope, not emitted. The tick is still a combat event, so it
+                        // keeps ACT's window alive (a DoT can hold it open; a HoT only while in combat).
                         if (!isHoT || _inCombat) RefreshCombat(t);
                     }
                     break;
                 }
-                case 30: // NetworkStatusRemove — drop the buff/sim state from tracking.
-                    if (SimEnabled && TryId(line.Field(2), out var rmId) && TryId(line.Field(7), out var rmTgt))
-                        SimRemoveStatus(rmId, rmTgt);
-                    break;
                 case 26: // NetworkStatusAdd -> Status (08)
                     if (TryId(line.Field(2), out var stId)
                         && TryId(line.Field(5), out var ssrc) && TryId(line.Field(7), out var stgt))
                     {
                         if (_inCombat)
+                        {
                             yield return new CombatAction(false, 8, false, 0, "",
                                 ResolveName(ssrc), ResolveName(stgt), ResolveStatus(stId, line.Field(3)), "", true);
-                        // Status reports via AddCombatAction directly — does NOT refresh combat.
-                        // Register the status for buff tracking + create the DoT/HoT sim state or
-                        // emit the damage shield (these run regardless of the in-combat status swing).
-                        if (SimEnabled)
-                        {
-                            double dur = double.TryParse(line.Field(4), NumberStyles.Float, CultureInfo.InvariantCulture, out var d) ? d : 0;
-                            TryId(line.Field(9), out var sparam);
-                            uint maxHp = uint.TryParse(line.Field(11), NumberStyles.Integer, CultureInfo.InvariantCulture, out var mh) ? mh : 0;
-                            foreach (var s in SimStatusAdd(stId, ssrc, stgt, dur, (ushort)sparam, maxHp, t)) yield return s;
+                            // ACT calls SetEncounter before AddCombatAction for every swing, so an
+                            // emitted status extends the combat window (it cannot start it: the swing
+                            // is only added while already in combat).
+                            RefreshCombat(t);
                         }
                     }
                     break;
@@ -189,10 +181,7 @@ public sealed partial class CombatLogParser
                     if (!TryId(line.Field(2), out var src) || !TryId(line.Field(6), out var tgt)) break;
                     TryId(line.Field(4), out var actionId);
                     string ability = ResolveAction(actionId, line.Field(5));
-                    // Field 45 = TargetIndex (the AoE target ordinal); only index 0 carries full potency.
-                    int targetIndex = int.TryParse(line.Field(45), NumberStyles.Integer, CultureInfo.InvariantCulture, out var ti) ? ti : 0;
                     bool meaningful = false;
-                    Dictionary<uint, long>? lineHeals = null; // heals this line, for heal-percent shields
                     foreach (var e in ActionEffectDecoder.DecodeFull(line))
                     {
                         meaningful = true; // any classified effect suppresses the no-effect Action(1)
@@ -210,19 +199,19 @@ public sealed partial class CombatLogParser
                                 yield return new CombatAction(false, swing, e.IsCritical, e.Amount, e.Special,
                                     attacker, victim, ability, ActionEffectDecoder.DamageTypeText(e.DamageTypeId, e.ElementId), true);
                                 _actionIsDamage[actionId] = true;
-                                if (SimEnabled) SimCalibrateDamage(src, victimId, actionId, targetIndex, e, t);
                                 RefreshCombat(t); // damage starts/continues combat (SetEncounter)
                                 break;
 
                             case EffectKind.Heal:
-                                if (SimEnabled) { (lineHeals ??= new())[victimId] = e.Amount;
-                                    SimCalibrateHeal(src, victimId, actionId, targetIndex, e, t); }
-                                if (!_inCombat) break;
+                                // ACT calls SetEncounter for heals too, so a heal starts/continues
+                                // combat (not just extends an already-open window). This keeps the
+                                // window open through healer-driven lulls so trailing heals and the
+                                // status applications that follow are emitted, as in ACT.
+                                RefreshCombat(t);
                                 string healer = IsLimitBreak(actionId, -1) ? "Limit Break" : ResolveName(src);
                                 yield return new CombatAction(true, 4, e.IsCritical, e.Amount, "",
                                     healer, ResolveName(victimId), ability, "", true);
                                 _actionIsHeal[actionId] = true;
-                                RefreshCombat(t);
                                 break;
 
                             case EffectKind.PowerGain:
@@ -233,8 +222,8 @@ public sealed partial class CombatLogParser
                                 RefreshCombat(t);
                                 break;
 
-                            // Threat / ApplyStatus produce no swing from the action line (threat is the
-                            // simulator's; status comes from the 26 line) but they count as meaningful.
+                            // Threat / ApplyStatus produce no swing from the action line (status comes
+                            // from the 26 line) but they count as meaningful.
                         }
                     }
                     if (!meaningful && _inCombat)
@@ -242,21 +231,14 @@ public sealed partial class CombatLogParser
                         // Action with no damage/heal/resource/status effect — a bare ability marker.
                         yield return new CombatAction(false, 1, false, 0, "",
                             ResolveName(src), ResolveName(tgt), ability, "", true);
-                        // Action reports via AddCombatAction directly — does NOT refresh combat.
+                        // ACT calls SetEncounter before AddCombatAction, so an emitted bare action
+                        // extends the combat window (cannot start it — gated on _inCombat above).
+                        RefreshCombat(t);
                     }
-                    // Remember the low bytes the status applications carry (so a later DoT/HoT can
-                    // anchor its amount) and the companion heal (so a heal-percent shield can size).
-                    if (SimEnabled)
-                        foreach (var a in ActionEffectDecoder.DecodeApplyStatus(line))
-                        {
-                            uint recip = a.ToSource ? src : tgt;
-                            _applyParams[(recip, a.StatusId)] = (a.P0, a.P1, a.P2);
-                            if (lineHeals != null && lineHeals.TryGetValue(recip, out var hv))
-                                _shieldHeal[(recip, a.StatusId)] = hv;
-                        }
                     break;
             }
         }
+        LogParseSummary(Log, fed, dropped);
     }
 
     // SetEncounter: start/continue combat and stamp the last hostile-action time.

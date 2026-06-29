@@ -14,4 +14,10 @@
     <ImplicitUsings>enable</ImplicitUsings>
   </PropertyGroup>
 
+  <!-- Optional logging seam (source-gen LoggerMessage). Abstractions only: the parser stays a pure
+       library and emits nothing unless a consumer supplies an ILogger. -->
+  <ItemGroup>
+    <PackageReference Include="Microsoft.Extensions.Logging.Abstractions" />
+  </ItemGroup>
+
 </Project>

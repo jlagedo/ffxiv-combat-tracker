@@ -4,18 +4,23 @@ using System.IO.Pipes;
 using System.Linq;
 using System.Windows.Forms;
 using Advanced_Combat_Tracker;
+using Fct.LegacyHost.Logging;
+using Fct.Logging;
+using Microsoft.Extensions.Logging;
 
 namespace Fct.LegacyHost
 {
     // The net48 satellite. Stands up the ACT facade, loads the real plugins into WinForms
     // tabs inside a borderless host window, and hands that window's HWND to the Avalonia
-    // host for embedding. Writes a verification log next to the executable.
+    // host for embedding. Logs through Serilog (rolling file + bridge forwarding + the
+    // s2-ffxiv.log verification artifact); see SatelliteLogging.
     internal static class Program
     {
         private static NamedPipeClientStream _bridge;
         private static StreamWriter _writer;
-        private static readonly string LogPath =
-            Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "s2-ffxiv.log");
+        private static readonly object _sendLock = new object();
+
+        private static ILogger _log = Microsoft.Extensions.Logging.Abstractions.NullLogger.Instance;
 
         private static LoadedPlugin _ffxiv;
         private static LoadedPlugin _overlay;
@@ -79,8 +84,15 @@ namespace Fct.LegacyHost
                 return;
             }
 
-            try { File.WriteAllText(LogPath, $"satellite start {DateTime.Now:HH:mm:ss}\n"); } catch { }
-            FacadeHost.Log = Log;
+            SatelliteLogging.Initialize();
+            _log = SatelliteLogging.Log;
+            _log.LogInformation(LogEvents.SatelliteBooting,
+                "Satellite starting (pid {Pid}, x64 {X64}, clr {Clr})",
+                System.Diagnostics.Process.GetCurrentProcess().Id, Environment.Is64BitProcess, Environment.Version);
+
+            // The ACT facade and plugin wrapper emit diagnostics through this Action<string>; route it
+            // into the same pipeline (classifying by the legacy "[Tag]" prefix).
+            FacadeHost.Log = SatelliteLogging.WriteLegacy;
 
             var pipeName = ParseBridgeArg(args);
             if (pipeName != null)
@@ -94,6 +106,7 @@ namespace Fct.LegacyHost
 
             // The ACT facade (hidden form: handle + Invoke marshaling).
             FacadeHost.CreateAct();
+            _log.LogDebug(LogEvents.FacadeCreated, "ACT facade created");
 
             _standalone = pipeName == null;
 
@@ -102,7 +115,14 @@ namespace Fct.LegacyHost
             ScheduleOnce(3000, StartDispatcherDiagnostics);
             ScheduleOnce(12000, WriteSummary);
 
-            Application.Run(new ApplicationContext());
+            try
+            {
+                Application.Run(new ApplicationContext());
+            }
+            finally
+            {
+                SatelliteLogging.Shutdown();
+            }
         }
 
         private static bool _standalone;
@@ -111,18 +131,21 @@ namespace Fct.LegacyHost
         {
             // Each plugin loads into its own borderless window; the host embeds whichever the
             // user selects, so a plugin's window shows only its own configuration tabs.
-            Log("loading FFXIV_ACT_Plugin (wrapped) from: " + FacadeHost.FfxivPluginPath);
+            _log.LogInformation(LogEvents.PluginLoading,
+                "Loading FFXIV_ACT_Plugin (wrapped) from {Path}", FacadeHost.FfxivPluginPath);
             _ffxiv = FacadeHost.LoadWrappedFfxivPlugin(FacadeHost.FfxivPluginPath);
             SendLine($"HWND {_ffxiv.Hwnd.ToInt64():X}");   // primary window (bridge-handshake compat)
             SendPlugin(_ffxiv);
 
-            Log("loading OverlayPlugin from: " + FacadeHost.OverlayPluginPath);
+            _log.LogInformation(LogEvents.PluginLoading,
+                "Loading OverlayPlugin from {Path}", FacadeHost.OverlayPluginPath);
             _overlay = FacadeHost.LoadPlugin("overlay", "OverlayPlugin", FacadeHost.OverlayPluginPath, null);
             SendPlugin(_overlay);
 
             SendLine("PLUGINS-END");
-            Log($"loaded {2} plugin window(s): {_ffxiv.Title}=0x{_ffxiv.Hwnd.ToInt64():X}, " +
-                $"{_overlay.Title}=0x{_overlay.Hwnd.ToInt64():X}");
+            _log.LogInformation(LogEvents.PluginsReady,
+                "Loaded 2 plugin window(s): {Ffxiv}=0x{FfxivHwnd:X}, {Overlay}=0x{OverlayHwnd:X}",
+                _ffxiv.Title, _ffxiv.Hwnd.ToInt64(), _overlay.Title, _overlay.Hwnd.ToInt64());
 
             if (_standalone)
                 foreach (var p in new[] { _ffxiv, _overlay })
@@ -162,13 +185,15 @@ namespace Fct.LegacyHost
 
                 var enc = act.ActiveZone.ActiveEncounter;
                 var cd = enc.GetCombatant("Player One");
-                Log($"[SelfTest] Damage={cd.Damage} Hits={cd.Hits} Crit%={cd.CritDamPerc:0} " +
-                    $"Duration={enc.Duration.TotalSeconds:0}s EncDPS={cd.EncDPS:0.0}");
+                _log.LogInformation(LogEvents.SelfTest,
+                    "[SelfTest] Damage={Damage} Hits={Hits} Crit%={Crit:0} Duration={Duration:0}s EncDPS={Dps:0.0}",
+                    cd.Damage, cd.Hits, cd.CritDamPerc, enc.Duration.TotalSeconds, cd.EncDPS);
                 string Ev(string k) => CombatantData.ExportVariables.TryGetValue(k, out var f) ? f.GetExportString(cd, "") : "(missing)";
-                Log($"[SelfTest] ExportVariables: encdps={Ev("encdps")} damage={Ev("damage")} " +
-                    $"name={Ev("name")} crithit%={Ev("crithit%")}");
+                _log.LogInformation(LogEvents.SelfTest,
+                    "[SelfTest] ExportVariables: encdps={Encdps} damage={Dmg} name={Name} crithit%={Crithit}",
+                    Ev("encdps"), Ev("damage"), Ev("name"), Ev("crithit%"));
             }
-            catch (Exception ex) { Log("[SelfTest] FAILED: " + ex); }
+            catch (Exception ex) { _log.LogError(LogEvents.SelfTest, ex, "[SelfTest] FAILED"); }
         }
 
         // Ring-buffer dispatcher health, asserted by the Tier 2 integration test. Proves the
@@ -201,20 +226,28 @@ namespace Fct.LegacyHost
             {
                 int commonCopies = AppDomain.CurrentDomain.GetAssemblies()
                     .Count(a => a.GetName().Name == "FFXIV_ACT_Plugin.Common");
-                Log($"[Diag] FFXIV_ACT_Plugin.Common loaded copies={commonCopies}");
+                _log.LogInformation(LogEvents.DispatcherDiagnostics,
+                    "[Diag] FFXIV_ACT_Plugin.Common loaded copies={Copies}", commonCopies);
 
-                if (wrapper == null) { Log("[Diag] wrapper missing (pluginObj is not WrappedFfxivPlugin)"); return; }
+                if (wrapper == null)
+                {
+                    _log.LogWarning(LogEvents.DispatcherDiagnostics,
+                        "[Diag] wrapper missing (pluginObj is not WrappedFfxivPlugin)");
+                    return;
+                }
 
-                Log($"[Diag] OverlayPlugin bound to ring: ProcessChanged subscribers={wrapper.ProcessChangedSubscriberCount} " +
-                    $"NetworkReceived subscribers={wrapper.NetworkReceivedSubscriberCount} (NetworkReceived is game-gated)");
+                _log.LogInformation(LogEvents.DispatcherDiagnostics,
+                    "[Diag] OverlayPlugin bound to ring: ProcessChanged subscribers={Pc} NetworkReceived subscribers={Nr} (NetworkReceived is game-gated)",
+                    wrapper.ProcessChangedSubscriberCount, wrapper.NetworkReceivedSubscriberCount);
 
                 long before = wrapper.RawPackets.DroppedCount;
                 for (int i = 0; i < 8; i++)
                     wrapper.RawPackets.InjectNetworkReceived("diag", i, new byte[64]);
                 long dropped = wrapper.RawPackets.DroppedCount - before;
-                Log($"[Diag] injected=8 dropped={dropped}");
+                _log.LogInformation(LogEvents.DispatcherDiagnostics,
+                    "[Diag] injected=8 dropped={Dropped}", dropped);
             }
-            catch (Exception ex) { Log("[Diag] FAILED: " + ex); }
+            catch (Exception ex) { _log.LogError(LogEvents.DispatcherDiagnostics, ex, "[Diag] FAILED"); }
         }
 
         private static bool IsPortOpen(int port)
@@ -240,19 +273,24 @@ namespace Fct.LegacyHost
                 ? Path.GetFileName(networkLogs[networkLogs.Length - 1])
                 : "(none)";
 
-            Log("==== SUMMARY ====");
-            Log($"FFXIV status: '{_ffxiv?.Data?.lblPluginStatus?.Text}'");
-            Log($"OverlayPlugin status: '{_overlay?.Data?.lblPluginStatus?.Text}'");
-            Log($"WS server (10501) open: {IsPortOpen(10501)}");
-            Log($"AddCombatAction={act.AddCombatActionCount} SetEncounter={act.SetEncounterCount} " +
-                $"ChangeZone={act.ChangeZoneCount} InCombat={act.InCombat} Zone='{act.CurrentZone}'");
-            Log($"Network_*.log count={networkLogs.Length} latest={today}");
+            _log.LogInformation(LogEvents.Summary,
+                "==== SUMMARY ==== FFXIV status '{FfxivStatus}', OverlayPlugin status '{OverlayStatus}', " +
+                "WS(10501) open {WsOpen}; AddCombatAction={AddCombatAction} SetEncounter={SetEncounter} " +
+                "ChangeZone={ChangeZone} InCombat={InCombat} Zone '{Zone}'; Network_*.log count={LogCount} latest {Latest}",
+                _ffxiv?.Data?.lblPluginStatus?.Text, _overlay?.Data?.lblPluginStatus?.Text, IsPortOpen(10501),
+                act.AddCombatActionCount, act.SetEncounterCount, act.ChangeZoneCount, act.InCombat,
+                act.CurrentZone, networkLogs.Length, today);
         }
 
         private static void ScheduleOnce(int ms, Action action)
         {
             var t = new Timer { Interval = ms };
-            t.Tick += (s, e) => { t.Stop(); t.Dispose(); try { action(); } catch (Exception ex) { Log("tick error: " + ex); } };
+            t.Tick += (s, e) =>
+            {
+                t.Stop(); t.Dispose();
+                try { action(); }
+                catch (Exception ex) { _log.LogError(LogEvents.SatelliteBooting, ex, "Scheduled task failed"); }
+            };
             t.Start();
         }
 
@@ -273,11 +311,29 @@ namespace Fct.LegacyHost
                 _writer = new StreamWriter(_bridge) { AutoFlush = true };
                 SendLine($"READY pid={System.Diagnostics.Process.GetCurrentProcess().Id} " +
                          $"x64={Environment.Is64BitProcess} clr={Environment.Version}");
+                // The pipe is up: start forwarding log records to the host's pipeline.
+                BridgeLogSink.Sender = SendLine;
+                _log.LogInformation(LogEvents.SatelliteBridgeConnected, "Bridge connected on {Pipe}", pipeName);
             }
-            catch { _bridge = null; _writer = null; }
+            catch (Exception ex)
+            {
+                _bridge = null; _writer = null;
+                _log.LogWarning(LogEvents.SatelliteBridgeConnectFailed, ex,
+                    "Bridge connect failed on {Pipe}; running detached", pipeName);
+            }
         }
 
-        private static void SendLine(string s) { try { _writer?.WriteLine(s); } catch { } }
+        // Single writer for the pipe, shared by the handshake/HWND lines and the forwarded LOG frames
+        // (which arrive from arbitrary threads), so each line is written atomically.
+        private static void SendLine(string s)
+        {
+            try
+            {
+                lock (_sendLock)
+                    _writer?.WriteLine(s);
+            }
+            catch { }
+        }
 
         // Announce a loaded plugin's embeddable window to the host:
         //   PLUGIN <key>|<hwndHex>|<status>|<title>
@@ -287,11 +343,6 @@ namespace Fct.LegacyHost
             var status = (p.Status ?? "").Replace('|', '/');
             var title = (p.Title ?? "").Replace('|', '/');
             SendLine($"PLUGIN {p.Key}|{p.Hwnd.ToInt64():X}|{status}|{title}");
-        }
-
-        private static void Log(string s)
-        {
-            try { File.AppendAllText(LogPath, $"{DateTime.Now:HH:mm:ss.fff} {s}\n"); } catch { }
         }
     }
 }

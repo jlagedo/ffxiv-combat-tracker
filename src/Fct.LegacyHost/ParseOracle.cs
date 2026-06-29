@@ -111,110 +111,11 @@ namespace Fct.LegacyHost
                 actionRows.Add($"{id:X}\t{(names.TryGetValue(id, out var nm) ? nm : "")}\t{cats[id]}");
             File.WriteAllLines(Path.Combine(outFolder, "actions.full.tsv"), actionRows);
             Log($"dumped {actionRows.Count - 1} actions ({cats.Values.Count(v => v == "AutoAttack")} auto) -> {outFolder}");
-
-            DumpDefinitions(container, repo, grd, rtType, outFolder, Log);
-        }
-
-        // Export the DoT/HoT/shield/buff potency definitions and per-action potencies from the
-        // plugin's IDefinitionRepository — the data the native simulator multiplies to reproduce
-        // ACT's simulated swing amounts.
-        private static void DumpDefinitions(object container, object repo, System.Reflection.MethodInfo grd,
-            Type rtType, string outFolder, Action<string> Log)
-        {
-            var defRepo = Resolve(container, "FFXIV_ACT_Plugin.Resource.IDefinitionRepository");
-            if (defRepo == null) { Log("IDefinitionRepository not resolved"); return; }
-            var getStatus = defRepo.GetType().GetMethod("GetStatusEffectById");
-            var getAction = defRepo.GetType().GetMethod("GetActionById");
-            var buffs = (System.Collections.IDictionary)grd.Invoke(repo, new[] { Enum.Parse(rtType, "BuffList_EN") });
-            var skills = (System.Collections.IDictionary)grd.Invoke(repo, new[] { Enum.Parse(rtType, "SkillList_EN") });
-
-            string S(object o) => Clean(o?.ToString() ?? "");
-            string Ids(object list) => list is System.Collections.IEnumerable en
-                ? string.Join(",", en.Cast<object>().Select(x => Convert.ToUInt32(x).ToString("X"))) : "";
-
-            // Serialize a Potency[] as type|amount|amountByte|isStacked|zone|cat|dmgType|actionIds;...
-            string Potencies(object arr)
-            {
-                if (arr is not System.Collections.IEnumerable en) return "";
-                var parts = new List<string>();
-                foreach (var p in en)
-                {
-                    var T = p.GetType();
-                    object P(string n) => T.GetProperty(n)?.GetValue(p);
-                    parts.Add(string.Join("|", S(P("Type")), S(P("Amount")), S(P("AmountByte")),
-                        S(P("IsStacked")), S(P("LimitToZoneId")), S(P("LimitToActionCategory")),
-                        S(P("LimitToDamageType")), Ids(P("LimitToActionIds"))));
-                }
-                return string.Join(";", parts);
-            }
-            string Multipliers(object arr)
-            {
-                if (arr is not System.Collections.IEnumerable en) return "";
-                var parts = new List<string>();
-                foreach (var m in en)
-                {
-                    var T = m.GetType();
-                    object P(string n) => T.GetProperty(n)?.GetValue(m);
-                    parts.Add(string.Join("|", S(P("Type")), S(P("Amount")), Ids(P("LimitToActionIds"))));
-                }
-                return string.Join(";", parts);
-            }
-
-            var statusRows = new List<string> {
-                "statusId\tname\ttpType\ttpPotency\ttpDamageType\ttpMaxTicks\tshieldType\tshieldAmount\tpotencyEffects\tmultipliers" };
-            foreach (System.Collections.DictionaryEntry de in buffs)
-            {
-                uint sid = Convert.ToUInt32(de.Key);
-                object def = null; try { def = getStatus.Invoke(defRepo, new object[] { sid }); } catch { }
-                if (def == null) continue;
-                var T = def.GetType();
-                object tp = T.GetProperty("TimeProc")?.GetValue(def);
-                object sh = T.GetProperty("DamageShield")?.GetValue(def);
-                object pe = T.GetProperty("PotencyEffects")?.GetValue(def);
-                object mu = T.GetProperty("Multipliers")?.GetValue(def);
-                string tpType = tp != null ? S(tp.GetType().GetProperty("Type")?.GetValue(tp)) : "";
-                string tpPot = tp != null ? S(tp.GetType().GetProperty("Potency")?.GetValue(tp)) : "";
-                string tpDmg = tp != null ? S(tp.GetType().GetProperty("DamageType")?.GetValue(tp)) : "";
-                string tpMax = tp != null ? S(tp.GetType().GetProperty("MaxTicks")?.GetValue(tp)) : "";
-                string shType = sh != null ? S(sh.GetType().GetProperty("Type")?.GetValue(sh)) : "";
-                string shAmt = sh != null ? S(sh.GetType().GetProperty("Amount")?.GetValue(sh)) : "";
-                // Skip statuses with nothing the simulator uses, to keep the file lean.
-                if (tp == null && sh == null && string.IsNullOrEmpty(Potencies(pe)) && string.IsNullOrEmpty(Multipliers(mu)))
-                    continue;
-                statusRows.Add(string.Join("\t", sid.ToString("X"), S(de.Value), tpType, tpPot, tpDmg, tpMax,
-                    shType, shAmt, Potencies(pe), Multipliers(mu)));
-            }
-            File.WriteAllLines(Path.Combine(outFolder, "status-defs.tsv"), statusRows);
-            Log($"dumped {statusRows.Count - 1} status defs");
-
-            // Per-action base potency for the per-hit calibration: GetDamagePotency(targetIndex, combo)
-            // and GetHealPotency(targetIndex) at the primary target (index 0). The native simulator
-            // divides observed primary-target hits by these to recover the source attack-power proxy.
-            var actionRows = new List<string> { "actionId\tpot0\tpot0combo\thealPot0" };
-            if (getAction != null)
-            {
-                foreach (System.Collections.DictionaryEntry de in skills)
-                {
-                    uint aid = Convert.ToUInt32(de.Key);
-                    object adef = null; try { adef = getAction.Invoke(defRepo, new object[] { aid }); } catch { }
-                    if (adef == null) continue;
-                    var gdp = adef.GetType().GetMethod("GetDamagePotency");
-                    var ghp = adef.GetType().GetMethod("GetHealPotency");
-                    object p0 = null, p0c = null, hp0 = null;
-                    try { p0 = gdp?.Invoke(adef, new object[] { 0, false }); } catch { }
-                    try { p0c = gdp?.Invoke(adef, new object[] { 0, true }); } catch { }
-                    try { hp0 = ghp?.Invoke(adef, new object[] { 0 }); } catch { }
-                    if (p0 == null && p0c == null && hp0 == null) continue;
-                    actionRows.Add($"{aid:X}\t{S(p0)}\t{S(p0c)}\t{S(hp0)}");
-                }
-            }
-            File.WriteAllLines(Path.Combine(outFolder, "action-potency.tsv"), actionRows);
-            Log($"dumped {actionRows.Count - 1} action potencies -> {outFolder}");
         }
 
         // Survey the plugin's IDataRepository: its public methods, the ResourceType enum values,
-        // and the type/size of every GetResourceDictionary(enum) — so we can find the action-category,
-        // status-name, and pet tables the native parser needs to mirror ACT's swing construction.
+        // and the type/size of every GetResourceDictionary(enum) — so we can find the FFXIV game-data
+        // tables the native parser needs (action-category, status-name, pet). These are data, not logic.
         private static void IntrospectImpl(string outPath, Action<string> Log)
         {
             var ffxiv = LoadStartedPlugin(Log);

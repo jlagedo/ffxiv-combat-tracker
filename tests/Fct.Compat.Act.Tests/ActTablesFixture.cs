@@ -4,10 +4,10 @@ using Advanced_Combat_Tracker;
 using Xunit;
 using DamageTypeDef = Advanced_Combat_Tracker.CombatantData.DamageTypeDef;
 
-// The engine relies on global static routing tables that the REAL FFXIV_ACT_Plugin
-// populates at init. These tests reproduce that exact setup (mirrored from the plugin's
-// ACT_UIMods damage-type registration) so the aggregation is exercised deterministically
-// without the live plugin. All test classes share this one fixture.
+// The engine relies on global static routing tables (swing-type → bucket links, bucket names) that
+// ACT runs with for FFXIV. These tests set up that table state so the aggregation is exercised
+// deterministically without the live plugin; the exact values are held to the real ACT binary by
+// ExportVarsCompatTests. All test classes share this one fixture.
 //
 // The tables are global mutable statics, so test parallelization is disabled to keep the
 // shared setup and per-test flag tweaks (e.g. ActGlobals.blockIsHit) from racing.

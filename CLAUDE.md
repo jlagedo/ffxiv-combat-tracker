@@ -5,8 +5,8 @@ Guidance for Claude Code when working in this repository.
 ## What this repo is
 
 **FFXIV Combat Tracker** — a clean-slate, FFXIV-only rebuild of the
-ACT + FFXIV_ACT_Plugin + OverlayPlugin stack. It is currently in the **design
-phase**: no application code yet. The full design lives in
+ACT + FFXIV_ACT_Plugin + OverlayPlugin stack. The two-process host builds and runs the real
+legacy plugins (**Slice 1 complete** — see *Active work* below). The full design lives in
 [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md) — read it before proposing changes.
 [`docs/DATA-FLOW.md`](docs/DATA-FLOW.md) is the authoritative map of how data flows
 through the real upstream stack (FFXIV_ACT_Plugin → ACT → OverlayPlugin) and the exact
@@ -40,6 +40,23 @@ swappable, independently-released component.
 - **We build only the ACT engine.** The FFXIV SDK and the OverlayPlugin/cactbot surface
   self-host by loading the real plugins; hosting the real FFXIV_ACT_Plugin inherits its
   per-patch opcode cadence for free.
+- **What we replicate — and what "parity" means** (read this before touching the parser).
+  **We replicate Advanced Combat Tracker (`E:\dev\ACT-decompiled`)**: how ACT reads `Network_*.log`
+  lines, collects `MasterSwing`s, runs its combat window, and aggregates encounters/DPS. **We never
+  read, mirror, or port logic from FFXIV_ACT_Plugin.** There are exactly two legitimate ground truths:
+  `ACT-decompiled` (ACT's own host / log-reading / aggregation behavior) and the **empirical oracle**
+  — ACT's actual captured output (`--mass-oracle`), in which the real plugin is used as an *opaque
+  producer* to generate reference output, never as source to copy.
+  - In the live stack FFXIV_ACT_Plugin is the **producer** (packets → `Network_*.log` lines, plus the
+    `MasterSwing`s it feeds ACT directly); ACT is the **consumer/aggregator** (→ encounters/DPS). Our
+    native parser re-reads the log and reproduces **ACT's consumer behavior**. For nearly every swing
+    the value is already in the log line, so it is parse-the-line + aggregate.
+  - **Out of scope — personal DoT/HoT ticks and damage shields.** The game sends one *combined,
+    unattributed* DoT tick per target (log type `24`, status id `0` — no per-source breakdown). The
+    per-source split that appears in ACT's output is **not ACT's work**: `ACT-decompiled` contains no
+    DoT/HoT/shield simulation — the plugin synthesizes those upstream and feeds them to ACT. That
+    synthesis is plugin logic and the values are not in the log, so **we do not replicate it**. (Gaps
+    /status: [`docs/ACT-OUTPUT-PARITY-GAPS.md`](docs/ACT-OUTPUT-PARITY-GAPS.md).)
 - **`Fct.Abstractions` multi-targets `net48;net10`** so the same record/interface types
   exist on both sides of the bridge.
 
@@ -52,7 +69,7 @@ swappable, independently-released component.
 | `Fct.LegacyHost` | net48 | clean-room ACT engine; hosts the five real plugins. |
 | `Fct.Bridge` | net48;net10 | IPC transport + versioned wire protocol. |
 | `Fct.Parser.Legacy` | net48 | wraps the real FFXIV_ACT_Plugin. `WrappedFfxivPlugin` sits in `pluginObj` (forwards `DataRepository`/`_iocContainer`/lifecycle to the real instance) and exposes `RingBufferDataSubscription` (`IDataSubscription` + `IRawPacketSource`): a bounded ring + single dispatch thread that replaces the plugin's per-subscriber `BeginInvoke` fan-out so OverlayPlugin's ~20 handlers cost one in-order dispatch. ~250× faster on the dispatch stage. |
-| `Fct.Parser.Native` | net10 | clean-room parser. `NetworkLogLine` (structure) + `ActionEffectDecoder` (effect byte decode) + `CombatLogParser` (stateful: names, combat window, all swing types) + `PotencySimulator` (ACT's simulated DoT/HoT/shield amounts). Reproduces every swing type ACT emits; deterministic log-derived types are bit-exact. The simulator mirrors ACT's `DoTSimulator`/`DamageShieldSimulator`/`PotencyStatusApplication` exactly — the per-source attack-power median (calibrated from primary-target hits only), the buff-multiplier engine, and the individual-crit tick branch (RNG crit/DH bits, `Random`-seeded). Simulated `(*)` DoT/HoT/shield amounts reach ~95.6% of ACT's damage sum (the DPS signal); per-tick bit-exact is bounded by ACT's RNG crits (~29% of ticks) and per-application buff-snapshot precision. Game-data tables (action categories, status names, DoT/heal potencies, shield/buff defs) are dumped from the real plugin via `--dump-tables`. See `docs/TESTING.md`. Live capture + memory later. |
+| `Fct.Parser.Native` | net10 | clean-room parser. `NetworkLogLine` (structure) + `ActionEffectDecoder` (decodes the FFXIV log/packet effect-byte layout) + `CombatLogParser` (stateful: names, ACT's combat window, every log-derived swing type). Reproduces, bit-exact, every swing whose value is present in the log, plus ACT's consumer/combat-window behavior — all derived from `ACT-decompiled` + the empirical oracle. FFXIV **game-data** tables (action id→name, action category, status names) are dumped from the real plugin's resources via `--dump-tables` — that is *data*, not logic. Per-source personal DoT/HoT/shield synthesis is plugin logic and **out of scope** (see the parser bullet above) — the parser emits only the DoT/HoT ticks the log carries (real ground-AoE, status id ≠ 0). See `docs/TESTING.md`. Live capture + memory later. |
 | `Fct.App` | net10 | Avalonia control panel + shell (MVVM). |
 | `Fct.Compat.Act` | net48 | the ACT facade surface (in LegacyHost). Its `EncounterData`/`CombatantData`/`AttackType` aggregation reproduces the real ACT binary bit-for-bit on captured combat (see Differential ACT-engine compat in `docs/TESTING.md`). |
 
@@ -93,14 +110,42 @@ are mapped in [`docs/ACT-INTERFACE-MAP.md`](docs/ACT-INTERFACE-MAP.md):
   does the MasterSwing collection and encounter **aggregation**. It contains **no** FFXIV
   parsing or DoT/HoT/shield simulation.
 - **`E:\dev\FFXIV_ACT_Plugin\ffxiv_act_plugin\decompiled\`** is the **FFXIV_ACT_Plugin**
-  decompile — all FFXIV-specific log parsing. The combat logic lives in the `.parse`
-  assembly: `…\ffxiv_act_plugin.parse\FFXIV_ACT_Plugin.Parse\` — `DoTSimulator.cs`,
-  `DamageShieldSimulator.cs`, `PotencyStatusApplication.cs`, the `ParseStrategy*` line
-  handlers, `ReportCombatData.cs`, `SwingType.cs`. Sibling assemblies: `.common`,
-  `.memory`, `.config`, `.logfile`. **This is the authority for how swings are produced.**
+  decompile. It exists here for **one purpose only: understanding the legacy stack we host
+  unmodified** (its load/lifecycle, the `FFXIV_ACT_Plugin.Common` SDK surface we facade, how it
+  drives ACT). **It is never a source to port parsing, swing-production, or DoT/HoT/shield logic
+  from.** We do not replicate FFXIV_ACT_Plugin; if any of our clean-room code was derived from it,
+  that is a bug to fix.
 
-When a compat detail is in doubt, match the exact signature/shape in the decompile, not an
-approximation — and pick the right tree: aggregation → ACT; swing production → FFXIV_ACT_Plugin.
+When a compat detail is in doubt, the authority for **our** implementation is `ACT-decompiled` (host
++ aggregation behavior) and the **empirical oracle** (ACT's captured output) — match the exact
+signature/shape there, not the plugin's internals.
+
+## Logging
+
+Both runtimes log through the **`Microsoft.Extensions.Logging` `ILogger`** surface with **Serilog**
+as the backend, so one API and one `EventId` taxonomy span both sides of the bridge.
+
+- **Host (`Fct.App`, net10):** Generic Host (`Microsoft.Extensions.Hosting`) owns the pipeline via
+  `Serilog.Extensions.Hosting`. Sinks: console + a daily-rolling file at
+  `%LOCALAPPDATA%\FFXIVCombatTracker\logs\host-.log`. Configured in `LoggingBootstrap`.
+- **Satellite (`Fct.LegacyHost`, net48):** Serilog behind a `SerilogLoggerFactory` (`SatelliteLogging`).
+  Sinks: the same `logs\satellite-.log` rolling file, a flat `s2-ffxiv.log` **verification artifact**
+  next to the exe (read by the integration tests), and a custom **`BridgeLogSink`** that forwards each
+  record to the host over the bridge.
+- **Unified stream:** the satellite forwards records as `LOG <wire>` frames (`BridgeLogRecord`); the
+  host's `SatelliteHost` keeps reading the pipe for its lifetime and **re-emits** them into its own
+  pipeline under the `Fct.Satellite` category, so everything lands in the host's console + file too.
+- **Legacy seam:** the ACT facade and plugin wrapper emit through an `Action<string>` (`[Info]`/
+  `[Debug]`/`[Exception]`/… prefixes); `SatelliteLogging.WriteLegacy` maps the prefix to a level +
+  `EventId` and routes it in. `Fct.Compat.Act` / `Fct.Parser.Legacy` take **no** logging dependency.
+- **Taxonomy:** `shared/Logging/` (linked into both processes) holds the `EventId` registry
+  (`LogEvents`: 1xxx host, 2xxx satellite, 3xxx parser), the bridge wire format (`BridgeLogRecord`),
+  and the shared log path (`LogPaths`).
+- **Native parser (`Fct.Parser.Native`):** optional `ILogger` seam (`CombatLogParser.Log`, default
+  `NullLogger`) with source-gen `LoggerMessage`; emits nothing unless a consumer supplies a logger.
+- **Level:** default Information (Debug in `DEBUG`); `FCT_LOG_LEVEL` env var overrides.
+- **Packages** are centrally pinned in `Directory.Packages.props` (so the Serilog stack is identical
+  on net48 and net10).
 
 ## Conventions
 
@@ -157,8 +202,10 @@ Run the slice end-to-end (launches host → satellite → loads real plugins):
 
 ```powershell
 dotnet build src\Fct.App\Fct.App.csproj
-.\src\Fct.App\bin\Debug\net10.0\Fct.App.exe   # verification logs land in
-                                              # bin\Debug\net10.0\satellite\s2-ffxiv.log
+.\src\Fct.App\bin\Debug\net10.0\Fct.App.exe   # unified logs: %LOCALAPPDATA%\FFXIVCombatTracker\
+                                              # logs\{host,satellite}-*.log (satellite records are
+                                              # forwarded into the host's pipeline too). The flat
+                                              # satellite\s2-ffxiv.log verification artifact remains.
 ```
 
 Status: **Slice 1 complete (S0–S5), pending live-game capture.** All phases built,

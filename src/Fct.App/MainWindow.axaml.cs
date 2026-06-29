@@ -1,7 +1,6 @@
 using System;
 using System.Collections.Generic;
 using System.ComponentModel;
-using System.IO;
 using System.Linq;
 using System.Threading.Tasks;
 using Avalonia.Controls;
@@ -9,18 +8,30 @@ using Avalonia.Input;
 using Avalonia.Interactivity;
 using Avalonia.Platform.Storage;
 using Fct.App.ViewModels;
+using Fct.Logging;
+using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Logging.Abstractions;
 
 namespace Fct.App;
 
 public partial class MainWindow : Window
 {
-    private readonly MainViewModel _vm = new();
+    private readonly MainViewModel _vm;
+    private readonly ILoggerFactory _loggerFactory;
+    private readonly ILogger<MainWindow> _log;
 
     // One embedded view per plugin window; the config slot shows whichever plugin is selected.
     private readonly Dictionary<IntPtr, EmbeddedSatelliteView> _embeds = new();
 
-    public MainWindow()
+    // Parameterless path is for the XAML previewer only; the running app resolves the DI ctor.
+    public MainWindow() : this(new MainViewModel(), NullLoggerFactory.Instance) { }
+
+    public MainWindow(MainViewModel vm, ILoggerFactory loggerFactory)
     {
+        _vm = vm;
+        _loggerFactory = loggerFactory;
+        _log = loggerFactory.CreateLogger<MainWindow>();
+
         InitializeComponent();
         DataContext = _vm;
         _vm.PropertyChanged += OnViewModelChanged;
@@ -80,7 +91,7 @@ public partial class MainWindow : Window
     private EmbeddedSatelliteView GetEmbed(IntPtr hwnd)
     {
         if (!_embeds.TryGetValue(hwnd, out var view))
-            _embeds[hwnd] = view = new EmbeddedSatelliteView(hwnd);
+            _embeds[hwnd] = view = new EmbeddedSatelliteView(hwnd, _loggerFactory.CreateLogger<EmbeddedSatelliteView>());
         return view;
     }
 
@@ -106,23 +117,23 @@ public partial class MainWindow : Window
     private async Task StartSatelliteAsync()
     {
         _vm.SetStarting();
-        var logPath = Path.Combine(AppContext.BaseDirectory, "s0-handshake.log");
         try
         {
-            var host = new SatelliteHost();
+            var host = new SatelliteHost(_loggerFactory);
             var result = await host.StartAsync();
             var pid = host.Process?.Id ?? 0;
 
             _vm.SetOnline(result.Handshake, pid, result.Plugins);
-            File.WriteAllText(logPath,
-                $"{result.Handshake}   plugins: {result.Plugins.Count}");
+            _log.LogInformation(LogEvents.SatelliteStarted,
+                "Satellite online: pid {Pid}, {PluginCount} plugin window(s) [{Handshake}]",
+                pid, result.Plugins.Count, result.Handshake);
 
             UpdateEmbed();
         }
         catch (Exception ex)
         {
             _vm.SetOffline(ex.Message);
-            File.WriteAllText(logPath, "Satellite launch FAILED:\n" + ex);
+            _log.LogError(LogEvents.SatelliteLaunchFailed, ex, "Satellite launch failed");
         }
     }
 

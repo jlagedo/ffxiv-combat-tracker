@@ -1,51 +1,52 @@
-# DPS Calculation Gaps — native parser combat-value parity
+# ACT Output-Parity — scope and status
 
-Actionable backlog for the **clean-room native parser** (`Fct.Parser.Native`) reproducing ACT's
-combat-value *calculation* — the simulated DoT/HoT/shield swing **values** that drive DPS —
-bit-for-bit against the real FFXIV_ACT_Plugin.
+> **What we replicate.** We replicate **Advanced Combat Tracker** (`E:\dev\ACT-decompiled`): how ACT
+> reads a `Network_*.log`, collects `MasterSwing`s, runs its combat window, and aggregates
+> encounters/DPS. The input is a log that FFXIV_ACT_Plugin already produced; our job is to feed our
+> parser the same log and emit the **same output ACT emits** from it.
+>
+> **Two ground truths, and only two:** `ACT-decompiled` (ACT's own host / log-reading / aggregation
+> behavior) and the **empirical oracle** — ACT's actual captured output (`--mass-oracle`), where the
+> real plugin is used as an *opaque producer* to generate reference output. **We never read, mirror,
+> or port logic from the FFXIV_ACT_Plugin decompile.** If any clean-room code was derived from it,
+> that is a bug to fix, not a feature to refine.
 
-This is the **calculation axis only**. The separate **surface/binding axis** — making the unmodified
-legacy plugins load and run on our clean-room ACT facade — lives in
-[`ACT-INTERFACE-MAP.md`](ACT-INTERFACE-MAP.md) (Part 2). The two are independent.
+## In scope — and its status
 
-- **Code under audit:** `Fct.Parser.Native` (`CombatLogParser` + `PotencySimulator`).
-- **Authority:** the decompiled `.parse` assembly,
-  `E:\dev\FFXIV_ACT_Plugin\ffxiv_act_plugin\decompiled\…\FFXIV_ACT_Plugin.Parse\` —
-  `DoTSimulator.cs`, `DamageShieldSimulator.cs`, `PotencyStatusApplication.cs`, the `ParseStrategy*`
-  handlers, `ReportCombatData.cs`. Full prose + measurement harness in [`TESTING.md`](TESTING.md).
+Everything ACT actually does. For nearly every swing the value is already in the log line, so it is
+parse-the-line + aggregate. Over the local corpus (67 logs, ~5.9M swings) the parser reproduces ACT's
+output bit-for-bit on the strict tuple `(swingType, crit, amount, special, attackType, attacker,
+damageType, victim)`:
 
-| Column | Meaning |
-|---|---|
-| **Sev** | `BLOCK` hard limit / can't close · `BREAK` materially skews the DPS signal · `MINOR` small/edge |
+| Swing class | Source in the log | Status |
+|---|---|---|
+| Damage / auto-attack (0/2) | `21`/`22` effect bytes | auto **99.98%**, ability **99.85%** |
+| Heals (4) | `21`/`22` heal effects | **95.1%** (residual is combat-window boundary) |
+| Power/MP (6/7) | `21`/`22` MP effects | **99.9%** |
+| Status (8) | `26` status-add | **99.4%** |
+| Action (1) | `21`/`22` with no effect | **92.4%** (combat-window boundary residue) |
+| Cancelled cast (2/4/1) | `23` | log-derived |
+| Real ground-AoE DoT/HoT (3/5) | `24` with **status id ≠ 0** — the log carries the true amount | exact |
 
-## Scope
+The residual on heals/action(1)/status(8) is **combat-window boundary** precision (exactly when ACT's
+idle-end opens/closes the encounter), which is `ACT-decompiled` behavior — that is where the remaining
+in-scope work is, if any.
 
-Deterministic, log-derived swing types are already bit-exact or near it (auto 99.98%, ability 99.85%,
-power 99.90%, status 97.6%, heal 91%, action 91%, real ground-AoE DoT/HoT exact). The gaps are almost
-entirely in ACT's *simulated* `(*)` swings — DoT/HoT ticks and damage shields the plugin synthesizes
-from bundled potency data, which depend on internal per-source/per-target state we only partially
-reproduce. Current simulated parity: **~95.6% of ACT's damage sum** (the DPS signal); per-tick
-bit-exact ~1.5% (DoT) / ~28% (HoT).
+## Out of scope — personal DoT/HoT ticks and damage shields
 
-| # | Gap | ACT behavior (source) | Ours | Sev | Cost |
-|---|---|---|---|---|---|
-| **P‑0** | **RNG crit/DH per tick** (uncloseable) | `DoTSimulator.SimulateTicks` draws crit/DH with time-seeded `new Random()`; ~29% of ticks carry a bit the real plugin wouldn't reproduce on re-run | Reproduce the exact individual-crit branch; non-crit ticks deterministic, crit ticks inherently divergent | BLOCK (hard limit) | — |
-| **P‑1a** | **Buff bytes not source-correlated** | `ParseStrategyAddStatus.AddOrUpdateStatus` (190–199): `EffectByte0/1/2` pulled from the specific 21/22 `ActionEffect` matched by source+target+statusId | `_applyParams` keyed `(recipient, statusId)` — source dropped, overwritten by last applier → wrong `Param0/1/2` (observed spurious ×0.85 / ×1.51) | BREAK | low |
-| **P‑1b** | **One-shot buff consumption** | `PotencyStatusApplication` sets `AppliedTimestamp`; consumed buffs (Kaiten/Boost/Kassatsu/LogosBoost/Harmonized/Tingling/Life Surge/Reassemble) skipped after first use (`ApplyStatusEffectToDamageEntry`:69) | No consume tracking — keeps applying until duration ends → inflated `potMult` | BREAK | low |
-| **P‑1c** | **`CalculatedPotency`-side buffs ignored** | `DamageAddPotency` adds to potency, `PotencyMultiplier` ×it (`ApplyStatusEffectToDamageEntry`:76–93); heal adds `GetHealPotency` | Use raw action/DoT potency; fold neither → biased median + amount when active | BREAK | med |
-| **P‑1d** | **Zone/category-limited multipliers skipped** | Applies only when `LimitToZoneId==ZoneId`, `LimitToActionCategory==actionCategory` match (line 74) | `BuffApplies` honors action-id/damage-type limits but **drops zone- and category-limited effects** (sim tracks neither) | BREAK | med-high |
-| **P‑1e** | **Duration-window asymmetry** | source buffs `Duration+1s`, target debuffs exact `Duration` (`ApplyStatusEffects`:31/43); DoT statuses don't refresh `Param1` on reapply (line 184) | `Expired` uses `Duration+1` for both; `Param1` always refreshed | MINOR | low |
-| **P‑1f** | **Override-status remapping** | `GetOverrideStatusIds`: Sacred Soil, Crest of Time, Wheel of Fortune, Improvisation, Undying Flame, Standard Finish Partner take bytes from a *different* status id | Literal statusId only | MINOR | low |
-| **P‑2a** | **Crit-buff accumulation + rate exclusion** | `CritDhStatusApplication.CalculateCrit` accumulates `CritBuffAmount` (Chain Stratagem +10%, Inner Chaos/Life Surge = 100%, …); running crit mean updates **only when `CritBuffAmount==0`** (`CriticalHitDamage`:29) | `Sim.CritBuff` always 0; crit mean updates on every hit → skewed tick crit rate | BREAK | med |
-| **P‑2b** | **Direct-hit buff accumulation** | `CalculateDirectHit` accumulates `DirectHitBuffs` (Full Metal Field=100%), subtracts before use | None | MINOR | low |
-| **P‑2c** | **Medicated/Weakness calibration exclusion** | `IgnoreSomeStatusesExceptAtStart`: with Medicated/Weakness/BrinkOfDeath + >10 swings, `CalculatedPotency=0` → hit excluded from attack-power median | No exclusion; tincture/raise hits pollute median | MINOR | low |
-| **P‑3a** | **Proc hits not excluded from calibration** | `SourcePotencyDamage`/`SourcePotencyHeal`:13 skip hits with non-empty `ProcActionName` | We don't identify procs → enter median | MINOR | med |
-| **P‑3b** | **Per-target-index potency** | `GetDamagePotency(TargetIndex, combo)` / `GetHealPotency(TargetIndex)` — AoE secondary targets use falloff potency | Only index-0 potency dumped; we calibrate from `TargetIndex==0` hits only (unbiased but AoE-only players contribute nothing) | MINOR | med (needs per-index dump) |
-| **P‑4** | **Special simulation paths** | Kardia/Kardion (`ChooseKardionEffect`), Pneuma deferred (`ProcessPneumaTick`), deferred events (`ProcessRemovedDeferredTick`/`ProcessDeferredEvents`), per-status tweaks Kaeshi Higanbana (+15), Blade of Valor (÷2), Wildfire (instant MaxTicks) — `CreateSimulatedDamageState`:114–143 | None of these special paths modelled | MINOR | low-med each |
-| **P‑5** | **Shield `Potency` type** | `DamageShieldSimulator` Potency shields = HealMedian × potency × mult | Modelled but inherits heal-calibration + buff gaps; shield-specific cases (Succor/Brutal Shell variants) not handled. `TargetHpPercent`/`HealPercent` shields **bit-exact**. Shields overall ~60% bit-exact | BREAK | med |
-| **P‑6** | **Threat swings (type 10)** | `ReportCombatData` emits enmity swings from EntryType 24/25/26 (`oracle=3,655`) | Classified `EffectKind.Threat`, no `CombatAction` emitted (enmity not value-decoded). Not a DPS signal | MINOR | low |
+The game sends one **combined, unattributed** personal DoT tick per target (log type `24`, **status
+id `0`** — no per-source / per-status breakdown). The per-source split that appears in ACT's output is
+**not ACT's work**: `ACT-decompiled` contains no DoT/HoT/shield simulation. The plugin synthesizes
+those values upstream (from its own bundled potency tables and an internal attack-power estimate) and
+hands the finished `MasterSwing`s to ACT.
 
-**Close order (cheapest × highest impact first):** P‑1a → P‑1b → P‑2a → P‑2c/P‑3a → P‑1c →
-P‑1d → P‑1e/P‑1f/P‑4. Everything in P‑1/P‑2 is fully present in the decompiled source — no new
-game-data extraction beyond what `--dump-tables` already produces. P‑0 (RNG), P‑3b (per-index
-potency), and P‑6 (threat) are uncloseable or off the DPS-parity path.
+Because that synthesis is **plugin logic** and the inputs are **not in the log**, it is out of scope:
+reproducing it would mean porting FFXIV_ACT_Plugin, which we do not do. Our parser emits only the
+DoT/HoT ticks the log actually carries (the real, attributed ground-AoE ticks above). Personal
+per-source DoT/HoT/shield amounts are not reproduced.
+
+The old `PotencySimulator.cs` (a port of the plugin's DoT/shield simulation) **has been removed**,
+along with the value-axis tables it consumed (`status-defs.tsv` / `action-potency.tsv` are no longer
+dumped by `--dump-tables`) and the simulated-value parity metric in `tools/mass-compare`. The
+action/status name tables (`actions.full.tsv`, `statuses.full.tsv`) stay — those are FFXIV game data,
+not plugin logic.

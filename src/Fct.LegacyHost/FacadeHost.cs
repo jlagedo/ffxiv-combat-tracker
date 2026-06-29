@@ -4,13 +4,19 @@ using System.Linq;
 using System.Reflection;
 using System.Windows.Forms;
 using Advanced_Combat_Tracker;
+using Fct.LegacyHost.Logging;
+using Fct.Logging;
 using Fct.Parser.Legacy;
+using Microsoft.Extensions.Logging;
 
 namespace Fct.LegacyHost
 {
     // Stands up the ACT facade and loads the real (net48) plugins into WinForms tabs.
     internal static class FacadeHost
     {
+        // Legacy delegate seam handed to the ACT facade (FormActMain.Log) and the plugin wrapper; the
+        // satellite points it at SatelliteLogging.WriteLegacy. FacadeHost's own diagnostics go through
+        // the ILogger directly (SatelliteLogging.Log).
         public static Action<string> Log = _ => { };
 
         public static string AppData => Path.Combine(
@@ -20,7 +26,7 @@ namespace Fct.LegacyHost
         public static string FfxivPluginPath => Path.Combine(AppData, "Plugins", "FFXIV_ACT_Plugin.dll");
 
         public static string OverlayPluginPath =>
-            @"E:\dev\Advanced Combat Tracker\OverlayPlugin-0.16.5\OverlayPlugin.dll";
+            Path.Combine(AppData, "Plugins", "OverlayPlugin", "OverlayPlugin.dll");
 
         // Resolve the plugins' strong-named reference to "Advanced Combat Tracker" to our
         // facade. The strong name/version are not re-checked on the AssemblyResolve path.
@@ -72,27 +78,28 @@ namespace Fct.LegacyHost
             {
                 if (!File.Exists(dllPath))
                 {
-                    Log($"[{title}] DLL not found: {dllPath}");
+                    SatelliteLogging.Log.LogError(LogEvents.PluginNotFound, "[{Title}] DLL not found: {Path}", title, dllPath);
                     status.Text = "DLL not found";
                     return result;
                 }
 
                 var asm = Assembly.LoadFrom(dllPath);
                 var type = asm.GetType("FFXIV_ACT_Plugin.FFXIV_ACT_Plugin") ?? FindPluginType(asm);
-                if (type == null) { Log($"[{title}] no IActPluginV1 type found"); return result; }
+                if (type == null) { SatelliteLogging.Log.LogError(LogEvents.PluginLoadFailed, "[{Title}] no IActPluginV1 type found", title); return result; }
 
                 var real = (IActPluginV1)Activator.CreateInstance(type);
                 var wrapper = new WrappedFfxivPlugin(real, ringCapacity: 4096, log: Log);
                 data.pluginObj = wrapper;          // OverlayPlugin reflects this for the SDK surface
                 data.pluginVersion = asm.GetName().Version?.ToString();
-                Log($"[{title}] instantiated {type.FullName} v{data.pluginVersion}; wrapping + InitPlugin…");
+                SatelliteLogging.Log.LogInformation(LogEvents.PluginInstantiated,
+                    "[{Title}] instantiated {Type} v{Version}; wrapping + InitPlugin…", title, type.FullName, data.pluginVersion);
                 wrapper.InitPlugin(tab, status);   // forwards to real, then binds the ring dispatcher
-                Log($"[{title}] InitPlugin returned. status='{status.Text}'");
+                SatelliteLogging.Log.LogInformation(LogEvents.PluginInitialized, "[{Title}] InitPlugin returned. status='{Status}'", title, status.Text);
             }
             catch (Exception ex)
             {
                 status.Text = "load failed";
-                Log($"[{title}] WRAPPED LOAD FAILED: {ex}");
+                SatelliteLogging.Log.LogError(LogEvents.PluginLoadFailed, ex, "[{Title}] wrapped load failed", title);
             }
             return result;
         }
@@ -129,26 +136,27 @@ namespace Fct.LegacyHost
             {
                 if (!File.Exists(dllPath))
                 {
-                    Log($"[{title}] DLL not found: {dllPath}");
+                    SatelliteLogging.Log.LogError(LogEvents.PluginNotFound, "[{Title}] DLL not found: {Path}", title, dllPath);
                     status.Text = "DLL not found";
                     return result;
                 }
 
                 var asm = Assembly.LoadFrom(dllPath);
                 var type = (knownTypeName != null ? asm.GetType(knownTypeName) : null) ?? FindPluginType(asm);
-                if (type == null) { Log($"[{title}] no IActPluginV1 type found"); return result; }
+                if (type == null) { SatelliteLogging.Log.LogError(LogEvents.PluginLoadFailed, "[{Title}] no IActPluginV1 type found", title); return result; }
 
                 var plugin = (IActPluginV1)Activator.CreateInstance(type);
                 data.pluginObj = plugin;
                 data.pluginVersion = asm.GetName().Version?.ToString();
-                Log($"[{title}] instantiated {type.FullName} v{data.pluginVersion}; calling InitPlugin…");
+                SatelliteLogging.Log.LogInformation(LogEvents.PluginInstantiated,
+                    "[{Title}] instantiated {Type} v{Version}; calling InitPlugin…", title, type.FullName, data.pluginVersion);
                 plugin.InitPlugin(tab, status);
-                Log($"[{title}] InitPlugin returned. status='{status.Text}'");
+                SatelliteLogging.Log.LogInformation(LogEvents.PluginInitialized, "[{Title}] InitPlugin returned. status='{Status}'", title, status.Text);
             }
             catch (Exception ex)
             {
                 status.Text = "load failed";
-                Log($"[{title}] LOAD FAILED: {ex}");
+                SatelliteLogging.Log.LogError(LogEvents.PluginLoadFailed, ex, "[{Title}] load failed", title);
             }
             return result;
         }

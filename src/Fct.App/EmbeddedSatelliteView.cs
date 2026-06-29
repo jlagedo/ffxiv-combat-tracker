@@ -1,9 +1,10 @@
 using System;
 using System.Diagnostics;
-using System.IO;
 using System.Runtime.InteropServices;
 using Avalonia.Controls;
 using Avalonia.Platform;
+using Fct.Logging;
+using Microsoft.Extensions.Logging;
 
 namespace Fct.App;
 
@@ -13,8 +14,13 @@ namespace Fct.App;
 internal sealed class EmbeddedSatelliteView : NativeControlHost
 {
     private readonly IntPtr _childHwnd;
+    private readonly ILogger _log;
 
-    public EmbeddedSatelliteView(IntPtr childHwnd) => _childHwnd = childHwnd;
+    public EmbeddedSatelliteView(IntPtr childHwnd, ILogger log)
+    {
+        _childHwnd = childHwnd;
+        _log = log;
+    }
 
     protected override IPlatformHandle CreateNativeControlCore(IPlatformHandle parent)
     {
@@ -33,13 +39,17 @@ internal sealed class EmbeddedSatelliteView : NativeControlHost
         SetParent(_childHwnd, parent.Handle);
         ShowWindow(_childHwnd, SW_SHOW);
 
-        // S1 verification: confirm the child is now parented into our process's window.
+        // Confirm the child is now parented into our process's window.
         IntPtr newParent = GetParent(_childHwnd);
         GetWindowThreadProcessId(newParent, out uint parentPid);
-        File.AppendAllText(
-            Path.Combine(AppContext.BaseDirectory, "s1-embed.log"),
-            $"child=0x{_childHwnd.ToInt64():X} reparented under parent=0x{newParent.ToInt64():X} " +
-            $"parentPid={parentPid} ourPid={Process.GetCurrentProcess().Id}\n");
+        if (newParent == parent.Handle)
+            _log.LogInformation(LogEvents.WindowReparented,
+                "Embedded plugin window 0x{Child:X} under host window 0x{Parent:X} (ourPid {OurPid})",
+                _childHwnd.ToInt64(), newParent.ToInt64(), Process.GetCurrentProcess().Id);
+        else
+            _log.LogWarning(LogEvents.WindowReparentFailed,
+                "Reparent of 0x{Child:X} did not stick: parent is 0x{Parent:X} (pid {ParentPid}), expected 0x{Expected:X}",
+                _childHwnd.ToInt64(), newParent.ToInt64(), parentPid, parent.Handle.ToInt64());
 
         return new PlatformHandle(_childHwnd, "HWND");
     }

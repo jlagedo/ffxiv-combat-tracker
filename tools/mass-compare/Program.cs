@@ -26,10 +26,7 @@ Directory.CreateDirectory(outFolder);
 var (skills, categories) = LoadActions(Path.Combine(oracleFolder, "actions.full.tsv"));
 if (skills.Count == 0) skills = LoadSkills(Path.Combine(oracleFolder, "skills.full.tsv"));
 var statuses = LoadStatuses(Path.Combine(oracleFolder, "statuses.full.tsv"));
-var statusDefs = CombatLogParser.LoadStatusDefs(Path.Combine(oracleFolder, "status-defs.tsv"));
-var actionPotency = CombatLogParser.LoadActionPotency(Path.Combine(oracleFolder, "action-potency.tsv"));
-Console.WriteLine($"skills: {skills.Count}  categories: {categories.Count}  statuses: {statuses.Count}  " +
-    $"statusDefs: {statusDefs.Count}  actionPotency: {actionPotency.Count}");
+Console.WriteLine($"skills: {skills.Count}  categories: {categories.Count}  statuses: {statuses.Count}");
 
 // One parser instance: combatant-name and combat state persist across files, matching the
 // oracle's single continuous plugin session.
@@ -38,8 +35,6 @@ var parser = new CombatLogParser
     Skills = skills.Count > 0 ? skills : null,
     ActionCategories = categories.Count > 0 ? categories : null,
     Statuses = statuses.Count > 0 ? statuses : null,
-    StatusDefs = statusDefs.Count > 0 ? statusDefs : null,
-    ActionPotency = actionPotency.Count > 0 ? actionPotency : null,
 };
 
 var files = Directory.GetFiles(logFolder, "Network_*.log")
@@ -51,8 +46,6 @@ report.AppendLine(string.Join('\t', "file", "oracle", "ours", "missing", "extra"
 var details = new StringBuilder();
 
 long tOracle = 0, tOurs = 0, tMissing = 0, tExtra = 0;
-long tSimOracle = 0, tSimMiss = 0, tSimExtra = 0;
-long tSimAmtOracle = 0, tSimAmtOurs = 0;
 int filesPerfect = 0, filesWithOracle = 0;
 
 // Per-swingType accounting: oracle count, ours count, and the missing/extra attributable to it.
@@ -63,7 +56,7 @@ var sampleByType = new Dictionary<int, List<string>>();
 foreach (var file in files)
 {
     string name = Path.GetFileNameWithoutExtension(file);
-    var ours = parser.Process(File.ReadLines(file)).ToList();
+    var ours = parser.Process(ReadLinesShared(file)).ToList();
     WriteOurs(Path.Combine(outFolder, name + ".ours.tsv"), ours);
 
     string oraclePath = Path.Combine(oracleFolder, name + ".oracle.tsv");
@@ -84,18 +77,6 @@ foreach (var file in files)
     var (missing, extra) = BagDiff(oursRows, oracle);
     foreach (var r in missing) { Slot(r.SwingType)[2]++; Sample(sampleByType, r, "MISS"); }
     foreach (var r in extra) { Slot(r.SwingType)[3]++; Sample(sampleByType, r, "EXTRA"); }
-
-    // Value-parity of the simulated "(*)" ticks: ACT's crit bit/±1 amount are RNG, so compare on
-    // (swingType, attacker, victim, attackType, amount) with crit normalized out.
-    static Row Sim(Row r) => r with { Crit = false, Special = "", DamageType = "" };
-    var oracleSim = oracle.Where(r => r.AttackType.EndsWith(" (*)")).Select(Sim);
-    var oursSim = ours.Select(ToRow).Where(r => r.AttackType.EndsWith(" (*)")).Select(Sim);
-    var (simMiss, simExtra) = BagDiff(oursSim, oracleSim);
-    int simO = oracle.Count(r => r.AttackType.EndsWith(" (*)"));
-    tSimOracle += simO; tSimMiss += simMiss.Count; tSimExtra += simExtra.Count;
-    // Aggregate simulated damage (the DPS-relevant signal): sum of "(*)" amounts.
-    tSimAmtOracle += oracle.Where(r => r.AttackType.EndsWith(" (*)")).Sum(r => r.Amount);
-    tSimAmtOurs += ours.Select(ToRow).Where(r => r.AttackType.EndsWith(" (*)")).Sum(r => r.Amount);
 
     int oc = oracle.Count, uc = ours.Count;
     report.AppendLine(string.Join('\t', name, oc, uc, missing.Count, extra.Count));
@@ -124,10 +105,6 @@ S($"files BIT-PERFECT (all swing types): {filesPerfect}/{filesWithOracle}");
 S($"total swings   ACT={tOracle:N0}  ours={tOurs:N0}  missing={tMissing:N0}  extra={tExtra:N0}");
 double pct = tOracle == 0 ? 100 : 100.0 * (tOracle - tMissing) / tOracle;
 S($"TOTAL reproduced: {pct:0.0000}% of ACT's swings  (extras: {tExtra:N0})");
-double simPct = tSimOracle == 0 ? 0 : 100.0 * (tSimOracle - tSimMiss) / tSimOracle;
-S($"simulated (*) value-parity (crit-excluded exact amount): {tSimOracle - tSimMiss:N0}/{tSimOracle:N0} = {simPct:0.00}%  (extras: {tSimExtra:N0})");
-double simAmtPct = tSimAmtOracle == 0 ? 0 : 100.0 * tSimAmtOurs / tSimAmtOracle;
-S($"simulated (*) damage SUM (DPS signal): ours={tSimAmtOurs:N0} / ACT={tSimAmtOracle:N0} = {simAmtPct:0.00}%");
 S("");
 S("per-swingType  [oracle  ours  missing  extra  reproduced%]");
 foreach (var kv in byType)
@@ -151,6 +128,16 @@ File.WriteAllText(Path.Combine(outFolder, "type-samples.txt"), stb.ToString());
 return (tMissing == 0 && tExtra == 0) ? 0 : 1;
 
 // ---- helpers ----
+
+// Read with FileShare.ReadWrite so a log the game is still writing to (the live file) doesn't
+// lock us out — we just read what's there.
+static IEnumerable<string> ReadLinesShared(string path)
+{
+    using var fs = new FileStream(path, FileMode.Open, FileAccess.Read, FileShare.ReadWrite);
+    using var sr = new StreamReader(fs);
+    string? l;
+    while ((l = sr.ReadLine()) != null) yield return l;
+}
 
 static Row ToRow(CombatAction a) => new(a.SwingType, a.IsCritical, a.Amount, a.Special ?? "",
     a.AttackType ?? "", a.Attacker ?? "", a.DamageType ?? "", a.Victim ?? "");
