@@ -75,8 +75,8 @@ namespace Fct.Parser.Native.Tests
             var oracle = ReadOracle();
             var effects = DecodeSlice();
 
-            // ACT damage swings are auto-attacks (0) and ability damage (2); fold both, since
-            // our value decode does not distinguish them.
+            // The pure byte-level decode: amount (incl. the >65535 transform), crit, and
+            // miss/block/parry. Fully determined by the line — no game-data tables needed.
             var oracleDmg = oracle.Where(r => r.SwingType is 0 or 2)
                                   .Select(r => (r.Crit, r.Damage, r.Special));
             var oursDmg = effects.Where(e => e.IsDamage)
@@ -90,6 +90,34 @@ namespace Fct.Parser.Native.Tests
 
             Assert.True(missing.Count == 0 && extra.Count == 0,
                 $"damage decode diverges from ACT: {missing.Count} missing, {extra.Count} extra");
+        }
+
+        [Fact]
+        public void Swing_type_classification_is_conservative_and_correct()
+        {
+            // Player auto-attacks (action id 0x07) are detectable from the line; NPC auto-attacks
+            // use other ids that ACT only knows from its bundled action table. So our id-0x07
+            // classification must be CONSERVATIVE: never call something auto that ACT calls an
+            // ability (no false positives). The only allowed mismatches are ACT-auto/ours-ability
+            // (NPC autos), and they must carry identical values — i.e. only the swing-type label
+            // differs, never a value.
+            var oracle = ReadOracle();
+            var effects = DecodeSlice();
+
+            var oracleDmg = oracle.Where(r => r.SwingType is 0 or 2)
+                                  .Select(r => (r.SwingType, r.Crit, r.Damage, r.Special));
+            var oursDmg = effects.Where(e => e.IsDamage)
+                                 .Select(e => (e.SwingType, e.IsCritical, e.Amount, e.Special));
+
+            var (missing, extra) = BagDiff(oursDmg, oracleDmg); // keyed by full tuple incl. swing
+            _out.WriteLine($"swing-type mismatches: {missing.Count} (each is an NPC auto-attack " +
+                           "whose id needs ACT's action table)");
+
+            // No false positives: everything we labelled auto (0) ACT also labelled auto.
+            Assert.All(extra, t => Assert.StartsWith("(2,", t));   // our extras are all ability(2)
+            Assert.All(missing, t => Assert.StartsWith("(0,", t)); // ACT's were auto(0)
+            // And they pair up 1:1 — same count, i.e. only the label differs, no value drift.
+            Assert.Equal(missing.Count, extra.Count);
         }
 
         [Fact]

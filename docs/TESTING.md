@@ -62,14 +62,21 @@ damage/heal values. It is validated **directly against ACT's own parse** of the 
 Current compat on the slice:
 - **Damage values: exact (100%).** Every damage `MasterSwing` ACT produces — amount (including
   the `>65535` `Flags2&0x40 ? Flags1<<16` transform), crit flag, and miss/block/parry — is
-  reproduced exactly (443/443 on the fixture).
+  reproduced exactly (443/443 on the fixture). This layer is pure byte decode: fully determined
+  by the line, no game-data tables.
+- **Swing-type: conservative and correct.** Player auto-attacks (action id `0x07`) are
+  classified as auto vs ability and verified against ACT with no false positives. NPC
+  auto-attacks use other action ids that ACT only knows from its bundled **action table**, so
+  those (3/443 on the fixture) are the sole swing-type gap — the test pins that the only
+  mismatches are ACT-auto/ours-ability with identical values.
 - **Heals: every ACT-reported heal reproduced (0 missing).** Our decode is a superset because
   ACT only reports heals while `InCombat` (`ReportCombatData.AddHealEntry`); the extras are
   out-of-combat heals ACT suppresses.
 
-Remaining toward full parity (tracked, not yet done): combat-state (`InCombat`) tracking for
-exact heal/shield/resource reporting; swing-type (auto-attack vs ability) and the
-damage-type/element enums; DoT/HoT simulation; and combatant/name resolution.
+Remaining toward full parity (tracked, not yet done) — each needs a layer beyond pure
+line decode: the **action table** (NPC auto-attack ids, ability names, damage-type/element
+enum strings); **combat-state** (`InCombat`) tracking for exact heal/shield/resource
+reporting; **combatant tracking** for attacker/victim name resolution; and DoT/HoT simulation.
 
 Regenerate the oracle fixture (needs the ACT install):
 

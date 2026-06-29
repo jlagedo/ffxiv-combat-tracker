@@ -25,6 +25,7 @@ public readonly record struct CombatEffect(
     EffectEntryType EntryType,
     bool IsDamage,
     bool IsHeal,
+    int SwingType,
     long Amount,
     bool IsCritical,
     bool IsDirectHit,
@@ -42,10 +43,18 @@ public static class ActionEffectDecoder
 
     public static bool IsActionEffectLine(in NetworkLogLine line) => line.IsAbility;
 
+    // FFXIV auto-attack action id ("attack"). ACT classifies it via ActionCategory; the id
+    // is stable, so we match on it directly. Pet/ranged autos resolve through the action
+    // table (not yet embedded) and are out of scope.
+    public const uint AutoAttackActionId = 0x07;
+
     public static IEnumerable<CombatEffect> Decode(NetworkLogLine line)
     {
         if (!line.IsAbility || line.FieldCount < MinFieldCount)
             yield break;
+
+        bool isAuto = TryHex(line.Field(4), out var actionId) && actionId == AutoAttackActionId;
+        int dmgSwing = isAuto ? 0 : 2; // SwingType.Autoattack : SwingType.Damage
 
         for (int slot = 0; slot < 8; slot++)
         {
@@ -70,19 +79,19 @@ public static class ActionEffectDecoder
             {
                 case EffectEntryType.Miss:
                     yield return new CombatEffect(slot, EffectEntryType.Miss, true, false,
-                        -1, false, false, damageType, element, "Miss");
+                        dmgSwing, -1, false, false, damageType, element, "Miss");
                     break;
                 case EffectEntryType.Damage:
                 case EffectEntryType.BlockedDamage:
                 case EffectEntryType.ParriedDamage:
                     yield return new CombatEffect(slot, (EffectEntryType)entryType, true, false,
-                        amount, (param0 & 0x20) != 0, (param0 & 0x40) != 0, damageType, element,
+                        dmgSwing, amount, (param0 & 0x20) != 0, (param0 & 0x40) != 0, damageType, element,
                         Special((EffectEntryType)entryType));
                     break;
                 case EffectEntryType.Heal:
                     // Heal crit comes from Param1's 0x20 bit (not Param0 as for damage).
                     yield return new CombatEffect(slot, EffectEntryType.Heal, false, true,
-                        amount, (param1 & 0x20) != 0, false, 0, 0, "");
+                        4, amount, (param1 & 0x20) != 0, false, 0, 0, "");
                     break;
                 default:
                     break; // status / resource / nothing — not a value effect
@@ -105,4 +114,7 @@ public static class ActionEffectDecoder
 
     private static uint HexUInt(string hex) =>
         uint.Parse(hex, NumberStyles.HexNumber, CultureInfo.InvariantCulture);
+
+    private static bool TryHex(string? s, out uint value) =>
+        uint.TryParse(s, NumberStyles.HexNumber, CultureInfo.InvariantCulture, out value);
 }
