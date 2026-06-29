@@ -20,6 +20,7 @@
 
   <ItemGroup>
     <Compile Include="..\..\src\Fct.App\SatelliteProtocol.cs" Link="SatelliteProtocol.cs" />
+    <Compile Include="..\..\src\Fct.App\ProcessJob.cs" Link="ProcessJob.cs" />
   </ItemGroup>
 
 </Project>

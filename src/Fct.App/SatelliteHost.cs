@@ -28,6 +28,12 @@ internal sealed class SatelliteStartResult
 // open for the host lifetime; it becomes the IPC bridge in later steps.
 internal sealed class SatelliteHost
 {
+    // A single kill-on-close job for the host process: any satellite enrolled here (and the CEF
+    // subprocesses it spawns) is terminated by the OS when the host exits or is killed, so no
+    // Fct.LegacyHost orphan survives. Static so the job handle lives for the whole host lifetime;
+    // null on non-Windows or if the job can't be created (we then just launch without enrollment).
+    private static readonly ProcessJob? KillOnExitJob = ProcessJob.TryCreate();
+
     private NamedPipeServerStream? _server;
     public Process? Process { get; private set; }
 
@@ -47,6 +53,11 @@ internal sealed class SatelliteHost
             Arguments = "--bridge " + pipeName,
             UseShellExecute = false,
         });
+
+        // Tie the satellite to the host's lifetime before it spawns its own children (CEF), so
+        // the whole tree dies with the host instead of orphaning.
+        if (Process != null && OperatingSystem.IsWindows())
+            KillOnExitJob?.AddProcess(Process);
 
         await _server.WaitForConnectionAsync(ct).ConfigureAwait(false);
 
