@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Globalization;
 using System.IO;
+using System.Linq;
 using System.Threading;
 using Advanced_Combat_Tracker;
 using Xunit;
@@ -43,14 +44,17 @@ namespace Fct.Compat.Act.Tests
                 if (cd == null) { mismatches.Add($"{name}: combatant missing in ours"); continue; }
                 if (!CombatantData.ExportVariables.TryGetValue(key, out var fmt))
                     { mismatches.Add($"{name}.{key}: key not registered in ours"); continue; }
-                string got = fmt.GetExportString(cd, "");
+                string got;
+                try { got = fmt.GetExportString(cd, ""); }
+                catch (Exception ex) { mismatches.Add($"{name}.{key}: THREW {ex.GetType().Name}: {ex.Message}"); continue; }
                 checked_++;
                 if (got != want) mismatches.Add($"{name}.{key}: ours='{got}' oracle='{want}'");
             }
 
             _out.WriteLine($"checked {checked_} export-variable strings");
-            if (mismatches.Count > 0) _out.WriteLine("MISMATCHES:\n  " + string.Join("\n  ", mismatches));
-            Assert.True(mismatches.Count == 0, $"{mismatches.Count} ExportVariable string(s) diverge from real ACT");
+            Assert.True(mismatches.Count == 0,
+                $"{mismatches.Count} ExportVariable string(s) diverge from real ACT:\n  " +
+                string.Join("\n  ", mismatches.Take(25)));
         }
     }
 }

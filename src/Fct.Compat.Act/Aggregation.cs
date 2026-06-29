@@ -264,7 +264,29 @@ namespace Advanced_Combat_Tracker
         public int CureDispels => D(DamageTypeDataOutgoingCures)?.Swings ?? 0;
         public int Misses => D(DamageTypeDataOutgoingDamage)?.Misses ?? 0;
         public int Blocked => 0;
-        public float ToHit => Swings == 0 ? 0f : (float)Hits / Swings * 100f;
+        // Unguarded like ACT (float 0/0 → NaN, which ACT surfaces for a no-swing combatant).
+        public float ToHit => (float)Hits / Swings * 100f;
+
+        // ACT's threat string "+(incCount)incSum/-(decCount)decSum"; for FFXIV the threat bucket is
+        // effectively empty, so this renders "+(0)0/-(0)0" as ACT does.
+        public string GetThreatStr(string label)
+        {
+            long inc = 0, dec = 0; int incN = 0, decN = 0;
+            var at = GetAttackType("All", label);
+            if (at != null)
+                foreach (var s in at.Items)
+                    if ((long)s.Damage > 0) { dec += (long)s.Damage; decN++; }
+            return $"+({incN}){inc}/-({decN}){dec}";
+        }
+        public long GetThreatDelta(string label)
+        {
+            long total = 0;
+            var at = GetAttackType("All", label);
+            if (at != null)
+                foreach (var s in at.Items)
+                    if ((long)s.Damage > 0) total += (long)s.Damage;
+            return total;
+        }
         // StartTime/EndTime span ALL outgoing swings (outAll); ShortEndTime is outgoing-damage only.
         public DateTime StartTime => outAll?.StartTime ?? DateTime.MaxValue;
         public DateTime EndTime => outAll?.EndTime ?? DateTime.MinValue;
@@ -314,25 +336,23 @@ namespace Advanced_Combat_Tracker
         // ACT's maxhit string: the top outgoing-damage swing as "AttackType-Damage" (ShowType) or
         // just the number, empty when there are no damaging hits. (Our CreateDamageString renders
         // the raw number, so the UseSuffix flag is a no-op here, as in the facade FormActMain.)
+        // maxhit renders the suffix with decimals only when ShowType; maxheal always uses decimals.
         public string GetMaxHit(bool showType = true, bool useSuffix = true)
-        {
-            var at = GetAttackType("All", DamageTypeDataOutgoingDamage);
-            MasterSwing max = null;
-            if (at != null)
-                foreach (var s in at.Items)
-                    if (max == null || (long)s.Damage > (long)max.Damage) max = s;
-            if (max == null) return string.Empty;
-            return showType ? $"{max.AttackType}-{(long)max.Damage}" : $"{(long)max.Damage}";
-        }
+            => MaxSwingString(GetAttackType("All", DamageTypeDataOutgoingDamage), showType, useSuffix, showType);
         public string GetMaxHeal(bool showType = true, bool countWards = false, bool useSuffix = true)
+            => MaxSwingString(GetAttackType("All", DamageTypeDataOutgoingHealing), showType, useSuffix, true);
+
+        // ACT's max-hit/heal rendering: the top swing as "AttackType-Damage" or just the rendered
+        // damage; empty when there are no swings.
+        private static string MaxSwingString(AttackType at, bool showType, bool useSuffix, bool useDecimals)
         {
-            var at = GetAttackType("All", DamageTypeDataOutgoingHealing);
             MasterSwing max = null;
             if (at != null)
                 foreach (var s in at.Items)
                     if (max == null || (long)s.Damage > (long)max.Damage) max = s;
             if (max == null) return string.Empty;
-            return showType ? $"{max.AttackType}-{(long)max.Damage}" : $"{(long)max.Damage}";
+            var cds = ActGlobals.oFormActMain.CreateDamageString((long)max.Damage, useSuffix, useDecimals);
+            return showType ? $"{max.AttackType}-{cds}" : cds;
         }
 
         public int CompareTo(object obj) => CompareTo(obj as CombatantData);

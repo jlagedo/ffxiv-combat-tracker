@@ -190,12 +190,23 @@ internal static class ActOracle
             {
                 var fmt = typeof(FormActMain).GetMethod("CombatantFormatSwitch",
                     BindingFlags.NonPublic | BindingFlags.Instance);
+                // The full ExportVariables key set OverlayPlugin's MiniParse iterates (ACT defaults).
                 string[] keys =
                 {
-                    "name", "duration", "DURATION", "encdps", "ENCDPS", "dps", "DPS",
-                    "damage", "damage%", "healed", "healed%", "enchps", "ENCHPS",
-                    "hits", "crithits", "crithit%", "critheal%", "critheals", "heals",
-                    "misses", "swings", "maxhit", "deaths", "kills",
+                    "n", "t", "name", "NAME", "duration", "DURATION",
+                    "damage", "damage-m", "damage-b", "damage-*", "DAMAGE-k", "DAMAGE-m", "DAMAGE-b", "DAMAGE-*", "damage%",
+                    "dps", "dps-*", "DPS", "DPS-k", "DPS-m", "DPS-*",
+                    "encdps", "encdps-*", "ENCDPS", "ENCDPS-k", "ENCDPS-m", "ENCDPS-*",
+                    "hits", "crithits", "crithit%", "crittypes", "misses", "hitfailed", "swings", "tohit", "TOHIT",
+                    "maxhit", "MAXHIT", "maxhit-*", "MAXHIT-*",
+                    "healed", "healed%", "enchps", "enchps-*", "ENCHPS", "ENCHPS-k", "ENCHPS-m", "ENCHPS-*",
+                    "critheals", "critheal%", "heals", "cures",
+                    "maxheal", "MAXHEAL", "maxhealward", "MAXHEALWARD", "maxheal-*", "MAXHEAL-*", "maxhealward-*", "MAXHEALWARD-*",
+                    "damagetaken", "damagetaken-*", "healstaken", "healstaken-*",
+                    "powerdrain", "powerdrain-*", "powerheal", "powerheal-*",
+                    "kills", "deaths", "threatstr", "threatdelta",
+                    "NAME3", "NAME4", "NAME5", "NAME6", "NAME7", "NAME8", "NAME9",
+                    "NAME10", "NAME11", "NAME12", "NAME13", "NAME14", "NAME15",
                 };
                 using (var w = new StreamWriter(argv[2]))
                 {
@@ -206,6 +217,13 @@ internal static class ActOracle
                             string val;
                             try { val = (string)fmt.Invoke(ActGlobals.oFormActMain, new object[] { cd, key, "" }); }
                             catch (Exception ex) { var x = ex; while (x.InnerException != null) x = x.InnerException; val = "<EX:" + x.GetType().Name + ">"; }
+                            // Skip keys that error in this headless harness (NAME/crittypes/threat*
+                            // call helpers that need a live form / threat data) — a harness artifact,
+                            // not real ACT behaviour, so they are not part of the asserted baseline.
+                            if (val == "ERROR" || val.StartsWith("<EX:")) continue;
+                            // The literal "n"/"t" keys are newline/tab; skip control-char values
+                            // (they would corrupt this TSV and carry no comparison value).
+                            if (val.IndexOf('\n') >= 0 || val.IndexOf('\t') >= 0 || val.IndexOf('\r') >= 0) continue;
                             w.WriteLine(cd.Name + "\t" + key + "\t" + val);
                         }
                 }
