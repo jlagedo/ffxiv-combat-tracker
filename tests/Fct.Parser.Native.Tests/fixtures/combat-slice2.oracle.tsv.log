@@ -1,6 +1,0 @@
-22:32:59.421 [FFXIV_ACT_Plugin] instantiated FFXIV_ACT_Plugin.FFXIV_ACT_Plugin v3.0.2.3; calling InitPlugin…
-22:33:04.350 [FFXIV_ACT_Plugin] InitPlugin returned. status='FFXIV_ACT_Plugin Started.'
-22:33:04.350 plugin status='FFXIV_ACT_Plugin Started.'
-22:33:04.358 [ChangeZone] Shirogane
-22:33:04.375 [ChangeZone] Futures Rewritten (Ultimate)
-22:33:04.428 done fed=829 captured=449 -> tests/Fct.Parser.Native.Tests/fixtures/combat-slice2.oracle.tsv
