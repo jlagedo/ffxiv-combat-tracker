@@ -25,13 +25,13 @@ namespace Fct.Compat.Act.Tests
         private static string F(double d) => d.ToString("0.##", CultureInfo.InvariantCulture);
         private static string I(long d) => d.ToString(CultureInfo.InvariantCulture);
 
-        internal static EncounterData BuildOurEncounter()
+        internal static EncounterData BuildOurEncounter(string slice = "combat-slice")
         {
             ActTables.EnsureInstalled();
             ActGlobals.charName = "YOU";
             var enc = ActTables.NewEncounter("YOU", "");
             int n = 0;
-            foreach (var line in File.ReadLines(Fixture("combat-slice.oracle.tsv")))
+            foreach (var line in File.ReadLines(Fixture(slice + ".oracle.tsv")))
             {
                 if (n++ == 0 && line.StartsWith("swingType")) continue;
                 var c = line.Split('\t');
@@ -46,9 +46,9 @@ namespace Fct.Compat.Act.Tests
         }
 
         // name -> (field -> value) from the oracle baseline.
-        private static (List<string> header, Dictionary<string, string[]> rows) ReadBaseline()
+        private static (List<string> header, Dictionary<string, string[]> rows) ReadBaseline(string slice = "combat-slice")
         {
-            var lines = File.ReadAllLines(Fixture("combat-slice.aggregate.tsv"));
+            var lines = File.ReadAllLines(Fixture(slice + ".aggregate.tsv"));
             var header = lines[0].Split('\t').ToList();
             var rows = new Dictionary<string, string[]>();
             foreach (var line in lines.Skip(1))
@@ -59,11 +59,13 @@ namespace Fct.Compat.Act.Tests
             return (header, rows);
         }
 
-        [Fact]
-        public void Per_combatant_aggregates_match_real_act_exactly()
+        [Theory]
+        [InlineData("combat-slice")]
+        [InlineData("combat-slice2")]
+        public void Per_combatant_aggregates_match_real_act_exactly(string slice)
         {
-            var enc = BuildOurEncounter();
-            var (header, baseline) = ReadBaseline();
+            var enc = BuildOurEncounter(slice);
+            var (header, baseline) = ReadBaseline(slice);
             var mismatches = new List<string>();
 
             foreach (var cd in enc.Items.Values)
@@ -115,11 +117,13 @@ namespace Fct.Compat.Act.Tests
             Assert.True(mismatches.Count == 0, $"{mismatches.Count} field mismatch(es) vs real ACT");
         }
 
-        [Fact]
-        public void Encounter_aggregates_match_real_act_exactly()
+        [Theory]
+        [InlineData("combat-slice")]
+        [InlineData("combat-slice2")]
+        public void Encounter_aggregates_match_real_act_exactly(string slice)
         {
-            var enc = BuildOurEncounter();
-            var (_, baseline) = ReadBaseline();
+            var enc = BuildOurEncounter(slice);
+            var (_, baseline) = ReadBaseline(slice);
             var e = baseline["*ENCOUNTER*"];
             // *ENCOUNTER*  Damage Healed DPS Duration NumCombatants NumAllies
             var mismatches = new List<string>();

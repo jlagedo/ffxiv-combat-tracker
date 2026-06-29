@@ -1,0 +1,450 @@
+swingType	crit	damage	special	attackType	attacker	damageType	victim	time
+2	0	23363		Piercing Talon	Combatant-013	Piercing	Combatant-019	2026-06-17T21:13:58.4350000-03:00
+2	0	71051		Rainbow Drip	Combatant-005	Magic	Combatant-019	2026-06-17T21:13:58.6140000-03:00
+2	0	17812		Holy Spirit	Combatant-010	Magic	Combatant-019	2026-06-17T21:13:58.7470000-03:00
+4	0	17056		Holy Spirit	Combatant-010		Combatant-010	2026-06-17T21:13:58.7470000-03:00
+0	1	8610		attack	Combatant-017	Piercing	Combatant-019	2026-06-17T21:13:58.9690000-03:00
+1	0	0		Thunderclap	Combatant-009		Combatant-019	2026-06-17T21:13:59.1030000-03:00
+2	0	61375		Pom Muse	Combatant-005	Magic	Combatant-019	2026-06-17T21:13:59.2370000-03:00
+2	0	25615		Glare III	Combatant-016	Magic	Combatant-019	2026-06-17T21:13:59.2370000-03:00
+0	0	50793		unknown_9cb4	Combatant-019	Slashing	Combatant-013	2026-06-17T21:13:59.2820000-03:00
+2	0	11197		Heavy Swing	YOU	Slashing	Combatant-019	2026-06-17T21:13:59.5030000-03:00
+2	0	55092		Double Standard Finish	Combatant-017	Piercing	Combatant-019	2026-06-17T21:13:59.6370000-03:00
+2	1	33093		Dragon Kick	Combatant-009	Blunt	Combatant-019	2026-06-17T21:13:59.7710000-03:00
+0	1	6786		attack	Combatant-009	Blunt	Combatant-019	2026-06-17T21:13:59.7710000-03:00
+10	0	-25630	Threat	Provoke	YOU		Combatant-019	2026-06-17T21:14:00.1720000-03:00
+0	0	6048		attack	YOU	Slashing	Combatant-019	2026-06-17T21:14:00.3050000-03:00
+0	0	5902		attack	Combatant-013	Piercing	Combatant-019	2026-06-17T21:14:00.4850000-03:00
+2	0	10029		Fast Blade	Combatant-010	Slashing	Combatant-019	2026-06-17T21:14:00.5730000-03:00
+2	1	9929		Dia	Combatant-016	Magic	Combatant-019	2026-06-17T21:14:00.7520000-03:00
+0	0	2944		attack	Combatant-010	Slashing	Combatant-019	2026-06-17T21:14:00.8410000-03:00
+2	0	13263		True Thrust	Combatant-013	Piercing	Combatant-019	2026-06-17T21:14:00.8850000-03:00
+4	0	33276		Second Wind	Combatant-013		Combatant-013	2026-06-17T21:14:01.5530000-03:00
+4	0	23321		Assize	Combatant-016		Combatant-016	2026-06-17T21:14:01.5530000-03:00
+7	0	500	Power	Assize	Combatant-016		Combatant-016	2026-06-17T21:14:01.5530000-03:00
+2	1	59020		Assize	Combatant-016	Magic	Combatant-019	2026-06-17T21:14:01.5530000-03:00
+4	0	22337		Assize	Combatant-016		Combatant-013	2026-06-17T21:14:01.5530000-03:00
+4	0	22417		Assize	Combatant-016		Combatant-009	2026-06-17T21:14:01.5530000-03:00
+4	0	22278		Assize	Combatant-016		Combatant-017	2026-06-17T21:14:01.5530000-03:00
+4	0	23393		Assize	Combatant-016		Combatant-015	2026-06-17T21:14:01.5530000-03:00
+4	0	22443		Assize	Combatant-016		YOU	2026-06-17T21:14:01.5530000-03:00
+4	0	22748		Assize	Combatant-016		Combatant-010	2026-06-17T21:14:01.5530000-03:00
+4	1	37417		Assize	Combatant-016		Combatant-005	2026-06-17T21:14:01.5530000-03:00
+2	1	49818		Leaping Opo	Combatant-009	Blunt	Combatant-019	2026-06-17T21:14:01.6410000-03:00
+0	1	9161		attack	Combatant-009	Blunt	Combatant-019	2026-06-17T21:14:01.8190000-03:00
+2	0	30014		Dosis III	Combatant-015	Magic	Combatant-019	2026-06-17T21:14:01.8190000-03:00
+0	0	5314		attack	Combatant-017	Piercing	Combatant-019	2026-06-17T21:14:02.1310000-03:00
+0	0	14590		unknown_9cb4	Combatant-019	Slashing	YOU	2026-06-17T21:14:02.3110000-03:00
+2	0	15752		Maim	YOU	Slashing	Combatant-019	2026-06-17T21:14:02.3110000-03:00
+0	0	1		attack	Combatant-016	Blunt	Combatant-019	2026-06-17T21:14:02.3570000-03:00
+1	0	0		Emboite	Combatant-017		Combatant-017	2026-06-17T21:14:02.7570000-03:00
+0	0	4429		attack	Combatant-009	Blunt	Combatant-019	2026-06-17T21:14:02.8460000-03:00
+2	0	14918		Riot Blade	Combatant-010	Slashing	Combatant-019	2026-06-17T21:14:03.0690000-03:00
+7	0	1000	Power	Riot Blade	Combatant-010		Combatant-010	2026-06-17T21:14:03.0690000-03:00
+0	0	3085		attack	Combatant-010	Slashing	Combatant-019	2026-06-17T21:14:03.1130000-03:00
+2	1	29748		Upheaval	YOU	Blunt	Combatant-019	2026-06-17T21:14:03.2470000-03:00
+0	0	5269		attack	Combatant-013	Piercing	Combatant-019	2026-06-17T21:14:03.2920000-03:00
+2	1	28055		Spiral Blow	Combatant-013	Piercing	Combatant-019	2026-06-17T21:14:03.3820000-03:00
+2	0	17733		Dragon Kick	Combatant-009	Blunt	Combatant-019	2026-06-17T21:14:03.6060000-03:00
+1	0	0		Wing Motif	Combatant-005		Combatant-005	2026-06-17T21:14:03.6490000-03:00
+0	0	4509		attack	YOU	Slashing	Combatant-019	2026-06-17T21:14:03.6930000-03:00
+1	0	0		Jete	Combatant-017		Combatant-017	2026-06-17T21:14:03.7390000-03:00
+2	0	26076		Glare III	Combatant-016	Magic	Combatant-019	2026-06-17T21:14:03.8730000-03:00
+0	1	7300		attack	Combatant-009	Blunt	Combatant-019	2026-06-17T21:14:03.8730000-03:00
+2	0	29932		Dosis III	Combatant-015	Magic	Combatant-019	2026-06-17T21:14:04.2300000-03:00
+1	0	0		Pirouette	Combatant-017		Combatant-017	2026-06-17T21:14:04.7180000-03:00
+2	0	23844		Storm's Eye	YOU	Slashing	Combatant-019	2026-06-17T21:14:04.8090000-03:00
+7	0	700	Power	Kerachole	Combatant-015		Combatant-015	2026-06-17T21:14:04.8520000-03:00
+0	0	6603		attack	Combatant-009	Blunt	Combatant-019	2026-06-17T21:14:04.8970000-03:00
+2	1	90458		Hammer Stamp	Combatant-005	Magic	Combatant-019	2026-06-17T21:14:05.1190000-03:00
+0	0	5920		attack	Combatant-017	Piercing	Combatant-019	2026-06-17T21:14:05.2540000-03:00
+0	0	54971		unknown_9cb4	Combatant-019	Slashing	YOU	2026-06-17T21:14:05.3430000-03:00
+0	0	3115		attack	Combatant-010	Slashing	Combatant-019	2026-06-17T21:14:05.3870000-03:00
+2	0	22398		Royal Authority	Combatant-010	Slashing	Combatant-019	2026-06-17T21:14:05.5660000-03:00
+2	1	52136		Leaping Opo	Combatant-009	Blunt	Combatant-019	2026-06-17T21:14:05.5660000-03:00
+2	0	56478		Phlegma III	Combatant-015	Magic	Combatant-019	2026-06-17T21:14:05.6990000-03:00
+1	0	0		Entrechat	Combatant-017		Combatant-017	2026-06-17T21:14:05.7430000-03:00
+2	0	33148		Chaotic Spring	Combatant-013	Piercing	Combatant-019	2026-06-17T21:14:05.8760000-03:00
+2	1	43236		Glare III	Combatant-016	Magic	Combatant-019	2026-06-17T21:14:05.8760000-03:00
+0	0	7073		attack	Combatant-009	Blunt	Combatant-019	2026-06-17T21:14:05.9650000-03:00
+0	0	8256		attack	Combatant-013	Piercing	Combatant-019	2026-06-17T21:14:06.0990000-03:00
+2	0	8344		Onslaught	YOU	Slashing	Combatant-019	2026-06-17T21:14:06.1890000-03:00
+2	0	74686		Psyche	Combatant-015	Magic	Combatant-019	2026-06-17T21:14:06.3680000-03:00
+0	0	1		attack	Combatant-016	Blunt	Combatant-019	2026-06-17T21:14:06.5470000-03:00
+2	1	42000		the Forbidden Chakra	Combatant-009	Blunt	Combatant-019	2026-06-17T21:14:06.5470000-03:00
+2	0	123975		Quadruple Technical Finish	Combatant-017	Piercing	Combatant-019	2026-06-17T21:14:06.7690000-03:00
+2	0	36564		Imperator	Combatant-010	Magic	Combatant-019	2026-06-17T21:14:06.8140000-03:00
+0	0	5769		attack	Combatant-009	Blunt	Combatant-019	2026-06-17T21:14:06.9920000-03:00
+0	0	5792		attack	YOU	Slashing	Combatant-019	2026-06-17T21:14:07.0820000-03:00
+2	1	35275		Geirskogul	Combatant-013	Piercing	Combatant-019	2026-06-17T21:14:07.2140000-03:00
+2	1	95341		Primal Rend	YOU	Slashing	Combatant-019	2026-06-17T21:14:07.3050000-03:00
+2	0	72549		Wind's Reply	Combatant-009	Blunt	Combatant-019	2026-06-17T21:14:07.3930000-03:00
+0	0	4655		attack	Combatant-010	Slashing	Combatant-019	2026-06-17T21:14:07.6590000-03:00
+2	0	29446		Glare III	Combatant-016	Magic	Combatant-019	2026-06-17T21:14:07.8380000-03:00
+0	1	12117		attack	Combatant-009	Blunt	Combatant-019	2026-06-17T21:14:08.0170000-03:00
+2	0	69353		Confiteor	Combatant-010	Magic	Combatant-019	2026-06-17T21:14:08.0610000-03:00
+4	0	16959		Confiteor	Combatant-010		Combatant-010	2026-06-17T21:14:08.0610000-03:00
+2	1	93308		Phlegma III	Combatant-015	Magic	Combatant-019	2026-06-17T21:14:08.1500000-03:00
+2	1	81141		Tillana	Combatant-017	Piercing	Combatant-019	2026-06-17T21:14:08.2390000-03:00
+2	1	54454		Wheeling Thrust	Combatant-013	Piercing	Combatant-019	2026-06-17T21:14:08.4180000-03:00
+4	0	10297		Unknown	Unknown		Combatant-013	2026-06-17T21:14:08.4180000-03:00
+0	1	9741		attack	Combatant-017	Piercing	Combatant-019	2026-06-17T21:14:08.4180000-03:00
+4	0	12899		Shake It Off	YOU		YOU	2026-06-17T21:14:08.5070000-03:00
+4	0	13213		Shake It Off	YOU		Combatant-017	2026-06-17T21:14:08.5070000-03:00
+4	0	12987		Shake It Off	YOU		Combatant-005	2026-06-17T21:14:08.5070000-03:00
+4	1	20696		Shake It Off	YOU		Combatant-010	2026-06-17T21:14:08.5070000-03:00
+4	1	21382		Shake It Off	YOU		Combatant-016	2026-06-17T21:14:08.5070000-03:00
+4	1	21406		Shake It Off	YOU		Combatant-013	2026-06-17T21:14:08.5070000-03:00
+4	1	21180		Shake It Off	YOU		Combatant-015	2026-06-17T21:14:08.5070000-03:00
+4	0	12908		Shake It Off	YOU		Combatant-009	2026-06-17T21:14:08.5070000-03:00
+2	1	14150		Circle of Scorn	Combatant-010	Slashing	Combatant-019	2026-06-17T21:14:08.7280000-03:00
+2	0	89710		Blizzard in Cyan	Combatant-005	Magic (Ice)	Combatant-019	2026-06-17T21:14:08.8620000-03:00
+0	1	16625		attack	Combatant-013	Piercing	Combatant-019	2026-06-17T21:14:08.9070000-03:00
+2	0	38728		High Jump	Combatant-013	Piercing	Combatant-019	2026-06-17T21:14:09.0850000-03:00
+0	0	6012		attack	Combatant-009	Blunt	Combatant-019	2026-06-17T21:14:09.0850000-03:00
+2	0	63500		Elixir Burst	Combatant-009	Blunt	Combatant-019	2026-06-17T21:14:09.2630000-03:00
+2	0	30079		Expiacion	Combatant-010	Slashing	Combatant-019	2026-06-17T21:14:09.3520000-03:00
+7	0	500	Power	Expiacion	Combatant-010		Combatant-010	2026-06-17T21:14:09.3520000-03:00
+2	1	37081		Fan Dance III	Combatant-017	Piercing	Combatant-019	2026-06-17T21:14:09.5750000-03:00
+2	1	88259		Inner Chaos	YOU	Slashing	Combatant-019	2026-06-17T21:14:09.7990000-03:00
+2	1	47133		Glare III	Combatant-016	Magic	Combatant-019	2026-06-17T21:14:09.8450000-03:00
+0	0	4216		attack	Combatant-010	Slashing	Combatant-019	2026-06-17T21:14:09.9330000-03:00
+0	0	6055		attack	Combatant-009	Blunt	Combatant-019	2026-06-17T21:14:10.1100000-03:00
+2	0	27974		the Forbidden Chakra	Combatant-009	Blunt	Combatant-019	2026-06-17T21:14:10.4220000-03:00
+0	1	9844		attack	YOU	Slashing	Combatant-019	2026-06-17T21:14:10.4660000-03:00
+2	1	77330		Blade of Faith	Combatant-010	Magic	Combatant-019	2026-06-17T21:14:10.5550000-03:00
+4	1	27485		Blade of Faith	Combatant-010		Combatant-010	2026-06-17T21:14:10.5550000-03:00
+2	1	54919		Toxikon II	Combatant-015	Magic	Combatant-019	2026-06-17T21:14:10.6000000-03:00
+0	0	1		attack	Combatant-016	Blunt	Combatant-019	2026-06-17T21:14:10.7330000-03:00
+2	0	82761		Dance of the Dawn	Combatant-017	Piercing	Combatant-019	2026-06-17T21:14:10.8220000-03:00
+2	1	72885		Drakesbane	Combatant-013	Piercing	Combatant-019	2026-06-17T21:14:10.9110000-03:00
+4	0	13783		Unknown	Unknown		Combatant-013	2026-06-17T21:14:10.9110000-03:00
+2	0	29296		Dragon Kick	Combatant-009	Blunt	Combatant-019	2026-06-17T21:14:11.1330000-03:00
+0	0	5751		attack	Combatant-009	Blunt	Combatant-019	2026-06-17T21:14:11.1770000-03:00
+2	0	92750		Stone in Yellow	Combatant-005	Magic (Earth)	Combatant-019	2026-06-17T21:14:11.3110000-03:00
+2	0	8445		Onslaught	YOU	Slashing	Combatant-019	2026-06-17T21:14:11.3110000-03:00
+2	1	15811		Intervene	Combatant-010	Slashing	Combatant-019	2026-06-17T21:14:11.3110000-03:00
+2	0	47157		Fan Dance IV	Combatant-017	Piercing	Combatant-019	2026-06-17T21:14:11.4880000-03:00
+2	0	49392		Dragonfire Dive	Combatant-013	Piercing (Fire)	Combatant-019	2026-06-17T21:14:11.5330000-03:00
+0	1	9724		attack	Combatant-017	Piercing	Combatant-019	2026-06-17T21:14:11.5770000-03:00
+0	0	10566		attack	Combatant-013	Piercing	Combatant-019	2026-06-17T21:14:11.7110000-03:00
+2	0	29534		Glare III	Combatant-016	Magic	Combatant-019	2026-06-17T21:14:11.8450000-03:00
+0	0	4501		attack	Combatant-010	Slashing	Combatant-019	2026-06-17T21:14:12.2010000-03:00
+0	1	9249		attack	Combatant-009	Blunt	Combatant-019	2026-06-17T21:14:12.2010000-03:00
+2	1	73117		Fell Cleave	YOU	Slashing	Combatant-019	2026-06-17T21:14:12.2900000-03:00
+2	1	112939		Nastrond	Combatant-013	Piercing	Combatant-019	2026-06-17T21:14:12.3780000-03:00
+2	1	165749		Comet in Black	Combatant-005	Magic	Combatant-019	2026-06-17T21:14:12.6010000-03:00
+1	0	0		Cyclonic Break	Combatant-019		Combatant-019	2026-06-17T21:14:12.9130000-03:00
+2	1	58633		Leaping Opo	Combatant-009	Blunt	Combatant-019	2026-06-17T21:14:13.0040000-03:00
+2	0	33405		Toxikon II	Combatant-015	Magic	Combatant-019	2026-06-17T21:14:13.0040000-03:00
+2	0	57275		Blade of Truth	Combatant-010	Magic	Combatant-019	2026-06-17T21:14:13.0480000-03:00
+4	0	17679		Blade of Truth	Combatant-010		Combatant-010	2026-06-17T21:14:13.0480000-03:00
+0	1	9478		attack	Combatant-009	Blunt	Combatant-019	2026-06-17T21:14:13.2250000-03:00
+2	1	106828		Winged Muse	Combatant-005	Magic	Combatant-019	2026-06-17T21:14:13.2690000-03:00
+2	0	147430		Afflatus Misery	Combatant-016	Magic	Combatant-019	2026-06-17T21:14:13.2690000-03:00
+2	0	52978		Last Dance	Combatant-017	Piercing	Combatant-019	2026-06-17T21:14:13.3150000-03:00
+2	0	8888		Onslaught	YOU	Slashing	Combatant-019	2026-06-17T21:14:13.3580000-03:00
+2	1	48335		Raiden Thrust	Combatant-013	Piercing	Combatant-019	2026-06-17T21:14:13.4030000-03:00
+2	0	0		Cyclonic Break	Combatant-019	Slashing	Combatant-009	2026-06-17T21:14:13.5370000-03:00
+2	0	0	Parried	Cyclonic Break	Combatant-019	Slashing	Combatant-015	2026-06-17T21:14:13.5370000-03:00
+2	0	0		Cyclonic Break	Combatant-019	Slashing	Combatant-016	2026-06-17T21:14:13.5370000-03:00
+2	0	0		Cyclonic Break	Combatant-019	Slashing	Combatant-010	2026-06-17T21:14:13.5370000-03:00
+2	0	20955		Cyclonic Break	Combatant-019	Slashing	Combatant-005	2026-06-17T21:14:13.5370000-03:00
+2	0	4598		Cyclonic Break	Combatant-019	Slashing	YOU	2026-06-17T21:14:13.5370000-03:00
+2	0	31992		Cyclonic Break	Combatant-019	Slashing	Combatant-013	2026-06-17T21:14:13.5390000-03:00
+2	0	0		Cyclonic Break	Combatant-019	Slashing	Combatant-017	2026-06-17T21:14:13.5390000-03:00
+0	0	5780		attack	YOU	Slashing	Combatant-019	2026-06-17T21:14:13.8500000-03:00
+2	1	134403		Mog of the Ages	Combatant-005	Magic	Combatant-019	2026-06-17T21:14:13.8940000-03:00
+2	1	134674		Stardiver	Combatant-013	Piercing (Fire)	Combatant-019	2026-06-17T21:14:14.0710000-03:00
+2	1	46620		the Forbidden Chakra	Combatant-009	Blunt	Combatant-019	2026-06-17T21:14:14.1620000-03:00
+0	1	1		attack	Combatant-016	Blunt	Combatant-019	2026-06-17T21:14:14.2050000-03:00
+0	0	5906		attack	Combatant-009	Blunt	Combatant-019	2026-06-17T21:14:14.2930000-03:00
+0	0	4217		attack	Combatant-010	Slashing	Combatant-019	2026-06-17T21:14:14.4730000-03:00
+0	1	13114		attack	Combatant-013	Piercing	Combatant-019	2026-06-17T21:14:14.5160000-03:00
+2	0	9679		Intervene	Combatant-010	Slashing	Combatant-019	2026-06-17T21:14:14.5610000-03:00
+0	0	6312		attack	Combatant-017	Piercing	Combatant-019	2026-06-17T21:14:14.7390000-03:00
+2	1	71677		Fell Cleave	YOU	Slashing	Combatant-019	2026-06-17T21:14:14.8270000-03:00
+2	0	23973		Dragon Kick	Combatant-009	Blunt	Combatant-019	2026-06-17T21:14:14.8720000-03:00
+2	1	181013		Star Prism	Combatant-005	Magic	Combatant-019	2026-06-17T21:14:15.0940000-03:00
+2	0	56349		Glare IV	Combatant-016	Magic	Combatant-019	2026-06-17T21:14:15.2280000-03:00
+0	0	6029		attack	Combatant-009	Blunt	Combatant-019	2026-06-17T21:14:15.3620000-03:00
+2	1	54996		Toxikon II	Combatant-015	Magic	Combatant-019	2026-06-17T21:14:15.4050000-03:00
+1	0	0		Cyclonic Break	Combatant-019		Unknown	2026-06-17T21:14:15.5840000-03:00
+1	0	0		Cyclonic Break	Combatant-019		Unknown	2026-06-17T21:14:15.5840000-03:00
+1	0	0		Cyclonic Break	Combatant-019		Unknown	2026-06-17T21:14:15.5840000-03:00
+1	0	0		Cyclonic Break	Combatant-019		Unknown	2026-06-17T21:14:15.5840000-03:00
+1	0	0		Cyclonic Break	Combatant-019		Unknown	2026-06-17T21:14:15.5840000-03:00
+1	0	0		Cyclonic Break	Combatant-019		Unknown	2026-06-17T21:14:15.5840000-03:00
+1	0	0		Cyclonic Break	Combatant-019		Unknown	2026-06-17T21:14:15.5840000-03:00
+1	0	0		Cyclonic Break	Combatant-019		Unknown	2026-06-17T21:14:15.5840000-03:00
+2	0	85903		Blade of Valor	Combatant-010	Magic	Combatant-019	2026-06-17T21:14:15.5840000-03:00
+4	0	17046		Blade of Valor	Combatant-010		Combatant-010	2026-06-17T21:14:15.5840000-03:00
+2	0	60732		Sinsmite	Combatant-019	Magic (Lightning)	Combatant-015	2026-06-17T21:14:15.6290000-03:00
+2	0	65699		Sinsmite	Combatant-019	Magic (Lightning)	Combatant-009	2026-06-17T21:14:15.6290000-03:00
+2	0	2035		Sinsmite	Combatant-019	Magic (Lightning)	Combatant-010	2026-06-17T21:14:15.6290000-03:00
+2	0	61967		Sinsmite	Combatant-019	Magic (Lightning)	Combatant-016	2026-06-17T21:14:15.6290000-03:00
+2	0	42272		Sinsmite	Combatant-019	Magic (Lightning)	YOU	2026-06-17T21:14:15.6290000-03:00
+2	0	62490		Sinsmite	Combatant-019	Magic (Lightning)	Combatant-005	2026-06-17T21:14:15.6290000-03:00
+2	0	71349		Sinsmite	Combatant-019	Magic (Lightning)	Combatant-013	2026-06-17T21:14:15.6290000-03:00
+2	0	54404		Sinsmite	Combatant-019	Magic (Lightning)	Combatant-017	2026-06-17T21:14:15.6290000-03:00
+2	0	66468		Finishing Move	Combatant-017	Piercing	Combatant-019	2026-06-17T21:14:15.8050000-03:00
+2	1	64722		Lance Barrage	Combatant-013	Piercing	Combatant-019	2026-06-17T21:14:15.8940000-03:00
+4	1	37539		Ixochole	Combatant-015		Combatant-015	2026-06-17T21:14:16.0280000-03:00
+7	0	700	Power	Ixochole	Combatant-015		Combatant-015	2026-06-17T21:14:16.0280000-03:00
+4	0	22656		Ixochole	Combatant-015		Combatant-013	2026-06-17T21:14:16.0280000-03:00
+4	0	23489		Ixochole	Combatant-015		Combatant-009	2026-06-17T21:14:16.0280000-03:00
+4	0	22956		Ixochole	Combatant-015		Combatant-010	2026-06-17T21:14:16.0280000-03:00
+4	0	17416		Star Prism	Combatant-005		Combatant-010	2026-06-17T21:14:16.3390000-03:00
+4	0	17413		Star Prism	Combatant-005		Combatant-013	2026-06-17T21:14:16.3390000-03:00
+4	1	28012		Star Prism	Combatant-005		YOU	2026-06-17T21:14:16.3390000-03:00
+4	1	27393		Star Prism	Combatant-005		Combatant-009	2026-06-17T21:14:16.3390000-03:00
+4	1	26890		Star Prism	Combatant-005		Combatant-016	2026-06-17T21:14:16.3390000-03:00
+4	1	27249		Star Prism	Combatant-005		Combatant-005	2026-06-17T21:14:16.3390000-03:00
+4	1	26712		Star Prism	Combatant-005		Combatant-015	2026-06-17T21:14:16.3390000-03:00
+4	1	26807		Star Prism	Combatant-005		Combatant-017	2026-06-17T21:14:16.3390000-03:00
+0	1	9489		attack	Combatant-009	Blunt	Combatant-019	2026-06-17T21:14:16.4280000-03:00
+2	1	200686		Starcross	Combatant-013	Piercing	Combatant-019	2026-06-17T21:14:16.5170000-03:00
+2	0	66554		Blade of Honor	Combatant-010	Magic	Combatant-019	2026-06-17T21:14:16.6950000-03:00
+0	1	6735		attack	Combatant-010	Slashing	Combatant-019	2026-06-17T21:14:16.7410000-03:00
+2	1	54652		Leaping Opo	Combatant-009	Blunt	Combatant-019	2026-06-17T21:14:16.7410000-03:00
+2	1	134337		Hammer Brush	Combatant-005	Magic	Combatant-019	2026-06-17T21:14:16.9630000-03:00
+2	0	53557		Rise of the Dragon	Combatant-013	Piercing	Combatant-019	2026-06-17T21:14:17.1840000-03:00
+0	0	5705		attack	YOU	Slashing	Combatant-019	2026-06-17T21:14:17.2300000-03:00
+2	0	57719		Glare IV	Combatant-016	Magic	Combatant-019	2026-06-17T21:14:17.2300000-03:00
+0	0	10328		attack	Combatant-013	Piercing	Combatant-019	2026-06-17T21:14:17.3190000-03:00
+2	1	75460		Fell Cleave	YOU	Slashing	Combatant-019	2026-06-17T21:14:17.3190000-03:00
+0	1	8955		attack	Combatant-009	Blunt	Combatant-019	2026-06-17T21:14:17.4940000-03:00
+1	0	0		Cyclonic Break	Combatant-019		Unknown	2026-06-17T21:14:17.6730000-03:00
+1	0	0		Cyclonic Break	Combatant-019		Unknown	2026-06-17T21:14:17.6730000-03:00
+1	0	0		Cyclonic Break	Combatant-019		Unknown	2026-06-17T21:14:17.6730000-03:00
+1	0	0		Cyclonic Break	Combatant-019		Unknown	2026-06-17T21:14:17.6730000-03:00
+1	0	0		Cyclonic Break	Combatant-019		Unknown	2026-06-17T21:14:17.6730000-03:00
+1	0	0		Cyclonic Break	Combatant-019		Unknown	2026-06-17T21:14:17.6730000-03:00
+1	0	0		Cyclonic Break	Combatant-019		Unknown	2026-06-17T21:14:17.6730000-03:00
+1	0	0		Cyclonic Break	Combatant-019		Unknown	2026-06-17T21:14:17.6730000-03:00
+2	1	53152		Toxikon II	Combatant-015	Magic	Combatant-019	2026-06-17T21:14:17.8060000-03:00
+0	0	6395		attack	Combatant-017	Piercing	Combatant-019	2026-06-17T21:14:17.8950000-03:00
+2	0	42327		Primal Wrath	YOU	Slashing	Combatant-019	2026-06-17T21:14:17.9860000-03:00
+2	0	47082		Goring Blade	Combatant-010	Slashing	Combatant-019	2026-06-17T21:14:18.0740000-03:00
+2	1	129749		Starfall Dance	Combatant-017	Piercing	Combatant-019	2026-06-17T21:14:18.3410000-03:00
+2	0	43411		Heavens' Thrust	Combatant-013	Piercing	Combatant-019	2026-06-17T21:14:18.3860000-03:00
+2	0	101124		Fire's Reply	Combatant-009	Blunt	Combatant-019	2026-06-17T21:14:18.6520000-03:00
+0	0	4492		attack	Combatant-010	Slashing	Combatant-019	2026-06-17T21:14:19.0100000-03:00
+2	0	46274		Mirage Dive	Combatant-013	Piercing	Combatant-019	2026-06-17T21:14:19.0540000-03:00
+2	0	56890		Glare IV	Combatant-016	Magic	Combatant-019	2026-06-17T21:14:19.2330000-03:00
+0	0	5557		attack	Combatant-009	Blunt	Combatant-019	2026-06-17T21:14:19.5450000-03:00
+1	0	0		Cyclonic Break	Combatant-019		Unknown	2026-06-17T21:14:19.7240000-03:00
+1	0	0		Cyclonic Break	Combatant-019		Unknown	2026-06-17T21:14:19.7240000-03:00
+1	0	0		Cyclonic Break	Combatant-019		Unknown	2026-06-17T21:14:19.7240000-03:00
+1	0	0		Cyclonic Break	Combatant-019		Unknown	2026-06-17T21:14:19.7240000-03:00
+1	0	0		Cyclonic Break	Combatant-019		Unknown	2026-06-17T21:14:19.7240000-03:00
+1	0	0		Cyclonic Break	Combatant-019		Unknown	2026-06-17T21:14:19.7240000-03:00
+1	0	0		Cyclonic Break	Combatant-019		Unknown	2026-06-17T21:14:19.7240000-03:00
+1	0	0		Cyclonic Break	Combatant-019		Unknown	2026-06-17T21:14:19.7240000-03:00
+2	1	97962		Primal Ruination	YOU	Slashing	Combatant-019	2026-06-17T21:14:19.8140000-03:00
+2	1	47760		the Forbidden Chakra	Combatant-009	Blunt	Combatant-019	2026-06-17T21:14:19.8140000-03:00
+0	0	10241		attack	Combatant-013	Piercing	Combatant-019	2026-06-17T21:14:20.1240000-03:00
+0	1	11459		attack	YOU	Slashing	Combatant-019	2026-06-17T21:14:20.6150000-03:00
+2	0	31997		Atonement	Combatant-010	Slashing	Combatant-019	2026-06-17T21:14:20.6150000-03:00
+7	0	400	Power	Atonement	Combatant-010		Combatant-010	2026-06-17T21:14:20.6150000-03:00
+2	1	131653		Thunder in Magenta	Combatant-005	Magic (Lightning)	Combatant-019	2026-06-17T21:14:20.6600000-03:00
+2	0	23631		Dragon Kick	Combatant-009	Blunt	Combatant-019	2026-06-17T21:14:20.7480000-03:00
+2	0	54060		Saber Dance	Combatant-017	Piercing	Combatant-019	2026-06-17T21:14:20.8380000-03:00
+2	0	32821		Fang and Claw	Combatant-013	Piercing	Combatant-019	2026-06-17T21:14:20.8820000-03:00
+0	1	12344		attack	Combatant-017	Piercing	Combatant-019	2026-06-17T21:14:21.0160000-03:00
+2	0	33444		Dosis III	Combatant-015	Magic	Combatant-019	2026-06-17T21:14:21.1500000-03:00
+0	0	4399		attack	Combatant-010	Slashing	Combatant-019	2026-06-17T21:14:21.2840000-03:00
+0	0	5653		attack	Combatant-009	Blunt	Combatant-019	2026-06-17T21:14:21.5950000-03:00
+2	0	114730		Rainbow Drip	Combatant-005	Magic	Combatant-019	2026-06-17T21:14:21.9520000-03:00
+2	1	89173		Inner Chaos	YOU	Slashing	Combatant-019	2026-06-17T21:14:22.3520000-03:00
+2	1	99243		Elixir Burst	Combatant-009	Blunt	Combatant-019	2026-06-17T21:14:22.5750000-03:00
+2	1	46796		Glare III	Combatant-016	Magic	Combatant-019	2026-06-17T21:14:22.7070000-03:00
+0	0	7893		attack	Combatant-013	Piercing	Combatant-019	2026-06-17T21:14:22.9300000-03:00
+2	1	54630		Supplication	Combatant-010	Slashing	Combatant-019	2026-06-17T21:14:23.1090000-03:00
+7	0	400	Power	Supplication	Combatant-010		Combatant-010	2026-06-17T21:14:23.1090000-03:00
+2	1	88310		Last Dance	Combatant-017	Piercing	Combatant-019	2026-06-17T21:14:23.3320000-03:00
+2	0	43594		Drakesbane	Combatant-013	Piercing	Combatant-019	2026-06-17T21:14:23.3780000-03:00
+2	0	596940		Powder Mark Trail	Combatant-019	Magic	YOU	2026-06-17T21:14:23.4210000-03:00
+0	0	4345		attack	Combatant-010	Slashing	Combatant-019	2026-06-17T21:14:23.5550000-03:00
+2	0	34696		Dosis III	Combatant-015	Magic	Combatant-019	2026-06-17T21:14:23.5550000-03:00
+0	1	8937		attack	Combatant-009	Blunt	Combatant-019	2026-06-17T21:14:23.6440000-03:00
+0	0	6031		attack	YOU	Slashing	Combatant-019	2026-06-17T21:14:23.9980000-03:00
+0	1	12091		attack	Combatant-017	Piercing	Combatant-019	2026-06-17T21:14:24.1760000-03:00
+2	1	147305		Polishing Hammer	Combatant-005	Magic	Combatant-019	2026-06-17T21:14:24.4430000-03:00
+2	1	55443		Leaping Opo	Combatant-009	Blunt	Combatant-019	2026-06-17T21:14:24.4430000-03:00
+2	0	14765		Heavy Swing	YOU	Slashing	Combatant-019	2026-06-17T21:14:24.8450000-03:00
+2	0	23906		the Forbidden Chakra	Combatant-009	Blunt	Combatant-019	2026-06-17T21:14:25.1120000-03:00
+2	0	31307		Glare III	Combatant-016	Magic	Combatant-019	2026-06-17T21:14:25.1560000-03:00
+2	1	57016		Sepulchre	Combatant-010	Slashing	Combatant-019	2026-06-17T21:14:25.6030000-03:00
+7	0	400	Power	Sepulchre	Combatant-010		Combatant-010	2026-06-17T21:14:25.6030000-03:00
+0	1	11705		attack	Combatant-013	Piercing	Combatant-019	2026-06-17T21:14:25.7340000-03:00
+0	0	4384		attack	Combatant-009	Blunt	Combatant-019	2026-06-17T21:14:25.7340000-03:00
+0	0	1938709		unknown_9cb4	Combatant-019	Slashing	YOU	2026-06-17T21:14:25.8240000-03:00
+2	1	50433		Fountainfall	Combatant-017	Piercing	Combatant-019	2026-06-17T21:14:25.8240000-03:00
+0	1	6840		attack	Combatant-010	Slashing	Combatant-019	2026-06-17T21:14:25.8240000-03:00
+2	0	34964		Raiden Thrust	Combatant-013	Piercing	Combatant-019	2026-06-17T21:14:25.9130000-03:00
+2	0	31758		Dosis III	Combatant-015	Magic	Combatant-019	2026-06-17T21:14:25.9580000-03:00
+2	0	24870		Twin Snakes	Combatant-009	Blunt	Combatant-019	2026-06-17T21:14:26.3150000-03:00
+1	0	0		Claw Motif	Combatant-005		Combatant-005	2026-06-17T21:14:26.9410000-03:00
+2	0	35206		Wyrmwind Thrust	Combatant-013	Piercing	Combatant-019	2026-06-17T21:14:27.1610000-03:00
+0	1	9597		attack	Combatant-017	Piercing	Combatant-019	2026-06-17T21:14:27.2950000-03:00
+2	1	29765		Maim	YOU	Slashing	Combatant-019	2026-06-17T21:14:27.3400000-03:00
+0	0	5330		attack	YOU	Slashing	Combatant-019	2026-06-17T21:14:27.3860000-03:00
+1	0	0		unknown_9ced	Combatant-019		Combatant-019	2026-06-17T21:14:27.5180000-03:00
+2	0	67905		Clawed Muse	Combatant-005	Magic	Combatant-019	2026-06-17T21:14:27.6070000-03:00
+2	1	40329		Glare III	Combatant-016	Magic	Combatant-019	2026-06-17T21:14:27.6510000-03:00
+0	0	4334		attack	Combatant-009	Blunt	Combatant-019	2026-06-17T21:14:27.7850000-03:00
+0	0	3188		attack	Combatant-010	Slashing	Combatant-019	2026-06-17T21:14:28.0950000-03:00
+2	0	24696		Holy Spirit	Combatant-010	Magic	Combatant-019	2026-06-17T21:14:28.1400000-03:00
+4	1	28399		Holy Spirit	Combatant-010		Combatant-010	2026-06-17T21:14:28.1400000-03:00
+2	0	22793		Demolish	Combatant-009	Blunt	Combatant-019	2026-06-17T21:14:28.1850000-03:00
+2	1	62321		Saber Dance	Combatant-017	Piercing	Combatant-019	2026-06-17T21:14:28.3180000-03:00
+2	0	19193		Spiral Blow	Combatant-013	Piercing	Combatant-019	2026-06-17T21:14:28.3630000-03:00
+2	0	30088		Dosis III	Combatant-015	Magic	Combatant-019	2026-06-17T21:14:28.3630000-03:00
+0	0	7175		attack	Combatant-013	Piercing	Combatant-019	2026-06-17T21:14:28.5410000-03:00
+0	0	1803611		unknown_9cb4	Combatant-019	Slashing	YOU	2026-06-17T21:14:28.8520000-03:00
+2	0	24715		Storm's Path	YOU	Slashing	Combatant-019	2026-06-17T21:14:29.8350000-03:00
+4	0	11002		Storm's Path	YOU		YOU	2026-06-17T21:14:29.8350000-03:00
+0	0	4257		attack	Combatant-009	Blunt	Combatant-019	2026-06-17T21:14:29.8350000-03:00
+2	0	21540		Dragon Kick	Combatant-009	Blunt	Combatant-019	2026-06-17T21:14:30.0580000-03:00
+2	0	25450		Glare III	Combatant-016	Magic	Combatant-019	2026-06-17T21:14:30.1470000-03:00
+0	0	3131		attack	Combatant-010	Slashing	Combatant-019	2026-06-17T21:14:30.3740000-03:00
+0	0	5743		attack	Combatant-017	Piercing	Combatant-019	2026-06-17T21:14:30.4580000-03:00
+2	0	10422		Fast Blade	Combatant-010	Slashing	Combatant-019	2026-06-17T21:14:30.6370000-03:00
+0	1	8354		attack	YOU	Slashing	Combatant-019	2026-06-17T21:14:30.7700000-03:00
+4	0	234173		Benediction	Combatant-016		YOU	2026-06-17T21:14:30.7700000-03:00
+2	0	28137		Dosis III	Combatant-015	Magic	Combatant-019	2026-06-17T21:14:30.8150000-03:00
+2	0	23139		Chaotic Spring	Combatant-013	Piercing	Combatant-019	2026-06-17T21:14:30.8590000-03:00
+2	1	38516		Reverse Cascade	Combatant-017	Piercing	Combatant-019	2026-06-17T21:14:30.8590000-03:00
+2	0	41805		Holy in White	Combatant-005	Magic	Combatant-019	2026-06-17T21:14:30.9470000-03:00
+0	0	5733		attack	Combatant-013	Piercing	Combatant-019	2026-06-17T21:14:31.3490000-03:00
+0	0	4198		attack	Combatant-009	Blunt	Combatant-019	2026-06-17T21:14:31.8850000-03:00
+2	1	46974		Rising Raptor	Combatant-009	Blunt	Combatant-019	2026-06-17T21:14:31.9300000-03:00
+2	0	36181		Fell Cleave	YOU	Slashing	Combatant-019	2026-06-17T21:14:32.3320000-03:00
+2	0	20454		the Forbidden Chakra	Combatant-009	Blunt	Combatant-019	2026-06-17T21:14:32.6000000-03:00
+2	1	40253		Glare III	Combatant-016	Magic	Combatant-019	2026-06-17T21:14:32.6440000-03:00
+0	0	3116		attack	Combatant-010	Slashing	Combatant-019	2026-06-17T21:14:32.6440000-03:00
+2	0	28967		Dosis III	Combatant-015	Magic	Combatant-019	2026-06-17T21:14:33.2240000-03:00
+2	1	35539		Upheaval	YOU	Blunt	Combatant-019	2026-06-17T21:14:33.2670000-03:00
+2	0	20131		Wheeling Thrust	Combatant-013	Piercing	Combatant-019	2026-06-17T21:14:33.3560000-03:00
+2	0	39792		Saber Dance	Combatant-017	Piercing	Combatant-019	2026-06-17T21:14:33.4010000-03:00
+0	1	10954		attack	Combatant-017	Piercing	Combatant-019	2026-06-17T21:14:33.5790000-03:00
+2	0	40883		Six-sided Star	Combatant-009	Blunt	Combatant-019	2026-06-17T21:14:33.8020000-03:00
+0	0	4198		attack	Combatant-009	Blunt	Combatant-019	2026-06-17T21:14:33.9380000-03:00
+1	0	0		Utopian Sky	Combatant-019		Combatant-019	2026-06-17T21:14:34.1140000-03:00
+1	0	0		Eukrasia	Combatant-015		Combatant-015	2026-06-17T21:14:34.7370000-03:00
+4	0	22806		Afflatus Rapture	Combatant-016		Combatant-016	2026-06-17T21:14:35.0950000-03:00
+4	1	37032		Afflatus Rapture	Combatant-016		Combatant-017	2026-06-17T21:14:35.0950000-03:00
+4	1	35694		Afflatus Rapture	Combatant-016		Combatant-009	2026-06-17T21:14:35.0950000-03:00
+4	0	23089		Afflatus Rapture	Combatant-016		YOU	2026-06-17T21:14:35.0950000-03:00
+4	0	23471		Afflatus Rapture	Combatant-016		Combatant-015	2026-06-17T21:14:35.0950000-03:00
+4	0	23076		Afflatus Rapture	Combatant-016		Combatant-010	2026-06-17T21:14:35.0950000-03:00
+4	0	23341		Afflatus Rapture	Combatant-016		Combatant-013	2026-06-17T21:14:35.0950000-03:00
+4	1	9073		Eukrasian Prognosis II	Combatant-015		Combatant-015	2026-06-17T21:14:35.7620000-03:00
+4	1	9305		Eukrasian Prognosis II	Combatant-015		Combatant-009	2026-06-17T21:14:35.7620000-03:00
+4	1	9326		Eukrasian Prognosis II	Combatant-015		Combatant-013	2026-06-17T21:14:35.7620000-03:00
+4	0	5666		Eukrasian Prognosis II	Combatant-015		YOU	2026-06-17T21:14:35.7620000-03:00
+4	0	5786		Eukrasian Prognosis II	Combatant-015		Combatant-016	2026-06-17T21:14:35.7620000-03:00
+4	0	5877		Eukrasian Prognosis II	Combatant-015		Combatant-010	2026-06-17T21:14:35.7620000-03:00
+4	0	5841		Eukrasian Prognosis II	Combatant-015		Combatant-017	2026-06-17T21:14:35.7620000-03:00
+4	0	5701		Eukrasian Prognosis II	Combatant-015		Combatant-005	2026-06-17T21:14:35.7620000-03:00
+1	0	0		Maw Motif	Combatant-005		Combatant-005	2026-06-17T21:14:35.9400000-03:00
+4	0	56201		Thrill of Battle	YOU		YOU	2026-06-17T21:14:36.7830000-03:00
+1	0	0		Eukrasia	Combatant-015		Combatant-015	2026-06-17T21:14:37.2740000-03:00
+1	0	0		Forbidden Meditation	Combatant-009		Combatant-009	2026-06-17T21:14:37.5850000-03:00
+1	0	0		Forbidden Meditation	Combatant-009		Combatant-009	2026-06-17T21:14:38.5670000-03:00
+2	0	142282		Burn Mark	Combatant-019	Magic	YOU	2026-06-17T21:14:39.5470000-03:00
+2	0	111088	Blocked	Burn Mark	Combatant-019	Magic	Combatant-010	2026-06-17T21:14:39.5470000-03:00
+1	0	0		Forbidden Meditation	Combatant-009		Combatant-009	2026-06-17T21:14:39.5470000-03:00
+1	0	0		Hammer Motif	Combatant-005		Combatant-005	2026-06-17T21:14:39.9500000-03:00
+1	0	0		Forbidden Meditation	Combatant-009		Combatant-009	2026-06-17T21:14:40.5750000-03:00
+1	0	0		Forbidden Meditation	Combatant-009		Combatant-009	2026-06-17T21:14:41.5560000-03:00
+4	0	5672		Eukrasian Prognosis II	Combatant-015		Combatant-015	2026-06-17T21:14:42.4920000-03:00
+4	0	5873		Eukrasian Prognosis II	Combatant-015		Combatant-005	2026-06-17T21:14:42.4920000-03:00
+4	1	9322		Eukrasian Prognosis II	Combatant-015		Combatant-009	2026-06-17T21:14:42.4920000-03:00
+4	0	5832		Eukrasian Prognosis II	Combatant-015		Combatant-013	2026-06-17T21:14:42.4920000-03:00
+4	0	5877		Eukrasian Prognosis II	Combatant-015		Combatant-016	2026-06-17T21:14:42.4920000-03:00
+4	0	6461		Eukrasian Prognosis II	Combatant-015		Combatant-010	2026-06-17T21:14:42.4920000-03:00
+1	0	0		Eukrasia	Combatant-015		Combatant-015	2026-06-17T21:14:43.9630000-03:00
+1	0	0		Starry Sky Motif	Combatant-005		Combatant-005	2026-06-17T21:14:46.5920000-03:00
+1	0	0		Emboite	Combatant-017		Combatant-017	2026-06-17T21:14:47.4850000-03:00
+1	0	0		Blasting Zone	Combatant-018		Unknown	2026-06-17T21:14:48.4210000-03:00
+1	0	0		Blasting Zone	Combatant-018		Unknown	2026-06-17T21:14:48.4210000-03:00
+1	0	0		Blasting Zone	Combatant-018		Unknown	2026-06-17T21:14:48.4210000-03:00
+1	0	0		Jete	Combatant-017		Combatant-017	2026-06-17T21:14:48.4640000-03:00
+2	0	89657		Sinbound Thunder III	Combatant-018	Magic (Lightning)	Combatant-009	2026-06-17T21:14:49.2240000-03:00
+2	0	76899		Sinbound Thunder III	Combatant-018	Magic (Lightning)	Combatant-015	2026-06-17T21:14:49.2240000-03:00
+2	0	86780		Sinbound Thunder III	Combatant-018	Magic (Lightning)	Combatant-016	2026-06-17T21:14:49.2240000-03:00
+2	0	27566	Blocked	Sinbound Thunder III	Combatant-018	Magic (Lightning)	Combatant-010	2026-06-17T21:14:49.2240000-03:00
+2	0	88586		Sinbound Thunder III	Combatant-018	Magic (Lightning)	Combatant-005	2026-06-17T21:14:49.2240000-03:00
+2	0	60650		Sinbound Thunder III	Combatant-018	Magic (Lightning)	YOU	2026-06-17T21:14:49.2240000-03:00
+2	0	85388		Sinbound Thunder III	Combatant-018	Magic (Lightning)	Combatant-013	2026-06-17T21:14:49.2240000-03:00
+2	0	104367		Sinbound Thunder III	Combatant-018	Magic (Lightning)	Combatant-017	2026-06-17T21:14:49.2240000-03:00
+1	0	0		Blasting Zone	Combatant-018		Combatant-018	2026-06-17T21:14:49.3570000-03:00
+1	0	0		Blasting Zone	Combatant-018		Combatant-018	2026-06-17T21:14:49.3570000-03:00
+1	0	0		Blasting Zone	Combatant-018		Combatant-018	2026-06-17T21:14:49.3570000-03:00
+4	0	5897		Eukrasian Prognosis II	Combatant-015		Combatant-015	2026-06-17T21:14:51.2300000-03:00
+4	0	5820		Eukrasian Prognosis II	Combatant-015		Combatant-013	2026-06-17T21:14:51.2300000-03:00
+4	0	6799		Eukrasian Prognosis II	Combatant-015		Combatant-010	2026-06-17T21:14:51.2300000-03:00
+4	0	5731		Eukrasian Prognosis II	Combatant-015		Combatant-005	2026-06-17T21:14:51.2300000-03:00
+4	0	6591		Eukrasian Prognosis II	Combatant-015		YOU	2026-06-17T21:14:51.2300000-03:00
+7	0	700	Power	Kerachole	Combatant-015		Combatant-015	2026-06-17T21:14:51.8990000-03:00
+4	0	23813		Ixochole	Combatant-015		Combatant-015	2026-06-17T21:14:52.5680000-03:00
+7	0	700	Power	Ixochole	Combatant-015		Combatant-015	2026-06-17T21:14:52.5680000-03:00
+4	0	23378		Ixochole	Combatant-015		Combatant-013	2026-06-17T21:14:52.5680000-03:00
+4	0	23476		Ixochole	Combatant-015		Combatant-005	2026-06-17T21:14:52.5680000-03:00
+4	0	25927		Ixochole	Combatant-015		Combatant-010	2026-06-17T21:14:52.5680000-03:00
+4	0	22893		Ixochole	Combatant-015		Combatant-017	2026-06-17T21:14:52.5680000-03:00
+4	0	23304		Ixochole	Combatant-015		Combatant-016	2026-06-17T21:14:52.5680000-03:00
+4	0	27159		Ixochole	Combatant-015		YOU	2026-06-17T21:14:52.5680000-03:00
+4	0	23796		Ixochole	Combatant-015		Combatant-009	2026-06-17T21:14:52.5680000-03:00
+4	0	14732		Medica III	Combatant-016		Combatant-016	2026-06-17T21:14:52.6570000-03:00
+4	0	16961		Medica III	Combatant-016		YOU	2026-06-17T21:14:52.6570000-03:00
+4	0	14204		Medica III	Combatant-016		Combatant-017	2026-06-17T21:14:52.6570000-03:00
+4	0	16931		Medica III	Combatant-016		Combatant-010	2026-06-17T21:14:52.6570000-03:00
+4	0	14091		Medica III	Combatant-016		Combatant-009	2026-06-17T21:14:52.6570000-03:00
+4	0	14438		Medica III	Combatant-016		Combatant-005	2026-06-17T21:14:52.6570000-03:00
+4	0	14421		Medica III	Combatant-016		Combatant-015	2026-06-17T21:14:52.6570000-03:00
+4	0	14261		Medica III	Combatant-016		Combatant-013	2026-06-17T21:14:52.6570000-03:00
+1	0	0		Eukrasia	Combatant-015		Combatant-015	2026-06-17T21:14:53.1910000-03:00
+4	1	37245		Assize	Combatant-016		Combatant-016	2026-06-17T21:14:53.2790000-03:00
+7	0	500	Power	Assize	Combatant-016		Combatant-016	2026-06-17T21:14:53.2790000-03:00
+4	0	22622		Assize	Combatant-016		Combatant-017	2026-06-17T21:14:53.2790000-03:00
+4	0	26991		Assize	Combatant-016		YOU	2026-06-17T21:14:53.2790000-03:00
+4	0	22587		Assize	Combatant-016		Combatant-009	2026-06-17T21:14:53.2790000-03:00
+4	0	26254		Assize	Combatant-016		Combatant-010	2026-06-17T21:14:53.2790000-03:00
+4	0	23458		Assize	Combatant-016		Combatant-005	2026-06-17T21:14:53.2790000-03:00
+4	1	36546		Assize	Combatant-016		Combatant-015	2026-06-17T21:14:53.2790000-03:00
+4	0	23053		Assize	Combatant-016		Combatant-013	2026-06-17T21:14:53.2790000-03:00
+1	0	0		Cyclonic Break	Combatant-018		Combatant-018	2026-06-17T21:14:54.9300000-03:00
+2	0	72236		Cyclonic Break	Combatant-018	Slashing	Combatant-009	2026-06-17T21:14:55.5540000-03:00
+2	0	65654		Cyclonic Break	Combatant-018	Slashing	Combatant-015	2026-06-17T21:14:55.5540000-03:00
+2	0	74829		Cyclonic Break	Combatant-018	Slashing	Combatant-016	2026-06-17T21:14:55.5540000-03:00
+2	0	6733	Blocked	Cyclonic Break	Combatant-018	Slashing	Combatant-010	2026-06-17T21:14:55.5540000-03:00
+2	0	31520	Parried	Cyclonic Break	Combatant-018	Slashing	Combatant-005	2026-06-17T21:14:55.5540000-03:00
+2	0	11902		Cyclonic Break	Combatant-018	Slashing	YOU	2026-06-17T21:14:55.5540000-03:00
+2	0	53037		Cyclonic Break	Combatant-018	Slashing	Combatant-013	2026-06-17T21:14:55.5540000-03:00
+2	0	61029	Parried	Cyclonic Break	Combatant-018	Slashing	Combatant-017	2026-06-17T21:14:55.5540000-03:00
+4	0	22901		Afflatus Rapture	Combatant-016		Combatant-016	2026-06-17T21:14:55.9550000-03:00
+4	1	36045		Afflatus Rapture	Combatant-016		Combatant-009	2026-06-17T21:14:55.9550000-03:00
+4	0	22477		Afflatus Rapture	Combatant-016		Combatant-017	2026-06-17T21:14:55.9550000-03:00
+4	0	26107		Afflatus Rapture	Combatant-016		YOU	2026-06-17T21:14:55.9550000-03:00
+4	1	37192		Afflatus Rapture	Combatant-016		Combatant-015	2026-06-17T21:14:55.9550000-03:00
+4	0	26464		Afflatus Rapture	Combatant-016		Combatant-010	2026-06-17T21:14:55.9550000-03:00
+4	0	22967		Afflatus Rapture	Combatant-016		Combatant-005	2026-06-17T21:14:55.9550000-03:00
+4	1	36933		Afflatus Rapture	Combatant-016		Combatant-013	2026-06-17T21:14:55.9550000-03:00
+4	0	5663		Eukrasian Prognosis II	Combatant-015		Combatant-015	2026-06-17T21:14:56.5810000-03:00
+4	1	9038		Eukrasian Prognosis II	Combatant-015		Combatant-013	2026-06-17T21:14:56.5810000-03:00
+4	0	6768		Eukrasian Prognosis II	Combatant-015		Combatant-010	2026-06-17T21:14:56.5810000-03:00
+4	0	5760		Eukrasian Prognosis II	Combatant-015		Combatant-009	2026-06-17T21:14:56.5810000-03:00
+4	0	5836		Eukrasian Prognosis II	Combatant-015		Combatant-016	2026-06-17T21:14:56.5810000-03:00
+4	0	5875		Eukrasian Prognosis II	Combatant-015		Combatant-005	2026-06-17T21:14:56.5810000-03:00
+4	0	5649		Eukrasian Prognosis II	Combatant-015		YOU	2026-06-17T21:14:56.5810000-03:00
+4	0	5867		Eukrasian Prognosis II	Combatant-015		Combatant-017	2026-06-17T21:14:56.5810000-03:00
+1	0	0		Cyclonic Break	Combatant-018		Unknown	2026-06-17T21:14:57.6070000-03:00
+1	0	0		Cyclonic Break	Combatant-018		Unknown	2026-06-17T21:14:57.6070000-03:00
+1	0	0		Cyclonic Break	Combatant-018		Unknown	2026-06-17T21:14:57.6070000-03:00
+1	0	0		Cyclonic Break	Combatant-018		Unknown	2026-06-17T21:14:57.6070000-03:00
+1	0	0		Cyclonic Break	Combatant-018		Unknown	2026-06-17T21:14:57.6070000-03:00
+1	0	0		Cyclonic Break	Combatant-018		Unknown	2026-06-17T21:14:57.6070000-03:00
+1	0	0		Cyclonic Break	Combatant-018		Unknown	2026-06-17T21:14:57.6070000-03:00

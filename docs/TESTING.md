@@ -99,7 +99,9 @@ OverlayPlugin/cactbot read. `Fct.Compat.Act` is our clean-room rebuild of that e
   per-combatant + encounter aggregate to `combat-slice.aggregate.tsv` (committed baseline).
 - **Diff test** (`AggregateCompatTests`) feeds the same stream through our facade and asserts every
   field equals the baseline — `Damage`, `Healed`, `Hits`, `CritHits`, `CritDamPerc`, `EncDPS`,
-  `EncHPS`, `MaxHit`, `DamagePercent`, the allied-party `Damage`/`NumAllies`, durations, etc.
+  `EncHPS`, `MaxHit`, `DamagePercent`, the allied-party `Damage`/`NumAllies`, durations, etc. It runs
+  over two independent real slices (`combat-slice`, a 2-ally mixed pull; `combat-slice2`, an 8-ally
+  full-party burst with heavy healing), both bit-for-bit exact.
 
 This pinned several behaviours our first-cut engine got wrong, each now matched exactly: `blockIsHit`
 defaults **true**; per-combatant `StartTime`/`EndTime` span all outgoing swings via the
