@@ -2,19 +2,21 @@
 
 Consolidated, verified gap list across two axes:
 - **Surface compat (M0–X):** making the **unmodified** legacy stack (`FFXIV_ACT_Plugin` +
-  OverlayPlugin/cactbot + Triggernometry + Discord-triggers) bind and run on our clean-room ACT
-  facade.
+  OverlayPlugin/cactbot + Triggernometry + ACT-Discord-Triggers + ACT.Hojoring) bind and run on
+  our clean-room ACT facade.
 - **Parser calculation (P):** the clean-room native parser (`Fct.Parser.Native`) reproducing
   ACT's combat-value *calculation* — the simulated DoT/HoT/shield swings — bit-for-bit.
 
 Derived from auditing the real sources (facade) and the decompiled `.parse` assembly (parser).
 
-- **Authority:** [`docs/DATA-FLOW.md`](DATA-FLOW.md) is the data-flow + surface contract. This
-  file is the *actionable backlog* extracted from it: what the unmodified plugins touch, what the
-  facade already provides, and what is still missing — grouped by phase.
+- **Authority:** [`docs/DATA-FLOW.md`](DATA-FLOW.md) is the data-flow + surface contract;
+  [`docs/ACT-INTERFACE-MAP.md`](ACT-INTERFACE-MAP.md) is the per-plugin map of every ACT member
+  consumed. This file is the *actionable backlog* extracted from them: what the unmodified plugins
+  touch, what the facade already provides, and what is still missing — grouped by phase.
 - **Code under audit:** `src/Fct.Compat.Act` (facade) and `src/Fct.Parser.Legacy` (plugin wrapper).
-- **Consumer evidence:** `reference/overlayplugin/` (OP, file:line), `reference/act-decompiled/`
-  (ACT/plugin shapes), Triggernometry/Discord (behaviour — marked *inferred* where no local source).
+- **Consumer evidence:** all five plugin source trees under `E:\dev` (OverlayPlugin, Triggernometry,
+  ACT-Discord-Triggers, ACT.Hojoring, FFXIV_ACT_Plugin — file:line) + `reference/act-decompiled/`
+  (ACT shapes). See `docs/ACT-INTERFACE-MAP.md` for the full member-level map.
 
 ### How to read
 
@@ -28,9 +30,10 @@ Derived from auditing the real sources (facade) and the decompiled `.parse` asse
 | Phase | Goal | Net gap state |
 |---|---|---|
 | **M0** Engine | real plugin Started, `AddCombatAction`, DPS, `Network_*.log` | **Done** (Slice 1) |
-| **M1** OverlayPlugin | discovery + MiniParse + NetworkProcessors against unmodified OP | **Code complete** — 1 VERIFY (live custom-log round-trip) |
+| **M1** OverlayPlugin | discovery + MiniParse + NetworkProcessors against unmodified OP | **Mostly complete** — 2 new GAPs (`TTS`/`PlaySound` methods, `oFormSpellTimers`) + 1 VERIFY |
 | **M2** Triggernometry | host runs no trigger engine; facade just lets the plugin **bind + degrade** | **Minimal compat done** — binding surface present, 1 VERIFY |
 | **M3** Discord | trigger/encounter events post on a kill | **Surface present** — all touched members DONE |
+| **M4** Hojoring | SpecialSpellTimer/TTSYukkuri/UltraScouter/XIVLog bind + run | **New scope** — needs `FormSpellTimers` API + `Form` members (see below) |
 | **X** Cross-cutting | model/event shape completeness for any reflecting consumer | a few MINOR shape gaps |
 | **P** Parser calc | native parser reproduces ACT's swing *values* (DoT/HoT/shield simulation) | **~95.6% DPS-sum**; per-tick gaps below |
 
@@ -54,6 +57,8 @@ the `InitActDone && Handle` init gate, `IsActClosing`, `InvokeRequired`/`Invoke`
 |---|---|---|---|---|---|
 | M1‑1 | `ActGlobals.oFormImportProgress` (+ `FormImportProgress : Form` type) | `MiniParseEventSource.cs:189` reads `?.Visible` each CombatData tick | **DONE** | BLOCK | Static field on `ActGlobals.cs` (null in our headless host) + `FormImportProgress.cs` stub so OP's IL field-token resolves; `?.Visible` short-circuits to `false` = "not importing". |
 | M1‑2 | `_iocContainer` → `GetService("…ILogOutput")` → `WriteLine` round-trip | `FFXIVRepository.cs:458/498`; NetworkProcessors custom lines 256+ | **VERIFY** | BREAK | Field name forwarded correctly; confirm a custom line (e.g. MapEffect 257) actually round-trips as a log-line event end-to-end once a live process is attached. |
+| M1‑3 | `FormActMain.TTS(string)` + `PlaySound(string)` **methods** | `MiniParseEventSource.cs:65/75` (cactbot `say`/`play_sound`); `AddonExampleEventSource.cs:34` | **GAP** | BREAK | Facade defines only the `PlaySoundDelegate`/`PlayTtsDelegate` *fields* — no methods. A cactbot TTS/sound action calls the **method** → `MissingMethodException`. Add `public void TTS(string)` / `PlaySound(string)` that invoke the corresponding delegate field (matches real ACT; also wires the Discord/TTSYukkuri delegate-hijack to OP/cactbot output). |
+| M1‑4 | `ActGlobals.oFormSpellTimers` field + `FormSpellTimers` type (`OnSpellTimerNotify`/`OnSpellTimerRemoved` events) | `SpellTimerOverlay.cs:25/50` (`+=` on each event) | **GAP** | BREAK | Only reached if the user adds a SpellTimer overlay, but then `+=` on a null field → NRE / bind failure. Add non-null `oFormSpellTimers` stub (`FormSpellTimers` exposing the two events, never fired) so the subscription binds inertly. Shared with M4 (Hojoring drives the full API). |
 
 ---
 
@@ -83,11 +88,14 @@ fires an export/corner/log action; they are stubbed so those paths never throw.
 | M2‑6 | `CornerControlAdd` / `CornerControlRemove`; private `tc1` TabControl | corner notifications (:233/:256); `LocateTab` (:186) | **OMITTED** | MINOR | All three are reflected with a `!= null` guard → absence degrades silently (no corner popup, no tab locate). Not implemented by design. |
 | M2‑7 | Plugin **status label string** | `GetInstance` (:444/:446) matches `lblPluginStatus.Text == "FFXIV Plugin Started."`/`"FFXIV_ACT_Plugin Started."`, version ≥ 2.0.4.6 | **VERIFY** | BLOCK | `ActPluginData` shape DONE; confirm the facade sets the **exact** status string and registers the FFXIV plugin before Trig inits. |
 
-**Phantoms removed** (the old backlog listed these; the real source touches neither):
+**Phantoms removed** (the old backlog listed this; the real source does not touch it):
 `oFormActMain.CustomTriggerCheck(...)` — does not exist; Triggernometry registers its *own*
 `HasCustomTriggers`/`GetCustomTriggers` as internal hooks and reads `CustomTriggers` directly.
-`ActGlobals.oFormSpellTimers` / `SpellTimer` — not referenced by Triggernometry **or**
-Discord-Triggers; no consumer in the supported stack.
+
+**Correction:** an earlier revision listed `ActGlobals.oFormSpellTimers` / `SpellTimer` as a phantom
+("no consumer in the supported stack"). That was wrong — Triggernometry and Discord-Triggers don't
+touch it, but **OverlayPlugin** (`SpellTimerOverlay.cs`) and **Hojoring** do. It is now tracked as
+**M1‑4** (OP, inert stub) and **M4** (Hojoring, full API).
 
 ---
 
@@ -108,6 +116,29 @@ and does not require Triggernometry to be loaded (only an indirect config-level 
 
 The minimal `GetTextExport` from M2‑3 also covers any encounter-summary export, though no consumer in
 the supported stack currently calls it.
+
+---
+
+## M4 — Hojoring (new scope — not yet started)
+
+ACT.Hojoring (`SpecialSpellTimer`, `TTSYukkuri`, `UltraScouter`, `XIVLog`) uses ACT as a **service
+bus + UI host**, not a data source — combat data comes from FFXIV_ACT_Plugin's `DataRepository` via
+`pluginObj` reflection, which the `WrappedFfxivPlugin` seam already serves. The new facade work is
+ACT's built-in **spell-timer subsystem** plus a wider set of `Form`-inherited members. Verified
+against `E:\dev\ACT.Hojoring\source` (see `docs/ACT-INTERFACE-MAP.md` §5/§7c).
+
+Already satisfied by the existing facade: `oFormActMain`, `IActPluginV1`, `InitActDone`, `ActPlugins`
++ `pluginObj` reflection, `OnLogLineRead`/`BeforeLogLineRead` (incl. reflectable multicast field for
+handler-list surgery), `CurrentZone`, `InCombat`, `EndCombat`, `PlayTtsMethod`/`PlaySoundMethod`
+(delegate-field hijack), `PluginGetSelfData`, `AppDataFolder`, `WriteExceptionLog`, `RestartACT`.
+
+| # | Surface | Consumed by | Status | Sev | Action |
+|---|---|---|---|---|---|
+| M4‑1 | `FormActMain.TTS(string)` / `PlaySound(string)` **methods** | sound/TTS output across SoundController/TimelineController | **GAP** | BREAK | Same fix as **M1‑3** — add the two methods routing through the delegate fields. Closes both at once. |
+| M4‑2 | `ActGlobals.oFormSpellTimers` + `FormSpellTimers` full API: `RebuildSpellTreeView()`, `TimerDefs`, `RemoveTimerDef(...)`, `AddEditTimerDef(TimerData)`, `NotifySpell(...)` | `SpellsController` drives ACT's native spell-timer tree | **GAP** | BREAK | Beyond M1‑4's inert event stub: a working `FormSpellTimers` with a `TimerDefs` collection + add/remove/notify. Plus the `TimerData`/`SpellTimer`/`TimelineEvent`/`TimerMod`/`TimerFrame` model family (all absent). Largest M4 item. |
+| M4‑3 | `FormActMain.CornerControlAdd/Remove(Control)` as **real** methods | SpecialSpellTimer title-bar toggle button | **GAP** | MINOR | Trig only reflects these with a null guard (M2‑6, OMITTED); Hojoring calls them directly → must be real (can be no-op that tracks the control). |
+| M4‑4 | `Form`-inherited `WindowState` (settable), `CanFocus`, `IsHandleCreated`, `IsDisposed` | UI marshal + lifecycle guards (`PluginCore`, `ActInvoker`, `LogParser.RaiseLog`) | **GAP** | MINOR | `FormActMain : Form` already inherits all four; verify the headless form returns sane values (`IsHandleCreated`/`CanFocus` true once shown, `IsDisposed` false). `WindowState` set is a no-op in the headless host. |
+| M4‑5 | `ActPluginData.lblPluginStatus.Text == "...Started"` | `HelpViewModel` confirms FFXIV plugin running | **VERIFY** | BLOCK | Same exact-status-string requirement as M2‑7; one fix covers both. |
 
 ---
 
