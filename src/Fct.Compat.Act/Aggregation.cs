@@ -301,7 +301,19 @@ namespace Advanced_Combat_Tracker
         public double EncHPS => (double)Healed / (Parent?.Duration.TotalSeconds ?? 0.0);
         public double ExtHPS => EncHPS;
         public int Deaths { get { var at = incAll != null && incAll.Items.TryGetValue("All", out var v) ? v : null; return at?.Items.Count(s => s.Damage == Dnum.Death) ?? 0; } }
-        public int Kills { get { var at = outAll != null && outAll.Items.TryGetValue("All", out var v) ? v : null; return at?.Items.Count(s => s.Damage == Dnum.Death) ?? 0; } }
+        // ACT (CombatantData.Kills) counts a death swing as a kill only when this combatant is one of
+        // the encounter's allies (flag), or the victim's name has no space — so a non-ally's blows on
+        // space-named victims (other players/most mobs) don't inflate its kill count.
+        public int Kills
+        {
+            get
+            {
+                var at = outAll != null && outAll.Items.TryGetValue("All", out var v) ? v : null;
+                if (at == null) return 0;
+                bool flag = Parent != null && Parent.GetAllies().Contains(this);
+                return at.Items.Count(s => s.Damage == Dnum.Death && (flag || !(s.Victim ?? "").Contains(" ")));
+            }
+        }
         // "--" unless this combatant is one of the encounter's allies (ACT only shows a share for
         // allied combatants), then its damage relative to the allied total, bounded to 0..100.
         public string DamagePercent
