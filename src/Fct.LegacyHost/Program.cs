@@ -17,9 +17,8 @@ namespace Fct.LegacyHost
         private static readonly string LogPath =
             Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "s2-ffxiv.log");
 
-        private static TabControl _tabs;
-        private static ActPluginData _ffxiv;
-        private static ActPluginData _overlay;
+        private static LoadedPlugin _ffxiv;
+        private static LoadedPlugin _overlay;
 
         [STAThread]
         private static void Main(string[] args)
@@ -43,12 +42,40 @@ namespace Fct.LegacyHost
                 return;
             }
 
+            // Batch oracle over a whole log folder (months of logs), one plugin load:
+            //   --mass-oracle <logFolder> <outFolder> [maxLinesPerFile]
+            int mo = Array.IndexOf(args, "--mass-oracle");
+            if (mo >= 0 && args.Length >= mo + 3)
+            {
+                int max = (args.Length >= mo + 4 && int.TryParse(args[mo + 3], out var m)) ? m : int.MaxValue;
+                ParseOracle.MassOracle(args[mo + 1], args[mo + 2], max);
+                return;
+            }
+
+            // Survey the plugin's resource tables (action category, status names, pet list):
+            //   --introspect <outPath>
+            int ii = Array.IndexOf(args, "--introspect");
+            if (ii >= 0 && args.Length >= ii + 2)
+            {
+                ParseOracle.Introspect(args[ii + 1]);
+                return;
+            }
+
             // Dump the plugin's skill (action id -> name) table for a slice's action ids:
             //   --dump-skills <sliceLog> <outPath>
             int di = Array.IndexOf(args, "--dump-skills");
             if (di >= 0 && args.Length >= di + 3)
             {
                 ParseOracle.DumpSkills(args[di + 1], args[di + 2]);
+                return;
+            }
+
+            // Dump the internal game-data tables (action categories, status names) the native
+            // parser needs:  --dump-tables <outFolder>
+            int dt = Array.IndexOf(args, "--dump-tables");
+            if (dt >= 0 && args.Length >= dt + 2)
+            {
+                ParseOracle.DumpTables(args[dt + 1]);
                 return;
             }
 
@@ -68,45 +95,43 @@ namespace Fct.LegacyHost
             // The ACT facade (hidden form: handle + Invoke marshaling).
             FacadeHost.CreateAct();
 
-            // The embeddable host window with the plugin tab strip.
-            var hostForm = new Form
-            {
-                Text = "Fct.LegacyHost",
-                FormBorderStyle = FormBorderStyle.None,
-                StartPosition = FormStartPosition.Manual,
-                ShowInTaskbar = false,
-                Width = 700,
-                Height = 460,
-                BackColor = System.Drawing.Color.FromArgb(248, 250, 252),
-            };
-            _tabs = new TabControl { Dock = DockStyle.Fill };
-            hostForm.Controls.Add(_tabs);
-
-            var handle = hostForm.Handle;            // realize handle
-            SendLine($"HWND {handle.ToInt64():X}");   // hand to host for reparenting
+            _standalone = pipeName == null;
 
             // Load plugins once the message loop is running (some plugins poll via timers).
             ScheduleOnce(250, LoadPlugins);
+            ScheduleOnce(3000, StartDispatcherDiagnostics);
             ScheduleOnce(12000, WriteSummary);
 
-            if (pipeName != null)
-                Application.Run(new ApplicationContext());
-            else
-            { hostForm.FormBorderStyle = FormBorderStyle.Sizable; Application.Run(hostForm); }
-
-            GC.KeepAlive(hostForm);
+            Application.Run(new ApplicationContext());
         }
+
+        private static bool _standalone;
 
         private static void LoadPlugins()
         {
-            Log("loading FFXIV_ACT_Plugin from: " + FacadeHost.FfxivPluginPath);
-            _ffxiv = FacadeHost.LoadPlugin(_tabs, "FFXIV_ACT_Plugin",
-                FacadeHost.FfxivPluginPath, "FFXIV_ACT_Plugin.FFXIV_ACT_Plugin");
+            // Each plugin loads into its own borderless window; the host embeds whichever the
+            // user selects, so a plugin's window shows only its own configuration tabs.
+            Log("loading FFXIV_ACT_Plugin (wrapped) from: " + FacadeHost.FfxivPluginPath);
+            _ffxiv = FacadeHost.LoadWrappedFfxivPlugin(FacadeHost.FfxivPluginPath);
+            SendLine($"HWND {_ffxiv.Hwnd.ToInt64():X}");   // primary window (bridge-handshake compat)
+            SendPlugin(_ffxiv);
+
             Log("loading OverlayPlugin from: " + FacadeHost.OverlayPluginPath);
-            _overlay = FacadeHost.LoadPlugin(_tabs, "OverlayPlugin",
-                FacadeHost.OverlayPluginPath, null);
-            Log($"embedded TabControl now has {_tabs.TabPages.Count} tab(s): " +
-                string.Join(", ", _tabs.TabPages.Cast<TabPage>().Select(t => t.Text)));
+            _overlay = FacadeHost.LoadPlugin("overlay", "OverlayPlugin", FacadeHost.OverlayPluginPath, null);
+            SendPlugin(_overlay);
+
+            SendLine("PLUGINS-END");
+            Log($"loaded {2} plugin window(s): {_ffxiv.Title}=0x{_ffxiv.Hwnd.ToInt64():X}, " +
+                $"{_overlay.Title}=0x{_overlay.Hwnd.ToInt64():X}");
+
+            if (_standalone)
+                foreach (var p in new[] { _ffxiv, _overlay })
+                {
+                    p.Window.FormBorderStyle = FormBorderStyle.Sizable;
+                    p.Window.StartPosition = FormStartPosition.WindowsDefaultLocation;
+                    p.Window.Text = p.Title;
+                    p.Window.Show();
+                }
 
             // Drive ACT's idle-end off the live log stream: the FFXIV plugin raises OnLogLineRead for
             // every parsed line, so advancing the clock per line splits combat into per-pull
@@ -146,6 +171,52 @@ namespace Fct.LegacyHost
             catch (Exception ex) { Log("[SelfTest] FAILED: " + ex); }
         }
 
+        // Ring-buffer dispatcher health, asserted by the Tier 2 integration test. Proves the
+        // type-identity unification held (one Common loaded) and the real OverlayPlugin discovered
+        // our wrapper and bound onto the ring (ProcessChanged), then smoke-injects synthetic packets.
+        // Polls because OverlayPlugin binds on a background Task after InitPlugin returns — emit the
+        // definitive line once it has bound (or after a deadline). NetworkReceived stays 0 with no
+        // game (OverlayPlugin gates packet capture on a live FFXIV process — see the Tier 3 path).
+        private static void StartDispatcherDiagnostics()
+        {
+            int ticks = 0;
+            var t = new Timer { Interval = 1000 };
+            t.Tick += (s, e) =>
+            {
+                ticks++;
+                var wrapper = _ffxiv?.Data?.pluginObj as Fct.Parser.Legacy.WrappedFfxivPlugin;
+                int bound = wrapper?.ProcessChangedSubscriberCount ?? 0;
+                if (bound > 0 || ticks >= 40)
+                {
+                    t.Stop(); t.Dispose();
+                    EmitDispatcherDiagnostics(wrapper);
+                }
+            };
+            t.Start();
+        }
+
+        private static void EmitDispatcherDiagnostics(Fct.Parser.Legacy.WrappedFfxivPlugin wrapper)
+        {
+            try
+            {
+                int commonCopies = AppDomain.CurrentDomain.GetAssemblies()
+                    .Count(a => a.GetName().Name == "FFXIV_ACT_Plugin.Common");
+                Log($"[Diag] FFXIV_ACT_Plugin.Common loaded copies={commonCopies}");
+
+                if (wrapper == null) { Log("[Diag] wrapper missing (pluginObj is not WrappedFfxivPlugin)"); return; }
+
+                Log($"[Diag] OverlayPlugin bound to ring: ProcessChanged subscribers={wrapper.ProcessChangedSubscriberCount} " +
+                    $"NetworkReceived subscribers={wrapper.NetworkReceivedSubscriberCount} (NetworkReceived is game-gated)");
+
+                long before = wrapper.RawPackets.DroppedCount;
+                for (int i = 0; i < 8; i++)
+                    wrapper.RawPackets.InjectNetworkReceived("diag", i, new byte[64]);
+                long dropped = wrapper.RawPackets.DroppedCount - before;
+                Log($"[Diag] injected=8 dropped={dropped}");
+            }
+            catch (Exception ex) { Log("[Diag] FAILED: " + ex); }
+        }
+
         private static bool IsPortOpen(int port)
         {
             try
@@ -170,8 +241,8 @@ namespace Fct.LegacyHost
                 : "(none)";
 
             Log("==== SUMMARY ====");
-            Log($"FFXIV status: '{_ffxiv?.lblPluginStatus?.Text}'");
-            Log($"OverlayPlugin status: '{_overlay?.lblPluginStatus?.Text}'");
+            Log($"FFXIV status: '{_ffxiv?.Data?.lblPluginStatus?.Text}'");
+            Log($"OverlayPlugin status: '{_overlay?.Data?.lblPluginStatus?.Text}'");
             Log($"WS server (10501) open: {IsPortOpen(10501)}");
             Log($"AddCombatAction={act.AddCombatActionCount} SetEncounter={act.SetEncounterCount} " +
                 $"ChangeZone={act.ChangeZoneCount} InCombat={act.InCombat} Zone='{act.CurrentZone}'");
@@ -207,6 +278,16 @@ namespace Fct.LegacyHost
         }
 
         private static void SendLine(string s) { try { _writer?.WriteLine(s); } catch { } }
+
+        // Announce a loaded plugin's embeddable window to the host:
+        //   PLUGIN <key>|<hwndHex>|<status>|<title>
+        private static void SendPlugin(LoadedPlugin p)
+        {
+            if (p == null) return;
+            var status = (p.Status ?? "").Replace('|', '/');
+            var title = (p.Title ?? "").Replace('|', '/');
+            SendLine($"PLUGIN {p.Key}|{p.Hwnd.ToInt64():X}|{status}|{title}");
+        }
 
         private static void Log(string s)
         {

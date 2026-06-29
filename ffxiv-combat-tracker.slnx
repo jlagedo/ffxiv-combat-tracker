@@ -4,11 +4,13 @@
     <Project Path="src/Fct.LegacyHost/Fct.LegacyHost.csproj" />
     <Project Path="src/Fct.Compat.Act/Fct.Compat.Act.csproj" />
     <Project Path="src/Fct.Parser.Native/Fct.Parser.Native.csproj" />
+    <Project Path="src/Fct.Parser.Legacy/Fct.Parser.Legacy.csproj" />
   </Folder>
   <Folder Name="/tests/">
     <Project Path="tests/Fct.Compat.Act.Tests/Fct.Compat.Act.Tests.csproj" />
     <Project Path="tests/Fct.App.Tests/Fct.App.Tests.csproj" />
     <Project Path="tests/Fct.Parser.Native.Tests/Fct.Parser.Native.Tests.csproj" />
     <Project Path="tests/Fct.Integration.Tests/Fct.Integration.Tests.csproj" />
+    <Project Path="tests/Fct.Parser.Legacy.Tests/Fct.Parser.Legacy.Tests.csproj" />
   </Folder>
 </Solution>

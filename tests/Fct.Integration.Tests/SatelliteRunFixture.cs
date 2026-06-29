@@ -99,6 +99,23 @@ namespace Fct.Integration.Tests
             LogText = ReadLogSafe(logPath);
         }
 
+        // Re-read the still-growing satellite log and wait for a marker to appear (the dispatcher
+        // diagnostics land later than the self-test the constructor waits on). Returns the latest
+        // text whether or not the marker arrived.
+        public string WaitForLog(string marker, int seconds)
+        {
+            if (ExePath is null) return "";
+            var logPath = Path.Combine(Path.GetDirectoryName(ExePath)!, "s2-ffxiv.log");
+            var deadline = DateTime.UtcNow.AddSeconds(seconds);
+            string text = ReadLogSafe(logPath);
+            while (DateTime.UtcNow < deadline && !text.Contains(marker))
+            {
+                Thread.Sleep(500);
+                text = ReadLogSafe(logPath);
+            }
+            return text;
+        }
+
         private static string ReadLogSafe(string path)
         {
             try

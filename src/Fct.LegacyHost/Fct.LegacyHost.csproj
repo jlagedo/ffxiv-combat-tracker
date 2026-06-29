@@ -19,6 +19,7 @@
 
   <ItemGroup>
     <ProjectReference Include="..\Fct.Compat.Act\Fct.Compat.Act.csproj" />
+    <ProjectReference Include="..\Fct.Parser.Legacy\Fct.Parser.Legacy.csproj" />
   </ItemGroup>
 
 </Project>

@@ -49,5 +49,25 @@ namespace Fct.App.Tests
             Assert.False(SatelliteProtocol.TryParseHwnd(line, out var h));
             Assert.Equal(IntPtr.Zero, h);
         }
+
+        [Fact]
+        public void TryParsePlugin_parses_key_hwnd_status_title()
+        {
+            Assert.True(SatelliteProtocol.TryParsePlugin(
+                "PLUGIN ffxiv|1A2B|FFXIV_ACT_Plugin Started|FFXIV_ACT_Plugin", out var p));
+            Assert.Equal("ffxiv", p.Key);
+            Assert.Equal(new IntPtr(0x1A2B), p.Hwnd);
+            Assert.Equal("FFXIV_ACT_Plugin Started", p.Status);
+            Assert.Equal("FFXIV_ACT_Plugin", p.Title);
+        }
+
+        [Theory]
+        [InlineData("PLUGIN overlay|0|x|y")]   // zero handle is invalid
+        [InlineData("PLUGIN overlay|1A2B")]    // too few fields
+        [InlineData("HWND 1A2B")]              // wrong line
+        [InlineData("")]
+        [InlineData(null)]
+        public void TryParsePlugin_rejects_invalid_lines(string? line)
+            => Assert.False(SatelliteProtocol.TryParsePlugin(line, out _));
     }
 }

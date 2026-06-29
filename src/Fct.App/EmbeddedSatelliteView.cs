@@ -46,8 +46,11 @@ internal sealed class EmbeddedSatelliteView : NativeControlHost
 
     protected override void DestroyNativeControlCore(IPlatformHandle control)
     {
-        // The satellite owns its window; detach instead of destroying it.
+        // The satellite owns its window; detach (and hide) instead of destroying it, so a
+        // deselected plugin's window doesn't flash on screen as a stray top-level window.
+        const int SW_HIDE = 0;
         SetParent(_childHwnd, IntPtr.Zero);
+        ShowWindow(_childHwnd, SW_HIDE);
     }
 
     [DllImport("user32.dll", SetLastError = true)]

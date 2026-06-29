@@ -415,7 +415,7 @@ namespace Advanced_Combat_Tracker
         public string Title { get; set; } = "Encounter";
         public List<DateTime> StartTimes { get; set; } = new List<DateTime>();
         public List<DateTime> EndTimes { get; set; } = new List<DateTime>();
-        public List<object> LogLines { get; set; } = new List<object>();
+        public List<LogLineEntry> LogLines { get; set; } = new List<LogLineEntry>();
         public Dictionary<string, object> Tags { get; set; } = new Dictionary<string, object>();
         public object HistoryRecord { get; set; }
         public bool DuplicateDetection { get; set; }

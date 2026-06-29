@@ -1,6 +1,9 @@
 # Reference source junctions — external repos, not part of this repo
 /reference/
 
+# Third-party proprietary binaries — local build inputs only, never redistribute
+/lib/
+
 # .NET build artifacts
 bin/
 obj/
@@ -16,3 +19,8 @@ TestResults/
 
 # Raw personal FFXIV network logs (never commit; copied here only as a local capture source)
 tests/fixtures/FFXIVLogs/
+
+# Local mass-compare outputs (per-file oracle/ours TSVs + reports; carry real combatant names)
+tmp/
+tools/mass-compare/bin/
+tools/mass-compare/obj/

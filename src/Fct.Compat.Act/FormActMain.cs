@@ -48,6 +48,7 @@ namespace Advanced_Combat_Tracker
             AppDataFolder = new DirectoryInfo(Path.Combine(
                 Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData),
                 "Advanced Combat Tracker"));
+            ZoneList.Add(ActiveZone);
             CombatTables.Setup();
         }
 
@@ -107,6 +108,23 @@ namespace Advanced_Combat_Tracker
         public bool IsActClosing { get; set; }
         public ZoneData ActiveZone { get; set; } = new ZoneData();
 
+        // Zone/encounter history. We keep a single live zone, so ZoneList holds ActiveZone; this is the
+        // surface Triggernometry walks for past-encounter export.
+        public List<ZoneData> ZoneList { get; } = new List<ZoneData>();
+
+        // ACT's user-defined custom triggers. We host no trigger engine; these stay empty so
+        // Triggernometry's HasCustomTriggers()/GetCustomTriggers() import bind and find nothing to
+        // import (its own triggers still run off the log stream).
+        public SortedList<string, CustomTrigger> CustomTriggers { get; } = new SortedList<string, CustomTrigger>();
+        public SortedList<string, CustomTrigger> ActiveCustomTriggers { get; } = new SortedList<string, CustomTrigger>();
+
+        // Triggernometry's export hooks reflect this private field by name and pass it to GetTextExport.
+        // Non-null so that reflected read + call never NRE. Default args match ACT.
+        private readonly TextExportFormatOptions defaultTextFormat =
+            new TextExportFormatOptions("{n}{NAME5} | {encdps-*}", "EncDPS", true, true,
+                "({duration}) {title}: {encdps-*} {maxhit-*}");
+        public TextExportFormatOptions DefaultTextFormat => defaultTextFormat;
+
         // --- Events plugins subscribe to ---
         public event NullDelegate UpdateCheckClicked;
         public event LogLineEventDelegate BeforeLogLineRead;
@@ -117,11 +135,22 @@ namespace Advanced_Combat_Tracker
         public event CombatActionDelegate BeforeCombatAction;
         public event CombatActionDelegate AfterCombatAction;
 
+        // No-op publishers: ACT raises these from UI/clipboard/XML-share/URL paths the headless
+        // host doesn't have. Declared so an unmodified plugin's `+=` binds (a `+=` to a missing
+        // event is a MissingMethodException); never fired here.
+        public event ActLifecycleEventDelegate ActLifecycleChanged;
+        public event LogFileRenamedDelegate LogFileRenamed;
+        public event XmlSnippetAddedDelegate XmlSnippetAdded;
+        public event ClipboardEventDelegate BeforeClipboardSet;
+        public event UrlRequestEventDelegate UrlRequest;
+
         // --- Version / plugin host ---
         public Version GetVersion() => new Version(3, 8, 5, 288);
 
         public ActPluginData PluginGetSelfData(IActPluginV1 plugin) =>
-            ActPlugins.FirstOrDefault(p => ReferenceEquals(p.pluginObj, plugin));
+            ActPlugins.FirstOrDefault(p =>
+                ReferenceEquals(p.pluginObj, plugin) ||
+                ReferenceEquals((p.pluginObj as IActPluginAlias)?.Inner, plugin));
 
         public FileInfo PluginDownload(int myPluginId) => null;
         public string PluginGetRemoteVersion(int myPluginId) => "";
@@ -131,6 +160,12 @@ namespace Advanced_Combat_Tracker
             Log($"[RestartACT] stopOnError={stopOnError} :: {message}");
 
         public void NotificationAdd(string title, string text) => Log($"[Notify] {title}: {text}");
+
+        // Encounter text export. Triggernometry/Discord call this for the active or a past encounter,
+        // passing the reflected defaultTextFormat. We host no formatter engine, so this returns a
+        // concise fixed summary — export-driven trigger actions get non-null text instead of throwing.
+        public string GetTextExport(EncounterData Encounter, TextExportFormatOptions ExportFormatting) =>
+            Encounter == null ? "" : $"({Encounter.DurationS}) {Encounter.Title}";
 
         public void WriteExceptionLog(Exception ex, string moreInfo) =>
             Log($"[Exception] {moreInfo}\n{ex}");
@@ -243,6 +278,8 @@ namespace Advanced_Combat_Tracker
         private void TouchEvents()
         {
             _ = UpdateCheckClicked; _ = BeforeLogLineRead; _ = OnLogLineRead;
+            _ = ActLifecycleChanged; _ = LogFileRenamed; _ = XmlSnippetAdded;
+            _ = BeforeClipboardSet; _ = UrlRequest;
         }
     }
 }

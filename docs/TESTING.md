@@ -86,6 +86,67 @@ Remaining toward full parity (tracked): ACT's **action-category** data (NPC auto
 swing-type), **combat-end detection** for exact heal/shield/resource counts, **proc-source**
 decoding, and DoT/HoT simulation. The differential harness measures each as it lands.
 
+## Massive parse compat (every log, ACT vs ours)
+
+`tools/mass-compare` scales the slice-level parser diff to an **entire folder of months of
+`Network_*.log` files**. Two stages, both over the same logs in chronological order as one
+continuous stream (combatant-name/owner/combat state carries across day-boundary rotations exactly
+as ACT sees it):
+
+1. `Fct.LegacyHost.exe --mass-oracle <logFolder> <outFolder>` loads the real `FFXIV_ACT_Plugin`
+   **once** and writes ACT's authoritative `MasterSwing` stream per file (`<name>.oracle.tsv`).
+2. `Fct.LegacyHost.exe --dump-tables <outFolder>` reflects the plugin's internal IoC container
+   (`Microsoft.MinIoC`) to export the game-data tables the public API does not expose:
+   `actions.full.tsv` (id → name + `ActionCategory`), `statuses.full.tsv` (id → name), and
+   `status-defs.tsv` / `action-potency.tsv` (DoT/HoT/shield potency + buff definitions from
+   `IDefinitionRepository`).
+3. `MassCompare <logFolder> <oracleFolder> <outFolder>` parses the same logs with the clean-room
+   `CombatLogParser` and bag-diffs **every** swing on the full tuple
+   `(swingType, crit, amount, special, attackType, attacker, damageType, victim)`, reporting a
+   per-swingType breakdown plus a value-parity metric for the simulated ticks.
+
+Run all three with `tools/mass-compare/run.ps1`. Outputs (per-file oracle/ours TSVs, `report.tsv`,
+`details.txt`, `summary.txt`, `type-samples.txt`) go to `tmp/mass-compare/` — gitignored, real
+names, never committed.
+
+`CombatLogParser` reproduces every swing type ACT emits, not just damage/heals:
+
+- **Damage / auto-attack (0/2)** — auto-vs-ability typing and **Limit Break** attribution use the
+  dumped `ActionCategory` table (ACT's authority: `GetActionCategory == AutoAttack` / `LimitBreak`),
+  covering NPC/pet/ranged autos whose ids are absent from the display-name list.
+- **Heals (4), Power/MP (7), Status (8), Action (1), Cancelled casts (2/4/1)** — emitted from the
+  `21/22` effect entries / `26` status-add / `23` cancel lines, mirroring `ReportCombatData`.
+- **Combat window** — ACT's exact `FormActMain` idle-end model: `LastKnownTime - LastHostileTime >
+  6s` (default `nudIdleLimit`) ends combat, checked per line against log timestamps. Every emitted
+  swing that runs `SetEncounter` (damage, heal, DoT/HoT, shield) refreshes the window; Status(8) and
+  Action(1) are in-combat-gated but bypass it. This is deterministic from the log and gates the
+  ~2M status / ~0.9M HoT swings correctly.
+- **Pet/summon owner attribution** — `03` field 6 `OwnerID`, field 4 `Job`: a true pet (job 0)
+  collapses to the bare owner name, an owned non-pet (e.g. `G'raha Tia`) renders `"name (owner)"`.
+
+**Potency simulator** (`PotencySimulator.cs`) reproduces ACT's *simulated* `(*)` swings — the ones
+the plugin synthesizes from bundled potency data rather than the log. It mirrors `DoTSimulator` +
+`DamageShieldSimulator` + `PotencyStatusApplication`: it calibrates a per-source attack-power proxy
+from observed direct hits (median of `amount / (crit·dh) / actionPotency / buffMult`), tracks active
+buffs for the damage-done multiplier, and multiplies the DoT/HoT/shield potency by both, anchoring
+the low byte to the status-application packet. Damage shields of `HealPercent` / `TargetHpPercent`
+type are fully log-derived (companion heal × %, or max-HP × %) and reproduced bit-exact.
+
+Over the local corpus (67 logs, ~5.9M swings) the parser reproduces, bit-for-bit on the strict
+tuple: auto **99.98%**, ability **99.85%**, power **99.90%**, status **97.6%**, heal **91%**,
+action **91%**, and the real (log-amount) ground-AoE DoT/HoT exactly. The simulated `(*)` DoT/HoT
+and shields reach **~94% aggregate value-parity** (sum of amounts vs ACT) with shields **60%
+bit-exact**.
+
+**Hard limit on the simulated ticks.** ACT's `DoTSimulator.SimulateTicks` decides each simulated
+tick's crit flag with `_random.Next(1000) < critRate·1000` and its ±1 rounding with
+`_random.NextDouble()` — `_random` is a time-seeded `new Random()`. So **21% of the 1.18M simulated
+ticks carry a crit bit ACT itself would not reproduce on a second run**, and amounts jitter ±1.
+Bit-identical parity on those is impossible by construction; the simulator targets **value-parity**
+(the DPS-relevant amount) instead, measured crit-excluded and as an aggregate damage sum. The
+remaining value gap is incomplete buff modeling (zone/category-limited multipliers, heal-potency
+calibration for HoTs) and shield special cases — refinement, not a structural limit.
+
 ## End-to-end live route (recorded logs)
 
 `ReplayRouteTests` exercises the whole pipeline the product runs at play time, on recorded data (no

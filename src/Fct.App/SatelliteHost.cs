@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using System.Diagnostics;
 using System.IO;
 using System.IO.Pipes;
@@ -7,10 +8,19 @@ using System.Threading.Tasks;
 
 namespace Fct.App;
 
+internal sealed class SatellitePlugin
+{
+    public string Key = "";
+    public string Title = "";
+    public string Status = "";
+    public IntPtr Hwnd = IntPtr.Zero;
+}
+
 internal sealed class SatelliteStartResult
 {
     public string Handshake = "";
     public IntPtr WindowHandle = IntPtr.Zero;
+    public List<SatellitePlugin> Plugins = new();
 }
 
 // Launches the net48 satellite (Fct.LegacyHost) and reads its startup messages over a
@@ -42,17 +52,35 @@ internal sealed class SatelliteHost
 
         var reader = new StreamReader(_server);   // do not dispose: keeps the pipe open
         var result = new SatelliteStartResult();
-        string? line;
-        while ((line = await reader.ReadLineAsync(ct).ConfigureAwait(false)) != null)
+
+        // Read the handshake and the per-plugin window announcements until PLUGINS-END, with a
+        // ceiling so a slow/failed plugin load can't hang the host forever.
+        using var timeout = CancellationTokenSource.CreateLinkedTokenSource(ct);
+        timeout.CancelAfter(TimeSpan.FromSeconds(60));
+
+        try
         {
-            if (SatelliteProtocol.IsReady(line))
-                result.Handshake = line;
-            else if (SatelliteProtocol.TryParseHwnd(line, out var hwnd))
+            string? line;
+            while ((line = await reader.ReadLineAsync(timeout.Token).ConfigureAwait(false)) != null)
             {
-                result.WindowHandle = hwnd;
-                break;
+                if (SatelliteProtocol.IsReady(line))
+                    result.Handshake = line;
+                else if (line == SatelliteProtocol.PluginsEnd)
+                    break;
+                else if (SatelliteProtocol.TryParsePlugin(line, out var p))
+                    result.Plugins.Add(new SatellitePlugin
+                    {
+                        Key = p.Key, Title = p.Title, Status = p.Status, Hwnd = p.Hwnd,
+                    });
+                else if (SatelliteProtocol.TryParseHwnd(line, out var hwnd))
+                    result.WindowHandle = hwnd;   // primary window (compat); plugins drive the UI
             }
         }
+        catch (OperationCanceledException) when (timeout.IsCancellationRequested && !ct.IsCancellationRequested)
+        {
+            // Timed out waiting for PLUGINS-END; return whatever loaded so far.
+        }
+
         return result;
     }
 }

@@ -68,11 +68,11 @@ namespace Fct.Parser.Native.Tests
 
             var oracleDmg = oracle.Where(r => r.SwingType is 0 or 2)
                                   .Select(r => (r.Crit, r.Damage, r.Special, r.Attacker, r.Victim));
-            var oursDmg = actions.Where(a => !a.IsHeal)
+            var oursDmg = actions.Where(a => a.SwingType is 0 or 2)
                                  .Select(a => (a.IsCritical, a.Amount, a.Special, a.Attacker, a.Victim));
 
             var (missing, extra) = BagDiff(oursDmg, oracleDmg);
-            _out.WriteLine($"oracle damage={oracle.Count(r => r.SwingType is 0 or 2)} ours={actions.Count(a => !a.IsHeal)}");
+            _out.WriteLine($"oracle damage={oracle.Count(r => r.SwingType is 0 or 2)} ours={actions.Count(a => a.SwingType is 0 or 2)}");
             if (missing.Count > 0) _out.WriteLine("MISSING:\n  " + string.Join("\n  ", missing.Take(20)));
             if (extra.Count > 0) _out.WriteLine("EXTRA:\n  " + string.Join("\n  ", extra.Take(20)));
 
@@ -91,11 +91,11 @@ namespace Fct.Parser.Native.Tests
 
             var oracleDmg = oracle.Where(r => r.SwingType is 0 or 2)
                                   .Select(r => (r.Crit, r.Damage, r.Special, r.Attacker, r.Victim, r.AttackType, r.DamageType));
-            var oursDmg = actions.Where(a => !a.IsHeal)
+            var oursDmg = actions.Where(a => a.SwingType is 0 or 2)
                                  .Select(a => (a.IsCritical, a.Amount, a.Special, a.Attacker, a.Victim, a.AttackType, a.DamageType));
 
             var (missing, extra) = BagDiff(oursDmg, oracleDmg);
-            _out.WriteLine($"oracle damage={oracle.Count(r => r.SwingType is 0 or 2)} ours={actions.Count(a => !a.IsHeal)}");
+            _out.WriteLine($"oracle damage={oracle.Count(r => r.SwingType is 0 or 2)} ours={actions.Count(a => a.SwingType is 0 or 2)}");
             if (missing.Count > 0) _out.WriteLine("MISSING:\n  " + string.Join("\n  ", missing.Take(20)));
             if (extra.Count > 0) _out.WriteLine("EXTRA:\n  " + string.Join("\n  ", extra.Take(20)));
 

@@ -27,7 +27,8 @@ try {
     $projects = @(
         "tests/Fct.Compat.Act.Tests/Fct.Compat.Act.Tests.csproj",
         "tests/Fct.App.Tests/Fct.App.Tests.csproj",
-        "tests/Fct.Parser.Native.Tests/Fct.Parser.Native.Tests.csproj"
+        "tests/Fct.Parser.Native.Tests/Fct.Parser.Native.Tests.csproj",
+        "tests/Fct.Parser.Legacy.Tests/Fct.Parser.Legacy.Tests.csproj"
     )
     if (-not $Unit) {
         $projects += "tests/Fct.Integration.Tests/Fct.Integration.Tests.csproj"

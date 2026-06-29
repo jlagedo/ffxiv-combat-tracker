@@ -307,6 +307,10 @@ satellite is empty, delete it.
 
 ---
 
+> The end-to-end data flow through the real upstream stack, and the exact integration
+> seams this engine must reproduce, are documented in [`DATA-FLOW.md`](DATA-FLOW.md) — the
+> concrete build contract behind §6 (compat surface) and §5 (v1 dataflow).
+
 ## 13. Reference sources
 
 Hard-linked (Windows directory junctions) under `reference/` — searchable in-place,

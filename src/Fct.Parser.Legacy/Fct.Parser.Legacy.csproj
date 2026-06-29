@@ -1,0 +1,35 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!--
+    Wraps the real (net48) FFXIV_ACT_Plugin so the unmodified OverlayPlugin binds to our
+    ring-buffer IDataSubscription instead of the plugin's per-subscriber BeginInvoke fan-out.
+    See docs/DATA-FLOW.md §5 (the IRawPacketSource "build (hatch)" row).
+
+    References FFXIV_ACT_Plugin.Common (the real embedded SDK, identity 3.0.0.0 / token
+    9f740ac505d6bc50) for compile only — Private=false so it is NOT copied to output. At
+    runtime the satellite's AssemblyResolve unifies it onto the single copy the real plugin
+    (Costura) already loaded, so our IDataSubscription is the same type OverlayPlugin sees.
+  -->
+  <PropertyGroup>
+    <TargetFramework>net48</TargetFramework>
+    <UseWindowsForms>true</UseWindowsForms>
+    <LangVersion>latest</LangVersion>
+    <Nullable>disable</Nullable>
+    <PlatformTarget>x64</PlatformTarget>
+    <Prefer32Bit>false</Prefer32Bit>
+    <AssemblyName>Fct.Parser.Legacy</AssemblyName>
+    <RootNamespace>Fct.Parser.Legacy</RootNamespace>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\Fct.Compat.Act\Fct.Compat.Act.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <Reference Include="FFXIV_ACT_Plugin.Common">
+      <HintPath>..\..\lib\FFXIV_ACT_Plugin.Common.dll</HintPath>
+      <Private>false</Private>
+    </Reference>
+  </ItemGroup>
+
+</Project>

@@ -8,6 +8,9 @@ Guidance for Claude Code when working in this repository.
 ACT + FFXIV_ACT_Plugin + OverlayPlugin stack. It is currently in the **design
 phase**: no application code yet. The full design lives in
 [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md) — read it before proposing changes.
+[`docs/DATA-FLOW.md`](docs/DATA-FLOW.md) is the authoritative map of how data flows
+through the real upstream stack (FFXIV_ACT_Plugin → ACT → OverlayPlugin) and the exact
+compat seams we must reproduce to make the unmodified plugins work — the build target.
 
 The product is a host that runs the **existing plugin ecosystem unmodified**
 (FFXIV_ACT_Plugin, OverlayPlugin/cactbot, Triggernometry, Discord triggers) while
@@ -46,8 +49,8 @@ swappable, independently-released component.
 | `Fct.Host` | net10 | microkernel: ALC plugin loader, typed bus, Generic Host. |
 | `Fct.LegacyHost` | net48 | clean-room ACT engine; hosts the four real plugins. |
 | `Fct.Bridge` | net48;net10 | IPC transport + versioned wire protocol. |
-| `Fct.Parser.Legacy` | net48 | wraps real FFXIV_ACT_Plugin as `IGameDataSource`. |
-| `Fct.Parser.Native` | net10 | clean-room parser. `NetworkLogLine` (structure) + `ActionEffectDecoder` (damage/heal byte decode) + `CombatLogParser` (stateful: combatant names, combat state). Damage `MasterSwing`s match ACT's parse exactly on real data (see Differential compat in `docs/TESTING.md`). Live capture + memory later. |
+| `Fct.Parser.Legacy` | net48 | wraps the real FFXIV_ACT_Plugin. `WrappedFfxivPlugin` sits in `pluginObj` (forwards `DataRepository`/`_iocContainer`/lifecycle to the real instance) and exposes `RingBufferDataSubscription` (`IDataSubscription` + `IRawPacketSource`): a bounded ring + single dispatch thread that replaces the plugin's per-subscriber `BeginInvoke` fan-out so OverlayPlugin's ~20 handlers cost one in-order dispatch. ~250× faster on the dispatch stage. |
+| `Fct.Parser.Native` | net10 | clean-room parser. `NetworkLogLine` (structure) + `ActionEffectDecoder` (effect byte decode) + `CombatLogParser` (stateful: names, combat window, all swing types) + `PotencySimulator` (ACT's simulated DoT/HoT/shield amounts). Reproduces every swing type ACT emits; deterministic log-derived types are bit-exact, simulated `(*)` ticks reach ~94% value-parity (ACT seeds them with `Random`, so bit-identical is impossible). Game-data tables (action categories, status names, potency defs) are dumped from the real plugin via `--dump-tables`. See `docs/TESTING.md`. Live capture + memory later. |
 | `Fct.App` | net10 | Avalonia control panel + shell (MVVM). |
 | `Fct.Overlays` | net10 | native WebView2 overlay layer (later). |
 | `Fct.Compat.Act` | net48 | the ACT facade surface (in LegacyHost). Its `EncounterData`/`CombatantData`/`AttackType` aggregation reproduces the real ACT binary bit-for-bit on captured combat (see Differential ACT-engine compat in `docs/TESTING.md`). |
@@ -67,14 +70,23 @@ Hard-linked Windows directory junctions under `reference/` — searchable in pla
 **Never modify anything under `reference/`**; these are external repos.
 
 - `reference/overlayplugin/` → `E:\dev\OverlayPlugin` (ngld OverlayPlugin, net48).
-- `reference/act-decompiled/` → `E:\dev\ACT-decompiled` (clean decompiles of ACT and
-  FFXIV_ACT_Plugin). The compat-surface oracle is
-  `reference/act-decompiled/Advanced_Combat_Tracker/` (`Forms/FormActMain.cs`,
-  `ActGlobals.cs`, `IActPluginV1.cs`, `Models/`, `Events/`). FFXIV_ACT_Plugin internals
-  are under `reference/act-decompiled/.audit/ffxiv_act_plugin/decompiled/`.
 
-When a compat detail is in doubt, the decompile is the authority — match the exact
-signature/shape there, not an approximation.
+**ACT vs FFXIV_ACT_Plugin are two separate decompiles — do not conflate them:**
+
+- **`E:\dev\ACT-decompiled`** (= `reference/act-decompiled/`) is **Advanced Combat Tracker**
+  only — the generic, game-agnostic host app: `Advanced_Combat_Tracker/`
+  (`Forms/FormActMain.cs`, `ActGlobals.cs`, `IActPluginV1.cs`, `Models/`, `Events/`). It
+  does the MasterSwing collection and encounter **aggregation**. It contains **no** FFXIV
+  parsing or DoT/HoT/shield simulation.
+- **`E:\dev\FFXIV_ACT_Plugin\ffxiv_act_plugin\decompiled\`** is the **FFXIV_ACT_Plugin**
+  decompile — all FFXIV-specific log parsing. The combat logic lives in the `.parse`
+  assembly: `…\ffxiv_act_plugin.parse\FFXIV_ACT_Plugin.Parse\` — `DoTSimulator.cs`,
+  `DamageShieldSimulator.cs`, `PotencyStatusApplication.cs`, the `ParseStrategy*` line
+  handlers, `ReportCombatData.cs`, `SwingType.cs`. Sibling assemblies: `.common`,
+  `.memory`, `.config`, `.logfile`. **This is the authority for how swings are produced.**
+
+When a compat detail is in doubt, match the exact signature/shape in the decompile, not an
+approximation — and pick the right tree: aggregation → ACT; swing production → FFXIV_ACT_Plugin.
 
 ## Conventions
 
@@ -120,8 +132,8 @@ VS 2026 / MSBuild.
 ## Test
 
 `./test.ps1` builds + stages the satellite, then runs all suites under `tests/`
-(`Fct.Compat.Act.Tests` net48, `Fct.App.Tests`, `Fct.Parser.Native.Tests`,
-`Fct.Integration.Tests` net10). 75 tests. Data-dependent tests skip when their
+(`Fct.Compat.Act.Tests` + `Fct.Parser.Legacy.Tests` net48, `Fct.App.Tests`,
+`Fct.Parser.Native.Tests`, `Fct.Integration.Tests` net10). 103 tests. Data-dependent tests skip when their
 prerequisites are absent: the real-log smoke needs a `Network_*.log` (`%APPDATA%\Advanced
 Combat Tracker\FFXIVLogs`, or `FCT_FFXIV_LOGS`); the satellite integration's plugin/self-test
 assertions need `FFXIV_ACT_Plugin.dll` installed. CI (`.github/workflows/ci.yml`) runs the
