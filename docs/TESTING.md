@@ -15,7 +15,7 @@ Or run a single project directly with `dotnet test tests/<project>`.
 
 | Project | TFM | Scope |
 |---|---|---|
-| `Fct.Compat.Act.Tests` | net48 | The clean-room ACT aggregation engine: `Dnum`, `MasterSwing`, `AttackType`/`CombatantData`/`EncounterData` math, the `ExportVariables` contract OverlayPlugin/cactbot read, and `SettingsSerializer` XML round-trip. |
+| `Fct.Compat.Act.Tests` | net48 | The clean-room ACT aggregation engine: `Dnum`, `MasterSwing`, `AttackType`/`CombatantData`/`EncounterData` math, the `ExportVariables` contract OverlayPlugin/cactbot read, `SettingsSerializer` XML round-trip, and the **differential ACT-engine compat** (`AggregateCompatTests`, below). |
 | `Fct.App.Tests` | net10 | The bridge handshake parser (`SatelliteProtocol`): READY detection, x64 gating, HWND hex parsing. |
 | `Fct.Parser.Native.Tests` | net10 | The structural `NetworkLogLine` parser (unit tests) plus a real-log smoke test over an installed `Network_*.log`. |
 | `Fct.Integration.Tests` | net10 | Black-box end-to-end: launches the staged net48 satellite, checks the handshake/HWND, and verifies the in-process self-test aggregation from the satellite log. |
@@ -85,6 +85,29 @@ table is dumped from the plugin's resource via `Fct.LegacyHost.exe --dump-skills
 Remaining toward full parity (tracked): ACT's **action-category** data (NPC auto-attack
 swing-type), **combat-end detection** for exact heal/shield/resource counts, **proc-source**
 decoding, and DoT/HoT simulation. The differential harness measures each as it lands.
+
+## Differential ACT-engine compat (ours vs the real ACT binary)
+
+The layer above parsing is **aggregation**: the real plugin calls `AddCombatAction(MasterSwing)` into
+ACT, which tallies `EncounterData`/`CombatantData` and exposes the `ExportVariables`/properties
+OverlayPlugin/cactbot read. `Fct.Compat.Act` is our clean-room rebuild of that engine, held to the
+**real `Advanced Combat Tracker.exe`** bit-for-bit:
+
+- **Oracle** (`tools/act-oracle`) loads the real ACT binary in-process, installs the exact damage-type
+  routing tables the FFXIV plugin registers (`ACT_UIMods`), replays the captured `MasterSwing` stream
+  (`combat-slice.oracle.tsv`) through the real `EncounterData`/`CombatantData`, and dumps every
+  per-combatant + encounter aggregate to `combat-slice.aggregate.tsv` (committed baseline).
+- **Diff test** (`AggregateCompatTests`) feeds the same stream through our facade and asserts every
+  field equals the baseline — `Damage`, `Healed`, `Hits`, `CritHits`, `CritDamPerc`, `EncDPS`,
+  `EncHPS`, `MaxHit`, `DamagePercent`, the allied-party `Damage`/`NumAllies`, durations, etc.
+
+This pinned several behaviours our first-cut engine got wrong, each now matched exactly: `blockIsHit`
+defaults **true**; per-combatant `StartTime`/`EndTime` span all outgoing swings via the
+"`All … (Ref)`" bucket (not just damage); the encounter's allied party comes from ACT's friend/foe
+graph (`GetAllies`, including its index-instability quirk over the growing `SortedList`); and
+`DamagePercent`/`HealedPercent` read `--` for non-allies. Regenerate the baseline (needs the ACT
+install) with `tools/act-oracle/build-and-run.ps1`; the committed baseline keeps the diff test
+running everywhere without ACT.
 
 Regenerate the oracle fixture (needs the ACT install):
 

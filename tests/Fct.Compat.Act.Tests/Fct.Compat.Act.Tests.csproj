@@ -32,4 +32,10 @@
     <Compile Include="..\..\src\Fct.Compat.Act\*.cs" />
   </ItemGroup>
 
+  <!-- The captured real-plugin swing stream + the real-ACT aggregation baseline (see
+       tools/act-oracle) drive the differential AggregateCompatTests. -->
+  <ItemGroup>
+    <None Include="fixtures\**\*" CopyToOutputDirectory="PreserveNewest" LinkBase="fixtures" />
+  </ItemGroup>
+
 </Project>

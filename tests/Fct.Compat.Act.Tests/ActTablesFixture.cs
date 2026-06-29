@@ -55,6 +55,9 @@ namespace Fct.Compat.Act.Tests
                 { "Power Replenish (Out)", Out("Power Replenish (Out)", 1) },
                 { "Cure/Dispel (Out)", Out("Cure/Dispel (Out)", 0) },
                 { "Threat (Out)", Out("Threat (Out)", -1) },
+                // The reference bucket every outgoing swing also lands in; must be registered last so
+                // CombatantData binds outAll to it (StartTime/EndTime/Duration derive from it).
+                { "All Outgoing (Ref)", Out("All Outgoing (Ref)", 0) },
             };
             CombatantData.IncomingDamageTypeDataObjects = new Dictionary<string, DamageTypeDef>
             {
@@ -69,6 +72,7 @@ namespace Fct.Compat.Act.Tests
                 { "Power Replenish (Inc)", Out("Power Replenish (Inc)", 1) },
                 { "Cure/Dispel (Inc)", Out("Cure/Dispel (Inc)", 0) },
                 { "Threat (Inc)", Out("Threat (Inc)", -1) },
+                { "All Incoming (Ref)", Out("All Incoming (Ref)", 0) },
             };
 
             CombatantData.SwingTypeToDamageTypeDataLinksOutgoing = new SortedDictionary<int, List<string>>

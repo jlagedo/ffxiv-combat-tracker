@@ -50,7 +50,7 @@ swappable, independently-released component.
 | `Fct.Parser.Native` | net10 | clean-room parser. `NetworkLogLine` (structure) + `ActionEffectDecoder` (damage/heal byte decode) + `CombatLogParser` (stateful: combatant names, combat state). Damage `MasterSwing`s match ACT's parse exactly on real data (see Differential compat in `docs/TESTING.md`). Live capture + memory later. |
 | `Fct.App` | net10 | Avalonia control panel + shell (MVVM). |
 | `Fct.Overlays` | net10 | native WebView2 overlay layer (later). |
-| `Fct.Compat.Act` | net48 | the ACT facade surface (in LegacyHost). |
+| `Fct.Compat.Act` | net48 | the ACT facade surface (in LegacyHost). Its `EncounterData`/`CombatantData`/`AttackType` aggregation reproduces the real ACT binary bit-for-bit on captured combat (see Differential ACT-engine compat in `docs/TESTING.md`). |
 
 ## UI frameworks
 

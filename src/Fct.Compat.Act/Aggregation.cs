@@ -46,7 +46,7 @@ namespace Advanced_Combat_Tracker
 
         public long Damage => Items.Where(s => (long)s.Damage > 0).Sum(s => (long)s.Damage);
         public int Hits => Items.Count(s => ActGlobals.blockIsHit ? (long)s.Damage >= 0 : (long)s.Damage > 0);
-        public int CritHits => Items.Count(s => s.Critical && (long)s.Damage > 0);
+        public int CritHits => Items.Count(s => s.Critical && (ActGlobals.blockIsHit ? (long)s.Damage >= 0 : (long)s.Damage > 0));
         public float CritPerc => Hits == 0 ? 0f : (float)CritHits / Hits * 100f;
         public int Swings => Items.Count(s => s.Damage != Dnum.Death);
         public int Misses => Items.Count(s => s.Damage == Dnum.Miss);
@@ -191,6 +191,11 @@ namespace Advanced_Combat_Tracker
         public static string DamageTypeDataOutgoingCures = "Cure/Dispel (Out)";
 
         private readonly Dictionary<string, DamageTypeData> items = new Dictionary<string, DamageTypeData>();
+        // The "(Ref)" reference buckets (the last registered outgoing/incoming damage-type), which
+        // ACT feeds EVERY swing into. CombatantData StartTime/EndTime/Duration derive from outAll
+        // (all outgoing swings — not just damage), matching ACT.
+        private DamageTypeData outAll;
+        private DamageTypeData incAll;
         public EncounterData Parent { get; }
         public string Name { get; }
         public SortedList<string, int> Allies { get; set; } = new SortedList<string, int>();
@@ -199,8 +204,8 @@ namespace Advanced_Combat_Tracker
         public CombatantData(string combatantName, EncounterData parent)
         {
             Name = combatantName; Parent = parent;
-            foreach (var kv in OutgoingDamageTypeDataObjects) items[kv.Key] = new DamageTypeData(true, kv.Key, this);
-            foreach (var kv in IncomingDamageTypeDataObjects) if (!items.ContainsKey(kv.Key)) items[kv.Key] = new DamageTypeData(false, kv.Key, this);
+            foreach (var kv in OutgoingDamageTypeDataObjects) { outAll = new DamageTypeData(true, kv.Key, this); items[kv.Key] = outAll; }
+            foreach (var kv in IncomingDamageTypeDataObjects) { incAll = new DamageTypeData(false, kv.Key, this); items[kv.Key] = incAll; }
         }
 
         public Dictionary<string, DamageTypeData> Items { get => items; set { } }
@@ -208,27 +213,31 @@ namespace Advanced_Combat_Tracker
         public void AddCombatAction(MasterSwing action)
         {
             var victim = action.Victim?.ToUpper() ?? "";
-            if (SwingTypeToDamageTypeDataLinksOutgoing.TryGetValue(action.SwingType, out var links))
-                foreach (var key in links)
-                    if (items.TryGetValue(key, out var dtd))
-                    {
-                        ModAlly(victim, OutgoingDamageTypeDataObjects.TryGetValue(key, out var def) ? def.AllyValue : 0);
-                        dtd.AddCombatAction(action, "All");
-                        dtd.AddCombatAction(action, action.AttackType);
-                    }
+            if (!SwingTypeToDamageTypeDataLinksOutgoing.TryGetValue(action.SwingType, out var links)) return;
+            foreach (var key in links)
+                if (items.TryGetValue(key, out var dtd))
+                {
+                    ModAlly(victim, OutgoingDamageTypeDataObjects.TryGetValue(key, out var def) ? def.AllyValue : 0);
+                    dtd.AddCombatAction(action, "All");
+                    if (!ActGlobals.restrictToAll) dtd.AddCombatAction(action, action.AttackType);
+                }
+            outAll.AddCombatAction(action, "All");
+            if (!ActGlobals.restrictToAll) outAll.AddCombatAction(action, action.AttackType);
         }
 
         public void AddReverseCombatAction(MasterSwing action)
         {
             var attacker = action.Attacker?.ToUpper() ?? "";
-            if (SwingTypeToDamageTypeDataLinksIncoming.TryGetValue(action.SwingType, out var links))
-                foreach (var key in links)
-                    if (items.TryGetValue(key, out var dtd))
-                    {
-                        ModAlly(attacker, IncomingDamageTypeDataObjects.TryGetValue(key, out var def) ? def.AllyValue : 0);
-                        dtd.AddCombatAction(action, "All");
-                        dtd.AddCombatAction(action, action.AttackType);
-                    }
+            if (!SwingTypeToDamageTypeDataLinksIncoming.TryGetValue(action.SwingType, out var links)) return;
+            foreach (var key in links)
+                if (items.TryGetValue(key, out var dtd))
+                {
+                    ModAlly(attacker, IncomingDamageTypeDataObjects.TryGetValue(key, out var def) ? def.AllyValue : 0);
+                    dtd.AddCombatAction(action, "All");
+                    if (!ActGlobals.restrictToAll) dtd.AddCombatAction(action, action.AttackType);
+                }
+            incAll.AddCombatAction(action, "All");
+            if (!ActGlobals.restrictToAll) incAll.AddCombatAction(action, action.AttackType);
         }
 
         public void ModAlly(string combatant, int mod)
@@ -256,9 +265,10 @@ namespace Advanced_Combat_Tracker
         public int Misses => D(DamageTypeDataOutgoingDamage)?.Misses ?? 0;
         public int Blocked => 0;
         public float ToHit => Swings == 0 ? 0f : (float)Hits / Swings * 100f;
-        public DateTime StartTime => D(DamageTypeDataOutgoingDamage)?.StartTime ?? DateTime.MaxValue;
-        public DateTime EndTime => D(DamageTypeDataOutgoingDamage)?.EndTime ?? DateTime.MinValue;
-        public DateTime ShortEndTime => EndTime;
+        // StartTime/EndTime span ALL outgoing swings (outAll); ShortEndTime is outgoing-damage only.
+        public DateTime StartTime => outAll?.StartTime ?? DateTime.MaxValue;
+        public DateTime EndTime => outAll?.EndTime ?? DateTime.MinValue;
+        public DateTime ShortEndTime => D(DamageTypeDataOutgoingDamage)?.EndTime ?? DateTime.MinValue;
         public TimeSpan Duration => EndTime > StartTime ? EndTime - StartTime : TimeSpan.Zero;
         public string DurationS => Duration.Hours == 0 ? $"{Duration.Minutes:00}:{Duration.Seconds:00}" : $"{Duration.Hours:00}:{Duration.Minutes:00}:{Duration.Seconds:00}";
         public double DPS => Duration.TotalSeconds > 0 ? (double)Damage / Duration.TotalSeconds : 0.0;
@@ -266,10 +276,34 @@ namespace Advanced_Combat_Tracker
         public double ExtDPS => EncDPS;
         public double EncHPS { get { var d = Parent?.Duration.TotalSeconds ?? 0; return d > 0 ? (double)Healed / d : 0.0; } }
         public double ExtHPS => EncHPS;
-        public int Deaths { get { var at = GetAttackType("All", DamageTypeDataIncomingDamage); return at?.Items.Count(s => s.Damage == Dnum.Death) ?? 0; } }
-        public int Kills { get { var at = GetAttackType("All", DamageTypeDataOutgoingDamage); return at?.Items.Count(s => s.Damage == Dnum.Death) ?? 0; } }
-        public string DamagePercent { get { var t = Parent?.Damage ?? 0; return t > 0 ? (int)((float)Damage / t * 100f) + "%" : "--"; } }
-        public string HealedPercent { get { var t = Parent?.Healed ?? 0; return t > 0 ? (int)((float)Healed / t * 100f) + "%" : "--"; } }
+        public int Deaths { get { var at = incAll != null && incAll.Items.TryGetValue("All", out var v) ? v : null; return at?.Items.Count(s => s.Damage == Dnum.Death) ?? 0; } }
+        public int Kills { get { var at = outAll != null && outAll.Items.TryGetValue("All", out var v) ? v : null; return at?.Items.Count(s => s.Damage == Dnum.Death) ?? 0; } }
+        // "--" unless this combatant is one of the encounter's allies (ACT only shows a share for
+        // allied combatants), then its damage relative to the allied total, bounded to 0..100.
+        public string DamagePercent
+        {
+            get
+            {
+                if (Parent != null && Parent.GetAllies().Contains(this) && Parent.Damage > 0)
+                {
+                    int n = (int)((float)Damage / Parent.Damage * 100f);
+                    if (n > -1 && n < 101) return n + "%";
+                }
+                return "--";
+            }
+        }
+        public string HealedPercent
+        {
+            get
+            {
+                if (Parent != null && Parent.GetAllies().Contains(this) && Parent.Healed > 0)
+                {
+                    int n = (int)((float)Healed / Parent.Healed * 100f);
+                    if (n > -1 && n < 101) return n + "%";
+                }
+                return "--";
+            }
+        }
         public string MaxHit { get { var at = GetAttackType("All", DamageTypeDataOutgoingDamage); return (at?.MaxHit ?? 0).ToString(); } }
 
         public AttackType GetAttackType(string attackTypeName, string type) => items.TryGetValue(type, out var d) && d.Items.TryGetValue(attackTypeName, out var at) ? at : null;
@@ -358,14 +392,87 @@ namespace Advanced_Combat_Tracker
             cv.AddReverseCombatAction(action);
         }
 
-        public void SetAlliesUncached() { }
-        public List<CombatantData> GetAllies() => new List<CombatantData>(combatants.Values);
+        private sealed class AllyObject
+        {
+            public readonly CombatantData cd;
+            public int allyVal;
+            public AllyObject(CombatantData c) { cd = c; allyVal = 0; }
+        }
+
+        private List<CombatantData> cAllies;
+        private bool alliesCached;
+
+        public void SetAlliesUncached() { alliesCached = false; cAllies = null; }
+
+        // ACT's friend/foe partition: starting from the anchor combatant (CharName), spread over the
+        // ModAlly adjacency (each link weighted by the damage-type's AllyValue) and keep the side of
+        // the graph the anchor falls on. Enemies land on the opposite sign and are excluded.
+        public List<CombatantData> GetAllies()
+        {
+            if (alliesCached && cAllies != null) return cAllies;
+            if (ignoreEnemies) return new List<CombatantData>(combatants.Values);
+            var anchor = GetCombatant(CharName);
+            if (anchor == null) return new List<CombatantData>();
+
+            var nodes = new SortedList<string, AllyObject>();
+            nodes.Add(anchor.Name.ToUpper(), new AllyObject(anchor));
+            bool changed = true;
+            while (changed)
+            {
+                changed = false;
+                for (int i = 0; i < nodes.Count; i++)
+                {
+                    // nodes.Values[i] is re-read on every access (not cached): a SortedList insert
+                    // below shifts indices, so within this loop the node at index i can change to a
+                    // different combatant mid-iteration. ACT's GetAllies has exactly this behaviour
+                    // and the friend/foe partition depends on it, so we reproduce it bit-for-bit.
+                    for (int j = 0; j < nodes.Values[i].cd.Allies.Count; j++)
+                    {
+                        string other = nodes.Values[i].cd.Allies.Keys[j];
+                        int num = nodes.Values[i].cd.Allies.Values[j];
+                        if (!nodes.ContainsKey(other))
+                        {
+                            var c2 = GetCombatant(other);
+                            if (c2 == null) continue;
+                            nodes.Add(other, new AllyObject(c2));
+                            changed = true;
+                        }
+                        if (nodes.Values[i].allyVal > 0) nodes[other].allyVal += num;
+                        else nodes[other].allyVal -= num;
+                    }
+                }
+            }
+
+            var list = new List<CombatantData>();
+            bool neg = nodes[anchor.Name.ToUpper()].allyVal < 0;
+            foreach (var kv in nodes)
+            {
+                if (neg) { if (kv.Value.allyVal < 0) list.Add(kv.Value.cd); }
+                else { if (kv.Value.allyVal > 0) list.Add(kv.Value.cd); }
+            }
+            list.RemoveAll(x => x == null);
+            cAllies = list;
+            alliesCached = true;
+            return list;
+        }
+
         public List<CombatantData> GetAllies(bool allowLimited) => GetAllies();
         public CombatantData GetCombatant(string name) => name != null && combatants.TryGetValue(name.ToUpper(), out var v) ? v : null;
         public bool GetIgnoreEnemies() => ignoreEnemies;
 
+        // StartTime is the earliest over ALL combatants; EndTime (ShortEndTime) is the latest over
+        // ALLIES only — matching ACT, so encounter duration is anchored on the allied party's end.
         public DateTime StartTime => combatants.Count == 0 ? DateTime.MaxValue : combatants.Values.Min(c => c.StartTime);
-        public DateTime EndTime => combatants.Count == 0 ? DateTime.MinValue : combatants.Values.Max(c => c.EndTime);
+        public DateTime ShortEndTime
+        {
+            get
+            {
+                var list = GetAllies();
+                if (list.Count == 0) list = new List<CombatantData>(combatants.Values);
+                return list.Count == 0 ? DateTime.MinValue : list.Max(c => c.ShortEndTime);
+            }
+        }
+        public DateTime EndTime => ShortEndTime;
         public TimeSpan Duration => EndTime > StartTime ? EndTime - StartTime : TimeSpan.Zero;
         public string DurationS => Duration.Hours == 0 ? $"{Duration.Minutes:00}:{Duration.Seconds:00}" : $"{Duration.Hours:00}:{Duration.Minutes:00}:{Duration.Seconds:00}";
         public long Damage => GetAllies().Sum(c => c.Damage);
