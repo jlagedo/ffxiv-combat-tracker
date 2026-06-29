@@ -18,10 +18,17 @@ namespace Fct.LegacyHost
     // Output is a TSV: one row per MasterSwing, in emission order.
     internal static class ParseOracle
     {
-        public static void Run(string logPath, int maxLines, string outPath)
+        public static void Run(string logPath, int maxLines, string outPath) =>
+            RunPumped(outPath, Log => Capture(logPath, maxLines, outPath, Log));
+
+        public static void DumpSkills(string sliceLog, string outPath) =>
+            RunPumped(outPath, Log => DumpSkillsImpl(sliceLog, outPath, Log));
+
+        // Stand up the facade + plugin under a live message loop (InitPlugin marshals to the UI
+        // thread), then run the given work from a timer tick — the same pattern the satellite uses.
+        private static void RunPumped(string outPath, Action<Action<string>> work)
         {
             void Log(string s) { try { File.AppendAllText(outPath + ".log", $"{DateTime.Now:HH:mm:ss.fff} {s}\n"); } catch { } }
-            Log($"oracle start log={logPath} max={maxLines}");
 
             FacadeHost.Log = Log;
             FacadeHost.InstallAssemblyResolver();
@@ -29,9 +36,6 @@ namespace Fct.LegacyHost
             Application.SetCompatibleTextRenderingDefault(false);
             FacadeHost.CreateAct();
 
-            // The plugin's InitPlugin needs a live message loop (it marshals to the UI thread),
-            // so run the capture from a timer tick after Application.Run starts — the same
-            // pattern the normal satellite uses.
             var pump = new Form { ShowInTaskbar = false, FormBorderStyle = FormBorderStyle.None,
                                   WindowState = FormWindowState.Minimized, Visible = false };
             _ = pump.Handle;
@@ -39,7 +43,7 @@ namespace Fct.LegacyHost
             timer.Tick += (s, e) =>
             {
                 timer.Stop();
-                try { Capture(logPath, maxLines, outPath, Log); }
+                try { work(Log); }
                 catch (Exception ex) { Log("FATAL: " + ex); }
                 finally { Environment.Exit(0); }
             };
@@ -47,14 +51,12 @@ namespace Fct.LegacyHost
             Application.Run(pump);
         }
 
-        private static void Capture(string logPath, int maxLines, string outPath, Action<string> Log)
+        // Load the plugin and pump until it reports "Started".
+        private static ActPluginData LoadStartedPlugin(Action<string> Log)
         {
-            var act = ActGlobals.oFormActMain;
             var tabs = new TabControl();
             var ffxiv = FacadeHost.LoadPlugin(tabs, "FFXIV_ACT_Plugin",
                 FacadeHost.FfxivPluginPath, "FFXIV_ACT_Plugin.FFXIV_ACT_Plugin");
-
-            // Let the plugin finish wiring its BeforeLogLineRead subscription.
             var deadline = DateTime.UtcNow.AddSeconds(25);
             while (DateTime.UtcNow < deadline)
             {
@@ -64,6 +66,46 @@ namespace Fct.LegacyHost
                 Thread.Sleep(50);
             }
             Log($"plugin status='{ffxiv.lblPluginStatus?.Text}'");
+            return ffxiv;
+        }
+
+        // Dump the plugin's skill (action id -> name) table, filtered to the action ids that
+        // appear in the slice, via reflection over IDataRepository.GetResourceDictionary. This is
+        // FFXIV game data, independent of the oracle capture.
+        private static void DumpSkillsImpl(string sliceLog, string outPath, Action<string> Log)
+        {
+            var ffxiv = LoadStartedPlugin(Log);
+
+            var ids = new HashSet<uint>();
+            foreach (var raw in File.ReadLines(sliceLog))
+            {
+                var f = raw.Split('|');
+                if (f.Length > 5 && (f[0] == "21" || f[0] == "22") &&
+                    uint.TryParse(f[4], NumberStyles.HexNumber, CultureInfo.InvariantCulture, out var id))
+                    ids.Add(id);
+            }
+
+            var plugin = ffxiv.pluginObj;
+            var repo = plugin.GetType().GetProperty("DataRepository")?.GetValue(plugin);
+            var method = repo?.GetType().GetMethod("GetResourceDictionary");
+            var rtType = method?.GetParameters()[0].ParameterType;
+            var skillList = rtType != null ? Enum.Parse(rtType, "SkillList_EN") : null;
+            var dict = (System.Collections.IDictionary)method.Invoke(repo, new[] { skillList });
+
+            var rows = new List<string>();
+            foreach (var id in ids.OrderBy(x => x))
+            {
+                var name = dict.Contains(id) ? dict[id]?.ToString() : null;
+                rows.Add($"{id:X}\t{(name ?? "")}");
+            }
+            File.WriteAllLines(outPath, new[] { "actionId\tname" }.Concat(rows));
+            Log($"dumped {rows.Count} skill names -> {outPath}");
+        }
+
+        private static void Capture(string logPath, int maxLines, string outPath, Action<string> Log)
+        {
+            var act = ActGlobals.oFormActMain;
+            LoadStartedPlugin(Log); // also wires the plugin's BeforeLogLineRead subscription
 
             var rows = new List<string>();
             CombatActionDelegate handler = (isImport, info) =>

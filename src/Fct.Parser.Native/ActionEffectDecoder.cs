@@ -101,6 +101,24 @@ public static class ActionEffectDecoder
         }
     }
 
+    // ACT's damage-type display string: DamageType name, plus " (Element)" unless the element
+    // is Unknown(0) or Unaspected(7). Enum values are FFXIV_ACT_Plugin.Resource.DamageType /
+    // ElementType (read from the plugin's resource assembly, not guessed).
+    public static string DamageTypeText(int damageType, int element)
+    {
+        string name = damageType switch
+        {
+            0 => "Unknown", 1 => "Slashing", 2 => "Piercing", 3 => "Blunt", 4 => "Shot",
+            5 => "Magic", 6 => "Breath", 7 => "Physical", 8 => "LimitBreak", _ => "Unknown",
+        };
+        string? elem = element switch
+        {
+            1 => "Fire", 2 => "Ice", 3 => "Air", 4 => "Earth", 5 => "Lightning", 6 => "Water",
+            _ => null, // 0 = Unknown, 7 = Unaspected → no suffix
+        };
+        return elem is null ? name : $"{name} ({elem})";
+    }
+
     private static string Special(EffectEntryType t) => t switch
     {
         EffectEntryType.BlockedDamage => "Blocked",

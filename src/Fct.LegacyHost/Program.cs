@@ -33,6 +33,15 @@ namespace Fct.LegacyHost
                 return;
             }
 
+            // Dump the plugin's skill (action id -> name) table for a slice's action ids:
+            //   --dump-skills <sliceLog> <outPath>
+            int di = Array.IndexOf(args, "--dump-skills");
+            if (di >= 0 && args.Length >= di + 3)
+            {
+                ParseOracle.DumpSkills(args[di + 1], args[di + 2]);
+                return;
+            }
+
             try { File.WriteAllText(LogPath, $"satellite start {DateTime.Now:HH:mm:ss}\n"); } catch { }
             FacadeHost.Log = Log;
 

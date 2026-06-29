@@ -13,6 +13,8 @@ public readonly record struct CombatAction(
     string Special,
     string Attacker,
     string Victim,
+    string AttackType,
+    string DamageType,
     bool InCombat);
 
 // Stateful, pure-log parser: tracks the primary player (02), combatant names (03/04), and
@@ -27,6 +29,10 @@ public sealed class CombatLogParser
     private bool _inCombat;
 
     public string CharName { get; init; } = "YOU";
+
+    // Optional action id -> name table (FFXIV game data). When set, ability names are resolved
+    // from it (matching ACT's attackType); otherwise the raw log name is used.
+    public IReadOnlyDictionary<uint, string>? Skills { get; init; }
 
     public IEnumerable<CombatAction> Process(IEnumerable<string> lines)
     {
@@ -48,6 +54,8 @@ public sealed class CombatLogParser
                 case 21:
                 case 22:
                     if (!TryId(line.Field(2), out var src) || !TryId(line.Field(6), out var tgt)) break;
+                    TryId(line.Field(4), out var actionId);
+                    string ability = ResolveAction(actionId, line.Field(5));
                     foreach (var e in ActionEffectDecoder.Decode(line))
                     {
                         // Source-attributed effects flip the victim back to the source.
@@ -57,12 +65,13 @@ public sealed class CombatLogParser
 
                         if (e.IsDamage)
                         {
-                            yield return new CombatAction(false, e.SwingType, e.IsCritical, e.Amount, e.Special, attacker, victim, true);
+                            var dmgType = ActionEffectDecoder.DamageTypeText(e.DamageTypeId, e.ElementId);
+                            yield return new CombatAction(false, e.SwingType, e.IsCritical, e.Amount, e.Special, attacker, victim, ability, dmgType, true);
                             _inCombat = true; // ungated damage starts/continues combat
                         }
                         else if (e.IsHeal)
                         {
-                            yield return new CombatAction(true, 4, e.IsCritical, e.Amount, "", attacker, victim, _inCombat);
+                            yield return new CombatAction(true, 4, e.IsCritical, e.Amount, "", attacker, victim, ability, "", _inCombat);
                         }
                     }
                     break;
@@ -77,6 +86,9 @@ public sealed class CombatLogParser
     }
 
     private void SetName(uint id, string? name) => _names[id] = name ?? "";
+
+    private string ResolveAction(uint id, string? logName) =>
+        Skills != null && Skills.TryGetValue(id, out var n) && !string.IsNullOrEmpty(n) ? n : (logName ?? "");
 
     private static bool TryId(string? s, out uint id) =>
         uint.TryParse(s, NumberStyles.HexNumber, CultureInfo.InvariantCulture, out id);

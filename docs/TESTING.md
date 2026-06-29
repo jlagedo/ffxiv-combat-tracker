@@ -66,21 +66,25 @@ is stateful: it tracks the primary player (`02`), combatant names (`03`/`04`) an
 state, resolving whole `MasterSwing`s (attacker/victim names, `InCombat`).
 
 Current compat on the slice:
-- **Damage `MasterSwing`s: full-field exact (100%).** Every damage swing ACT produces matches
-  on amount (incl. the `>65535` `Flags2&0x40 ? Flags1<<16` transform), crit, miss/block/parry,
-  **and resolved attacker/victim names** (443/443 on the fixture). Damage is ungated by
-  `InCombat`, so this is complete.
+- **Damage `MasterSwing`s: full-field exact (100%).** Every damage swing ACT produces matches on
+  **amount** (incl. the `>65535` `Flags2&0x40 ? Flags1<<16` transform), **crit**, **miss/block/
+  parry**, **attacker/victim names**, **ability name**, and **damage-type string** — 443/443 on
+  the fixture. The only excluded field is swing-type for NPC auto-attacks (below).
 - **Swing-type: conservative and correct.** Player auto-attacks (action id `0x07`) classify as
-  auto vs ability with no false positives. NPC auto-attacks use other ids ACT knows only from
-  its bundled **action table** (3/443) — pinned as the sole swing-type gap.
+  auto vs ability with no false positives. NPC auto-attacks use ids whose *category* ACT knows
+  only from its bundled action-category data (3/443) — pinned as the sole swing-type gap.
 - **Heals: every ACT-reported heal reproduced (0 missing)** on value + crit. Exact heal *count*
   needs ACT's combat-end detection (`StopCombat` → `InCombat` false mid-fight); a few heals are
-  also proc-attributed (proc-source decoding pending), so heal names are not yet asserted.
+  proc-attributed (proc-source decoding pending), so heal names are not yet asserted.
 
-Remaining toward full parity (tracked) — each needs a layer beyond log-line parsing: the
-**action table** (NPC auto-attack ids, ability names, damage-type/element enum strings);
-ACT's **combat-end detection** for exact heal/shield/resource counts; **proc-source** decoding;
-and DoT/HoT simulation. The differential harness measures each as it lands.
+Ability names and the damage-type/element enums are FFXIV game data, not derived: the skill
+table is dumped from the plugin's resource via `Fct.LegacyHost.exe --dump-skills`
+(`IDataRepository.GetResourceDictionary`), committed as `fixtures/skills.tsv`; the
+`DamageType`/`ElementType` enums are read from `ffxiv_act_plugin.resource.dll`.
+
+Remaining toward full parity (tracked): ACT's **action-category** data (NPC auto-attack
+swing-type), **combat-end detection** for exact heal/shield/resource counts, **proc-source**
+decoding, and DoT/HoT simulation. The differential harness measures each as it lands.
 
 Regenerate the oracle fixture (needs the ACT install):
 

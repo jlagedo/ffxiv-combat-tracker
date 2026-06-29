@@ -17,7 +17,7 @@ namespace Fct.Parser.Native.Tests
         private static string Fixture(string name) =>
             Path.Combine(AppContext.BaseDirectory, "fixtures", name);
 
-        private sealed record OracleRow(int SwingType, bool Crit, long Damage, string Special, string Attacker, string Victim);
+        private sealed record OracleRow(int SwingType, bool Crit, long Damage, string Special, string AttackType, string Attacker, string DamageType, string Victim);
 
         private static List<OracleRow> ReadOracle()
         {
@@ -26,13 +26,26 @@ namespace Fct.Parser.Native.Tests
             {
                 var c = line.Split('\t');
                 // swingType, crit, damage, special, attackType, attacker, damageType, victim, time
-                rows.Add(new OracleRow(int.Parse(c[0]), c[1] == "1", long.Parse(c[2]), c[3], c[5], c[7]));
+                rows.Add(new OracleRow(int.Parse(c[0]), c[1] == "1", long.Parse(c[2]), c[3], c[4], c[5], c[6], c[7]));
             }
             return rows;
         }
 
-        private static List<CombatAction> ParseSlice() =>
-            new CombatLogParser().Process(File.ReadLines(Fixture("combat-slice.log"))).ToList();
+        private static Dictionary<uint, string> ReadSkills()
+        {
+            var map = new Dictionary<uint, string>();
+            foreach (var line in File.ReadLines(Fixture("skills.tsv")).Skip(1))
+            {
+                var c = line.Split('\t');
+                if (c.Length >= 2 && uint.TryParse(c[0], System.Globalization.NumberStyles.HexNumber, null, out var id))
+                    map[id] = c[1];
+            }
+            return map;
+        }
+
+        private static List<CombatAction> ParseSlice(bool withSkills = false) =>
+            new CombatLogParser { Skills = withSkills ? ReadSkills() : null }
+                .Process(File.ReadLines(Fixture("combat-slice.log"))).ToList();
 
         private static (List<string> missing, List<string> extra) BagDiff<T>(IEnumerable<T> ours, IEnumerable<T> oracle)
         {
@@ -65,6 +78,29 @@ namespace Fct.Parser.Native.Tests
 
             Assert.True(missing.Count == 0 && extra.Count == 0,
                 $"damage (with names) diverges: {missing.Count} missing, {extra.Count} extra");
+        }
+
+        [Fact]
+        public void Damage_full_masterswing_matches_act_exactly()
+        {
+            // The full damage MasterSwing: crit, amount, special, attacker, victim, ability name
+            // (from the skill table) and damage-type string (DamageType/ElementType enums). Only
+            // swing-type for NPC auto-attacks is excluded (needs ACT's action-category table).
+            var oracle = ReadOracle();
+            var actions = ParseSlice(withSkills: true);
+
+            var oracleDmg = oracle.Where(r => r.SwingType is 0 or 2)
+                                  .Select(r => (r.Crit, r.Damage, r.Special, r.Attacker, r.Victim, r.AttackType, r.DamageType));
+            var oursDmg = actions.Where(a => !a.IsHeal)
+                                 .Select(a => (a.IsCritical, a.Amount, a.Special, a.Attacker, a.Victim, a.AttackType, a.DamageType));
+
+            var (missing, extra) = BagDiff(oursDmg, oracleDmg);
+            _out.WriteLine($"oracle damage={oracle.Count(r => r.SwingType is 0 or 2)} ours={actions.Count(a => !a.IsHeal)}");
+            if (missing.Count > 0) _out.WriteLine("MISSING:\n  " + string.Join("\n  ", missing.Take(20)));
+            if (extra.Count > 0) _out.WriteLine("EXTRA:\n  " + string.Join("\n  ", extra.Take(20)));
+
+            Assert.True(missing.Count == 0 && extra.Count == 0,
+                $"damage (ability name + damage type) diverges: {missing.Count} missing, {extra.Count} extra");
         }
 
         [Fact]
