@@ -59,24 +59,28 @@ damage/heal values. It is validated **directly against ACT's own parse** of the 
 - **Diff test** (`ParseCompatTests`) decodes the slice and compares value multisets to the
   oracle.
 
-Current compat on the slice:
-- **Damage values: exact (100%).** Every damage `MasterSwing` ACT produces — amount (including
-  the `>65535` `Flags2&0x40 ? Flags1<<16` transform), crit flag, and miss/block/parry — is
-  reproduced exactly (443/443 on the fixture). This layer is pure byte decode: fully determined
-  by the line, no game-data tables.
-- **Swing-type: conservative and correct.** Player auto-attacks (action id `0x07`) are
-  classified as auto vs ability and verified against ACT with no false positives. NPC
-  auto-attacks use other action ids that ACT only knows from its bundled **action table**, so
-  those (3/443 on the fixture) are the sole swing-type gap — the test pins that the only
-  mismatches are ACT-auto/ours-ability with identical values.
-- **Heals: every ACT-reported heal reproduced (0 missing).** Our decode is a superset because
-  ACT only reports heals while `InCombat` (`ReportCombatData.AddHealEntry`); the extras are
-  out-of-combat heals ACT suppresses.
+Two layers are tested:
 
-Remaining toward full parity (tracked, not yet done) — each needs a layer beyond pure
-line decode: the **action table** (NPC auto-attack ids, ability names, damage-type/element
-enum strings); **combat-state** (`InCombat`) tracking for exact heal/shield/resource
-reporting; **combatant tracking** for attacker/victim name resolution; and DoT/HoT simulation.
+`ActionEffectDecoder` is the pure byte decode (one line → effect values). `CombatLogParser`
+is stateful: it tracks the primary player (`02`), combatant names (`03`/`04`) and combat
+state, resolving whole `MasterSwing`s (attacker/victim names, `InCombat`).
+
+Current compat on the slice:
+- **Damage `MasterSwing`s: full-field exact (100%).** Every damage swing ACT produces matches
+  on amount (incl. the `>65535` `Flags2&0x40 ? Flags1<<16` transform), crit, miss/block/parry,
+  **and resolved attacker/victim names** (443/443 on the fixture). Damage is ungated by
+  `InCombat`, so this is complete.
+- **Swing-type: conservative and correct.** Player auto-attacks (action id `0x07`) classify as
+  auto vs ability with no false positives. NPC auto-attacks use other ids ACT knows only from
+  its bundled **action table** (3/443) — pinned as the sole swing-type gap.
+- **Heals: every ACT-reported heal reproduced (0 missing)** on value + crit. Exact heal *count*
+  needs ACT's combat-end detection (`StopCombat` → `InCombat` false mid-fight); a few heals are
+  also proc-attributed (proc-source decoding pending), so heal names are not yet asserted.
+
+Remaining toward full parity (tracked) — each needs a layer beyond log-line parsing: the
+**action table** (NPC auto-attack ids, ability names, damage-type/element enum strings);
+ACT's **combat-end detection** for exact heal/shield/resource counts; **proc-source** decoding;
+and DoT/HoT simulation. The differential harness measures each as it lands.
 
 Regenerate the oracle fixture (needs the ACT install):
 

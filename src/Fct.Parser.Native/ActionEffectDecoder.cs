@@ -31,6 +31,7 @@ public readonly record struct CombatEffect(
     bool IsDirectHit,
     int DamageTypeId,
     int ElementId,
+    bool IsSourceEntry,
     string Special);
 
 // Clean-room decode of the 8 effect slots of an ActionEffect (21/22) line. The formulas
@@ -74,24 +75,25 @@ public static class ActionEffectDecoder
             long amount = value + (((flags2 & 0x40) != 0) ? (long)flags1 << 16 : 0);
             int damageType = param1 & 0xF;
             int element = param1 >> 4;
+            bool isSourceEntry = (flags2 & 0x80) != 0;
 
             switch ((EffectEntryType)entryType)
             {
                 case EffectEntryType.Miss:
                     yield return new CombatEffect(slot, EffectEntryType.Miss, true, false,
-                        dmgSwing, -1, false, false, damageType, element, "Miss");
+                        dmgSwing, -1, false, false, damageType, element, isSourceEntry, "Miss");
                     break;
                 case EffectEntryType.Damage:
                 case EffectEntryType.BlockedDamage:
                 case EffectEntryType.ParriedDamage:
                     yield return new CombatEffect(slot, (EffectEntryType)entryType, true, false,
                         dmgSwing, amount, (param0 & 0x20) != 0, (param0 & 0x40) != 0, damageType, element,
-                        Special((EffectEntryType)entryType));
+                        isSourceEntry, Special((EffectEntryType)entryType));
                     break;
                 case EffectEntryType.Heal:
                     // Heal crit comes from Param1's 0x20 bit (not Param0 as for damage).
                     yield return new CombatEffect(slot, EffectEntryType.Heal, false, true,
-                        4, amount, (param1 & 0x20) != 0, false, 0, 0, "");
+                        4, amount, (param1 & 0x20) != 0, false, 0, 0, isSourceEntry, "");
                     break;
                 default:
                     break; // status / resource / nothing — not a value effect
