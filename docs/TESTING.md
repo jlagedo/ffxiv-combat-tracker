@@ -18,7 +18,7 @@ Or run a single project directly with `dotnet test tests/<project>`.
 | `Fct.Compat.Act.Tests` | net48 | The clean-room ACT aggregation engine: `Dnum`, `MasterSwing`, `AttackType`/`CombatantData`/`EncounterData` math, the `ExportVariables` contract OverlayPlugin/cactbot read, `SettingsSerializer` XML round-trip, and the **differential ACT-engine compat** (`AggregateCompatTests`, below). |
 | `Fct.App.Tests` | net10 | The bridge handshake parser (`SatelliteProtocol`): READY detection, x64 gating, HWND hex parsing. |
 | `Fct.Parser.Native.Tests` | net10 | The structural `NetworkLogLine` parser (unit tests) plus a real-log smoke test over an installed `Network_*.log`. |
-| `Fct.Integration.Tests` | net10 | Black-box end-to-end: launches the staged net48 satellite, checks the handshake/HWND, and verifies the in-process self-test aggregation from the satellite log. |
+| `Fct.Integration.Tests` | net10 | Black-box end-to-end: launches the staged net48 satellite, checks the handshake/HWND, verifies the in-process self-test aggregation, and runs the **full live route** on a recorded slice (`--replay`, below). |
 
 ## What runs vs. skips
 
@@ -85,6 +85,18 @@ table is dumped from the plugin's resource via `Fct.LegacyHost.exe --dump-skills
 Remaining toward full parity (tracked): ACT's **action-category** data (NPC auto-attack
 swing-type), **combat-end detection** for exact heal/shield/resource counts, **proc-source**
 decoding, and DoT/HoT simulation. The differential harness measures each as it lands.
+
+## End-to-end live route (recorded logs)
+
+`ReplayRouteTests` exercises the whole pipeline the product runs at play time, on recorded data (no
+live game): the staged satellite's `--replay <log>` mode feeds each line of an anonymized slice
+through the **real FFXIV plugin**, which parses and drives our ACT facade (`SetEncounter`/
+`AddCombatAction`); the parse clock advances per line so ACT's idle-end splits the stream into
+encounters; each completed encounter's `ExportVariables` (the strings OverlayPlugin/cactbot read) are
+dumped. The test asserts the slice splits into ≥2 encounters, each exposes the consumer strings
+(`encdps`, `maxhit` as `Skill-Damage`, …), and the per-encounter damage **sums back to the
+bit-perfect aggregate** (`YOU` = 2692084) — i.e. the idle-split conserves the totals. Skips cleanly
+without the staged satellite or the installed plugin.
 
 ## Differential ACT-engine compat (ours vs the real ACT binary)
 

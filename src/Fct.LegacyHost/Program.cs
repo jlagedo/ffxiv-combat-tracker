@@ -33,6 +33,16 @@ namespace Fct.LegacyHost
                 return;
             }
 
+            // End-to-end live route on a recorded log: plugin parse -> our ACT facade (with
+            // idle-end encounter splitting) -> per-encounter ExportVariables.
+            //   --replay <logPath> <maxLines> <outPath>
+            int rpi = Array.IndexOf(args, "--replay");
+            if (rpi >= 0 && args.Length >= rpi + 4)
+            {
+                ParseOracle.Replay(args[rpi + 1], int.Parse(args[rpi + 2]), args[rpi + 3]);
+                return;
+            }
+
             // Dump the plugin's skill (action id -> name) table for a slice's action ids:
             //   --dump-skills <sliceLog> <outPath>
             int di = Array.IndexOf(args, "--dump-skills");

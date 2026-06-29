@@ -24,6 +24,14 @@ namespace Fct.LegacyHost
         public static void DumpSkills(string sliceLog, string outPath) =>
             RunPumped(outPath, Log => DumpSkillsImpl(sliceLog, outPath, Log));
 
+        // End-to-end live route on a recorded log: the real plugin parses each line and drives our
+        // facade (SetEncounter/AddCombatAction); we advance the parse clock per line so ACT's
+        // idle-end splits the stream into encounters, then dump each completed encounter's
+        // ExportVariables — exactly the data OverlayPlugin/cactbot read live. Proves the whole
+        // route works on recorded data, no live game required.
+        public static void Replay(string logPath, int maxLines, string outPath) =>
+            RunPumped(outPath, Log => ReplayImpl(logPath, maxLines, outPath, Log));
+
         // Stand up the facade + plugin under a live message loop (InitPlugin marshals to the UI
         // thread), then run the given work from a timer tick — the same pattern the satellite uses.
         private static void RunPumped(string outPath, Action<Action<string>> work)
@@ -138,6 +146,47 @@ namespace Fct.LegacyHost
             var header = "swingType\tcrit\tdamage\tspecial\tattackType\tattacker\tdamageType\tvictim\ttime";
             File.WriteAllLines(outPath, new[] { header }.Concat(rows));
             Log($"done fed={fed} captured={rows.Count} -> {outPath}");
+        }
+
+        private static void ReplayImpl(string logPath, int maxLines, string outPath, Action<string> Log)
+        {
+            var act = ActGlobals.oFormActMain;
+            LoadStartedPlugin(Log); // plugin registers the damage-type tables + drives SetEncounter
+
+            var rows = new List<string>();
+            int encIdx = 0;
+            string EV(CombatantData cd, string k) =>
+                CombatantData.ExportVariables.TryGetValue(k, out var f) ? f.GetExportString(cd, "") : "";
+            void DumpEncounter(EncounterData enc)
+            {
+                if (enc == null || enc.Items.Count == 0) return;
+                encIdx++;
+                foreach (var cd in enc.Items.Values)
+                    rows.Add(string.Join("\t", encIdx.ToString(CultureInfo.InvariantCulture), Clean(cd.Name),
+                        EV(cd, "encdps"), EV(cd, "damage"), EV(cd, "hits"), EV(cd, "crithit%"),
+                        EV(cd, "healed"), EV(cd, "maxhit"), enc.DurationS));
+            }
+
+            CombatToggleEventDelegate onEnd = (imp, info) => DumpEncounter(info.encounter);
+            act.OnCombatEnd += onEnd;
+
+            int fed = 0;
+            foreach (var raw in File.ReadLines(logPath).Take(maxLines))
+            {
+                if (raw.Length == 0) continue;
+                fed++;
+                var ts = ParseTimestamp(raw);
+                if (ts > DateTime.MinValue) act.AdvanceClock(ts); // quiet gap > idle limit ends combat
+                var args = new LogLineEventArgs(raw, 0, ts, act.CurrentZone ?? "", act.InCombat);
+                try { act.FireBeforeLogLineRead(true, args); }
+                catch (Exception ex) { Log($"line {fed} parse error: {ex.Message}"); }
+            }
+            if (act.InCombat) act.EndCombat(true); // flush the final encounter (dumped via OnCombatEnd)
+            act.OnCombatEnd -= onEnd;
+
+            var header = "encounter\tname\tencdps\tdamage\thits\tcrithit%\thealed\tmaxhit\tduration";
+            File.WriteAllLines(outPath, new[] { header }.Concat(rows));
+            Log($"done fed={fed} encounters={encIdx} rows={rows.Count} -> {outPath}");
         }
 
         private static DateTime ParseTimestamp(string raw)
