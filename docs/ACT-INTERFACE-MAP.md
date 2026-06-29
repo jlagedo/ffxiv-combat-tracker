@@ -367,16 +367,21 @@ via `TraySlider`). All out of scope (principle 4).
 
 | St | member | consumers | why |
 |:--:|---|---|---|
-| 🟡 | `PluginGetRemoteVersion(int)` / `PluginDownload(int)` / `PluginDownloadMem(int)` / `UnZip(...)` / `GetAutomaticUpdatesAllowed()` / `UpdateCheckClicked` (event) / `RestartACT(bool,string)` | FFXIV, OP, Trig, Disc, Hojo | self-update flow — inert stubs (G‑5) |
-| 🟡 | `TraySlider` / `ButtonLayoutEnum` / `PluginDownloadData` | FFXIV, Trig | update toast — **G‑4** (add inert stubs only if a bind throws) |
+| 🟡 | `PluginGetRemoteVersion(int)` / `PluginDownload(int)` / `GetAutomaticUpdatesAllowed()` / `UpdateCheckClicked` (event) / `RestartACT(bool,string)` | FFXIV, OP, Trig, Disc, Hojo | self-update flow — inert stubs (G‑5) |
+| 🟡 | `TraySlider` / `ButtonLayoutEnum` / `PluginDownloadData` / `PluginDownloadMem(int)` / `UnZip(...)` | FFXIV, Trig | update **download/install** — **G‑4** (deferred; unreachable behind the version gate) |
 
-**Strategy.** `PluginGetRemoteVersion`→`""`, `PluginDownload`→null, `GetAutomaticUpdatesAllowed`→false,
-`RestartACT`/`UnZip` no-op, `UpdateCheckClicked` never fired. Most `TraySlider` uses are reflective /
-try-catch tolerant, so add those stubs only if a bind actually throws.
+**Strategy.** `PluginGetRemoteVersion`→`"0.0.0.0"`, `PluginDownload`→null, `GetAutomaticUpdatesAllowed`→false,
+`RestartACT` no-op, `UpdateCheckClicked` never fired. The download/install members
+(`PluginDownloadMem`/`UnZip`/`TraySlider`) are **not built** — the plugins' update flow bails at the
+version check before reaching them.
 
 > **Decision (G‑4 — deferred on-demand):** do **not** pre-build `TraySlider`/`ButtonLayoutEnum`/
-> `PluginDownloadData` stubs. They are added only if a real consumer bind throws on a live run;
-> until then this stays 🟡 by design.
+> `PluginDownloadData`/`PluginDownloadMem`/`UnZip` stubs. The FFXIV updater
+> (`ACT_PluginUpdate.cs:45-49`) and Triggernometry's both compare `local < PluginGetRemoteVersion(...)`
+> first; with `PluginGetRemoteVersion` → `"0.0.0.0"` that is always false, so the `TraySlider` toast
+> and the `PluginDownloadMem`→`UnZip` path are never reached. `PluginDownloadMem` would also require
+> `PluginDownloadData`. Add these only if a real consumer bind throws on a live run; until then this
+> stays 🟡 by design.
 
 ## 12. Error / diagnostic logging — ✅ DONE
 

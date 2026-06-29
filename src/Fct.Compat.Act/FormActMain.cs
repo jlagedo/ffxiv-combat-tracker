@@ -162,7 +162,9 @@ namespace Advanced_Combat_Tracker
                 ReferenceEquals((p.pluginObj as IActPluginAlias)?.Inner, plugin));
 
         public FileInfo PluginDownload(int myPluginId) => null;
-        public string PluginGetRemoteVersion(int myPluginId) => "";
+        // Self-update is out of scope. Return a low version (not "") so the plugins' update check
+        // (`new Version(...)` then `local < remote`) parses without throwing and evaluates false.
+        public string PluginGetRemoteVersion(int myPluginId) => "0.0.0.0";
         public bool GetAutomaticUpdatesAllowed() => false;
 
         public void RestartACT(bool stopOnError, string message) =>
