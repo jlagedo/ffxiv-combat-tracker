@@ -54,15 +54,16 @@ swappable, independently-released component.
 | `Fct.Parser.Legacy` | net48 | wraps the real FFXIV_ACT_Plugin. `WrappedFfxivPlugin` sits in `pluginObj` (forwards `DataRepository`/`_iocContainer`/lifecycle to the real instance) and exposes `RingBufferDataSubscription` (`IDataSubscription` + `IRawPacketSource`): a bounded ring + single dispatch thread that replaces the plugin's per-subscriber `BeginInvoke` fan-out so OverlayPlugin's ~20 handlers cost one in-order dispatch. ~250× faster on the dispatch stage. |
 | `Fct.Parser.Native` | net10 | clean-room parser. `NetworkLogLine` (structure) + `ActionEffectDecoder` (effect byte decode) + `CombatLogParser` (stateful: names, combat window, all swing types) + `PotencySimulator` (ACT's simulated DoT/HoT/shield amounts). Reproduces every swing type ACT emits; deterministic log-derived types are bit-exact. The simulator mirrors ACT's `DoTSimulator`/`DamageShieldSimulator`/`PotencyStatusApplication` exactly — the per-source attack-power median (calibrated from primary-target hits only), the buff-multiplier engine, and the individual-crit tick branch (RNG crit/DH bits, `Random`-seeded). Simulated `(*)` DoT/HoT/shield amounts reach ~95.6% of ACT's damage sum (the DPS signal); per-tick bit-exact is bounded by ACT's RNG crits (~29% of ticks) and per-application buff-snapshot precision. Game-data tables (action categories, status names, DoT/heal potencies, shield/buff defs) are dumped from the real plugin via `--dump-tables`. See `docs/TESTING.md`. Live capture + memory later. |
 | `Fct.App` | net10 | Avalonia control panel + shell (MVVM). |
-| `Fct.Overlays` | net10 | native WebView2 overlay layer (later). |
 | `Fct.Compat.Act` | net48 | the ACT facade surface (in LegacyHost). Its `EncounterData`/`CombatantData`/`AttackType` aggregation reproduces the real ACT binary bit-for-bit on captured combat (see Differential ACT-engine compat in `docs/TESTING.md`). |
 
 ## UI frameworks
 
 - **net10 control panel/shell → Avalonia** (XAML + MVVM). Native desktop app.
-- **Overlays → web** (HTML/JS via Kestrel, rendered in WebView2 hosted inside Avalonia).
-  Two deliberate rendering stacks: Avalonia for app chrome, web for overlays (overlay
-  web rendering is required for cactbot/ecosystem compatibility).
+- **Overlays → unmodified OverlayPlugin.** The host does **not** build a native overlay layer
+  (no `Fct.Overlays`, no WebView2, no host-side WebSocket — now or later). OverlayPlugin runs
+  unmodified in the net48 satellite, bringing its own CEF + Fleck + event sources, and renders
+  overlays as its own transparent click-through windows. cactbot/ecosystem compatibility comes
+  from hosting the real OverlayPlugin, not from reproducing its web stack.
 - **net48 legacy UI → WinForms**, forced by `IActPluginV1.InitPlugin(TabPage, Label)`;
   quarantined in `Fct.LegacyHost`.
 

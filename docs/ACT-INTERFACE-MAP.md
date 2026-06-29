@@ -48,10 +48,10 @@ OverlayPlugin's `MessageType`) were excluded. ACT signatures verified against th
 
 ### Scope note
 
-Of the five plugins, **four are the locked build target** (FFXIV_ACT_Plugin, OverlayPlugin,
-Triggernometry, Discord-Triggers). **ACT.Hojoring** is the fifth — added to scope but heaviest and
-most unusual; its extra requirements are flagged as **M4** (out-of-scope until committed). It is the
-only consumer that drives ACT's built-in spell-timer subsystem in full.
+All five plugins are in scope. FFXIV_ACT_Plugin, OverlayPlugin, Triggernometry and Discord-Triggers
+are the original build target; **ACT.Hojoring** is the heaviest and most unusual, so its extra
+surface (chiefly the full spell-timer subsystem) is the larger, not-yet-built batch tracked as
+**M4**. It is the only consumer that drives ACT's built-in spell-timer subsystem in full.
 
 ---
 
@@ -207,7 +207,7 @@ audio stack** (see §8F).
 paths (`TTS`/`PlaySound`) must call through whatever is currently assigned. Requires `oFormActMain`
 to be a real WinForms `Form` (handle, `Invoke`, dialog owner).
 
-## 5. ACT.Hojoring — heaviest consumer (M4, out-of-scope until committed)
+## 5. ACT.Hojoring — heaviest consumer (M4 surface, not yet built)
 
 `E:\dev\ACT.Hojoring`. Four `IActPluginV1` plugins (SpecialSpellTimer, TTSYukkuri, UltraScouter,
 XIVLog). Uses ACT as a **service bus + UI host**, not a data source (combat data comes from
@@ -400,7 +400,7 @@ ACT's *built-in* spell-timer engine (a second WinForms form). Two very different
   reproduce ACT's spell-timer feature, we just let the subscription resolve.
 - **Hojoring (M4):** a *working* `FormSpellTimers` (real `TimerDefs` + add/remove/rebuild/notify) plus
   the `TimerData`/`SpellTimer`/`TimelineEvent`/`TimerMod`/`TimerFrame` model family — all absent
-  today. The single largest M4 item; build only if Hojoring becomes a committed target.
+  today. The single largest M4 item; not yet built.
 
 ## 8H. Custom-trigger import — `CustomTriggers` / `CustomTrigger` — **DONE**
 
@@ -477,11 +477,12 @@ intended. **What to do:** build only when a real consumer appears (principle 1).
 | **G‑6** | `ActPluginData.btnXButton` + `IEquatable` missing | none reached | **MINOR** | Shape only. |
 | **G‑7** | `NotificationAdd` 2-arg only | OP (2-arg) | **none** | Matches consumer. |
 | **VERIFY** | `BeforeLogLineRead` reflectable multicast field; exact "Started" status string before Trig/OP/Hojoring init | OP/Trig/Hojoring | — | Test on the live path. |
-| **M4** | Hojoring: full `FormSpellTimers` + `TimerData` family; real `CornerControlAdd/Remove`; `Form` lifecycle members (`WindowState`/`CanFocus`/`IsHandleCreated`/`IsDisposed`) | Hojoring | — | Large; only if Hojoring committed. |
+| **M4** | Hojoring: full `FormSpellTimers` + `TimerData` family; real `CornerControlAdd/Remove`; `Form` lifecycle members (`WindowState`/`CanFocus`/`IsHandleCreated`/`IsDisposed`) | Hojoring | — | Large; the M4 batch (not yet built). |
 
-**Priority order:** G‑1 → G‑2 → G‑3 → VERIFY → (G‑4 conditional) → M4 (deferred). Everything else in
-this document is **DONE** or **STUB-by-design**. The supported-stack interface work reduces to three
-small facade additions (G‑1/G‑2/G‑3) plus verification.
+**Priority order:** G‑1 → G‑2 → G‑3 → VERIFY → (G‑4 conditional) → M4 (Hojoring spell-timer
+subsystem — the larger batch). Everything else in this document is **DONE** or **STUB-by-design**.
+The four-plugin interface work reduces to three small facade additions (G‑1/G‑2/G‑3) plus
+verification; M4 adds the Hojoring spell-timer surface on top.
 
 **Already satisfied (verified):** Discord-Triggers surface fully covered (delegate-field hijack,
 `PluginGetSelfData`, `AppDataFolder`, `WriteExceptionLog`, `Form` identity). Triggernometry
@@ -536,15 +537,13 @@ protocol:
   scan of `ActPlugins`), then register via `Registry.StartEventSource`/`RegisterOverlay`. cactbot's
   `CactbotEventSource` is an `EventSourceBase` registered exactly this way.
 
-**What our host must do — nothing now; future work.** Because **OverlayPlugin runs unmodified**, it
-brings its own CEF + Fleck + dispatcher + event sources. Our supported-stack obligation is only to get
-OverlayPlugin loaded and the §9 FFXIV seam populated; OverlayPlugin self-hosts the entire web surface.
-This matters only for the **future native `Fct.Overlays` (WebView2) layer**: to host cactbot *without*
-OverlayPlugin we would reproduce the dispatcher protocol (`subscribe`/`call`+`rseq`/cached replay),
-both transports, the injected `window.OverlayPluginApi` + `__OverlayCallback` (via WebView2
-`AddHostObjectToScript`/`PostWebMessage`), the URL-param injection, the event/handler catalog, and
-click-through transparent rendering. (Note: CLAUDE.md's "overlays via Kestrel" describes that *future
-native* layer, not unmodified OverlayPlugin — they differ.)
+**What our host must do — nothing.** Because **OverlayPlugin runs unmodified**, it brings its own
+CEF + Fleck + dispatcher + event sources and renders overlays as its own transparent, click-through
+windows. Our only obligation is to get OverlayPlugin loaded (§8A) and the §9 FFXIV seam populated;
+OverlayPlugin self-hosts the entire web + rendering surface. **We do not build a native overlay
+layer** — there is no `Fct.Overlays` / WebView2 / host-side WebSocket path, now or later. This
+surface is documented only to explain how cactbot reaches its data; reproducing it in the host is an
+explicit non-goal.
 
 ## 11. The Discord-Triggers audio bridge — the official audio stack
 

@@ -27,16 +27,16 @@ Today's stack is three independently-evolved layers glued together by a stringly
 pipe-delimited log line. This project explores collapsing that into two cooperating
 processes:
 
-- **A real .NET Framework 4.8 satellite** (`Fct.LegacyHost`) that hosts the four legacy
-  plugins **unmodified** (FFXIV_ACT_Plugin, OverlayPlugin/cactbot, Triggernometry, Discord
-  triggers) behind a clean-room ACT engine facade.
+- **A real .NET Framework 4.8 satellite** (`Fct.LegacyHost`) that hosts the five legacy
+  plugins **unmodified** (FFXIV_ACT_Plugin, OverlayPlugin/cactbot, Triggernometry,
+  ACT-Discord-Triggers, ACT.Hojoring) behind a clean-room ACT engine facade.
 - **A .NET 10 host** (`Fct.App`, Avalonia) that runs new typed plugins and receives data
   over IPC. The two CLRs cannot share a process, so the OS process boundary *is* the
   runtime boundary — only data crosses.
 
 Two hard directives gate every decision:
 
-1. The first version must run the four legacy plugins by **drop-in, unmodified**.
+1. The first version must run the five legacy plugins by **drop-in, unmodified**.
 2. Built for the future with a **clear legacy → native migration path** — opt-in,
    incremental, never a flag day.
 

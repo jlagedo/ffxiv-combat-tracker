@@ -31,11 +31,12 @@ The reference decompiles for all of this live under `reference/` (see §11).
 ## 2. Non-negotiable directives
 
 1. **It must run the legacy ecosystem unmodified.** The first version succeeds only
-   if these four real plugins work by drop-in, with no recompilation:
+   if these five real plugins work by drop-in, with no recompilation:
    - **FFXIV_ACT_Plugin** (the parser)
    - **OverlayPlugin** (ngld) + cactbot
    - **Triggernometry** (triggers/timelines/TTS)
-   - **Discord-trigger plugin**
+   - **ACT-Discord-Triggers** (the official audio stack)
+   - **ACT.Hojoring** (SpecialSpellTimer / TTSYukkuri / UltraScouter / XIVLog)
 2. **Built for the future, with a clear legacy → native migration path** that unlocks
    capabilities the legacy log-line format cannot express. Migration is opt-in and
    incremental — never a flag day.
@@ -90,7 +91,8 @@ free** in v1 — we sign up for zero opcode maintenance until the native parser 
 │  • clean-room ACT engine         │ pipe / │  • typed bus (Fct.Abstractions)   │
 │  • real FFXIV_ACT_Plugin         │ shared │  • ALC-isolated NEW plugins       │
 │  • real OverlayPlugin + CEF      │ memory │  • native parser (later)          │
-│  • Triggernometry, Discord       │        │  • native overlays (WebView2)     │
+│  • Triggernometry, Discord       │        │  • Avalonia shell + control panel │
+│  • ACT.Hojoring                  │        │                                   │
 │  ← all net48, runs natively      │        │  ← all net10, runs natively       │
 └─────────────────────────────────┘        └──────────────────────────────────┘
         the OS process boundary IS the runtime boundary; only DATA crosses
@@ -114,7 +116,7 @@ Fct.Host           net10        microkernel: ALC-per-plugin loader, manifest +
                                 Generic Host, config, logging, lifecycle.
 
 Fct.LegacyHost     net48        clean-room ACT engine + IActPluginV1 loader; hosts
-                                the four real plugins; bridge client.
+                                the five real plugins; bridge client.
 
 Fct.Bridge         net48;net10  IPC transport + wire protocol (named pipe +
                                 shared-memory ring for the combat hot path).
@@ -126,8 +128,6 @@ Fct.Parser.Native  net10        clean-room source-gen capture+opcodes+memory. La
 
 Fct.App            net10        Avalonia control panel + shell (MVVM). The net10
                                 user-facing UI. See §4a.
-Fct.Overlays       net10        native overlay layer (WebView2 + WS hub + addon host).
-                                Replaces CEF. Later.
 
 Fct.Compat.Act     net48        the ACT facade surface (lives in LegacyHost).
 ```
@@ -136,10 +136,12 @@ Fct.Compat.Act     net48        the ACT facade surface (lives in LegacyHost).
 
 - **net10 control panel + shell → Avalonia (XAML + MVVM).** A native .NET desktop app:
   modern, themeable, no packaging/runtime friction. The user-facing face of `Fct.Host`.
-- **Overlays remain web** (HTML/JS served by Kestrel, rendered in WebView2). Avalonia
-  hosts the WebView2 surface for native overlay windows (transparent, click-through).
-  This is the deliberate two-rendering-stack split: **Avalonia for app chrome, web for
-  overlays** (overlays must stay web for cactbot/ecosystem compatibility).
+- **Overlays → unmodified OverlayPlugin.** The host does **not** build a native overlay
+  layer (no `Fct.Overlays`, no WebView2, no host-side WebSocket/Kestrel — now or later).
+  OverlayPlugin runs unmodified in the net48 satellite, bringing its own CEF + Fleck +
+  event sources, and renders overlays as its own transparent click-through windows.
+  cactbot/ecosystem compatibility comes from hosting the real OverlayPlugin, not from
+  reproducing its web stack.
 - **net48 legacy UI is WinForms** — forced, not a choice: `IActPluginV1.InitPlugin`
   hands each legacy plugin a WinForms `TabPage`. It is quarantined in `Fct.LegacyHost`.
 
@@ -299,11 +301,11 @@ satellite is empty, delete it.
    reflecting over `ActGlobals.oFormActMain.ActPlugins` and into plugin-instance fields.
    The facade must match the shape it reflects against, not just the public API.
 3. **Assembly identity.** Strong-name / type-forward the facade assemblies to the exact
-   identities the four plugins are compiled against, or binds fail.
-4. **`ActGlobals` surface bound.** Reproduce the *measured* subset these four use; publish
+   identities the five plugins are compiled against, or binds fail.
+4. **`ActGlobals` surface bound.** Reproduce the *measured* subset these five use; publish
    a "supported legacy surface"; accept a long tail.
 5. **Native deps in collectible ALCs.** Machina sockets, Deucalion injection,
-   WebView2 — expect *stop → unload → reload* for parser swap, not live hot-reload.
+   OverlayPlugin's CEF — expect *stop → unload → reload* for parser swap, not live hot-reload.
 
 ---
 
