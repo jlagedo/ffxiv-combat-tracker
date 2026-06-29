@@ -47,7 +47,7 @@ swappable, independently-released component.
 | `Fct.LegacyHost` | net48 | clean-room ACT engine; hosts the four real plugins. |
 | `Fct.Bridge` | net48;net10 | IPC transport + versioned wire protocol. |
 | `Fct.Parser.Legacy` | net48 | wraps real FFXIV_ACT_Plugin as `IGameDataSource`. |
-| `Fct.Parser.Native` | net10 | clean-room parser. Structural `NetworkLogLine` today (line type/timestamp/actor/zone/ability); capture + opcode/damage decode + memory later. |
+| `Fct.Parser.Native` | net10 | clean-room parser. `NetworkLogLine` (structure) + `ActionEffectDecoder` (damage/heal byte decode) + `CombatLogParser` (stateful: combatant names, combat state). Damage `MasterSwing`s match ACT's parse exactly on real data (see Differential compat in `docs/TESTING.md`). Live capture + memory later. |
 | `Fct.App` | net10 | Avalonia control panel + shell (MVVM). |
 | `Fct.Overlays` | net10 | native WebView2 overlay layer (later). |
 | `Fct.Compat.Act` | net48 | the ACT facade surface (in LegacyHost). |
