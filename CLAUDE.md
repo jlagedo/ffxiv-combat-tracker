@@ -195,8 +195,7 @@ VS 2026 / MSBuild.
 (`Fct.Compat.Act.Tests` + `Fct.Parser.Legacy.Tests` net48, `Fct.App.Tests`,
 `Fct.Integration.Tests` net10). Data-dependent tests skip when their prerequisites are absent: the
 satellite integration's plugin/self-test assertions and the replay-route test need
-`FFXIV_ACT_Plugin.dll` installed. CI (`.github/workflows/ci.yml`) runs the suite on
-`windows-latest`. Full details: [`docs/TESTING.md`](docs/TESTING.md).
+`FFXIV_ACT_Plugin.dll` installed. Full details: [`docs/TESTING.md`](docs/TESTING.md).
 
 Run the slice end-to-end (launches host → satellite → loads real plugins):
 

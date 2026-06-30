@@ -22,8 +22,8 @@ Or run a single project directly with `dotnet test tests/<project>`.
 ## What runs vs. skips
 
 The unit/parser tests are self-contained and always run. The data-dependent tests skip
-cleanly when their prerequisites are absent, so a clean checkout (and CI without an ACT
-install) stays green:
+cleanly when their prerequisites are absent, so a clean checkout without an ACT
+install stays green:
 
 - **Satellite integration** (`Fct.Integration.Tests`) needs the satellite staged
   (`dotnet build src/Fct.App/Fct.App.csproj`); `test.ps1` does this first. The handshake and
