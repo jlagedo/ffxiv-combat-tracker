@@ -44,9 +44,8 @@ for ACT — it carries the existing ecosystem forward.
   (`Fct.LegacyHost`); the **.NET 10 host** (`Fct.App`) runs new plugins; they bridge over
   IPC. `AssemblyLoadContext` isolates net10 plugins from each other — it is **not**
   cross-runtime.
-- **We build only the ACT engine.** The FFXIV SDK and the OverlayPlugin/cactbot surface
-  self-host by loading the real plugins; hosting the real FFXIV_ACT_Plugin inherits its
-  per-patch opcode cadence for free.
+- **Scope: the ACT compat engine only** (`Fct.Compat.Act`). The FFXIV SDK and the
+  OverlayPlugin/cactbot surface self-host by loading the real plugins.
 - **What we build, and what "parity" means** (read this before touching aggregation).
   **We build only the ACT engine** (`Fct.Compat.Act`) — the consumer/aggregator that turns
   `MasterSwing`s into encounters / DPS / `ExportVariables`. **The real FFXIV_ACT_Plugin is the sole

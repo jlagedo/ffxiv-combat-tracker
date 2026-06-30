@@ -284,6 +284,11 @@ satellite is empty, delete it.
 
 ## 11. Milestones (each a measurable drop-in test)
 
+The arc is compat-first, then migration: M0–M3 prove the existing ecosystem runs **unmodified**
+on the modern host; M4 opens the **opt-in** path for new plugins to consume typed events
+**alongside** the legacy ones. Nothing is replaced at any step — the legacy plugins keep working
+exactly as before; the forward surface is additive.
+
 - **M0 — Engine core:** host loads the real FFXIV_ACT_Plugin; `ParseRawLogLine` feeds
   the encounter pipeline; encounters/DPS show; `Network_*.log` written.
   *Test: numbers match real ACT on a fight.*
@@ -293,7 +298,7 @@ satellite is empty, delete it.
   *Test: a known Triggernometry pack triggers.*
 - **M3 — Discord triggers:** trigger/encounter events post to Discord. *Test: a kill posts.*
 - **M4 — Forward surface:** the parallel typed bus + a demo native plugin reads typed
-  events alongside the legacy four.
+  events alongside the legacy four — the migration path proven, opt-in, nothing replaced.
 
 ---
 
