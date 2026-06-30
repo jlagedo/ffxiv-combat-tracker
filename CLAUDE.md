@@ -4,9 +4,10 @@ Guidance for Claude Code when working in this repository.
 
 ## What this repo is
 
-**FFXIV Combat Tracker** — a clean-slate, FFXIV-only rebuild of the
-ACT + FFXIV_ACT_Plugin + OverlayPlugin stack. The two-process host builds and runs the real
-legacy plugins (**Slice 1 complete** — see *Active work* below). The full design lives in
+**FFXIV Combat Tracker** — a clean-slate, FFXIV-only rebuild of **ACT** (the Advanced Combat
+Tracker host/engine at the center of the FFXIV_ACT_Plugin + OverlayPlugin stack), running the
+real FFXIV_ACT_Plugin + OverlayPlugin **unmodified**. The two-process host builds and runs the
+real legacy plugins (**Slice 1 complete** — see *Active work* below). The full design lives in
 [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md) — read it before proposing changes.
 [`docs/DATA-FLOW.md`](docs/DATA-FLOW.md) is the authoritative map of how data flows
 through the real upstream stack (FFXIV_ACT_Plugin → ACT → OverlayPlugin) and the exact

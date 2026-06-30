@@ -12,8 +12,9 @@
 
 ---
 
-A clean-slate, **FFXIV-only** experimental rebuild of the ACT + FFXIV_ACT_Plugin +
-OverlayPlugin stack on modern .NET. The aim being explored here: a host that can run the
+A clean-slate, **FFXIV-only** experimental rebuild of **ACT** — the host/engine at the center
+of the FFXIV_ACT_Plugin + OverlayPlugin stack — on modern .NET, running the real plugins
+unmodified. The aim being explored here: a host that can run the
 **existing plugin ecosystem unmodified** while exposing a typed, future-facing plugin API,
 with the network/opcode parser as a swappable, independently-released component.
 

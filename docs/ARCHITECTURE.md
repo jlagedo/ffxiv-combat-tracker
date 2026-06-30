@@ -1,7 +1,7 @@
 # FFXIV Combat Tracker — Architecture
 
-A clean-slate, **FFXIV-only** rebuild of the ACT + FFXIV_ACT_Plugin + OverlayPlugin
-stack. The goal: a modern .NET host that runs the **existing plugin ecosystem
+A clean-slate, **FFXIV-only** rebuild of **ACT** — the host/engine at the center of the
+FFXIV_ACT_Plugin + OverlayPlugin stack. The goal: a modern .NET host that runs the **existing plugin ecosystem
 unmodified** today, and unlocks a typed, future-facing plugin API tomorrow — with
 the network/opcode parser living as a swappable, independently-released component.
 
