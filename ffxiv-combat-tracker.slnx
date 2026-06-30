@@ -1,5 +1,7 @@
 <Solution>
   <Folder Name="/src/">
+    <Project Path="src/Fct.Abstractions/Fct.Abstractions.csproj" />
+    <Project Path="src/Fct.Abstractions.UI/Fct.Abstractions.UI.csproj" />
     <Project Path="src/Fct.App/Fct.App.csproj" />
     <Project Path="src/Fct.LegacyHost/Fct.LegacyHost.csproj" />
     <Project Path="src/Fct.Compat.Act/Fct.Compat.Act.csproj" />

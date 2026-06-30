@@ -1,0 +1,26 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!--
+    The UI contribution contract: how a net10 plugin patches Avalonia surfaces (settings page,
+    nav page, dashboard widget, status item) into the host shell. net10-only + Avalonia, kept
+    OUT of Fct.Abstractions so headless plugins (parsers/triggers/audio sinks) take no UI dep.
+    The host's plugin loader shares Avalonia.* up to the default AssemblyLoadContext so plugin
+    Controls have one type identity with the shell (plugins are pinned to the host Avalonia version).
+  -->
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <LangVersion>latest</LangVersion>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>disable</ImplicitUsings>
+    <RootNamespace>Fct.Abstractions.UI</RootNamespace>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Avalonia" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\Fct.Abstractions\Fct.Abstractions.csproj" />
+  </ItemGroup>
+
+</Project>

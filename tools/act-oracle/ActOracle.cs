@@ -339,7 +339,16 @@ internal static class ActOracle
         th.SetApartmentState(ApartmentState.STA);
         th.IsBackground = true;
         th.Start();
-        if (!th.Join(120000)) { Console.WriteLine("TIMEOUT"); return 1; }
+        // Folder mode aggregates every *.oracle.tsv on the worker thread, so the watchdog must scale
+        // to the corpus (a months-long single session is millions of swings); a single slice keeps
+        // the original 2-minute budget.
+        int timeoutMs = 120000;
+        if (argv[0] == "--folder")
+        {
+            try { timeoutMs = Math.Max(120000, Directory.GetFiles(argv[1], "*.oracle.tsv").Length * 30000); }
+            catch { timeoutMs = 3600000; }
+        }
+        if (!th.Join(timeoutMs)) { Console.WriteLine("TIMEOUT"); return 1; }
         Console.WriteLine(_result);
         return _result.StartsWith("OK") ? 0 : 1;
     }

@@ -76,7 +76,9 @@ if (-not (Test-Path $actExe)) {
 
 Write-Host "==> compiling ActOracle against the real ACT binary" -ForegroundColor Cyan
 $csc = "$env:WINDIR\Microsoft.NET\Framework64\v4.0.30319\csc.exe"
-$actOracleExe = "$repo\tools\act-oracle\ActOracle.exe"
+# Emit into OutFolder (not the shared tools dir) so concurrent per-player runs don't collide on
+# compiling/executing the same ActOracle.exe.
+$actOracleExe = "$OutFolder\ActOracle.exe"
 & $csc -nologo -platform:x64 -reference:"$actExe" -reference:System.Drawing.dll `
     -reference:System.Windows.Forms.dll -out:"$actOracleExe" "$repo\tools\act-oracle\ActOracle.cs"
 if ($LASTEXITCODE -ne 0) { throw "ActOracle compile failed" }

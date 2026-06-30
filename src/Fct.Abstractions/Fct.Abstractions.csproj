@@ -1,0 +1,27 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!--
+    The plugin SDK: contracts + domain records, no opcodes, no UI. Multi-targets net48;net10
+    so the SAME record/interface types exist on both sides of the bridge (a plugin author
+    writes against it once; the binary runs in whichever host matches its runtime).
+    UI contracts live in Fct.Abstractions.UI (net10 + Avalonia) so headless plugins take no UI dep.
+  -->
+  <PropertyGroup>
+    <TargetFrameworks>net48;net10.0</TargetFrameworks>
+    <LangVersion>latest</LangVersion>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>disable</ImplicitUsings>
+    <RootNamespace>Fct.Abstractions</RootNamespace>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Microsoft.Extensions.Logging.Abstractions" />
+  </ItemGroup>
+
+  <!-- net10 ships records (init accessors), IAsyncEnumerable and IAsyncDisposable in-box;
+       net48 needs the BCL shims. IsExternalInit.cs supplies the init-accessor attribute. -->
+  <ItemGroup Condition="'$(TargetFramework)' == 'net48'">
+    <PackageReference Include="Microsoft.Bcl.AsyncInterfaces" />
+  </ItemGroup>
+
+</Project>
