@@ -15,7 +15,7 @@ Or run a single project directly with `dotnet test tests/<project>`.
 
 | Project | TFM | Scope |
 |---|---|---|
-| `Fct.Compat.Act.Tests` | net48 | The clean-room ACT aggregation engine: `Dnum`, `MasterSwing`, `AttackType`/`CombatantData`/`EncounterData` math, the `ExportVariables` contract OverlayPlugin/cactbot read, `SettingsSerializer` XML round-trip, and the **differential ACT-engine compat** (`AggregateCompatTests`, below). |
+| `Fct.Compat.Act.Tests` | net48 | The from-scratch ACT aggregation engine: `Dnum`, `MasterSwing`, `AttackType`/`CombatantData`/`EncounterData` math, the `ExportVariables` contract OverlayPlugin/cactbot read, `SettingsSerializer` XML round-trip, and the **differential ACT-engine compat** (`AggregateCompatTests`, below). |
 | `Fct.App.Tests` | net10 | The bridge handshake parser (`SatelliteProtocol`): READY detection, x64 gating, HWND hex parsing. |
 | `Fct.Integration.Tests` | net10 | Black-box end-to-end: launches the staged net48 satellite, checks the handshake/HWND, verifies the in-process self-test aggregation, and runs the **full live route** on a recorded slice (`--replay`, below). |
 
@@ -91,7 +91,7 @@ without the staged satellite or the installed plugin.
 
 The layer above parsing is **aggregation**: the real plugin calls `AddCombatAction(MasterSwing)` into
 ACT, which tallies `EncounterData`/`CombatantData` and exposes the `ExportVariables`/properties
-OverlayPlugin/cactbot read. `Fct.Compat.Act` is our clean-room rebuild of that engine, held to the
+OverlayPlugin/cactbot read. `Fct.Compat.Act` is our from-scratch reimplementation of that engine, held to the
 **real `Advanced Combat Tracker.exe`** bit-for-bit:
 
 - **Oracle** (`tools/act-oracle`) loads the real ACT binary in-process, installs the exact damage-type

@@ -1,9 +1,11 @@
 # FFXIV Combat Tracker — Architecture
 
-A clean-slate, **FFXIV-only** rebuild of **ACT** — the host/engine at the center of the
-FFXIV_ACT_Plugin + OverlayPlugin stack. The goal: a modern .NET host that runs the **existing plugin ecosystem
-unmodified** today, and unlocks a typed, future-facing plugin API tomorrow — with
-the network/opcode parser living as a swappable, independently-released component.
+**FFXIV Combat Tracker modernizes the stack under the FFXIV ACT plugin ecosystem.** It runs
+today's ACT plugins unmodified on current .NET, and opens an incremental, opt-in path to migrate
+them onto a typed modern API. **It is not a new ACT and not a replacement** — the goal is to
+carry the community's existing plugins forward. To do that it reproduces ACT's plugin-host
+surface as a from-scratch compatibility facade (**FFXIV-only**), with the network/opcode parser
+living as a swappable, independently-released component.
 
 ---
 
@@ -73,7 +75,7 @@ Directive 1 requires honoring **three** legacy contracts, but we only *build* on
 
 | # | Contract | Provided in v1 by | Our build cost |
 |---|---|---|---|
-| 1 | **ACT host surface** (`ActGlobals.oFormActMain`, `IActPluginV1`, encounter pipeline, events, TTS, `CustomTrigger`, models) | **us** — clean-room from the decompile | The v1 build |
+| 1 | **ACT host surface** (`ActGlobals.oFormActMain`, `IActPluginV1`, encounter pipeline, events, TTS, `CustomTrigger`, models) | **us** — from-scratch, behavior reproduced from the decompile | The v1 build |
 | 2 | **FFXIV SDK** (`IDataSubscription`/`IDataRepository`, `RegisterNetworkParser`, custom log lines) | the **real FFXIV_ACT_Plugin**, hosted unmodified | ~0 |
 | 3 | **OverlayPlugin surface** (WebSocket protocol, `IOverlayAddonV2`, cactbot) | the **real OverlayPlugin**, hosted unmodified | ~0 |
 
@@ -90,7 +92,7 @@ only the consume/aggregate side (the ACT engine).
 ┌─────────────────────────────────┐        ┌──────────────────────────────────┐
 │  Fct.LegacyHost  (.NET Fx 4.8)   │  IPC   │  Fct.App  (.NET 10)               │
 │                                  │◄──────►│                                  │
-│  • clean-room ACT engine         │ pipe / │  • typed bus (Fct.Abstractions)   │
+│  • from-scratch ACT engine         │ pipe / │  • typed bus (Fct.Abstractions)   │
 │  • real FFXIV_ACT_Plugin         │ shared │  • ALC-isolated NEW plugins       │
 │  • real OverlayPlugin + CEF      │ memory │  • typed game-data API            │
 │  • Triggernometry, Discord       │        │  • Avalonia shell + control panel │
@@ -124,7 +126,7 @@ Fct.App            net10        the net10 host AND user-facing UI (one project):
                                 Target: ALC-per-plugin loader + manifest/contract-version
                                 gate for new plugins. See §4a.
 
-Fct.LegacyHost     net48        clean-room ACT engine + IActPluginV1 loader; hosts
+Fct.LegacyHost     net48        from-scratch ACT engine + IActPluginV1 loader; hosts
                                 the five real plugins; satellite end of the bridge.
 
 Fct.Parser.Legacy  net48        wraps the real FFXIV_ACT_Plugin as an IGameDataSource
@@ -167,7 +169,7 @@ real FFXIV_ACT_Plugin            ← hosted as IActPluginV1, given our ActGlobal
    │  ParseRawLogLine(...)        (pipe-delimited lines, as in real ACT)
    │  IDataSubscription + RegisterNetworkParser (raw packets) + custom log lines
    ▼
-clean-room ACT engine (Fct.LegacyHost)
+from-scratch ACT engine (Fct.LegacyHost)
    • ParseRawLogLine → MasterSwing → CombatantData → EncounterData
    • raises Before/OnLogLineRead, OnCombatStart/End, Before/AfterCombatAction
    • CustomTrigger eval → TTS(...) / PlaySound(...)

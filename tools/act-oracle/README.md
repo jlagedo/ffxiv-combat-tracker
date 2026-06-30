@@ -1,6 +1,6 @@
 # ACT-layer differential oracle
 
-Holds our clean-room ACT engine (`Fct.Compat.Act`) to **bit-perfect parity with the real
+Holds our from-scratch ACT engine (`Fct.Compat.Act`) to **bit-perfect parity with the real
 Advanced Combat Tracker** at the aggregation layer the consumers (OverlayPlugin/cactbot) read.
 
 ## What it does

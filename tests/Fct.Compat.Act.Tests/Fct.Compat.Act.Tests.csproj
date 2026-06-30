@@ -1,7 +1,7 @@
 <Project Sdk="Microsoft.NET.Sdk">
 
   <!--
-    Unit tests for the clean-room ACT facade engine (Fct.Compat.Act). net48 to match the
+    Unit tests for the from-scratch ACT facade engine (Fct.Compat.Act). net48 to match the
     facade TFM; UseWindowsForms because SettingsSerializer and ActPluginData touch WinForms
     controls. These tests are pure/deterministic: no game, no plugin, no satellite.
   -->

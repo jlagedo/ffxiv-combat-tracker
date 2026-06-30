@@ -12,7 +12,7 @@ It is reconstructed from the real sources:
   decompile (`.audit/ffxiv_act_plugin/decompiled/`, mirrored at `E:\dev\FFXIV_ACT_Plugin\_decompiled`).
 - `reference/overlayplugin/` → `E:\dev\OverlayPlugin` — ngld OverlayPlugin (net48).
 - `E:\dev\IINACT` — a working in-process re-host of the same stack (its `NotACT` is the
-  independent proof that our clean-room ACT approach is correct).
+  independent proof that our from-scratch ACT approach is correct).
 
 > Rule: when a compat detail is in doubt, the decompile is the authority. Match the exact
 > signature / string name / property shape there, not an approximation. OverlayPlugin's
@@ -31,7 +31,7 @@ from **both** plugin channels *and* from ACT's aggregated output — it reflects
 to reach the plugin's SDK directly, and reads ACT's `EncounterData.ExportVariables` for DPS.
 
 Our job: **host the real `FFXIV_ACT_Plugin` unmodified (it owns the two channels for free),
-and build a clean-room ACT (`Fct.Compat.Act`) whose shape matches exactly what OverlayPlugin
+and build a from-scratch ACT (`Fct.Compat.Act`) whose shape matches exactly what OverlayPlugin
 and the other plugins reflect against.**
 
 ---
@@ -58,7 +58,7 @@ ffxiv_dx11.exe
 ╚═══════════════════│════════════════════════════════════│════════════════════════╝
                     │ log lines (file/queue)              │  (reflected into directly)
                     ▼                                     │
-╔═══════════════ ACT  (we build clean-room: Fct.Compat.Act) ═══════════════════════╗
+╔═══════════════ ACT  (we build from-scratch: Fct.Compat.Act) ═══════════════════════╗
 ║  FormActMain tails the log → regex → MasterSwing                                  ║
 ║     → AddCombatAction → CombatantData → EncounterData                             ║
 ║     → EncounterData.ExportVariables / CombatantData.ExportVariables               ║
@@ -239,7 +239,7 @@ log line ──regex──► MasterSwing ──AddCombatAction──► Combata
                                                           └─ reverse action ─► victim CombatantData
 ```
 
-### 3.1 The aggregation engine (clean-room from the decompile)
+### 3.1 The aggregation engine (from-scratch, behavior reproduced from the decompile)
 
 - `MasterSwing` — one action/damage event (attacker, victim, attackType, damage `Dnum`,
   swingType, critical, special, time/timeSorter). Strings interned on add.
@@ -486,7 +486,7 @@ net10 host. See `docs/ARCHITECTURE.md` §3b–§4 for the runtime split rational
 IINACT solves the *same* problem with the opposite tradeoff: it runs **in-process** as a
 Dalamud plugin on net10, and gets there by **modifying** the ecosystem — it binary-patches
 `FFXIV_ACT_Plugin.dll` and forked/ported OverlayPlugin to net10. Its `NotACT` project is a
-clean-room ACT that impersonates the `Advanced Combat Tracker` identity — independent
+from-scratch ACT that impersonates the `Advanced Combat Tracker` identity — independent
 confirmation that our `Fct.Compat.Act` approach is correct, and a working reference for the
 aggregation engine. Where IINACT reaches into plugin internals (e.g. reading
 `FfxivPlugin._dataCollection._logOutput._LogQueue` by reflection) it can pin/patch the DLL;

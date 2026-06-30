@@ -4,10 +4,13 @@ Guidance for Claude Code when working in this repository.
 
 ## What this repo is
 
-**FFXIV Combat Tracker** — a clean-slate, FFXIV-only rebuild of **ACT** (the Advanced Combat
-Tracker host/engine at the center of the FFXIV_ACT_Plugin + OverlayPlugin stack), running the
-real FFXIV_ACT_Plugin + OverlayPlugin **unmodified**. The two-process host builds and runs the
-real legacy plugins (**Slice 1 complete** — see *Active work* below). The full design lives in
+**FFXIV Combat Tracker modernizes the stack under the FFXIV ACT plugin ecosystem** — it runs
+today's ACT plugins unmodified on current .NET and opens an incremental, opt-in migration path
+onto a typed modern API. It is **not a new ACT and not a replacement**; the goal is to carry the
+community's existing plugins forward. To run those plugins it reproduces ACT's plugin-host
+surface as a from-scratch compatibility facade (FFXIV-only), hosting the real FFXIV_ACT_Plugin +
+OverlayPlugin **unmodified**. The two-process host builds and runs the real legacy plugins
+(**Slice 1 complete** — see *Active work* below). The full design lives in
 [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md) — read it before proposing changes.
 [`docs/DATA-FLOW.md`](docs/DATA-FLOW.md) is the authoritative map of how data flows
 through the real upstream stack (FFXIV_ACT_Plugin → ACT → OverlayPlugin) and the exact
@@ -19,8 +22,9 @@ compat seams we must reproduce to make the unmodified plugins work — the build
 
 The product is a host that runs the **existing plugin ecosystem unmodified**
 (FFXIV_ACT_Plugin, OverlayPlugin/cactbot, Triggernometry, ACT-Discord-Triggers, ACT.Hojoring)
-while exposing a typed, future-facing plugin API, with the network/opcode parser as a
-swappable, independently-released component.
+while defining a typed, future-facing plugin API for the next generation of plugins, with the
+network/opcode parser as a swappable, independently-released component. It is not a replacement
+for ACT — it carries the existing ecosystem forward.
 
 ## Two hard directives (these gate every decision)
 
@@ -74,7 +78,7 @@ swappable, independently-released component.
 | `Fct.Abstractions` | net48;net10 | the plugin SDK: contracts + domain records. No opcodes. |
 | `Fct.Abstractions.UI` | net10 | Avalonia UI contribution surfaces (`IUiContributor`/`IUiHost`); referenced only by UI-contributing net10 plugins. |
 | `Fct.App` | net10 | the **.NET 10 host**: Avalonia control panel + shell (MVVM); launches/embeds the satellite and owns the IPC bridge client (`SatelliteHost`/`SatelliteProtocol`/`SatelliteLifetime`). |
-| `Fct.LegacyHost` | net48 | clean-room ACT engine host; hosts the five real plugins; the net48 end of the bridge. |
+| `Fct.LegacyHost` | net48 | from-scratch ACT engine host; hosts the five real plugins; the net48 end of the bridge. |
 | `Fct.Parser.Legacy` | net48 | wraps the real FFXIV_ACT_Plugin. `WrappedFfxivPlugin` sits in `pluginObj` (forwards `DataRepository`/`_iocContainer`/lifecycle to the real instance) and exposes `RingBufferDataSubscription` (`IDataSubscription` + `IRawPacketSource`): a bounded ring + single dispatch thread that replaces the plugin's per-subscriber `BeginInvoke` fan-out so OverlayPlugin's ~20 handlers cost one in-order dispatch. ~250× faster on the dispatch stage. |
 | `Fct.Compat.Act` | net48 | **the ACT engine** (the facade surface, hosted in LegacyHost). Its `EncounterData`/`CombatantData`/`AttackType` aggregation + `ExportVariables` reproduce the real ACT binary bit-for-bit when fed the real plugin's `MasterSwing` stream. Held to that baseline by `AggregateCompatTests`/`ExportVarsCompatTests` (fixtures) and corpus-scale by `tools/mass-compare` — the satellite's `--mass-engine-exports` aggregates each captured `oracle.tsv` through this engine, diffed against the real-ACT baseline. See `docs/TESTING.md`. |
 | `Fct.StreamProbe` | net48 | diagnostic plugin loaded in the satellite; taps the parser's `MasterSwing`/raw-packet stream for inspection. |
@@ -122,7 +126,7 @@ are mapped in [`docs/ACT-INTERFACE-MAP.md`](docs/ACT-INTERFACE-MAP.md):
   decompile. It exists here for **one purpose only: understanding the legacy stack we host
   unmodified** (its load/lifecycle, the `FFXIV_ACT_Plugin.Common` SDK surface we facade, how it
   drives ACT). **It is never a source to port parsing, swing-production, or DoT/HoT/shield logic
-  from.** We do not replicate FFXIV_ACT_Plugin; if any of our clean-room code was derived from it,
+  from.** We do not replicate FFXIV_ACT_Plugin; if any of our from-scratch code was derived from it,
   that is a bug to fix.
 
 When a compat detail is in doubt, the authority for **our** implementation is `ACT-decompiled` (host
@@ -221,7 +225,7 @@ tested via run logs, committed:
   real FFXIV_ACT_Plugin reaches **"Started"**.
 - S3 real OverlayPlugin hosted; FFXIVRepository discovery works; CEF runs (overlays created).
 - S4 both plugin config tabs embedded in the Avalonia window (3 tabs).
-- S5 clean-room aggregation verified deterministically (self-test: 10×1000/9s →
+- S5 from-scratch aggregation verified deterministically (self-test: 10×1000/9s →
   encdps=1111, damage=10000, crithit%=40%, exact).
 
 **Remaining live check:** with FFXIV running, confirm `AddCombatAction` count > 0 and an

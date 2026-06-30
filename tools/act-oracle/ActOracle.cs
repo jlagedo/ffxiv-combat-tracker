@@ -12,7 +12,7 @@ using Advanced_Combat_Tracker;
 // exact damage-type routing tables the FFXIV plugin installs at runtime, replays a captured
 // MasterSwing stream (the real plugin's authoritative parse, e.g. combat-slice.oracle.tsv)
 // through the real EncounterData/CombatantData aggregation, and dumps the per-combatant and
-// encounter aggregates. That output is the gold baseline our clean-room Fct.Compat.Act facade
+// encounter aggregates. That output is the gold baseline our from-scratch Fct.Compat.Act facade
 // is held to (see Fct.Compat.Act.Tests/AggregateCompatTests).
 //
 // The real FormActMain is never run; ActGlobals.oFormActMain is an uninitialized instance used

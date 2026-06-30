@@ -10,7 +10,7 @@ using Xunit.Abstractions;
 namespace Fct.Compat.Act.Tests
 {
     // ACT-layer differential compat: feed the captured real-plugin MasterSwing stream
-    // (combat-slice.oracle.tsv) through OUR clean-room Fct.Compat.Act aggregation and assert every
+    // (combat-slice.oracle.tsv) through OUR from-scratch Fct.Compat.Act aggregation and assert every
     // per-combatant + encounter aggregate matches the REAL Advanced Combat Tracker binary's output
     // (combat-slice.aggregate.tsv, produced by tools/act-oracle). Values are formatted exactly as
     // the oracle wrote them, so this is a bit-for-bit comparison of the numbers consumers read.

@@ -1,6 +1,6 @@
 # mass-compare
 
-Corpus-scale **ACT-engine parity**: proves our clean-room ACT engine (`Fct.Compat.Act`) reproduces
+Corpus-scale **ACT-engine parity**: proves our from-scratch ACT engine (`Fct.Compat.Act`) reproduces
 the real Advanced Combat Tracker binary's aggregation — the `ExportVariables` payload OverlayPlugin/
 cactbot read — over an **entire folder of `Network_*.log` files** (months of logs), fed the identical
 plugin-produced swings.

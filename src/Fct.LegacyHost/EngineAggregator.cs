@@ -11,7 +11,7 @@ namespace Fct.LegacyHost
 {
     // Corpus-scale ACT-engine parity. The real plugin (the sole parser) has already turned each
     // Network_*.log into a MasterSwing stream — captured by --mass-oracle as <name>.oracle.tsv.
-    // Here we feed those SAME swings through OUR clean-room Fct.Compat.Act aggregation and dump the
+    // Here we feed those SAME swings through OUR from-scratch Fct.Compat.Act aggregation and dump the
     // ExportVariables payload OverlayPlugin/cactbot read, to <name>.engine.exports.tsv. The real-ACT
     // baseline over the identical swings is produced by tools/act-oracle (<name>.oracle.exports.tsv);
     // MassCompare --exports-diff diffs the two. This is the corpus version of

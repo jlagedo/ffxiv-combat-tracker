@@ -12,11 +12,15 @@
 
 ---
 
-A clean-slate, **FFXIV-only** experimental rebuild of **ACT** — the host/engine at the center
-of the FFXIV_ACT_Plugin + OverlayPlugin stack — on modern .NET, running the real plugins
-unmodified. The aim being explored here: a host that can run the
-**existing plugin ecosystem unmodified** while working toward a typed, future-facing plugin API,
-with the network/opcode parser as a swappable, independently-released component.
+**FFXIV Combat Tracker modernizes the stack under the FFXIV ACT plugin ecosystem.** It runs
+today's ACT plugins unmodified on current .NET, and opens an incremental, opt-in path to
+migrate them onto a typed modern API. **It is not a new ACT and not a replacement** — the
+point is to carry the community's existing plugins forward, not to compete with the tools they
+rely on.
+
+Concretely, this is an **FFXIV-only** experiment: a two-process host that loads the real
+FFXIV_ACT_Plugin + OverlayPlugin (and the wider ecosystem) unmodified, with the network/opcode
+parser kept as a swappable, independently-released component.
 
 The authoritative design lives in [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md). The map of
 how data flows through the real upstream stack — and the compat seams this project must
@@ -140,11 +144,14 @@ or an installed `FFXIV_ACT_Plugin.dll`) are absent.
 
 ## Relationship to upstream projects
 
-This project studies and reproduces compat seams against the **decompiled** behavior of
-Advanced Combat Tracker, FFXIV_ACT_Plugin, and OverlayPlugin. Those are third-party works
-owned by their respective authors; nothing here is affiliated with or endorsed by them. This
-repository contains **no game client code and no reverse-engineered game opcodes** — the v1
-design deliberately hosts the real parser plugin rather than reimplementing it.
+**This is not a replacement for ACT, FFXIV_ACT_Plugin, or OverlayPlugin — use the upstream
+tools for live play.** This project exists to carry their ecosystem forward onto modern .NET,
+not to compete with it. It studies and reproduces compat seams against the **decompiled**
+behavior of Advanced Combat Tracker, FFXIV_ACT_Plugin, and OverlayPlugin so the real plugins
+keep working; those are third-party works owned by their respective authors, and nothing here
+is affiliated with or endorsed by them. This repository contains **no game client code and no
+reverse-engineered game opcodes** — the v1 design deliberately hosts the real parser plugin
+rather than reimplementing it.
 
 FINAL FANTASY XIV © SQUARE ENIX CO., LTD. This is an unaffiliated fan project.
 

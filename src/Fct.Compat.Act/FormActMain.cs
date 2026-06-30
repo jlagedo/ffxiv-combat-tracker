@@ -338,7 +338,7 @@ namespace Advanced_Combat_Tracker
 
         public void ActCommands(string commandText) => Log($"[ActCommands] {commandText}");
 
-        // --- Combat pipeline: feed the clean-room aggregation engine ---
+        // --- Combat pipeline: feed the from-scratch aggregation engine ---
         public void AddCombatAction(MasterSwing action)
         {
             AddCombatActionCount++;

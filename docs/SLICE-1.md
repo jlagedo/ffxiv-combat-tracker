@@ -97,7 +97,7 @@ handshake (ready + HWND) over IPC. The full typed-event bridge is **not** needed
 ## Scope decision (RESOLVED — Option B)
 
 "Overlay shows live DPS" requires ACT's aggregation engine (above). **Option B was taken**: the
-clean-room aggregation engine shipped as **S5** (see Results). The two options weighed were:
+from-scratch aggregation engine shipped as **S5** (see Results). The two options weighed were:
 
 - **Option A — Defer the engine.** Slice 1 proves the *new, risky* unknowns:
   two-process launch, strong-name facade via `AssemblyResolve`, real plugin loading + init,
@@ -106,8 +106,8 @@ clean-room aggregation engine shipped as **S5** (see Results). The two options w
   **slice 2** (→ MiniParse DPS).
 - **Option B — Include live DPS now.** Also build ACT's combat-aggregation engine
   (`AddCombatAction`/`SetEncounter`/`ChangeZone` + `MasterSwing→CombatantData→EncounterData`
-  + the `ExportVariables` DPS formatters). Much larger; also raises copy-vs-clean-room
-  (ACT is copyrighted — the architecture mandates clean-room reimplementation, not copying
+  + the `ExportVariables` DPS formatters). Much larger; also raises copy-vs-reimplement
+  (ACT is copyrighted — the architecture mandates a from-scratch reimplementation, not copying
   decompiled code).
 
 ---
@@ -154,7 +154,7 @@ All phases build, were tested via run logs, and are committed.
 ### Remaining
 - **Live capture:** with FFXIV running, confirm `AddCombatAction` count > 0 and an overlay
   shows live DPS. Data source (FFXIV plugin) is Started; the rest of the path is verified.
-- **Debt:** the aggregation is a simplified clean-room slice impl (no threat / personal-
+- **Debt:** the aggregation is a simplified from-scratch slice impl (no threat / personal-
   duration splits / full column set); OverlayPlugin 0.18.2 is old; satellite paths are
   hard-coded; IPC is the S0/S1 handshake only (no typed event bridge yet).
 
@@ -164,4 +164,4 @@ All phases build, were tested via run logs, and are committed.
   references exactly.
 - Avalonia 12 transparent/click-through + hosting a foreign HWND.
 - OverlayPlugin 0.18.2 is old; CEF first-run download; MSVC runtime dependency.
-- Option B: clean-room reimplementation of `ExportVariables` keys overlays depend on.
+- Option B: from-scratch reimplementation of `ExportVariables` keys overlays depend on.

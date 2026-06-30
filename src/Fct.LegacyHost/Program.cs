@@ -171,7 +171,7 @@ namespace Fct.LegacyHost
         }
 
         // Deterministic S5 check: drive synthetic combat through the facade and read back
-        // the clean-room aggregation + the export formatters OverlayPlugin/cactbot consume.
+        // the from-scratch aggregation + the export formatters OverlayPlugin/cactbot consume.
         private static void SelfTestAggregation()
         {
             try
