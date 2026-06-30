@@ -1,0 +1,40 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!--
+    A real (net48) IActPluginV1 diagnostic plugin. It discovers the FFXIV_ACT_Plugin exactly the
+    way OverlayPlugin does (reflect ActGlobals.oFormActMain.ActPlugins), reflects its
+    DataSubscription/DataRepository, subscribes to the full SDK event stream, taps ACT's log/combat
+    events + the live ExportVariables rollup, and logs everything to streamprobe.log. Read-only: it
+    never writes into the engine, so it cannot perturb ACT-engine parity.
+
+    Built against the REAL signed Advanced Combat Tracker.exe (genuine Advanced_Combat_Tracker
+    surface, strong name token a946b61e93d97868). Private=false: the ACT binary is never copied to
+    output. At runtime the satellite's AppDomain.AssemblyResolve binds "Advanced Combat Tracker" to
+    the Fct.Compat.Act facade, so loading this plugin also proves the facade is API-compatible with
+    real ACT for every member the probe touches.
+  -->
+  <PropertyGroup>
+    <TargetFramework>net48</TargetFramework>
+    <UseWindowsForms>true</UseWindowsForms>
+    <LangVersion>latest</LangVersion>
+    <Nullable>disable</Nullable>
+    <PlatformTarget>x64</PlatformTarget>
+    <Prefer32Bit>false</Prefer32Bit>
+    <AssemblyName>Fct.StreamProbe</AssemblyName>
+    <RootNamespace>Fct.StreamProbe</RootNamespace>
+    <!-- The real ACT install (override on CI / other machines). -->
+    <ActExePath Condition="'$(ActExePath)' == ''">E:\dev\Advanced Combat Tracker\Advanced Combat Tracker.exe</ActExePath>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <Reference Include="Advanced Combat Tracker">
+      <HintPath>$(ActExePath)</HintPath>
+      <Private>false</Private>
+    </Reference>
+    <Reference Include="FFXIV_ACT_Plugin.Common">
+      <HintPath>..\..\lib\FFXIV_ACT_Plugin.Common.dll</HintPath>
+      <Private>false</Private>
+    </Reference>
+  </ItemGroup>
+
+</Project>

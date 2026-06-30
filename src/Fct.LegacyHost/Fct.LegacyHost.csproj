@@ -24,7 +24,21 @@
   <ItemGroup>
     <ProjectReference Include="..\Fct.Compat.Act\Fct.Compat.Act.csproj" />
     <ProjectReference Include="..\Fct.Parser.Legacy\Fct.Parser.Legacy.csproj" />
+    <!-- The diagnostic stream-probe plugin. ReferenceOutputAssembly=false: the satellite does NOT
+         bind it at compile time — it is loaded at runtime via Assembly.LoadFrom, exactly like a
+         third-party legacy plugin, so the discovery/binding seam is exercised for real. The target
+         below stages its DLL into plugins\ next to the satellite. -->
+    <ProjectReference Include="..\Fct.StreamProbe\Fct.StreamProbe.csproj"
+                      ReferenceOutputAssembly="false" Private="false" />
   </ItemGroup>
+
+  <Target Name="StageStreamProbe" AfterTargets="Build">
+    <ItemGroup>
+      <_ProbeDll Include="..\Fct.StreamProbe\bin\$(Configuration)\net48\Fct.StreamProbe.dll" />
+    </ItemGroup>
+    <Copy SourceFiles="@(_ProbeDll)" DestinationFolder="$(OutDir)plugins"
+          SkipUnchangedFiles="true" Condition="Exists('@(_ProbeDll)')" />
+  </Target>
 
   <!-- Serilog backend behind the Microsoft.Extensions.Logging API (same ILogger surface the host
        uses). Serilog.Extensions.Logging gives a SerilogLoggerFactory; the file sink is the local

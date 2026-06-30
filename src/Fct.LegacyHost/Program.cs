@@ -24,6 +24,7 @@ namespace Fct.LegacyHost
 
         private static LoadedPlugin _ffxiv;
         private static LoadedPlugin _overlay;
+        private static LoadedPlugin _probe;
 
         [STAThread]
         private static void Main(string[] args)
@@ -135,6 +136,12 @@ namespace Fct.LegacyHost
                 "Loading OverlayPlugin from {Path}", FacadeHost.OverlayPluginPath);
             _overlay = FacadeHost.LoadPlugin("overlay", "OverlayPlugin", FacadeHost.OverlayPluginPath, null);
             SendPlugin(_overlay);
+
+            // Headless diagnostic plugin: taps the full data path and logs to satellite\streamprobe.log.
+            // No embeddable window, so it is not announced to the host (no SendPlugin).
+            _log.LogInformation(LogEvents.PluginLoading,
+                "Loading Fct.StreamProbe from {Path}", FacadeHost.StreamProbePath);
+            _probe = FacadeHost.LoadProbe(FacadeHost.StreamProbePath);
 
             SendLine("PLUGINS-END");
             _log.LogInformation(LogEvents.PluginsReady,

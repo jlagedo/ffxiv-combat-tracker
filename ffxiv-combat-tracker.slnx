@@ -4,6 +4,7 @@
     <Project Path="src/Fct.LegacyHost/Fct.LegacyHost.csproj" />
     <Project Path="src/Fct.Compat.Act/Fct.Compat.Act.csproj" />
     <Project Path="src/Fct.Parser.Legacy/Fct.Parser.Legacy.csproj" />
+    <Project Path="src/Fct.StreamProbe/Fct.StreamProbe.csproj" />
   </Folder>
   <Folder Name="/tests/">
     <Project Path="tests/Fct.Compat.Act.Tests/Fct.Compat.Act.Tests.csproj" />

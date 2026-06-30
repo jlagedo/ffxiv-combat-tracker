@@ -28,6 +28,10 @@ namespace Fct.LegacyHost
         public static string OverlayPluginPath =>
             Path.Combine(AppData, "Plugins", "OverlayPlugin", "OverlayPlugin.dll");
 
+        // The diagnostic stream-probe plugin, staged next to the satellite under plugins\.
+        public static string StreamProbePath =>
+            Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "plugins", "Fct.StreamProbe.dll");
+
         // Resolve the plugins' strong-named reference to "Advanced Combat Tracker" to our
         // facade. The strong name/version are not re-checked on the AssemblyResolve path.
         //
@@ -100,6 +104,60 @@ namespace Fct.LegacyHost
             {
                 status.Text = "load failed";
                 SatelliteLogging.Log.LogError(LogEvents.PluginLoadFailed, ex, "[{Title}] wrapped load failed", title);
+            }
+            return result;
+        }
+
+        // Load a headless diagnostic plugin (no embeddable window): the stream probe consumes data
+        // and logs to a file, so it needs no UI. It still goes into ActPlugins (faithful: it appears
+        // as a loaded plugin and gets DeInitPlugin on shutdown to flush its log), but it does not
+        // match OverlayPlugin's "FFXIV_ACT_Plugin"-titled discovery scan, so it is inert to others.
+        // Loaded via Assembly.LoadFrom — its compile-time references to the real "Advanced Combat
+        // Tracker" / "FFXIV_ACT_Plugin.Common" resolve through the satellite's AssemblyResolve, so
+        // this also proves the facade is API-compatible with the real ACT surface it was built on.
+        public static LoadedPlugin LoadProbe(string dllPath)
+        {
+            const string title = "Fct.StreamProbe";
+            var status = new Label { Dock = DockStyle.Bottom, Height = 22, Text = "(loading)" };
+            var tab = new TabPage(title);   // detached: the probe ignores it
+
+            var data = new ActPluginData
+            {
+                pluginFile = new FileInfo(dllPath),
+                cbEnabled = new CheckBox { Checked = true },
+                lblPluginTitle = new Label { Text = title },
+                lblPluginStatus = status,
+                tpPluginSpace = tab,
+                pPluginInfo = new Panel(),
+            };
+            ActGlobals.oFormActMain.ActPlugins.Add(data);
+            var result = new LoadedPlugin { Key = "probe", Title = title, Data = data, Window = null };
+
+            try
+            {
+                if (!File.Exists(dllPath))
+                {
+                    SatelliteLogging.Log.LogWarning(LogEvents.PluginNotFound, "[{Title}] DLL not found: {Path}", title, dllPath);
+                    status.Text = "DLL not found";
+                    return result;
+                }
+
+                var asm = Assembly.LoadFrom(dllPath);
+                var type = asm.GetType("Fct.StreamProbe.StreamProbePlugin") ?? FindPluginType(asm);
+                if (type == null) { SatelliteLogging.Log.LogWarning(LogEvents.PluginLoadFailed, "[{Title}] no IActPluginV1 type found", title); return result; }
+
+                var plugin = (IActPluginV1)Activator.CreateInstance(type);
+                data.pluginObj = plugin;
+                data.pluginVersion = asm.GetName().Version?.ToString();
+                SatelliteLogging.Log.LogInformation(LogEvents.PluginInstantiated,
+                    "[{Title}] instantiated {Type} v{Version}; calling InitPlugin…", title, type.FullName, data.pluginVersion);
+                plugin.InitPlugin(tab, status);
+                SatelliteLogging.Log.LogInformation(LogEvents.PluginInitialized, "[{Title}] InitPlugin returned. status='{Status}'", title, status.Text);
+            }
+            catch (Exception ex)
+            {
+                status.Text = "load failed";
+                SatelliteLogging.Log.LogError(LogEvents.PluginLoadFailed, ex, "[{Title}] load failed", title);
             }
             return result;
         }
