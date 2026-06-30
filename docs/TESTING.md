@@ -65,8 +65,15 @@ gitignored, real names, never committed.
 
 Because both engines consume the **identical** plugin swings, this isolates our aggregation: any
 divergence is a real bug in our engine, never a parser difference (the plugin's DoT/HoT/shield potency
-synthesis is already baked into the swings both engines receive). On the fixture corpus it diffs
-**100.000%** (1,452 key/value pairs, 0 ours-only / 0 act-only).
+synthesis is already baked into the swings both engines receive). On the committed fixture corpus it
+diffs **100.000%** (1,452 key/value pairs, 0 ours-only / 0 act-only). The same harness run over private
+play-log corpora holds corpus-wide: **460,432 key/value pairs across 208 `Network_*.log` files** (three
+players, patches 27109→30203, content from solo/city downtime through dungeons, Extremes, two Savage
+tiers, and Ultimate) all match exact — 0 ours-only / 0 act-only, every per-key numeric Σ bit-identical.
+
+The baseline (`ActOracle`) scales its watchdog to the file count, so a months-long single session
+(millions of swings) finishes instead of being silently truncated, and compiles into the run's
+`<outFolder>` so concurrent per-corpus runs don't collide on the shared binary.
 
 ## End-to-end live route (recorded logs)
 
