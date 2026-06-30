@@ -51,10 +51,13 @@ This is a prototype; the table below reflects what exists in the tree, not a fin
 
 | Project | TFM | Role |
 |---|---|---|
-| `Fct.App` | net10 | Avalonia control panel + shell (MVVM); launches and embeds the satellite. |
-| `Fct.LegacyHost` | net48 | clean-room ACT engine; hosts the real plugins; bridge client. |
+| `Fct.App` | net10 | Avalonia control panel + shell (MVVM); launches and embeds the satellite; owns the IPC bridge client. |
+| `Fct.LegacyHost` | net48 | clean-room ACT engine; hosts the real plugins; satellite end of the bridge. |
 | `Fct.Compat.Act` | net48 | the ACT facade surface — `EncounterData`/`CombatantData` aggregation reproducing real ACT's binary output bit-for-bit on captured combat. |
 | `Fct.Parser.Legacy` | net48 | wraps the real FFXIV_ACT_Plugin (the sole parser); ring-buffered single-dispatch `IDataSubscription`/`IRawPacketSource`. |
+| `Fct.Abstractions` | net48;net10 | the forward, typed plugin SDK — contracts + domain records shared across the bridge. No opcodes. |
+| `Fct.Abstractions.UI` | net10 | Avalonia UI contribution surfaces for net10 plugins. |
+| `Fct.StreamProbe` | net48 | diagnostic plugin in the satellite; taps the parser's swing/raw-packet stream. |
 
 Plus `tools/mass-compare/` — a corpus-scale differential harness holding our ACT engine to the real
 ACT binary, both fed the same plugin-produced swings, on recorded logs.
@@ -92,23 +95,22 @@ Identical input into both engines, so any difference is purely *our aggregation 
 
 | | |
 |---|---|
-| Real `Network_*.log` files | **68** (54 with combat) |
-| Swings parsed by the plugin | **5,875,218** |
-| Span | 2026-03-16 → 2026-06-29 (~3.5 months) |
-| Game-client builds covered | 8 |
-| Rows compared | **1,561** (1,493 combatants + 68 encounters) |
-| Key/value pairs | **102,686** |
+| Real `Network_*.log` files | **208** |
+| Players | **3** |
+| Patches spanned | **27109 → 30203** |
+| Content | solo/city downtime, dungeons, Extremes, two Savage tiers, Ultimate |
+| Key/value pairs compared | **460,432** |
 
 ### Result
 
-**100.000% exact** — all 102,686 string values identical, **0 ours-only, 0 act-only**. Every
-export key OverlayPlugin reads matches, for both the `Combatant` object (per-player
-DPS/HPS/crit%/max-hit/deaths/…) and the raid-wide `Encounter` object. Independent numeric
-cross-checks agree too — e.g. Σ damage `147,357,922,640`; Σ healed `54,251,599,282`;
-`3,799,748` hits; `24,841` deaths — identical on both sides.
+**100.000% exact** — all 460,432 string values identical, **0 ours-only, 0 act-only**, every
+per-key numeric Σ bit-identical on both sides. Every export key OverlayPlugin reads matches,
+for both the `Combatant` object (per-player DPS/HPS/crit%/max-hit/deaths/…) and the raid-wide
+`Encounter` object.
 
 The fixture-level version of the same check (`AggregateCompatTests` / `ExportVarsCompatTests`)
-runs in CI on two committed slices. Full method: [`docs/TESTING.md`](docs/TESTING.md).
+runs against two committed slices on every test pass. Full method:
+[`docs/TESTING.md`](docs/TESTING.md).
 
 ### What this does and doesn't prove
 

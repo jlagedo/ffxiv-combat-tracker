@@ -13,6 +13,8 @@ through the real upstream stack (FFXIV_ACT_Plugin → ACT → OverlayPlugin) and
 compat seams we must reproduce to make the unmodified plugins work — the build target.
 [`docs/ACT-INTERFACE-MAP.md`](docs/ACT-INTERFACE-MAP.md) is the host↔plugin contract: every
 `Advanced_Combat_Tracker` member each supported plugin consumes, why, and the facade gaps.
+[`docs/PLUGIN-API.md`](docs/PLUGIN-API.md) sketches the forward, typed plugin surface
+(`Fct.Abstractions`/`Fct.Abstractions.UI`) and the legacy → native migration path.
 
 The product is a host that runs the **existing plugin ecosystem unmodified**
 (FFXIV_ACT_Plugin, OverlayPlugin/cactbot, Triggernometry, ACT-Discord-Triggers, ACT.Hojoring)
@@ -34,7 +36,7 @@ swappable, independently-released component.
 - **Two runtimes, two processes.** net48 and net10 cannot share a process, and the five
   legacy plugins cannot load unmodified on .NET 10 (CefSharp's net48 build alone settles
   it). Legacy plugins run in a **real .NET Framework 4.8 satellite process**
-  (`Fct.LegacyHost`); the **.NET 10 host** (`Fct.Host`) runs new plugins; they bridge over
+  (`Fct.LegacyHost`); the **.NET 10 host** (`Fct.App`) runs new plugins; they bridge over
   IPC. `AssemblyLoadContext` isolates net10 plugins from each other — it is **not**
   cross-runtime.
 - **We build only the ACT engine.** The FFXIV SDK and the OverlayPlugin/cactbot surface
@@ -64,17 +66,20 @@ swappable, independently-released component.
 - **`Fct.Abstractions` multi-targets `net48;net10`** so the same record/interface types
   exist on both sides of the bridge.
 
-## Project map (target — not yet created)
+## Project map
 
 | Project | TFM | Role |
 |---|---|---|
 | `Fct.Abstractions` | net48;net10 | the plugin SDK: contracts + domain records. No opcodes. |
-| `Fct.Host` | net10 | microkernel: ALC plugin loader, typed bus, Generic Host. |
-| `Fct.LegacyHost` | net48 | clean-room ACT engine; hosts the five real plugins. |
-| `Fct.Bridge` | net48;net10 | IPC transport + versioned wire protocol. |
+| `Fct.Abstractions.UI` | net10 | Avalonia UI contribution surfaces (`IUiContributor`/`IUiHost`); referenced only by UI-contributing net10 plugins. |
+| `Fct.App` | net10 | the **.NET 10 host**: Avalonia control panel + shell (MVVM); launches/embeds the satellite and owns the IPC bridge client (`SatelliteHost`/`SatelliteProtocol`/`SatelliteLifetime`). |
+| `Fct.LegacyHost` | net48 | clean-room ACT engine host; hosts the five real plugins; the net48 end of the bridge. |
 | `Fct.Parser.Legacy` | net48 | wraps the real FFXIV_ACT_Plugin. `WrappedFfxivPlugin` sits in `pluginObj` (forwards `DataRepository`/`_iocContainer`/lifecycle to the real instance) and exposes `RingBufferDataSubscription` (`IDataSubscription` + `IRawPacketSource`): a bounded ring + single dispatch thread that replaces the plugin's per-subscriber `BeginInvoke` fan-out so OverlayPlugin's ~20 handlers cost one in-order dispatch. ~250× faster on the dispatch stage. |
-| `Fct.App` | net10 | Avalonia control panel + shell (MVVM). |
 | `Fct.Compat.Act` | net48 | **the ACT engine** (the facade surface, hosted in LegacyHost). Its `EncounterData`/`CombatantData`/`AttackType` aggregation + `ExportVariables` reproduce the real ACT binary bit-for-bit when fed the real plugin's `MasterSwing` stream. Held to that baseline by `AggregateCompatTests`/`ExportVarsCompatTests` (fixtures) and corpus-scale by `tools/mass-compare` — the satellite's `--mass-engine-exports` aggregates each captured `oracle.tsv` through this engine, diffed against the real-ACT baseline. See `docs/TESTING.md`. |
+| `Fct.StreamProbe` | net48 | diagnostic plugin loaded in the satellite; taps the parser's `MasterSwing`/raw-packet stream for inspection. |
+
+The net10↔net48 **IPC bridge is not its own project** — the host end lives in `Fct.App`
+(`SatelliteHost`/`SatelliteProtocol`/`SatelliteLifetime`) and the satellite end in `Fct.LegacyHost`.
 
 ## UI frameworks
 
@@ -175,7 +180,7 @@ verified findings: [`docs/SLICE-1.md`](docs/SLICE-1.md). Key locked facts:
 
 ## Build
 
-Solution: `ffxiv-combat-tracker.sln`. Projects under `src/`.
+Solution: `ffxiv-combat-tracker.slnx`. Projects under `src/`.
 
 ```powershell
 dotnet build src\Fct.App\Fct.App.csproj   # net10 host; chains + stages the net48 satellite

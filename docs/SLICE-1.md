@@ -79,7 +79,7 @@ engine, not just plugin loading.
 ## Two-process topology (this slice)
 
 ```
-Fct.Host (.NET 10, Avalonia 12)                Fct.LegacyHost (.NET Fx 4.8, WinForms)
+Fct.App (.NET 10, Avalonia 12)                 Fct.LegacyHost (.NET Fx 4.8, WinForms)
   • launches + supervises the satellite          • Advanced Combat Tracker facade
   • embeds the satellite's tab window   ◄──IPC──►  (AssemblyResolve-supplied)
     via cross-process SetParent                  • loads real FFXIV_ACT_Plugin.dll
@@ -94,11 +94,12 @@ handshake (ready + HWND) over IPC. The full typed-event bridge is **not** needed
 
 ---
 
-## Scope decision (OPEN — needs confirmation)
+## Scope decision (RESOLVED — Option B)
 
-"Overlay shows live DPS" requires ACT's aggregation engine (above). Two ways to scope slice 1:
+"Overlay shows live DPS" requires ACT's aggregation engine (above). **Option B was taken**: the
+clean-room aggregation engine shipped as **S5** (see Results). The two options weighed were:
 
-- **Option A — Defer the engine (recommended).** Slice 1 proves the *new, risky* unknowns:
+- **Option A — Defer the engine.** Slice 1 proves the *new, risky* unknowns:
   two-process launch, strong-name facade via `AssemblyResolve`, real plugin loading + init,
   FFXIVRepository discovery, OverlayPlugin alive (WS server up), and the plugin UI embedded
   in Avalonia. Acceptance excludes live DPS aggregation. The aggregation engine becomes
@@ -111,7 +112,7 @@ handshake (ready + HWND) over IPC. The full typed-event bridge is **not** needed
 
 ---
 
-## Build sequence (de-risking order)
+## Build sequence (de-risking order — all complete; see Results)
 
 1. **S0** — Avalonia 12 net10 shell launches a net48 child process; minimal IPC handshake.
 2. **S1** — cross-process `SetParent`: embed a trivial net48 WinForms window into the
@@ -122,7 +123,7 @@ handshake (ready + HWND) over IPC. The full typed-event bridge is **not** needed
 4. **S3** — load **real OverlayPlugin.dll**; FFXIVRepository discovery succeeds; CEF
    provisions; WS server up; an overlay window renders. *(de-risk coupling + CEF)*
 5. **S4** — both plugin tabs embedded in the Avalonia shell.
-6. **(Option B only)** **S5** — aggregation engine → MiniParse shows live DPS.
+6. **S5** — aggregation engine → MiniParse shows live DPS.
 
 ---
 
@@ -162,5 +163,5 @@ All phases build, were tested via run logs, and are committed.
 - `AssemblyResolve` facade fidelity — type/member shape must match what the plugins' IL
   references exactly.
 - Avalonia 12 transparent/click-through + hosting a foreign HWND.
-- OverlayPlugin 0.16.5 is old; CEF first-run download; MSVC runtime dependency.
+- OverlayPlugin 0.18.2 is old; CEF first-run download; MSVC runtime dependency.
 - Option B: clean-room reimplementation of `ExportVariables` keys overlays depend on.

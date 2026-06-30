@@ -88,7 +88,7 @@ only the consume/aggregate side (the ACT engine).
 
 ```
 ┌─────────────────────────────────┐        ┌──────────────────────────────────┐
-│  Fct.LegacyHost  (.NET Fx 4.8)   │  IPC   │  Fct.Host  (.NET 10)              │
+│  Fct.LegacyHost  (.NET Fx 4.8)   │  IPC   │  Fct.App  (.NET 10)               │
 │                                  │◄──────►│                                  │
 │  • clean-room ACT engine         │ pipe / │  • typed bus (Fct.Abstractions)   │
 │  • real FFXIV_ACT_Plugin         │ shared │  • ALC-isolated NEW plugins       │
@@ -113,29 +113,36 @@ Fct.Abstractions   net48;net10  the SDK. IPlugin, IGameEventStream (bus),
                                 IRawPacketSource (opt-in raw hatch), domain records.
                                 Semver'd, additive-only. NO opcodes/packets/Machina.
 
-Fct.Host           net10        microkernel: ALC-per-plugin loader, manifest +
-                                contract-version gate, bus impl (Channels),
-                                Generic Host, config, logging, lifecycle.
+Fct.Abstractions.UI net10       Avalonia UI contribution surfaces (IUiContributor /
+                                IUiHost); referenced only by UI-contributing plugins.
+
+Fct.App            net10        the net10 host AND user-facing UI (one project):
+                                Avalonia control panel + shell (MVVM), plus the host
+                                runtime — Generic Host, config, logging, lifecycle, the
+                                typed bus (Channels), and the IPC bridge client
+                                (SatelliteHost/SatelliteProtocol/SatelliteLifetime).
+                                Target: ALC-per-plugin loader + manifest/contract-version
+                                gate for new plugins. See §4a.
 
 Fct.LegacyHost     net48        clean-room ACT engine + IActPluginV1 loader; hosts
-                                the five real plugins; bridge client.
-
-Fct.Bridge         net48;net10  IPC transport + wire protocol (named pipe +
-                                shared-memory ring for the combat hot path).
+                                the five real plugins; satellite end of the bridge.
 
 Fct.Parser.Legacy  net48        wraps the real FFXIV_ACT_Plugin as an IGameDataSource
                                 (+ IRawPacketSource). The parser, permanently.
 
-Fct.App            net10        Avalonia control panel + shell (MVVM). The net10
-                                user-facing UI. See §4a.
-
 Fct.Compat.Act     net48        the ACT facade surface (lives in LegacyHost).
+
+Fct.StreamProbe    net48        diagnostic plugin in the satellite; taps the parser's
+                                swing/raw-packet stream for inspection.
 ```
+
+The net48↔net10 IPC bridge (named pipe + wire protocol) is **not its own project**: the
+host end lives in `Fct.App`, the satellite end in `Fct.LegacyHost`.
 
 ### 4a. UI framework
 
 - **net10 control panel + shell → Avalonia (XAML + MVVM).** A native .NET desktop app:
-  modern, themeable, no packaging/runtime friction. The user-facing face of `Fct.Host`.
+  modern, themeable, no packaging/runtime friction. The user-facing face of `Fct.App`.
 - **Overlays → unmodified OverlayPlugin.** The host does **not** build a native overlay
   layer (no `Fct.Overlays`, no WebView2, no host-side WebSocket/Kestrel — now or later).
   OverlayPlugin runs unmodified in the net48 satellite, bringing its own CEF + Fleck +
@@ -166,7 +173,7 @@ clean-room ACT engine (Fct.LegacyHost)
    • CustomTrigger eval → TTS(...) / PlaySound(...)
    • ActGlobals.oFormActMain.ActPlugins holds loaded plugin instances
         ↑ OverlayPlugin's FFXIVRepository reflects over THIS to find the parser
-   • ── parallel tap ──► Fct.Bridge ──► typed bus on Fct.Host (forward surface)
+   • ── parallel tap ──► IPC bridge ──► typed bus on Fct.App (forward surface)
    ▼
 real OverlayPlugin ──► its WebSocket server ──► cactbot, addons
 Triggernometry     ──► CustomTriggers / encounter events / TTS

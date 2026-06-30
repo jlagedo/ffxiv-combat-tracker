@@ -16,7 +16,8 @@ to run the five plugins **unmodified**. This document is the **net10 contract** 
 
 1. **Modern** (`Fct.Abstractions` + `Fct.Abstractions.UI`) — typed, clean, best-practice. What new
    plugins target.
-2. **Compat** (`Fct.Compat.*`, net10 — not yet built) — a re-projection of the ACT + FFXIV-SDK
+2. **Compat** (a planned **net10** shim, not yet built — distinct from the existing **net48**
+   `Fct.Compat.Act`, which is the satellite's ACT engine) — a re-projection of the ACT + FFXIV-SDK
    programming model, implemented **as an adapter over the modern contract**. An ACT-era plugin
    **recompiles** against it (minimal changes), moves off the net48 satellite into the isolated
    net10 host, then migrates compat→modern member-by-member and drops the shim.
@@ -74,7 +75,7 @@ Three findings drove the shapes:
 |---|---|---|
 | `Fct.Abstractions` | net48;net10 | core contract: lifecycle, events, snapshot, encounter, audio, registry, raw hatch. **No UI, no opcodes.** |
 | `Fct.Abstractions.UI` | net10 | Avalonia UI contribution surfaces. Referenced only by UI-contributing plugins. |
-| `Fct.Compat.*` (planned) | net10 | the recompile-shim adapter over the modern contract. |
+| net10 compat shim (planned) | net10 | the recompile-shim adapter over the modern contract. Distinct from the existing net48 `Fct.Compat.Act` (the satellite's ACT engine). |
 
 net48 support in the core uses `IsExternalInit.cs` (init-accessor shim) + `Microsoft.Bcl.AsyncInterfaces`
 (records / `IAsyncEnumerable` / `IAsyncDisposable`), so the identical record/interface types exist on
@@ -211,7 +212,7 @@ public interface IUiHost
 
 ## The compat shim (adapter)
 
-`Fct.Compat.*` (net10, planned) re-projects the exact ACT + FFXIV-SDK surface the plugins compile
+The planned net10 compat shim (not the existing net48 `Fct.Compat.Act`) re-projects the exact ACT + FFXIV-SDK surface the plugins compile
 against, **implemented entirely over the modern host**:
 
 | Legacy symbol (recompiled against shim) | Backed by |

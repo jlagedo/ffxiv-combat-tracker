@@ -474,7 +474,8 @@ net10 host. See `docs/ARCHITECTURE.md` §3b–§4 for the runtime split rational
 5. **Triggernometry (M2):** `CustomTrigger` regex matches log lines; timers + TTS/sound fire.
 6. **Discord (M3):** trigger/encounter events post to Discord on a kill.
 
-> Validation harness: `tools/mass-compare/` + `ParseOracle` run captured `Network_*.log`s
+> Validation harness: `tools/mass-compare/` + `tools/act-oracle/` (plus the satellite's
+> `ParseOracle`/`--mass-*` modes) run captured `Network_*.log`s
 > through both our engine and the reference, asserting `MasterSwing`/`ExportVariables` parity.
 > See `docs/TESTING.md` (Differential compat).
 
