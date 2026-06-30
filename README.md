@@ -15,7 +15,7 @@
 A clean-slate, **FFXIV-only** experimental rebuild of **ACT** — the host/engine at the center
 of the FFXIV_ACT_Plugin + OverlayPlugin stack — on modern .NET, running the real plugins
 unmodified. The aim being explored here: a host that can run the
-**existing plugin ecosystem unmodified** while exposing a typed, future-facing plugin API,
+**existing plugin ecosystem unmodified** while working toward a typed, future-facing plugin API,
 with the network/opcode parser as a swappable, independently-released component.
 
 The authoritative design lives in [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md). The map of
@@ -28,12 +28,14 @@ Today's stack is three independently-evolved layers glued together by a stringly
 pipe-delimited log line. This project explores collapsing that into two cooperating
 processes:
 
-- **A real .NET Framework 4.8 satellite** (`Fct.LegacyHost`) that hosts the five legacy
-  plugins **unmodified** (FFXIV_ACT_Plugin, OverlayPlugin/cactbot, Triggernometry,
-  ACT-Discord-Triggers, ACT.Hojoring) behind a clean-room ACT engine facade.
-- **A .NET 10 host** (`Fct.App`, Avalonia) that runs new typed plugins and receives data
-  over IPC. The two CLRs cannot share a process, so the OS process boundary *is* the
-  runtime boundary — only data crosses.
+- **A real .NET Framework 4.8 satellite** (`Fct.LegacyHost`) that hosts the legacy plugins
+  **unmodified** behind a from-scratch ACT engine facade. The target set is five
+  (FFXIV_ACT_Plugin, OverlayPlugin/cactbot, Triggernometry, ACT-Discord-Triggers,
+  ACT.Hojoring); Slice 1 loads the first two today.
+- **A .NET 10 host** (`Fct.App`, Avalonia) that today launches and embeds the satellite. By
+  design it will also run new typed plugins and receive combat data over IPC — that host
+  layer is not built yet. The two CLRs cannot share a process, so the OS process boundary
+  *is* the runtime boundary; only data crosses.
 
 Two hard directives gate every decision:
 
@@ -53,7 +55,7 @@ This is a prototype; the table below reflects what exists in the tree, not a fin
 | Project | TFM | Role |
 |---|---|---|
 | `Fct.App` | net10 | Avalonia control panel + shell (MVVM); launches and embeds the satellite; owns the IPC bridge client. |
-| `Fct.LegacyHost` | net48 | clean-room ACT engine; hosts the real plugins; satellite end of the bridge. |
+| `Fct.LegacyHost` | net48 | from-scratch ACT engine; hosts the real plugins; satellite end of the bridge. |
 | `Fct.Compat.Act` | net48 | the ACT facade surface — `EncounterData`/`CombatantData` aggregation reproducing real ACT's binary output bit-for-bit on captured combat. |
 | `Fct.Parser.Legacy` | net48 | wraps the real FFXIV_ACT_Plugin (the sole parser); ring-buffered single-dispatch `IDataSubscription`/`IRawPacketSource`. |
 | `Fct.Abstractions` | net48;net10 | the forward, typed plugin SDK — contracts + domain records shared across the bridge. No opcodes. |
@@ -72,9 +74,9 @@ map.
 
 ## Validation — ACT-engine output parity
 
-The one hard, measurable claim this prototype makes: **our clean-room ACT aggregation engine
-(`Fct.Compat.Act`) reproduces the real ACT binary's output bit-for-bit**, given the same
-plugin-produced swings. "Output" means `ExportVariables` — the exact per-combatant and
+The one hard, measurable claim this prototype makes: **our from-scratch ACT aggregation engine
+(`Fct.Compat.Act`) reproduces the real ACT binary's output bit-for-bit** (no ACT code is
+copied), given the same plugin-produced swings. "Output" means `ExportVariables` — the exact per-combatant and
 per-encounter dictionaries OverlayPlugin builds and cactbot/overlays read.
 
 ### How the test works (`tools/mass-compare`)
@@ -109,9 +111,11 @@ per-key numeric Σ bit-identical on both sides. Every export key OverlayPlugin r
 for both the `Combatant` object (per-player DPS/HPS/crit%/max-hit/deaths/…) and the raid-wide
 `Encounter` object.
 
-The fixture-level version of the same check (`AggregateCompatTests` / `ExportVarsCompatTests`)
-runs against two committed slices on every test pass. Full method:
-[`docs/TESTING.md`](docs/TESTING.md).
+This 208-log corpus is **private play-data — it is not shipped in this repo**, so the
+460,432-pair number can't be reproduced from a checkout. What ships and runs anywhere is the
+fixture-level version of the same check (`AggregateCompatTests` / `ExportVarsCompatTests`),
+held to ACT bit-for-bit over **two committed slices** (1,452 pairs) on every test pass. Full
+method: [`docs/TESTING.md`](docs/TESTING.md).
 
 ### What this does and doesn't prove
 
