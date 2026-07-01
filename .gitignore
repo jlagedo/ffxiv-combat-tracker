@@ -13,9 +13,8 @@ obj/
 .vs/
 artifacts/
 
-# Release output from release.ps1
+# Distributable builds from build/ (dotnet run --project build [-- release])
 /dist/
-/dist.zip
 
 # Tooling
 *.binlog

@@ -198,6 +198,27 @@ the satellite output to `bin\<cfg>\net10.0\satellite\`. At runtime the host laun
 Toolchain present: .NET 10 SDK (10.0.301), net48 targeting pack, WindowsDesktop runtime,
 VS 2026 / MSBuild.
 
+### Distributable builds — `build/` (C# / Bullseye)
+
+`build/` is a small C# console project (Bullseye targets + SimpleExec) that publishes the runnable
+two-process tree (host + `satellite\`) into `dist\<mode>\`. It runs through the installed SDK — no
+PowerShell, no extra tooling — and exposes two targets:
+
+```powershell
+dotnet run --project build            # "debug" (default): Debug, loose DLLs, no compression, no
+                                      #   R2R -> dist\debug. Fast, debuggable dev drop; launch
+                                      #   skips the single-file self-extract step.
+dotnet run --project build -- release # Release, single-file, compressed, ReadyToRun -> dist\release.
+                                      #   One tidy self-contained Fct.App.exe; R2R halves warm start,
+                                      #   first run pays a one-time self-extract + AV scan.
+```
+
+Both drops are self-contained `win-x64` with portable PDBs. The real legacy plugins are **not**
+bundled — they load from the user's ACT install. The `build` project opts out of central package
+management and is not in the solution, so it stays isolated from the app's dependency graph.
+Producing a build is **Windows-only**: the net48 satellite (WinForms + CefSharp + the real plugins)
+cannot publish off Windows.
+
 ## Test
 
 `./test.ps1` builds + stages the satellite, then runs all suites under `tests/`
