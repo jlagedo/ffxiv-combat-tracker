@@ -9,6 +9,9 @@
     <Project Path="src/Fct.Parser.Legacy/Fct.Parser.Legacy.csproj" />
     <Project Path="src/Fct.StreamProbe/Fct.StreamProbe.csproj" />
   </Folder>
+  <Folder Name="/samples/">
+    <Project Path="samples/Fct.SamplePlugin/Fct.SamplePlugin.csproj" />
+  </Folder>
   <Folder Name="/tests/">
     <Project Path="tests/Fct.Compat.Act.Tests/Fct.Compat.Act.Tests.csproj" />
     <Project Path="tests/Fct.App.Tests/Fct.App.Tests.csproj" />

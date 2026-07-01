@@ -1,7 +1,10 @@
 using System;
 using System.Threading.Tasks;
 using Avalonia;
+using Fct.Abstractions;
+using Fct.App.Hosting;
 using Fct.App.Logging;
+using Fct.App.Plugins;
 using Fct.App.ViewModels;
 using Fct.Logging;
 using Microsoft.Extensions.DependencyInjection;
@@ -68,6 +71,26 @@ class Program
 
         // Gracefully de-init the satellite's plugins on host shutdown (persists their state).
         builder.Services.AddHostedService<SatelliteLifetime>();
+
+        // Native plugin host (slice A+B): the real IPluginHost services + the ALC-per-plugin loader.
+        builder.Services.AddSingleton<GameEventBus>();
+        builder.Services.AddSingleton<IGameEventSink>(sp => sp.GetRequiredService<GameEventBus>());
+        builder.Services.AddSingleton<GameSnapshotProvider>();
+        builder.Services.AddSingleton<IGameSession, GameSession>();
+        builder.Services.AddSingleton<RegistryService>();
+        builder.Services.AddSingleton<IPluginRegistry>(sp => sp.GetRequiredService<RegistryService>());
+        builder.Services.AddSingleton<IAudioOutput, AudioService>();
+        builder.Services.AddSingleton<IEncounterService, EncounterService>();
+        builder.Services.AddSingleton<IClock, SystemClock>();
+        builder.Services.AddSingleton<PluginManager>();
+        builder.Services.AddHostedService<PluginLifetime>();
+
+#if DEBUG
+        // TEMPORARY: synthetic game data until the net48→net10 bridge forwarder (piece C) exists.
+        // Registered last so plugins are loaded + subscribed before it emits.
+        builder.Services.AddSingleton<DevGameEventSource>();
+        builder.Services.AddHostedService(sp => sp.GetRequiredService<DevGameEventSource>());
+#endif
 
         return builder.Build();
     }

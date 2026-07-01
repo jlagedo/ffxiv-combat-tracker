@@ -1,9 +1,9 @@
 <Project Sdk="Microsoft.NET.Sdk">
 
   <!--
-    Unit tests for the net10 host's pure logic. SatelliteProtocol.cs is linked (rather than
-    referencing the Avalonia WinExe and dragging in the satellite build chain) so the tests
-    stay fast and headless.
+    Unit tests for the net10 host's pure logic. Host source (SatelliteProtocol, and the plugin
+    subsystem under Hosting/ + Plugins/) is *linked* rather than referenced so the tests stay fast and
+    headless — referencing the Avalonia WinExe would drag in the satellite build chain.
   -->
   <PropertyGroup>
     <TargetFramework>net10.0</TargetFramework>
@@ -19,8 +19,45 @@
   </ItemGroup>
 
   <ItemGroup>
+    <ProjectReference Include="..\..\src\Fct.Abstractions\Fct.Abstractions.csproj" />
+    <ProjectReference Include="..\..\src\Fct.Abstractions.Testing\Fct.Abstractions.Testing.csproj" />
+  </ItemGroup>
+
+  <!-- Existing linked host logic. -->
+  <ItemGroup>
     <Compile Include="..\..\src\Fct.App\SatelliteProtocol.cs" Link="SatelliteProtocol.cs" />
     <Compile Include="..\..\src\Fct.App\ProcessJob.cs" Link="ProcessJob.cs" />
   </ItemGroup>
+
+  <!-- Plugin subsystem under test (headless, no Avalonia/IHostedService deps): the host services and
+       the ALC loader. DevGameEventSource + PluginLifetime (IHostedService) are intentionally excluded. -->
+  <ItemGroup>
+    <Compile Include="..\..\src\Fct.App\Hosting\*.cs"
+             Exclude="..\..\src\Fct.App\Hosting\DevGameEventSource.cs"
+             Link="Hosting\%(Filename)%(Extension)" />
+    <Compile Include="..\..\src\Fct.App\Plugins\HostContract.cs" Link="Plugins\HostContract.cs" />
+    <Compile Include="..\..\src\Fct.App\Plugins\PluginManifest.cs" Link="Plugins\PluginManifest.cs" />
+    <Compile Include="..\..\src\Fct.App\Plugins\PluginLoadContext.cs" Link="Plugins\PluginLoadContext.cs" />
+    <Compile Include="..\..\src\Fct.App\Plugins\PluginManager.cs" Link="Plugins\PluginManager.cs" />
+    <Compile Include="..\..\shared\Logging\LogEvents.cs" Link="Logging\LogEvents.cs" />
+    <Compile Include="..\..\shared\Logging\LogPaths.cs" Link="Logging\LogPaths.cs" />
+  </ItemGroup>
+
+  <!-- Build the sample plugin and stage it under plugins\ so the loader tests can load it from disk.
+       No assembly reference: it must load only through its own ALC. -->
+  <ItemGroup>
+    <ProjectReference Include="..\..\samples\Fct.SamplePlugin\Fct.SamplePlugin.csproj"
+                      ReferenceOutputAssembly="false"
+                      Private="false" />
+  </ItemGroup>
+
+  <Target Name="StageSamplePluginForTests" AfterTargets="Build">
+    <ItemGroup>
+      <TestSamplePlugin Include="$(MSBuildThisFileDirectory)..\..\samples\Fct.SamplePlugin\bin\$(Configuration)\net10.0\**\*" />
+    </ItemGroup>
+    <Copy SourceFiles="@(TestSamplePlugin)"
+          DestinationFiles="@(TestSamplePlugin->'$(OutDir)plugins\Fct.SamplePlugin\%(RecursiveDir)%(Filename)%(Extension)')"
+          SkipUnchangedFiles="true" />
+  </Target>
 
 </Project>

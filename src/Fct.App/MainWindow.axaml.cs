@@ -2,7 +2,6 @@ using System;
 using System.Linq;
 using System.Threading.Tasks;
 using Avalonia.Controls;
-using Avalonia.Input;
 using Avalonia.Platform.Storage;
 using Fct.App.ViewModels;
 using Fct.Logging;
@@ -32,7 +31,12 @@ public partial class MainWindow : Window
         // The Plugins page owns these interactions; the window owns the satellite + the picker.
         _vm.PluginsPage.RetryRequested += () => _ = StartSatelliteAsync();
         _vm.PluginsPage.AddPluginRequested += () => _ = PickPluginAsync();
+    }
 
+    // Kick off the satellite once the shell is on screen, so the window paints first.
+    protected override void OnOpened(EventArgs e)
+    {
+        base.OnOpened(e);
         _ = StartSatelliteAsync();
     }
 
@@ -72,17 +76,8 @@ public partial class MainWindow : Window
     }
 
     // ---- custom window chrome ----
-    private void OnTitleBarPressed(object? sender, PointerPressedEventArgs e)
-    {
-        if (e.GetCurrentPoint(this).Properties.IsLeftButtonPressed)
-        {
-            if (e.ClickCount == 2)
-                ToggleMaximize();
-            else
-                BeginMoveDrag(e);
-        }
-    }
-
+    // Dragging and double-click-to-maximize are handled natively via the title bar's
+    // WindowDecorationProperties.ElementRole; the buttons keep their explicit actions.
     private void OnMinimize(object? sender, Avalonia.Interactivity.RoutedEventArgs e)
         => WindowState = WindowState.Minimized;
 

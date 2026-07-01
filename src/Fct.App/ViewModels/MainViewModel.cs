@@ -2,6 +2,8 @@ using System;
 using System.Collections.Generic;
 using System.Collections.ObjectModel;
 using System.Linq;
+using CommunityToolkit.Mvvm.ComponentModel;
+using CommunityToolkit.Mvvm.Input;
 
 namespace Fct.App.ViewModels;
 
@@ -10,7 +12,7 @@ public enum HostState { Starting, Online, Offline }
 // The shell coordinator: owns the shared plugin roster + satellite state, and the top-level
 // navigation (CurrentPage). Page-specific behaviour lives in the per-page view models, which
 // read shared state back through this instance.
-public sealed class MainViewModel : ObservableObject
+public sealed partial class MainViewModel : ObservableObject
 {
     public ObservableCollection<PluginViewModel> Plugins { get; } = new();
 
@@ -97,24 +99,15 @@ public sealed class MainViewModel : ObservableObject
         };
         _currentPage = PluginsPage;
 
-        SelectPageCommand = new RelayCommand(Navigate);
-
         SetStarting();
     }
 
     // ---- navigation ----
-    public RelayCommand SelectPageCommand { get; }
-
-    private PageViewModel _currentPage;
-    public PageViewModel CurrentPage
-    {
-        get => _currentPage;
-        private set => SetField(ref _currentPage, value);
-    }
-
     // Accepts a Section (typed) or its name (from a XAML CommandParameter string); the enum
-    // is the source of truth — the string is parsed once here, at the boundary.
-    private void Navigate(object? param)
+    // is the source of truth — the string is parsed once here, at the boundary. The generated
+    // command is SelectPageCommand (matches the XAML binding).
+    [RelayCommand]
+    private void SelectPage(object? param)
     {
         Section? target = param switch
         {
@@ -126,58 +119,44 @@ public sealed class MainViewModel : ObservableObject
             CurrentPage = page;
     }
 
-    // ---- shared selection ----
-    private PluginViewModel? _selectedPlugin;
-    public PluginViewModel? SelectedPlugin
+    private PageViewModel _currentPage;
+    public PageViewModel CurrentPage
     {
-        get => _selectedPlugin;
-        set
-        {
-            var old = _selectedPlugin;
-            if (!SetField(ref _selectedPlugin, value)) return;
-            if (old is not null) old.IsSelected = false;
-            if (value is not null) value.IsSelected = true;
-        }
+        get => _currentPage;
+        private set => SetProperty(ref _currentPage, value);
+    }
+
+    // ---- shared selection ----
+    [ObservableProperty]
+    private PluginViewModel? _selectedPlugin;
+
+    // Keep exactly one plugin flagged selected as the selection moves.
+    partial void OnSelectedPluginChanged(PluginViewModel? oldValue, PluginViewModel? newValue)
+    {
+        if (oldValue is not null) oldValue.IsSelected = false;
+        if (newValue is not null) newValue.IsSelected = true;
     }
 
     // ---- satellite / host state ----
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(IsOnline), nameof(IsOffline))]
     private HostState _host = HostState.Starting;
-    public HostState Host
-    {
-        get => _host;
-        set { if (SetField(ref _host, value)) { Raise(nameof(IsOnline)); Raise(nameof(IsOffline)); } }
-    }
 
     public bool IsOnline => Host == HostState.Online;
     public bool IsOffline => Host == HostState.Offline;
 
+    [ObservableProperty]
     private string _satelliteSummary = "Launching .NET Framework 4.8 satellite…";
-    public string SatelliteSummary
-    {
-        get => _satelliteSummary;
-        set => SetField(ref _satelliteSummary, value);
-    }
 
+    [ObservableProperty]
     private string _satelliteState = "Starting";
-    public string SatelliteState
-    {
-        get => _satelliteState;
-        set => SetField(ref _satelliteState, value);
-    }
 
+    [ObservableProperty]
     private bool _configReady;
-    public bool ConfigReady
-    {
-        get => _configReady;
-        set => SetField(ref _configReady, value);
-    }
 
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(HasError))]
     private string? _errorMessage;
-    public string? ErrorMessage
-    {
-        get => _errorMessage;
-        set { if (SetField(ref _errorMessage, value)) Raise(nameof(HasError)); }
-    }
 
     public bool HasError => !string.IsNullOrEmpty(ErrorMessage);
 
@@ -251,8 +230,8 @@ public sealed class MainViewModel : ObservableObject
     // Re-raise the roster-derived figures after the collection or a plugin's status changes.
     internal void RaiseRosterChanged()
     {
-        Raise(nameof(LoadedCount));
-        Raise(nameof(LoadedSummary));
+        OnPropertyChanged(nameof(LoadedCount));
+        OnPropertyChanged(nameof(LoadedSummary));
     }
 
     // Pull the CLR version out of "READY pid=.. x64=True clr=.." for the status chip.

@@ -5,7 +5,8 @@
              xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
              mc:Ignorable="d" d:DesignWidth="820" d:DesignHeight="620"
              x:Class="Fct.App.Views.PluginsView"
-             x:DataType="vm:PluginsViewModel">
+             x:DataType="vm:PluginsViewModel"
+             d:DataContext="{x:Static vm:DesignData.Plugins}">
 
     <Grid RowDefinitions="Auto,Auto,*">
 
@@ -40,6 +41,7 @@
                                TextWrapping="Wrap" MaxWidth="700" HorizontalAlignment="Left"/>
                 </StackPanel>
                 <Button Grid.Column="1" Classes="ghost" Content="Retry" VerticalAlignment="Center"
+                        AutomationProperties.AutomationId="plugins.retry"
                         Command="{Binding RetryCommand}"/>
             </Grid>
         </Border>
@@ -47,8 +49,11 @@
         <!-- Channel rail + bay -->
         <Grid Grid.Row="2" ColumnDefinitions="212,18,*">
 
+            <!-- Drag to widen the channel rail (and shrink the embedded plugin config bay). -->
+            <GridSplitter Grid.Column="1" Classes="pane" ResizeDirection="Columns"/>
+
             <!-- ===== Channel rail: quick switch between plugins ===== -->
-            <Border Grid.Column="0" Classes="card rise2" Padding="0">
+            <Border Grid.Column="0" Classes="card rise2" Padding="0" MinWidth="180" MaxWidth="320">
                 <DockPanel Margin="10">
                     <Grid DockPanel.Dock="Top" Margin="6,6,6,12">
                         <TextBlock Text="CHANNELS" Classes="eyebrow" VerticalAlignment="Center"/>
@@ -69,6 +74,8 @@
                     <ScrollViewer HorizontalScrollBarVisibility="Disabled">
                         <ListBox Classes="rail" ItemsSource="{Binding Shell.Plugins}"
                                  SelectedItem="{Binding Shell.SelectedPlugin, Mode=TwoWay}"
+                                 AutomationProperties.AutomationId="plugin.rail"
+                                 AutomationProperties.Name="Plugin channels"
                                  Tapped="OnRailTapped">
                             <ListBox.ItemTemplate>
                                 <DataTemplate x:DataType="vm:PluginViewModel">
@@ -184,6 +191,8 @@
                             <TextBlock Text="{Binding Shell.LoadedSummary}" Classes="meta" FontSize="11"/>
                         </StackPanel>
                         <Button Grid.Column="1" Classes="ghost" VerticalAlignment="Center"
+                                AutomationProperties.Name="Add plugin"
+                                AutomationProperties.AutomationId="plugins.add"
                                 Command="{Binding AddPluginCommand}">
                             <StackPanel Orientation="Horizontal" Spacing="8">
                                 <Path Width="12" Height="12" Stretch="Uniform" Stroke="{StaticResource FrostBrush}"
@@ -207,13 +216,13 @@
                                         <Grid ColumnDefinitions="Auto,Auto,*,Auto,Auto">
                                             <!-- reorder -->
                                             <StackPanel Grid.Column="0" Spacing="3" VerticalAlignment="Center" Margin="0,0,12,0">
-                                                <Button Classes="iconbtn"
+                                                <Button Classes="iconbtn" AutomationProperties.Name="Move plugin up"
                                                         Command="{Binding ((vm:PluginsViewModel)DataContext).MoveUpCommand, RelativeSource={RelativeSource AncestorType=ItemsControl}}"
                                                         CommandParameter="{Binding}">
                                                     <Path Width="10" Height="6" Stretch="Uniform"
                                                           StrokeThickness="1.5" Data="M1 6 L6 1 L11 6"/>
                                                 </Button>
-                                                <Button Classes="iconbtn"
+                                                <Button Classes="iconbtn" AutomationProperties.Name="Move plugin down"
                                                         Command="{Binding ((vm:PluginsViewModel)DataContext).MoveDownCommand, RelativeSource={RelativeSource AncestorType=ItemsControl}}"
                                                         CommandParameter="{Binding}">
                                                     <Path Width="10" Height="6" Stretch="Uniform"
@@ -246,6 +255,7 @@
                                             </StackPanel>
                                             <!-- remove -->
                                             <Button Grid.Column="4" Classes="iconbtn danger" VerticalAlignment="Center"
+                                                    AutomationProperties.Name="Remove plugin"
                                                     Command="{Binding ((vm:PluginsViewModel)DataContext).RemovePluginCommand, RelativeSource={RelativeSource AncestorType=ItemsControl}}"
                                                     CommandParameter="{Binding}">
                                                 <Path Width="11" Height="11" Stretch="Uniform"

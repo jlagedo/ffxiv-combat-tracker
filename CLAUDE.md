@@ -163,8 +163,10 @@ as the backend, so one API and one `EventId` taxonomy span both sides of the bri
   that must impersonate legacy DLLs keep the **legacy** identity (e.g. `Advanced Combat
   Tracker`, `FFXIV_ACT_Plugin.Common`) — that is intentional, not a mistake.
 - **Modern .NET patterns** on the net10 side: Generic Host + MEDI, `System.Threading.
-  Channels` for the bus, `System.Text.Json` source-gen, `ILogger` source-gen, records +
-  spans. No Newtonsoft, no hand-rolled DI containers on the net10 side.
+  Channels` for the bus, `System.Text.Json` source-gen, `ILogger` source-gen,
+  CommunityToolkit.Mvvm (`[ObservableProperty]`/`[RelayCommand]` source-gen) for the Avalonia
+  view models, records + spans. No Newtonsoft, no hand-rolled DI containers, no ReactiveUI on
+  the net10 side.
 - **This file is a facts document.** Present-tense state only — no change history or
   rationale-for-past-decisions. Design rationale belongs in `docs/ARCHITECTURE.md`.
 

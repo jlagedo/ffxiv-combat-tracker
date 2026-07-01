@@ -12,6 +12,7 @@
     <PackageReference Include="Avalonia.Desktop" />
     <PackageReference Include="Avalonia.Themes.Fluent" />
     <PackageReference Include="Avalonia.Fonts.Inter" />
+    <PackageReference Include="CommunityToolkit.Mvvm" />
     <PackageReference Include="AvaloniaUI.DiagnosticsSupport">
       <IncludeAssets Condition="'$(Configuration)' != 'Debug'">None</IncludeAssets>
       <PrivateAssets Condition="'$(Configuration)' != 'Debug'">All</PrivateAssets>
@@ -34,6 +35,12 @@
     <Compile Include="..\..\shared\Logging\BridgeLogRecord.cs" Link="Logging\BridgeLogRecord.cs" />
   </ItemGroup>
 
+  <!-- The plugin SDK — the host resolves it into the default ALC so contract types have one identity
+       across the host↔plugin boundary. -->
+  <ItemGroup>
+    <ProjectReference Include="..\Fct.Abstractions\Fct.Abstractions.csproj" />
+  </ItemGroup>
+
   <!-- Build the net48 satellite as a dependency (no assembly reference: different runtime)
        and stage its output under satellite\ next to the host. -->
   <ItemGroup>
@@ -43,12 +50,29 @@
                       Private="false" />
   </ItemGroup>
 
+  <!-- Build the sample plugin as a dependency but DO NOT reference its assembly: it must load only
+       through its own ALC, never into the host's default context. Staged under plugins\ next to the host. -->
+  <ItemGroup>
+    <ProjectReference Include="..\..\samples\Fct.SamplePlugin\Fct.SamplePlugin.csproj"
+                      ReferenceOutputAssembly="false"
+                      Private="false" />
+  </ItemGroup>
+
   <Target Name="StageSatellite" AfterTargets="Build">
     <ItemGroup>
       <SatelliteFiles Include="$(MSBuildThisFileDirectory)..\Fct.LegacyHost\bin\$(Configuration)\net48\**\*" />
     </ItemGroup>
     <Copy SourceFiles="@(SatelliteFiles)"
           DestinationFiles="@(SatelliteFiles->'$(OutDir)satellite\%(RecursiveDir)%(Filename)%(Extension)')"
+          SkipUnchangedFiles="true" />
+  </Target>
+
+  <Target Name="StageSamplePlugin" AfterTargets="Build">
+    <ItemGroup>
+      <SamplePluginFiles Include="$(MSBuildThisFileDirectory)..\..\samples\Fct.SamplePlugin\bin\$(Configuration)\net10.0\**\*" />
+    </ItemGroup>
+    <Copy SourceFiles="@(SamplePluginFiles)"
+          DestinationFiles="@(SamplePluginFiles->'$(OutDir)plugins\Fct.SamplePlugin\%(RecursiveDir)%(Filename)%(Extension)')"
           SkipUnchangedFiles="true" />
   </Target>
 </Project>

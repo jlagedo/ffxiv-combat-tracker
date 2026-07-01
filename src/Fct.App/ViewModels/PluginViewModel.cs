@@ -1,4 +1,5 @@
 using System;
+using CommunityToolkit.Mvvm.ComponentModel;
 
 namespace Fct.App.ViewModels;
 
@@ -19,7 +20,7 @@ public enum PluginKind { Legacy, Native }
 
 // One row in the plugin roster. Status is derived so the orb, pill, and label all stay
 // in sync with whether the host is up and whether the user has the plugin toggled on.
-public sealed class PluginViewModel : ObservableObject
+public sealed partial class PluginViewModel : ObservableObject
 {
     public required string Name { get; init; }
     public required string Role { get; init; }
@@ -37,36 +38,24 @@ public sealed class PluginViewModel : ObservableObject
     public IntPtr Hwnd { get; set; }
 
     // Drives the channel rail's active styling; the MainViewModel keeps exactly one set.
+    [ObservableProperty]
     private bool _isSelected;
-    public bool IsSelected
-    {
-        get => _isSelected;
-        set => SetField(ref _isSelected, value);
-    }
 
+    [ObservableProperty]
     private bool _hasNativeConfig;
-    public bool HasNativeConfig
-    {
-        get => _hasNativeConfig;
-        set => SetField(ref _hasNativeConfig, value);
-    }
 
     // Runtime badge, e.g. "net48 · satellite" / "net10 · host".
     public string Runtime => Kind == PluginKind.Legacy ? "net48 · satellite" : "net10 · host";
 
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(Status), nameof(IsLive), nameof(StatusLabel),
+        nameof(ConfigPlaceholderTitle), nameof(ConfigPlaceholderBody))]
     private PluginStatus _baseStatus = PluginStatus.Loading;
-    public PluginStatus BaseStatus
-    {
-        get => _baseStatus;
-        set { if (SetField(ref _baseStatus, value)) RaiseDerived(); }
-    }
 
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(Status), nameof(IsLive), nameof(StatusLabel),
+        nameof(ConfigPlaceholderTitle), nameof(ConfigPlaceholderBody))]
     private bool _isActive = true;
-    public bool IsActive
-    {
-        get => _isActive;
-        set { if (SetField(ref _isActive, value)) RaiseDerived(); }
-    }
 
     // Preview plugins ignore the toggle (nothing to start yet); everything else collapses
     // to Disabled when switched off.
@@ -105,13 +94,4 @@ public sealed class PluginViewModel : ObservableObject
         PluginStatus.Unavailable => "Unavailable",
         _ => "Error"
     };
-
-    private void RaiseDerived()
-    {
-        Raise(nameof(Status));
-        Raise(nameof(IsLive));
-        Raise(nameof(StatusLabel));
-        Raise(nameof(ConfigPlaceholderTitle));
-        Raise(nameof(ConfigPlaceholderBody));
-    }
 }

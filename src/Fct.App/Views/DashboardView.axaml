@@ -5,7 +5,8 @@
              xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
              mc:Ignorable="d" d:DesignWidth="820" d:DesignHeight="620"
              x:Class="Fct.App.Views.DashboardView"
-             x:DataType="vm:DashboardViewModel">
+             x:DataType="vm:DashboardViewModel"
+             d:DataContext="{x:Static vm:DesignData.Dashboard}">
 
     <ScrollViewer>
         <StackPanel Spacing="18">

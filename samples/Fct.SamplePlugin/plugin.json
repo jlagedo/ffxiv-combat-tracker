@@ -1,0 +1,8 @@
+{
+  "id": "com.fct.sample",
+  "version": "1.0.0",
+  "contract": "1.0",
+  "assembly": "Fct.SamplePlugin.dll",
+  "entry": "Fct.SamplePlugin.SamplePlugin",
+  "capabilities": [ "raw" ]
+}

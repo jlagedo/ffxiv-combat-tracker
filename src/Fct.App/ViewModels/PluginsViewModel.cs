@@ -1,5 +1,7 @@
 using System;
 using System.IO;
+using CommunityToolkit.Mvvm.ComponentModel;
+using CommunityToolkit.Mvvm.Input;
 
 namespace Fct.App.ViewModels;
 
@@ -7,18 +9,9 @@ namespace Fct.App.ViewModels;
 // add/remove/reorder rack ("Manage"). Roster mutations operate on the shell's shared
 // Plugins collection and selection. Supplies its own compact chrome, so it hides the
 // shell's generic header.
-public sealed class PluginsViewModel : PageViewModel
+public sealed partial class PluginsViewModel : PageViewModel
 {
-    public PluginsViewModel(MainViewModel shell) : base(shell)
-    {
-        ManageCommand = new RelayCommand(() => PluginsMode = "Manage");
-        ConfigureCommand = new RelayCommand(() => PluginsMode = "Configure");
-        AddPluginCommand = new RelayCommand(() => AddPluginRequested?.Invoke());
-        RemovePluginCommand = new RelayCommand(p => RemovePlugin(p as PluginViewModel));
-        MoveUpCommand = new RelayCommand(p => Move(p as PluginViewModel, -1));
-        MoveDownCommand = new RelayCommand(p => Move(p as PluginViewModel, +1));
-        RetryCommand = new RelayCommand(() => RetryRequested?.Invoke());
-    }
+    public PluginsViewModel(MainViewModel shell) : base(shell) { }
 
     public override Section Section => Section.Plugins;
     public override string Eyebrow => "Plugins";
@@ -27,14 +20,6 @@ public sealed class PluginsViewModel : PageViewModel
         "Load the legacy ecosystem unmodified, then configure each plugin's native tabs in place.";
     public override bool ShowGenericHeader => false;
 
-    public RelayCommand ManageCommand { get; }
-    public RelayCommand ConfigureCommand { get; }
-    public RelayCommand AddPluginCommand { get; }
-    public RelayCommand RemovePluginCommand { get; }
-    public RelayCommand MoveUpCommand { get; }
-    public RelayCommand MoveDownCommand { get; }
-    public RelayCommand RetryCommand { get; }
-
     // Raised when the user asks to relaunch the host after a failed start; the window owns
     // the satellite lifecycle and wires this up.
     public event Action? RetryRequested;
@@ -42,17 +27,22 @@ public sealed class PluginsViewModel : PageViewModel
     // Raised when the user clicks "Add plugin"; the window owns the file picker.
     public event Action? AddPluginRequested;
 
+    // Command methods — the generated XCommand properties match the existing XAML bindings.
+    [RelayCommand] private void Manage() => PluginsMode = "Manage";
+    [RelayCommand] private void Configure() => PluginsMode = "Configure";
+    [RelayCommand] private void AddPlugin() => AddPluginRequested?.Invoke();
+    [RelayCommand] private void Retry() => RetryRequested?.Invoke();
+    [RelayCommand] private void MoveUp(PluginViewModel? p) => Move(p, -1);
+    [RelayCommand] private void MoveDown(PluginViewModel? p) => Move(p, +1);
+
     // The page has two surfaces in the same space: "Configure" (the embedded plugin tabs)
     // and "Manage" (add / remove / enable / reorder the roster).
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(IsConfigure), nameof(IsManage))]
     private string _pluginsMode = "Configure";
-    public string PluginsMode
-    {
-        get => _pluginsMode;
-        set { if (SetField(ref _pluginsMode, value)) { Raise(nameof(IsConfigure)); Raise(nameof(IsManage)); } }
-    }
 
-    public bool IsConfigure => _pluginsMode == "Configure";
-    public bool IsManage => _pluginsMode == "Manage";
+    public bool IsConfigure => PluginsMode == "Configure";
+    public bool IsManage => PluginsMode == "Manage";
 
     // Reorder the roster in place (the channel rail and rack both reflect the order).
     private void Move(PluginViewModel? p, int dir)
@@ -65,6 +55,7 @@ public sealed class PluginsViewModel : PageViewModel
     }
 
     // Remove an added/loaded plugin; keep a sensible selection on whatever remains.
+    [RelayCommand]
     private void RemovePlugin(PluginViewModel? p)
     {
         if (p is null) return;

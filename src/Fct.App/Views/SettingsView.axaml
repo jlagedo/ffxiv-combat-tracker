@@ -5,7 +5,8 @@
              xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
              mc:Ignorable="d" d:DesignWidth="820" d:DesignHeight="620"
              x:Class="Fct.App.Views.SettingsView"
-             x:DataType="vm:SettingsViewModel">
+             x:DataType="vm:SettingsViewModel"
+             d:DataContext="{x:Static vm:DesignData.Settings}">
 
     <ScrollViewer>
         <StackPanel Spacing="16" MaxWidth="720" HorizontalAlignment="Left">
@@ -38,7 +39,9 @@
                             <TextBlock Text="Launch the satellite with the host" Classes="body"/>
                             <TextBlock Text="Starts the .NET 4.8 process automatically on open." Classes="meta" FontSize="11"/>
                         </StackPanel>
-                        <ToggleSwitch Grid.Column="1" IsChecked="True" OnContent="" OffContent=""/>
+                        <ToggleSwitch Grid.Column="1" IsChecked="{Binding LaunchSatelliteWithHost, Mode=TwoWay}"
+                                      OnContent="" OffContent=""
+                                      AutomationProperties.Name="Launch the satellite with the host"/>
                     </Grid>
                     <Border Height="1" Background="{StaticResource HairlineBrush}"/>
                     <Grid ColumnDefinitions="*,Auto">
@@ -46,7 +49,9 @@
                             <TextBlock Text="Embed plugin tabs in the host window" Classes="body"/>
                             <TextBlock Text="Reparents each plugin's WinForms tabs into this shell." Classes="meta" FontSize="11"/>
                         </StackPanel>
-                        <ToggleSwitch Grid.Column="1" IsChecked="True" OnContent="" OffContent=""/>
+                        <ToggleSwitch Grid.Column="1" IsChecked="{Binding EmbedPluginTabs, Mode=TwoWay}"
+                                      OnContent="" OffContent=""
+                                      AutomationProperties.Name="Embed plugin tabs in the host window"/>
                     </Grid>
                 </StackPanel>
             </Border>

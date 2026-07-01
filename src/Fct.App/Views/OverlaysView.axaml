@@ -5,7 +5,8 @@
              xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
              mc:Ignorable="d" d:DesignWidth="820" d:DesignHeight="620"
              x:Class="Fct.App.Views.OverlaysView"
-             x:DataType="vm:OverlaysViewModel">
+             x:DataType="vm:OverlaysViewModel"
+             d:DataContext="{x:Static vm:DesignData.Overlays}">
 
     <Border Classes="card rise1" Padding="40">
         <StackPanel VerticalAlignment="Center" HorizontalAlignment="Center" Spacing="12" MaxWidth="460">

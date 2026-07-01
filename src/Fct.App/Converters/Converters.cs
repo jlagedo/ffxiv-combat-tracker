@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using System.Globalization;
 using Avalonia;
 using Avalonia.Data.Converters;
@@ -11,8 +12,6 @@ namespace Fct.App.Converters;
 //   "fill" (orb core), "glow" (soft halo), "text"/"pill" (label colour).
 public sealed class StatusToBrushConverter : IValueConverter
 {
-    public static readonly StatusToBrushConverter Instance = new();
-
     public object Convert(object? value, Type targetType, object? parameter, CultureInfo culture)
     {
         // The satellite chip binds a plain string ("Online"/"Offline"/"Starting").
@@ -37,13 +36,7 @@ public sealed class StatusToBrushConverter : IValueConverter
             _ => "Warn",
         };
 
-        var brush = Brush(key + "Brush");
-        if ((parameter as string) == "glow" && brush is ISolidColorBrush scb)
-        {
-            var c = scb.Color;
-            return new SolidColorBrush(Color.FromArgb(0x33, c.R, c.G, c.B));
-        }
-        return brush;
+        return (parameter as string) == "glow" ? Glow(key) : Brush(key + "Brush");
     }
 
     public object ConvertBack(object? value, Type targetType, object? parameter, CultureInfo culture)
@@ -52,14 +45,27 @@ public sealed class StatusToBrushConverter : IValueConverter
     private static IBrush Brush(string key) =>
         Application.Current?.Resources.TryGetResource(key, null, out var r) == true && r is IBrush b
             ? b : Brushes.Gray;
+
+    // A translucent halo of the status colour. Derived once per status key and reused — the item
+    // templates re-evaluate this binding on every roster/status change, so caching avoids a fresh
+    // SolidColorBrush allocation each pass. UI-thread only, so a plain dictionary is safe.
+    private static readonly Dictionary<string, IBrush> GlowCache = new();
+
+    private static IBrush Glow(string key)
+    {
+        if (GlowCache.TryGetValue(key, out var cached)) return cached;
+        var glow = Brush(key + "Brush") is ISolidColorBrush scb
+            ? new SolidColorBrush(Color.FromArgb(0x33, scb.Color.R, scb.Color.G, scb.Color.B))
+            : Brush(key + "Brush");
+        GlowCache[key] = glow;
+        return glow;
+    }
 }
 
 // True when the bound enum value's name equals the ConverterParameter — drives the nav
 // rail's active styling against MainViewModel.CurrentPage.Section.
 public sealed class EnumEqualsConverter : IValueConverter
 {
-    public static readonly EnumEqualsConverter Instance = new();
-
     public object Convert(object? value, Type targetType, object? parameter, CultureInfo culture)
         => string.Equals(value?.ToString(), parameter as string, StringComparison.Ordinal);
 
@@ -69,8 +75,6 @@ public sealed class EnumEqualsConverter : IValueConverter
 
 public sealed class InverseBoolConverter : IValueConverter
 {
-    public static readonly InverseBoolConverter Instance = new();
-
     public object Convert(object? value, Type targetType, object? parameter, CultureInfo culture)
         => value is bool b && !b;
 

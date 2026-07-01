@@ -40,6 +40,15 @@ namespace Fct.Logging
         public static readonly EventId WindowReparented = new EventId(1300, nameof(WindowReparented));
         public static readonly EventId WindowReparentFailed = new EventId(1301, nameof(WindowReparentFailed));
 
+        // -- 14xx native plugin host (net10 ALC loader + lifecycle) --
+        public static readonly EventId NativePluginsScanning = new EventId(1400, nameof(NativePluginsScanning));
+        public static readonly EventId NativePluginManifestRejected = new EventId(1401, nameof(NativePluginManifestRejected));
+        public static readonly EventId NativePluginLoaded = new EventId(1402, nameof(NativePluginLoaded));
+        public static readonly EventId NativePluginInitialized = new EventId(1403, nameof(NativePluginInitialized));
+        public static readonly EventId NativePluginFaulted = new EventId(1404, nameof(NativePluginFaulted));
+        public static readonly EventId NativePluginUnloaded = new EventId(1405, nameof(NativePluginUnloaded));
+        public static readonly EventId NativePluginsReady = new EventId(1406, nameof(NativePluginsReady));
+
         // -- 20xx satellite lifecycle (satellite side) --
         public static readonly EventId SatelliteBooting = new EventId(2000, nameof(SatelliteBooting));
         public static readonly EventId SatelliteBridgeConnected = new EventId(2001, nameof(SatelliteBridgeConnected));

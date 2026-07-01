@@ -8,15 +8,16 @@ It is the counterpart to the *backward* surface: [`ACT-INTERFACE-MAP.md`](ACT-IN
 [`DATA-FLOW.md`](DATA-FLOW.md) document the legacy ACT host surface the net48 satellite impersonates
 to run the five plugins **unmodified**. This document is the **net10 contract** they migrate *to*.
 
-> **Status: design + scaffold + flow-test harness (all contract gaps closed).** `Fct.Abstractions`
-> (net48;net10) and `Fct.Abstractions.UI` (net10 + Avalonia) exist as compiling contract stubs —
-> interfaces and domain records, **no host implementation, no loader, no shim, no bus**. A headless
-> flow-test harness exercises the contract shapes end-to-end: `Fct.Abstractions.Testing` (net48;net10)
-> supplies in-memory fakes of every interface plus the `ShimStub` seam, and `Fct.FlowTests` (net10)
-> runs the legacy↔native flow suite (**18 tests, all green, 0 skipped**). The archetype
-> shapes below are cross-checked against the actual source of all five supported plugins on `E:\dev`;
-> the gaps that check surfaced (**G1–G11, all now shipped**) are
-> tracked in [Contract gaps](#contract-gaps-tracked), and the flow suite is documented in
+> **Status: contract + flow-test harness + net10 host & ALC loader (slice A+B) built; compat shim
+> (D) and live bridge data (C) pending.** `Fct.Abstractions` (net48;net10) and `Fct.Abstractions.UI`
+> (net10 + Avalonia) are the compiling contract; a headless flow-test harness exercises the contract
+> shapes end-to-end: `Fct.Abstractions.Testing` supplies in-memory fakes of every interface plus the
+> `ShimStub` seam, and `Fct.FlowTests` (net10) runs the legacy↔native flow suite (**18 tests, all
+> green, 0 skipped**). The **real host services + ALC-per-plugin loader now exist in `Fct.App`** and
+> load a sample native plugin end-to-end (see [The net10 host & ALC loader](#the-net10-host--alc-loader-built)).
+> The archetype shapes below are cross-checked against the actual source of all five supported plugins
+> on `E:\dev`; the gaps that check surfaced (**G1–G11, all now shipped**) are tracked in
+> [Contract gaps](#contract-gaps-tracked), and the flow suite is documented in
 > [Testing the contract](#testing-the-contract--legacynative-flow-tests).
 
 ## Two interfaces, one contract
@@ -411,13 +412,42 @@ its scenario went RED→green.
 manifest. New `GameEvent` records are additive (switch-and-ignore-unknown); every fix in
 [Contract gaps](#contract-gaps-tracked) is an additive edit.
 
+## The net10 host & ALC loader (built)
+
+The real host services + assembly loader exist in `Fct.App` (net10), promoting the in-memory fakes to
+production and loading a real native `IPlugin` from disk:
+
+- **Host services** (`src/Fct.App/Hosting/`): `GameEventBus` (a real `IGameEventStream` — bounded
+  per-subscription channel drained by a background pump, drop-oldest backpressure, fault-guarded
+  handlers, generalizing `RingBufferDataSubscription`) with an in-process `IGameEventSink` producer
+  seam; `RegistryService`, `AudioService` (priority fan-out + terminal-sink G3), `EncounterService`,
+  disk-backed `PluginStorage`, `SystemClock`, the capability-gated `RawLogLineEmitter` (G4), and the
+  per-plugin `PluginHost : IPluginHost`. Registered in `Program.BuildHost`.
+- **ALC loader** (`src/Fct.App/Plugins/`): `PluginManifest` (`plugin.json`, read without loading the
+  assembly) + `HostContract` major-version gate; `PluginLoadContext` (collectible, `Fct.Abstractions`/
+  `Fct.Abstractions.UI`/`Microsoft.Extensions.Logging.Abstractions`/`Avalonia.*` shared to the default
+  context, everything else private via `AssemblyDependencyResolver`); `PluginManager` (discover →
+  gate → load → time-boxed fault-guarded init → quarantine/unload) driven by the `PluginLifetime`
+  hosted service.
+- **Sample plugin** (`samples/Fct.SamplePlugin`) loads end-to-end and exercises events/snapshot/
+  registry/audio/storage/raw-write-back; covered by `tests/Fct.App.Tests` (bus, registry, audio,
+  manifest gate, share-to-default identity, load/init/unload from disk).
+
+The net10 **compat shim** (`ShimStub` → real, piece D) and **live game data** over the bridge
+(net48→net10 forwarder, piece C) are not yet built; until then a Debug-only `DevGameEventSource`
+feeds the bus synthetic events.
+
 ## Open items / next steps
 
+- The net10 compat shim that turns the `ShimStub` seam into the real ACT/SDK re-projection (piece D):
+  full `IDataSubscription` (11 events), `Combatant`/`Player`/`NetworkBuff` projection over
+  `Actor`/`StatusEffect`, `IDataRepository.Get*`, `IActPluginV1` lifecycle, `TabPage`-via-
+  `NativeControlHost`. Under-specified rows: the `AddCombatAction(MasterSwing)` sink, `Form`-inherited
+  `oFormActMain` members, spell-timer / custom-trigger subsystems.
+- The net48→net10 bridge data forwarder (piece C): map the satellite's SDK/ACT stream to `GameEvent`
+  records over a new bridge frame kind, feeding the `IGameEventSink` producer seam (replaces
+  `DevGameEventSource`).
 - Complete the `GameEvent` hierarchy against the full 0–274 taxonomy.
-- `PluginLoadContext`: manifest gate + the `Fct.Abstractions`/`Avalonia` share-to-default mechanism,
-  end-to-end.
-- The net10 compat shim + host that turn the `ShimStub` seam and in-memory fakes into real
-  implementations (the [contract gaps](#contract-gaps-tracked) G1–G11 are all shipped).
 - Config-UI sub-decision detail (Avalonia control vs. WebView) — deferred per
   [`ARCHITECTURE.md`](ARCHITECTURE.md) §4a; the contract is framework-agnostic enough to defer.
 - Whether `IResourceCatalog` ships our own complete name tables or proxies the plugin's

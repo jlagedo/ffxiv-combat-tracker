@@ -1,9 +1,11 @@
+using CommunityToolkit.Mvvm.ComponentModel;
+
 namespace Fct.App.ViewModels;
 
 // Base for the shell's content pages. Each page owns its own header copy and binds the
 // shared host/satellite state through Shell. The shell swaps CurrentPage; a DataTemplate
 // maps the concrete page type to its view.
-public abstract class PageViewModel : ObservableObject
+public abstract partial class PageViewModel : ObservableObject
 {
     protected PageViewModel(MainViewModel shell) => Shell = shell;
 

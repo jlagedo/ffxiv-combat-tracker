@@ -16,6 +16,7 @@
     <PackageVersion Include="Avalonia.Themes.Fluent" Version="12.0.5" />
     <PackageVersion Include="Avalonia.Fonts.Inter" Version="12.0.5" />
     <PackageVersion Include="AvaloniaUI.DiagnosticsSupport" Version="2.2.3" />
+    <PackageVersion Include="CommunityToolkit.Mvvm" Version="8.4.2" />
   </ItemGroup>
 
   <!-- Hosting + logging. Serilog targets netstandard2.0, so the same versions load on net48. -->

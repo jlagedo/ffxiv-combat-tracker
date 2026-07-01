@@ -536,4 +536,18 @@
         <Setter Property="Foreground" Value="{StaticResource GlintBrush}"/>
     </Style>
 
+    <!-- ============================ GridSplitter (pane divider) ============================
+         Invisible until hovered — a cold hairline glow marks the drag handle; the resize
+         cursor is supplied by the control. -->
+    <Style Selector="GridSplitter.pane">
+        <Setter Property="Background" Value="Transparent"/>
+        <Setter Property="MinWidth" Value="6"/>
+        <Setter Property="Transitions">
+            <Transitions><BrushTransition Property="Background" Duration="0:0:0.15"/></Transitions>
+        </Setter>
+    </Style>
+    <Style Selector="GridSplitter.pane:pointerover">
+        <Setter Property="Background" Value="{StaticResource FrostRuleBrush}"/>
+    </Style>
+
 </Styles>
