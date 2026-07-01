@@ -10,7 +10,6 @@
   <PropertyGroup>
     <TargetFramework>net48</TargetFramework>
     <UseWindowsForms>true</UseWindowsForms>
-    <LangVersion>latest</LangVersion>
     <Nullable>disable</Nullable>
     <AssemblyName>Advanced Combat Tracker</AssemblyName>
     <RootNamespace>Advanced_Combat_Tracker</RootNamespace>

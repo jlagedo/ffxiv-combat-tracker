@@ -1,0 +1,10 @@
+<Project>
+
+  <!--
+    Intentionally isolates build/ from the repo-root Directory.Build.props: this is the repo's build
+    automation (Bullseye + SimpleExec), not shipping code. It opts out of central package management
+    (see Build.csproj) and of the strict app-wide defaults. Empty on purpose — its presence stops
+    MSBuild from walking up to the repo-root defaults.
+  -->
+
+</Project>

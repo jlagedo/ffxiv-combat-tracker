@@ -115,7 +115,7 @@ public sealed class SatelliteHost
             string? line;
             while ((line = await reader.ReadLineAsync(timeout.Token).ConfigureAwait(false)) != null)
             {
-                if (BridgeLogRecord.TryParse(line, out var rec))
+                if (BridgeLogRecord.TryParse(line, out var rec) && rec is not null)
                 {
                     ReEmit(rec);
                 }
@@ -166,7 +166,7 @@ public sealed class SatelliteHost
             string? line;
             while (!ct.IsCancellationRequested && (line = await reader.ReadLineAsync(ct).ConfigureAwait(false)) != null)
             {
-                if (BridgeLogRecord.TryParse(line, out var rec))
+                if (BridgeLogRecord.TryParse(line, out var rec) && rec is not null)
                     ReEmit(rec);
                 else
                     _log.LogDebug(LogEvents.BridgeFrameMalformed, "Unrecognized bridge frame after handshake: {Frame}", line);

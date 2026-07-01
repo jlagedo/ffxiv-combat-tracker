@@ -34,7 +34,7 @@ namespace Fct.Compat.Act.Tests
             form.SetEncounter(T0, "YOU", "Enemy");
             form.AddCombatAction(Dmg("YOU", "Enemy", T0));
             Assert.True(form.InCombat);
-            Assert.Equal(1, form.ActiveZone.Items.Count);
+            Assert.Single(form.ActiveZone.Items);
             Assert.Equal(1, starts);
 
             // 5 s of quiet log time: under the 6 s idle limit, combat continues.
@@ -68,7 +68,7 @@ namespace Fct.Compat.Act.Tests
                 form.AddCombatAction(Dmg("YOU", "Enemy", t));
             }
             Assert.True(form.InCombat);
-            Assert.Equal(1, form.ActiveZone.Items.Count);
+            Assert.Single(form.ActiveZone.Items);
         }
 
         [Fact]

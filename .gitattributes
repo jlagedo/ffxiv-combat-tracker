@@ -1,0 +1,34 @@
+# Normalize line endings: Git stores text as LF, checks out native on each platform.
+* text=auto
+
+# Source and config — always LF in the repo.
+*.cs        text eol=lf
+*.csproj    text eol=lf
+*.props     text eol=lf
+*.targets   text eol=lf
+*.slnx      text eol=lf
+*.json      text eol=lf
+*.axaml     text eol=lf
+*.xml       text eol=lf
+*.md        text eol=lf
+*.editorconfig text eol=lf
+.gitattributes text eol=lf
+.gitignore  text eol=lf
+
+# Windows-only scripts stay CRLF.
+*.ps1       text eol=crlf
+*.cmd       text eol=crlf
+*.bat       text eol=crlf
+
+# Shell scripts stay LF.
+*.sh        text eol=lf
+
+# Binaries — never touch.
+*.dll       binary
+*.exe       binary
+*.pdb       binary
+*.png       binary
+*.jpg       binary
+*.ico       binary
+*.snk       binary
+*.publickey binary

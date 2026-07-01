@@ -8,8 +8,6 @@
   -->
   <PropertyGroup>
     <TargetFrameworks>net48;net10.0</TargetFrameworks>
-    <LangVersion>latest</LangVersion>
-    <Nullable>enable</Nullable>
     <ImplicitUsings>disable</ImplicitUsings>
     <RootNamespace>Fct.Abstractions.Testing</RootNamespace>
     <IsPackable>false</IsPackable>

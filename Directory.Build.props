@@ -1,0 +1,32 @@
+<Project>
+
+  <!--
+    Repo-wide build defaults, imported early into every project under the repo root
+    (src/, tests/, samples/). Any project may override a property locally: the net48 facade and
+    legacy-host projects set <Nullable>disable</Nullable> themselves. build/ and tools/ carry their
+    own (empty) Directory.Build.props so they opt out of these defaults — they are dev tooling, not
+    shipping code, and stay isolated from the app's build graph.
+  -->
+
+  <PropertyGroup>
+    <LangVersion>latest</LangVersion>
+    <Nullable>enable</Nullable>
+    <Deterministic>true</Deterministic>
+  </PropertyGroup>
+
+  <!-- Strict: compiler + analyzer warnings fail the build; code-style rules are enforced at build
+       time (their severities are set in .editorconfig). -->
+  <PropertyGroup>
+    <TreatWarningsAsErrors>true</TreatWarningsAsErrors>
+    <EnforceCodeStyleInBuild>true</EnforceCodeStyleInBuild>
+    <AnalysisLevel>latest</AnalysisLevel>
+  </PropertyGroup>
+
+  <!-- Shared assembly/package metadata. -->
+  <PropertyGroup>
+    <Product>FFXIV Combat Tracker</Product>
+    <Authors>João Amaro Lagedo</Authors>
+    <Copyright>Copyright © 2026</Copyright>
+  </PropertyGroup>
+
+</Project>
