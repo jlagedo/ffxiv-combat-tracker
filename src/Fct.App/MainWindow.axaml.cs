@@ -3,6 +3,7 @@ using System.Linq;
 using System.Threading.Tasks;
 using Avalonia.Controls;
 using Avalonia.Platform.Storage;
+using Fct.App.Hosting;
 using Fct.App.ViewModels;
 using Fct.Logging;
 using Microsoft.Extensions.Logging;
@@ -17,7 +18,7 @@ public partial class MainWindow : Window
     private readonly SatelliteHost _satellite;
 
     // Parameterless path is for the XAML previewer only; the running app resolves the DI ctor.
-    public MainWindow() : this(new MainViewModel(), new SatelliteHost(NullLoggerFactory.Instance), NullLoggerFactory.Instance) { }
+    public MainWindow() : this(new MainViewModel(), new SatelliteHost(NullLoggerFactory.Instance, NullGameEventSink.Instance), NullLoggerFactory.Instance) { }
 
     public MainWindow(MainViewModel vm, SatelliteHost satellite, ILoggerFactory loggerFactory)
     {

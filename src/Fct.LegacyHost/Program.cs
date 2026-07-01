@@ -25,6 +25,7 @@ namespace Fct.LegacyHost
         private static LoadedPlugin _ffxiv;
         private static LoadedPlugin _overlay;
         private static LoadedPlugin _probe;
+        private static BridgeForwarder _forwarder;
 
         [STAThread]
         private static void Main(string[] args)
@@ -166,6 +167,14 @@ namespace Fct.LegacyHost
                 if (args.detectedTime > DateTime.MinValue)
                     ActGlobals.oFormActMain.AdvanceClock(args.detectedTime);
             };
+
+            // Forward the live SDK/ACT stream to the net10 host as typed GameEvent frames (piece C).
+            // Only when bridged: standalone runs have no host to receive them.
+            if (!_standalone)
+            {
+                _forwarder = new BridgeForwarder(SendLine, _log);
+                _forwarder.Start();
+            }
 
             SelfTestAggregation();
         }
@@ -433,6 +442,8 @@ namespace Fct.LegacyHost
             var act = ActGlobals.oFormActMain;
             Action drainAndExit = () =>
             {
+                try { _forwarder?.Dispose(); }
+                catch (Exception ex) { _log.LogError(LogEvents.PluginDeInit, ex, "Bridge forwarder dispose failed"); }
                 try { FacadeHost.DeInitPlugins(); }
                 catch (Exception ex) { _log.LogError(LogEvents.PluginDeInit, ex, "Plugin de-init failed"); }
                 finally { Application.Exit(); }

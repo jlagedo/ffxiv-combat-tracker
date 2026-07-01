@@ -8,8 +8,8 @@ It is the counterpart to the *backward* surface: [`ACT-INTERFACE-MAP.md`](ACT-IN
 [`DATA-FLOW.md`](DATA-FLOW.md) document the legacy ACT host surface the net48 satellite impersonates
 to run the five plugins **unmodified**. This document is the **net10 contract** they migrate *to*.
 
-> **Status: contract + flow-test harness + net10 host & ALC loader (slice A+B) built; compat shim
-> (D) and live bridge data (C) pending.** `Fct.Abstractions` (net48;net10) and `Fct.Abstractions.UI`
+> **Status: contract + flow-test harness + net10 host & ALC loader (slice A+B) + the net48→net10
+> bridge data forwarder (C) built; the net10 compat shim (D) pending.** `Fct.Abstractions` (net48;net10) and `Fct.Abstractions.UI`
 > (net10 + Avalonia) are the compiling contract; a headless flow-test harness exercises the contract
 > shapes end-to-end: `Fct.Abstractions.Testing` supplies in-memory fakes of every interface plus the
 > `ShimStub` seam, and `Fct.FlowTests` (net10) runs the legacy↔native flow suite (**18 tests, all
@@ -433,9 +433,34 @@ production and loading a real native `IPlugin` from disk:
   registry/audio/storage/raw-write-back; covered by `tests/Fct.App.Tests` (bus, registry, audio,
   manifest gate, share-to-default identity, load/init/unload from disk).
 
-The net10 **compat shim** (`ShimStub` → real, piece D) and **live game data** over the bridge
-(net48→net10 forwarder, piece C) are not yet built; until then a Debug-only `DevGameEventSource`
-feeds the bus synthetic events.
+The net48→net10 **bridge data forwarder** (piece C) is built (see below); the net10 **compat shim**
+(`ShimStub` → real, piece D) is not yet built.
+
+## The bridge data forwarder (built)
+
+Live game data reaches the net10 bus over the existing satellite→host pipe (piece C):
+
+- **Satellite (`src/Fct.LegacyHost/BridgeForwarder.cs`)** — the production form of `Fct.StreamProbe`:
+  same discovery (reflect `ActGlobals.oFormActMain.ActPlugins`), the same SDK subscriptions and ACT-hub
+  tap, but it **projects each callback into a typed `GameEvent`** and ships it to the host instead of
+  logging it. A bounded ring + one writer thread (drop-oldest + a dropped counter, mirroring
+  `RingBufferDataSubscription`) keeps pipe I/O off the SDK dispatch/UI threads on the high-rate firehose.
+- **Wire (`shared/Bridge/GameEventFrame.cs`, linked into both processes)** — a new `EVT` frame kind
+  alongside `LOG`: one tab-delimited, backslash-escaped line per event, **no JSON** (the
+  `BridgeLogRecord` convention). `Sequence` is not on the wire — the host re-stamps each decoded event
+  from its own `IGameEventSink.NextSequence()` so the bus keeps one coherent per-session ordering.
+- **Host (`src/Fct.App/SatelliteHost.cs`)** — the bridge read loop decodes `EVT` frames and calls
+  `IGameEventSink.Emit`, so bridge events flow to every subscription exactly like any in-process source.
+
+**What the forwarder can carry is bounded by the sole-parser directive** — it may only project data the
+SDK/ACT hub exposes *post-parse*, never re-parse a log line. Forwarded today: `RawLogLine` (the SDK
+`LogLine` firehose that Trig/cactbot regex over), `ZoneChanged`, `PartyChanged`,
+`PrimaryPlayerChanged`, `CombatantAdded`/`CombatantRemoved` (`Combatant`→`Actor`, lossless for
+DoL/DoH per [G10](#contract-gaps-tracked)), and `ActionEffect` (from the ACT hub's post-aggregation
+`AfterCombatAction`). Events that exist only as parsed log-line fields — `StatusApplied`/`Removed`,
+`Cast*`, `DeathOccurred`, `HpUpdated` — are **not** synthesized; consumers reach them through the
+`RawLogLine` firehose, exactly as in ACT today. Codec round-trip + decode-onto-bus are covered by
+`tests/Fct.App.Tests/BridgeEventFrameTests.cs`.
 
 ## Open items / next steps
 
@@ -444,9 +469,9 @@ feeds the bus synthetic events.
   `Actor`/`StatusEffect`, `IDataRepository.Get*`, `IActPluginV1` lifecycle, `TabPage`-via-
   `NativeControlHost`. Under-specified rows: the `AddCombatAction(MasterSwing)` sink, `Form`-inherited
   `oFormActMain` members, spell-timer / custom-trigger subsystems.
-- The net48→net10 bridge data forwarder (piece C): map the satellite's SDK/ACT stream to `GameEvent`
-  records over a new bridge frame kind, feeding the `IGameEventSink` producer seam (replaces
-  `DevGameEventSource`).
+- Snapshot/encounter **projection** off the forwarded stream: wire `CombatantAdded`/`Removed` into a
+  live `IGameSnapshot` and the encounter `ExportVariables` rollup into `IEncounterService` (piece C
+  forwards the event *stream*; the projection is the next increment).
 - Complete the `GameEvent` hierarchy against the full 0–274 taxonomy.
 - Config-UI sub-decision detail (Avalonia control vs. WebView) — deferred per
   [`ARCHITECTURE.md`](ARCHITECTURE.md) §4a; the contract is framework-agnostic enough to defer.
