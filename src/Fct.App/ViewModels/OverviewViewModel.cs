@@ -1,3 +1,5 @@
+using Fct.App.Lang;
+
 namespace Fct.App.ViewModels;
 
 // The landing page: connection state, plugins at a glance, and recent activity. Reads everything
@@ -7,8 +9,7 @@ public sealed class OverviewViewModel : PageViewModel
     public OverviewViewModel(MainViewModel shell) : base(shell) { }
 
     public override Section Section => Section.Overview;
-    public override string Eyebrow => "Overview";
-    public override string Title => "Overview";
-    public override string Subtitle =>
-        "The state of the app at a glance — connection, the plugins it runs, and what's happened lately.";
+    public override string Eyebrow => Resources.Nav_Overview;
+    public override string Title => Resources.Nav_Overview;
+    public override string Subtitle => Resources.Overview_Subtitle;
 }

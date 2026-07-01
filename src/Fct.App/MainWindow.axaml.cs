@@ -6,6 +6,10 @@ using Avalonia.Controls;
 using Avalonia.Platform.Storage;
 using Fct.App.Hosting;
 using Fct.App.ViewModels;
+// Aliased: MainWindow inherits Window.Resources (IResourceDictionary), which shadows the
+// Fct.App.Lang.Resources type name inside this class; "Lang" would itself collide with the
+// Fct.App.Lang namespace since this file's namespace (Fct.App) is its direct parent.
+using Strings = Fct.App.Lang.Resources;
 using Fct.Logging;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Logging.Abstractions;
@@ -57,7 +61,7 @@ public partial class MainWindow : Window
     {
         var folders = await StorageProvider.OpenFolderPickerAsync(new FolderPickerOpenOptions
         {
-            Title = "Add a native plugin folder",
+            Title = Strings.Dialog_AddPluginFolderTitle,
             AllowMultiple = false,
         });
         if (folders.FirstOrDefault() is { } f)
@@ -70,8 +74,8 @@ public partial class MainWindow : Window
         {
             if (!File.Exists(Path.Combine(sourceDir, "plugin.json")))
             {
-                _notifications.Publish(NotificationSeverity.Warning, "Plugins", "That folder isn't a plugin",
-                    "Pick a folder containing a plugin.json manifest.");
+                _notifications.Publish(NotificationSeverity.Warning, Strings.Notify_Source_Plugins, Strings.Notify_NotAPluginFolderTitle,
+                    Strings.Notify_NotAPluginFolderBody);
                 return;
             }
 
@@ -79,13 +83,13 @@ public partial class MainWindow : Window
             var dest = Path.Combine(AppContext.BaseDirectory, "plugins", name);
             CopyDirectory(sourceDir, dest);
             _log.LogInformation(LogEvents.NativePluginLoaded, "Installed plugin folder {Name} -> {Dest}", name, dest);
-            _notifications.Publish(NotificationSeverity.Success, "Plugins", $"Installed {name}",
-                "The plugin loads the next time you start the app.");
+            _notifications.Publish(NotificationSeverity.Success, Strings.Notify_Source_Plugins, string.Format(Strings.Notify_PluginInstalledTitleFormat, name),
+                Strings.Notify_PluginInstalledBody);
         }
         catch (Exception ex)
         {
             _log.LogWarning(LogEvents.NativePluginManifestRejected, ex, "Plugin install failed from {Source}", sourceDir);
-            _notifications.Publish(NotificationSeverity.Error, "Plugins", "Couldn't install the plugin", ex.Message);
+            _notifications.Publish(NotificationSeverity.Error, Strings.Notify_Source_Plugins, Strings.Notify_PluginInstallFailedTitle, ex.Message);
         }
     }
 

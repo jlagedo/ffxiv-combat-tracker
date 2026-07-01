@@ -1,0 +1,178 @@
+<?xml version="1.0" encoding="utf-8"?>
+<root>
+  <resheader name="resmimetype">
+    <value>text/microsoft-resx</value>
+  </resheader>
+  <resheader name="version">
+    <value>2.0</value>
+  </resheader>
+  <resheader name="reader">
+    <value>System.Resources.ResXResourceReader, System.Windows.Forms, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b77a5c561934e089</value>
+  </resheader>
+  <resheader name="writer">
+    <value>System.Resources.ResXResourceWriter, System.Windows.Forms, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b77a5c561934e089</value>
+  </resheader>
+
+  <!-- General labels -->
+  <data name="Label_App" xml:space="preserve"><value>App</value></data>
+  <data name="Label_Game" xml:space="preserve"><value>Game</value></data>
+  <data name="Label_ClassicEngine" xml:space="preserve"><value>Classic engine</value></data>
+  <data name="Label_ClassicChip" xml:space="preserve"><value>classic</value></data>
+  <data name="Label_ModernChip" xml:space="preserve"><value>modern</value></data>
+  <data name="Label_IssuesChip" xml:space="preserve"><value>issues</value></data>
+  <data name="Label_ClassicRuntime" xml:space="preserve"><value>Classic</value></data>
+  <data name="Label_ModernRuntime" xml:space="preserve"><value>Modern</value></data>
+  <data name="Label_Identity" xml:space="preserve"><value>Identity</value></data>
+  <data name="Label_Version" xml:space="preserve"><value>Version</value></data>
+  <data name="Label_Contract" xml:space="preserve"><value>Contract</value></data>
+  <data name="Label_Duration" xml:space="preserve"><value>duration</value></data>
+  <data name="Label_RaidDps" xml:space="preserve"><value>raid dps</value></data>
+  <data name="Label_JobFormat" xml:space="preserve"><value>Job {0}</value></data>
+  <data name="Placeholder_Dash" xml:space="preserve"><value>—</value></data>
+
+  <!-- Navigation (also reused as page eyebrow/title) -->
+  <data name="Nav_Overview" xml:space="preserve"><value>Overview</value></data>
+  <data name="Nav_Plugins" xml:space="preserve"><value>Plugins</value></data>
+  <data name="Nav_Encounters" xml:space="preserve"><value>Encounters</value></data>
+  <data name="Nav_Settings" xml:space="preserve"><value>Settings</value></data>
+
+  <!-- All-caps section eyebrows -->
+  <data name="Eyebrow_Host" xml:space="preserve"><value>HOST</value></data>
+  <data name="Eyebrow_Plugins" xml:space="preserve"><value>PLUGINS</value></data>
+  <data name="Eyebrow_Classic" xml:space="preserve"><value>CLASSIC</value></data>
+  <data name="Eyebrow_Modern" xml:space="preserve"><value>MODERN</value></data>
+
+  <!-- Actions / buttons -->
+  <data name="Action_RestartClassicEngine" xml:space="preserve"><value>Restart classic engine</value></data>
+  <data name="Action_ManagePlugins" xml:space="preserve"><value>Manage plugins</value></data>
+  <data name="Action_OpenNotifications" xml:space="preserve"><value>Open notifications</value></data>
+  <data name="Action_AddPlugin" xml:space="preserve"><value>Add plugin</value></data>
+  <data name="Action_ConfigurePlugins" xml:space="preserve"><value>Configure plugins</value></data>
+  <data name="Action_ViewEncounters" xml:space="preserve"><value>View encounters</value></data>
+  <data name="Action_Restart" xml:space="preserve"><value>Restart</value></data>
+  <data name="Action_Clear" xml:space="preserve"><value>Clear</value></data>
+  <data name="Action_OpenLogsFolder" xml:space="preserve"><value>Open logs folder</value></data>
+
+  <!-- Accessibility names -->
+  <data name="A11y_Notifications" xml:space="preserve"><value>Notifications</value></data>
+  <data name="A11y_Minimize" xml:space="preserve"><value>Minimize</value></data>
+  <data name="A11y_MaximizeRestore" xml:space="preserve"><value>Maximize or restore</value></data>
+  <data name="A11y_Close" xml:space="preserve"><value>Close</value></data>
+  <data name="A11y_CloseNotifications" xml:space="preserve"><value>Close notifications</value></data>
+  <data name="A11y_DismissNotification" xml:space="preserve"><value>Dismiss notification</value></data>
+  <data name="A11y_ClassicPluginsList" xml:space="preserve"><value>Classic plugins</value></data>
+  <data name="A11y_ModernPluginsList" xml:space="preserve"><value>Modern plugins</value></data>
+
+  <!-- Status bar / connection state -->
+  <data name="Status_AppRunning" xml:space="preserve"><value>App running</value></data>
+  <data name="Status_GameFormat" xml:space="preserve"><value>Game: {0}</value></data>
+  <data name="Status_Live" xml:space="preserve"><value>Live</value></data>
+  <data name="Status_LastFight" xml:space="preserve"><value>Last fight</value></data>
+  <data name="Status_Starting" xml:space="preserve"><value>Starting…</value></data>
+  <data name="Status_Running" xml:space="preserve"><value>Running</value></data>
+  <data name="Status_Loaded" xml:space="preserve"><value>Loaded</value></data>
+  <data name="Status_NotLoaded" xml:space="preserve"><value>Not loaded</value></data>
+  <data name="Status_Unavailable" xml:space="preserve"><value>Unavailable</value></data>
+  <data name="Status_Error" xml:space="preserve"><value>Error</value></data>
+  <data name="Status_NotConnected" xml:space="preserve"><value>Not connected</value></data>
+  <data name="Status_WaitingForCombat" xml:space="preserve"><value>Waiting for combat</value></data>
+  <data name="Status_Stopped" xml:space="preserve"><value>Stopped</value></data>
+  <data name="Status_NotStarted" xml:space="preserve"><value>Not started</value></data>
+  <data name="Status_EngineStoppedSummary" xml:space="preserve"><value>Classic plugin engine stopped.</value></data>
+  <data name="Status_EngineNotStartedSummary" xml:space="preserve"><value>Classic plugin engine not started — start it from the Plugins page.</value></data>
+  <data name="Status_StartingEngineSummary" xml:space="preserve"><value>Starting the classic plugin engine…</value></data>
+  <data name="Status_EngineRunningSummary_One" xml:space="preserve"><value>Classic plugin engine running · 1 plugin.</value></data>
+  <data name="Status_EngineRunningSummary_Many" xml:space="preserve"><value>Classic plugin engine running · {0} plugins.</value></data>
+
+  <!-- Notifications (toasts / centre) -->
+  <data name="NotificationCenter_Title" xml:space="preserve"><value>Notifications</value></data>
+  <data name="NotificationCenter_Subtitle" xml:space="preserve"><value>Messages, errors, and plugin activity</value></data>
+  <data name="NotificationCenter_EmptyTitle" xml:space="preserve"><value>Nothing yet</value></data>
+  <data name="NotificationCenter_EmptyBody" xml:space="preserve"><value>Plugin messages and errors show up here.</value></data>
+  <data name="Notify_Source_ClassicEngine" xml:space="preserve"><value>Classic engine</value></data>
+  <data name="Notify_Source_ClassicPlugin" xml:space="preserve"><value>Classic plugin</value></data>
+  <data name="Notify_Source_Plugins" xml:space="preserve"><value>Plugins</value></data>
+  <data name="Notify_EngineRunningTitle" xml:space="preserve"><value>Classic engine running</value></data>
+  <data name="Notify_EngineReady_One" xml:space="preserve"><value>1 classic plugin ready.</value></data>
+  <data name="Notify_EngineReady_Many" xml:space="preserve"><value>{0} classic plugins ready.</value></data>
+  <data name="Notify_EngineStartFailedTitle" xml:space="preserve"><value>Couldn't start the classic engine</value></data>
+  <data name="Notify_EngineStoppedTitle" xml:space="preserve"><value>The classic engine stopped</value></data>
+  <data name="Notify_EngineStoppedBody" xml:space="preserve"><value>Classic plugins are no longer running. Restart it from the Plugins page.</value></data>
+  <data name="Notify_PluginReportedErrorTitle" xml:space="preserve"><value>A classic plugin reported an error</value></data>
+  <data name="Notify_PluginLoadFailedTitle" xml:space="preserve"><value>A classic plugin failed to load</value></data>
+  <data name="Notify_EngineErrorTitle" xml:space="preserve"><value>Classic engine error</value></data>
+  <data name="Notify_EngineWarningTitle" xml:space="preserve"><value>Classic engine warning</value></data>
+  <data name="Notify_NotAPluginFolderTitle" xml:space="preserve"><value>That folder isn't a plugin</value></data>
+  <data name="Notify_NotAPluginFolderBody" xml:space="preserve"><value>Pick a folder containing a plugin.json manifest.</value></data>
+  <data name="Notify_PluginInstalledTitleFormat" xml:space="preserve"><value>Installed {0}</value></data>
+  <data name="Notify_PluginInstalledBody" xml:space="preserve"><value>The plugin loads the next time you start the app.</value></data>
+  <data name="Notify_PluginInstallFailedTitle" xml:space="preserve"><value>Couldn't install the plugin</value></data>
+  <data name="Dialog_AddPluginFolderTitle" xml:space="preserve"><value>Add a native plugin folder</value></data>
+
+  <!-- Overview page -->
+  <data name="Overview_Subtitle" xml:space="preserve"><value>The state of the app at a glance — connection, the plugins it runs, and what's happened lately.</value></data>
+  <data name="Overview_ConnectionTitle" xml:space="preserve"><value>Connection</value></data>
+  <data name="Overview_RecentActivityTitle" xml:space="preserve"><value>Recent activity</value></data>
+  <data name="Overview_EmptyActivityTitle" xml:space="preserve"><value>Nothing has happened yet.</value></data>
+  <data name="Overview_EmptyActivityBody" xml:space="preserve"><value>Plugin messages, errors, and load events will appear here.</value></data>
+  <data name="Overview_LoadedSummaryFormat" xml:space="preserve"><value>{0} loaded · {1} classic · {2} modern</value></data>
+
+  <!-- Plugins page -->
+  <data name="Plugins_Subtitle" xml:space="preserve"><value>Classic plugins are the ACT plugins you already use; modern plugins are built for this app. Select one to configure it.</value></data>
+  <data name="Plugins_EngineDownTitle" xml:space="preserve"><value>The classic engine isn't running</value></data>
+  <data name="Plugins_NoClassicLoaded" xml:space="preserve"><value>No classic plugins loaded.</value></data>
+  <data name="Plugins_NoModernInstalled" xml:space="preserve"><value>No modern plugins installed.</value></data>
+  <data name="Plugins_SelectPluginTitle" xml:space="preserve"><value>Select a plugin</value></data>
+  <data name="Plugins_SelectPluginBody" xml:space="preserve"><value>Pick a plugin on the left to configure it or view its details.</value></data>
+  <data name="Plugins_ConfigLoadingBody" xml:space="preserve"><value>Configuration loads when the classic engine is running</value></data>
+  <data name="Plugins_ModernConfigNote" xml:space="preserve"><value>Modern plugins configure themselves through their own settings.</value></data>
+  <data name="Plugins_ConfiguredInPlugin" xml:space="preserve"><value>Configured in the plugin</value></data>
+  <data name="Plugins_NoConfigToShow" xml:space="preserve"><value>No configuration to show</value></data>
+  <data name="Plugins_ConfigUnavailable" xml:space="preserve"><value>Configuration unavailable</value></data>
+  <data name="Plugins_ModernNoEmbedBody" xml:space="preserve"><value>Modern plugins run inside the app and bring their own settings — there's nothing to embed here.</value></data>
+  <data name="Plugins_ClassicNoWindowBody" xml:space="preserve"><value>This classic plugin didn't provide a configuration window.</value></data>
+  <data name="Plugins_EngineDownBody" xml:space="preserve"><value>The classic engine isn't running, so this plugin's configuration can't be shown.</value></data>
+  <data name="Plugins_ModernPluginRole" xml:space="preserve"><value>Modern plugin</value></data>
+  <data name="Plugins_ModernPluginDescription" xml:space="preserve"><value>Runs inside the app in its own sandbox.</value></data>
+
+  <!-- Encounters page -->
+  <data name="Encounters_Subtitle" xml:space="preserve"><value>Live DPS and per-player metrics for the current fight.</value></data>
+  <data name="Encounters_WaitingTitle" xml:space="preserve"><value>Waiting for game data</value></data>
+  <data name="Encounters_WaitingBody" xml:space="preserve"><value>Encounters and per-player DPS appear here once combat data starts flowing in.</value></data>
+  <data name="Encounters_DefaultTitle" xml:space="preserve"><value>Encounter</value></data>
+  <data name="Column_Rank" xml:space="preserve"><value>#</value></data>
+  <data name="Column_Combatant" xml:space="preserve"><value>COMBATANT</value></data>
+  <data name="Column_Dps" xml:space="preserve"><value>DPS</value></data>
+  <data name="Column_Damage" xml:space="preserve"><value>DAMAGE</value></data>
+  <data name="Column_Hps" xml:space="preserve"><value>HPS</value></data>
+  <data name="Column_Deaths" xml:space="preserve"><value>DEATHS</value></data>
+
+  <!-- Settings page -->
+  <data name="Settings_Subtitle" xml:space="preserve"><value>How the app launches and where it keeps its files.</value></data>
+  <data name="Settings_StartupTitle" xml:space="preserve"><value>Startup</value></data>
+  <data name="Settings_AutoStartLabel" xml:space="preserve"><value>Start the classic engine automatically</value></data>
+  <data name="Settings_AutoStartDescription" xml:space="preserve"><value>Starts the classic plugin engine when the app opens. Turn off to start it yourself from the Plugins page.</value></data>
+  <data name="Settings_AppearanceTitle" xml:space="preserve"><value>Appearance</value></data>
+  <data name="Settings_ThemeLabel" xml:space="preserve"><value>Theme</value></data>
+  <data name="Settings_ThemeDescription" xml:space="preserve"><value>The cold-field palette drawn from the game's crystal motif.</value></data>
+  <data name="Settings_DiagnosticsTitle" xml:space="preserve"><value>Diagnostics</value></data>
+  <data name="Settings_LogsLabel" xml:space="preserve"><value>Logs</value></data>
+  <data name="Settings_AboutTitle" xml:space="preserve"><value>About</value></data>
+  <data name="Settings_AboutDescription" xml:space="preserve"><value>Runs your existing ACT plugins alongside modern ones, with an opt-in path from classic to modern.</value></data>
+
+  <!-- Legacy plugin catalog (plugin names are product names and stay untranslated) -->
+  <data name="Catalog_Ffxiv_Role" xml:space="preserve"><value>Network parser · data source</value></data>
+  <data name="Catalog_Ffxiv_Description" xml:space="preserve"><value>Reads the game's network stream and turns it into combat actions. Every other plugin builds on the data it produces.</value></data>
+  <data name="Catalog_Overlay_Role" xml:space="preserve"><value>Overlays · cactbot bridge</value></data>
+  <data name="Catalog_Overlay_Description" xml:space="preserve"><value>Serves overlays and bridges cactbot — DPS meters, timelines, and raid tools. Overlay windows are drawn by OverlayPlugin itself; configure them from its tab here.</value></data>
+  <data name="Catalog_Triggernometry_Role" xml:space="preserve"><value>Triggers · timelines · TTS</value></data>
+  <data name="Catalog_Triggernometry_Description" xml:space="preserve"><value>Matches log lines to fire alerts, timers, and text-to-speech callouts from your own trigger packs.</value></data>
+  <data name="Catalog_Discord_Role" xml:space="preserve"><value>Encounter → Discord</value></data>
+  <data name="Catalog_Discord_Description" xml:space="preserve"><value>Posts encounter results and trigger events to a Discord webhook when a fight ends.</value></data>
+  <data name="Catalog_Hojoring_Role" xml:space="preserve"><value>Spell timers · TTS suite</value></data>
+  <data name="Catalog_Hojoring_Description" xml:space="preserve"><value>The Hojoring suite — SpecialSpellTimer, TTSYukkuri, UltraScouter, and XIVLog.</value></data>
+  <data name="Catalog_Probe_Role" xml:space="preserve"><value>Diagnostics</value></data>
+  <data name="Catalog_Probe_Description" xml:space="preserve"><value>A diagnostic tap on the combat-action and raw-packet stream, for inspecting the pipeline.</value></data>
+  <data name="Catalog_Fallback_Role" xml:space="preserve"><value>Classic plugin</value></data>
+  <data name="Catalog_Fallback_Description" xml:space="preserve"><value>A classic ACT plugin, running in the compatibility engine.</value></data>
+</root>

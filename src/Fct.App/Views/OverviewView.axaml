@@ -1,6 +1,7 @@
 <UserControl xmlns="https://github.com/avaloniaui"
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
              xmlns:vm="using:Fct.App.ViewModels"
+             xmlns:lang="using:Fct.App.Lang"
              xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
              xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
              mc:Ignorable="d" d:DesignWidth="820" d:DesignHeight="620"
@@ -17,33 +18,33 @@
                 <!-- Connection -->
                 <Border Grid.Column="0" Classes="card rise1" Padding="22,18">
                     <StackPanel Spacing="14">
-                        <TextBlock Text="Connection" Classes="h2"/>
+                        <TextBlock Text="{x:Static lang:Resources.Overview_ConnectionTitle}" Classes="h2"/>
                         <Border Classes="rule" Width="52" HorizontalAlignment="Left"/>
 
                         <Grid ColumnDefinitions="Auto,*,Auto" RowDefinitions="Auto,Auto,Auto" RowSpacing="13">
                             <Ellipse Grid.Row="0" Width="9" Height="9" VerticalAlignment="Center" Margin="0,0,11,0"
-                                     Fill="{Binding Shell.HostStateLabel, Converter={StaticResource StatusToBrush}}"/>
-                            <TextBlock Grid.Row="0" Grid.Column="1" Text="App" Classes="body" VerticalAlignment="Center"/>
+                                     Fill="{Binding Shell.HostStatusKind, Converter={StaticResource StatusToBrush}}"/>
+                            <TextBlock Grid.Row="0" Grid.Column="1" Text="{x:Static lang:Resources.Label_App}" Classes="body" VerticalAlignment="Center"/>
                             <TextBlock Grid.Row="0" Grid.Column="2" Text="{Binding Shell.HostStateLabel}" Classes="meta"
                                        VerticalAlignment="Center"
-                                       Foreground="{Binding Shell.HostStateLabel, Converter={StaticResource StatusToBrush}}"/>
+                                       Foreground="{Binding Shell.HostStatusKind, Converter={StaticResource StatusToBrush}}"/>
 
                             <Ellipse Grid.Row="1" Width="9" Height="9" VerticalAlignment="Center" Margin="0,0,11,0"
-                                     Fill="{Binding Shell.SatelliteState, Converter={StaticResource StatusToBrush}}"/>
-                            <TextBlock Grid.Row="1" Grid.Column="1" Text="Classic engine" Classes="body" VerticalAlignment="Center"/>
+                                     Fill="{Binding Shell.SatelliteStatusKind, Converter={StaticResource StatusToBrush}}"/>
+                            <TextBlock Grid.Row="1" Grid.Column="1" Text="{x:Static lang:Resources.Label_ClassicEngine}" Classes="body" VerticalAlignment="Center"/>
                             <TextBlock Grid.Row="1" Grid.Column="2" Text="{Binding Shell.SatelliteState}" Classes="meta"
                                        VerticalAlignment="Center"
-                                       Foreground="{Binding Shell.SatelliteState, Converter={StaticResource StatusToBrush}}"/>
+                                       Foreground="{Binding Shell.SatelliteStatusKind, Converter={StaticResource StatusToBrush}}"/>
 
                             <Ellipse Grid.Row="2" Width="9" Height="9" VerticalAlignment="Center" Margin="0,0,11,0"
-                                     Fill="{Binding Shell.GameStateLabel, Converter={StaticResource StatusToBrush}}"/>
-                            <TextBlock Grid.Row="2" Grid.Column="1" Text="Game" Classes="body" VerticalAlignment="Center"/>
+                                     Fill="{Binding Shell.GameStatusKind, Converter={StaticResource StatusToBrush}}"/>
+                            <TextBlock Grid.Row="2" Grid.Column="1" Text="{x:Static lang:Resources.Label_Game}" Classes="body" VerticalAlignment="Center"/>
                             <TextBlock Grid.Row="2" Grid.Column="2" Text="{Binding Shell.GameStateLabel}" Classes="meta"
                                        VerticalAlignment="Center"
-                                       Foreground="{Binding Shell.GameStateLabel, Converter={StaticResource StatusToBrush}}"/>
+                                       Foreground="{Binding Shell.GameStatusKind, Converter={StaticResource StatusToBrush}}"/>
                         </Grid>
 
-                        <Button Classes="ghost small" Content="Restart classic engine" HorizontalAlignment="Left"
+                        <Button Classes="ghost small" Content="{x:Static lang:Resources.Action_RestartClassicEngine}" HorizontalAlignment="Left"
                                 Command="{Binding Shell.RestartSatelliteCommand}"/>
                     </StackPanel>
                 </Border>
@@ -51,26 +52,26 @@
                 <!-- Plugins -->
                 <Border Grid.Column="2" Classes="card rise2" Padding="22,18">
                     <StackPanel Spacing="14">
-                        <TextBlock Text="Plugins" Classes="h2"/>
+                        <TextBlock Text="{x:Static lang:Resources.Nav_Plugins}" Classes="h2"/>
                         <Border Classes="rule" Width="52" HorizontalAlignment="Left"/>
 
                         <Grid ColumnDefinitions="*,*,*">
                             <StackPanel Grid.Column="0" Spacing="3">
                                 <TextBlock Text="{Binding Shell.LegacyLoadedCount}" Classes="h1" FontSize="30"/>
-                                <TextBlock Text="classic" Classes="meta" FontSize="11"/>
+                                <TextBlock Text="{x:Static lang:Resources.Label_ClassicChip}" Classes="meta" FontSize="11"/>
                             </StackPanel>
                             <StackPanel Grid.Column="1" Spacing="3">
                                 <TextBlock Text="{Binding Shell.ModernLoadedCount}" Classes="h1" FontSize="30"/>
-                                <TextBlock Text="modern" Classes="meta" FontSize="11"/>
+                                <TextBlock Text="{x:Static lang:Resources.Label_ModernChip}" Classes="meta" FontSize="11"/>
                             </StackPanel>
                             <StackPanel Grid.Column="2" Spacing="3">
                                 <TextBlock Text="{Binding Shell.FaultCount}" Classes="h1" FontSize="30"
                                            Foreground="{StaticResource WarnBrush}"/>
-                                <TextBlock Text="issues" Classes="meta" FontSize="11"/>
+                                <TextBlock Text="{x:Static lang:Resources.Label_IssuesChip}" Classes="meta" FontSize="11"/>
                             </StackPanel>
                         </Grid>
 
-                        <Button Classes="ghost small" Content="Manage plugins" HorizontalAlignment="Left"
+                        <Button Classes="ghost small" Content="{x:Static lang:Resources.Action_ManagePlugins}" HorizontalAlignment="Left"
                                 Command="{Binding Shell.SelectPageCommand}" CommandParameter="Plugins"/>
                     </StackPanel>
                 </Border>
@@ -80,15 +81,15 @@
             <Border Classes="card rise3" Padding="0">
                 <DockPanel>
                     <Grid DockPanel.Dock="Top" Margin="22,18,18,12" ColumnDefinitions="*,Auto">
-                        <TextBlock Text="Recent activity" Classes="h2" VerticalAlignment="Center"/>
-                        <Button Grid.Column="1" Classes="ghost small" Content="Open notifications"
+                        <TextBlock Text="{x:Static lang:Resources.Overview_RecentActivityTitle}" Classes="h2" VerticalAlignment="Center"/>
+                        <Button Grid.Column="1" Classes="ghost small" Content="{x:Static lang:Resources.Action_OpenNotifications}"
                                 VerticalAlignment="Center"
                                 Command="{Binding Shell.Notifications.ToggleCenterCommand}"/>
                     </Grid>
 
                     <StackPanel IsVisible="{Binding !Shell.Notifications.HasHistory}" Margin="22,6,22,26" Spacing="6">
-                        <TextBlock Text="Nothing has happened yet." Classes="meta"/>
-                        <TextBlock Text="Plugin messages, errors, and load events will appear here." Classes="meta" FontSize="11"/>
+                        <TextBlock Text="{x:Static lang:Resources.Overview_EmptyActivityTitle}" Classes="meta"/>
+                        <TextBlock Text="{x:Static lang:Resources.Overview_EmptyActivityBody}" Classes="meta" FontSize="11"/>
                     </StackPanel>
 
                     <ItemsControl IsVisible="{Binding Shell.Notifications.HasHistory}"
@@ -113,10 +114,10 @@
 
             <!-- Quick actions -->
             <StackPanel Orientation="Horizontal" Spacing="12" Classes="rise4">
-                <Button Classes="ghost" Content="Add plugin" Command="{Binding Shell.AddPluginCommand}"/>
-                <Button Classes="ghost" Content="Configure plugins"
+                <Button Classes="ghost" Content="{x:Static lang:Resources.Action_AddPlugin}" Command="{Binding Shell.AddPluginCommand}"/>
+                <Button Classes="ghost" Content="{x:Static lang:Resources.Action_ConfigurePlugins}"
                         Command="{Binding Shell.SelectPageCommand}" CommandParameter="Plugins"/>
-                <Button Classes="ghost" Content="View encounters"
+                <Button Classes="ghost" Content="{x:Static lang:Resources.Action_ViewEncounters}"
                         Command="{Binding Shell.SelectPageCommand}" CommandParameter="Encounters"/>
             </StackPanel>
         </StackPanel>

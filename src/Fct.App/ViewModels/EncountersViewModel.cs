@@ -4,6 +4,7 @@ using System.Globalization;
 using Avalonia.Threading;
 using CommunityToolkit.Mvvm.ComponentModel;
 using Fct.Abstractions;
+using Fct.App.Lang;
 
 namespace Fct.App.ViewModels;
 
@@ -27,10 +28,9 @@ public sealed partial class EncountersViewModel : PageViewModel
     }
 
     public override Section Section => Section.Encounters;
-    public override string Eyebrow => "Encounters";
-    public override string Title => "Encounters";
-    public override string Subtitle =>
-        "Live DPS and per-player metrics for the current fight.";
+    public override string Eyebrow => Resources.Nav_Encounters;
+    public override string Title => Resources.Nav_Encounters;
+    public override string Subtitle => Resources.Encounters_Subtitle;
 
     public ObservableCollection<EncounterCombatantViewModel> Combatants { get; } = new();
 
@@ -59,8 +59,8 @@ public sealed partial class EncountersViewModel : PageViewModel
 
         HasEncounter = true;
         IsLive = snap.Active;
-        SourceLabel = snap.Active ? "Live" : "Last fight";
-        EncounterTitle = string.IsNullOrWhiteSpace(snap.Title) ? "Encounter" : snap.Title;
+        SourceLabel = snap.Active ? Resources.Status_Live : Resources.Status_LastFight;
+        EncounterTitle = string.IsNullOrWhiteSpace(snap.Title) ? Resources.Encounters_DefaultTitle : snap.Title;
         Zone = snap.Zone ?? "";
         DurationLabel = snap.Duration.ToString(@"mm\:ss", CultureInfo.InvariantCulture);
         DpsLabel = Compact(snap.Dps);
@@ -111,11 +111,11 @@ public sealed partial class EncounterCombatantViewModel : ObservableObject
     {
         Rank = rank;
         Name = m.Name;
-        JobLabel = m.Job > 0 ? "Job " + m.Job.ToString(CultureInfo.InvariantCulture) : "—";
+        JobLabel = m.Job > 0 ? string.Format(Resources.Label_JobFormat, m.Job) : Resources.Placeholder_Dash;
         DpsLabel = EncountersViewModel.Compact(m.EncDps);
         DamagePercentLabel = m.DamagePercent.ToString("0", CultureInfo.InvariantCulture) + "%";
         DamageFraction = Math.Clamp(m.DamagePercent / 100.0, 0, 1);
-        HpsLabel = m.Healing > 0 ? EncountersViewModel.Compact(m.Healing) : "—";
+        HpsLabel = m.Healing > 0 ? EncountersViewModel.Compact(m.Healing) : Resources.Placeholder_Dash;
         Deaths = m.Deaths;
     }
 }
