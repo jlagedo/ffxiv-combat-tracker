@@ -13,6 +13,7 @@ using Xunit;
 
 namespace Fct.App.Tests.Plugins;
 
+[Collection("Sample plugin")]
 public class PluginLoaderTests
 {
     private const string SampleId = "com.fct.sample";

@@ -17,6 +17,9 @@
     <PackageVersion Include="Avalonia.Fonts.Inter" Version="12.0.5" />
     <PackageVersion Include="AvaloniaUI.DiagnosticsSupport" Version="2.2.3" />
     <PackageVersion Include="CommunityToolkit.Mvvm" Version="8.4.2" />
+    <!-- Metadata-only assembly inspection for classifying an installed plugin (net10 vs net48,
+         which "Advanced Combat Tracker" it references) without executing it. -->
+    <PackageVersion Include="System.Reflection.MetadataLoadContext" Version="10.0.0" />
   </ItemGroup>
 
   <!-- Hosting + logging. Serilog targets netstandard2.0, so the same versions load on net48. -->

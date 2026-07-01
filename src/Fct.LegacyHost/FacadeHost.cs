@@ -299,6 +299,30 @@ namespace Fct.LegacyHost
             Log("[Info] Plugin deinit complete.");
         }
 
+        // Tear down and unload a single plugin at runtime (no restart). De-inits just this plugin
+        // (its DeInitPlugin persists its state), removes it from ActPlugins, and disposes its host
+        // window. Does NOT set the global IsActClosing (that would signal shutdown to every plugin) —
+        // this is a single-plugin unload. The host un-embeds the window on its side before asking.
+        public static void UnloadPlugin(LoadedPlugin p)
+        {
+            if (p == null) return;
+            var act = ActGlobals.oFormActMain;
+            try
+            {
+                Log($"[Info] Unloading {p.Title}...");
+                p.Data?.pluginObj?.DeInitPlugin();
+            }
+            catch (Exception ex)
+            {
+                SatelliteLogging.Log.LogError(LogEvents.PluginDeInit, ex, "[{Title}] DeInit failed during unload", p.Title);
+            }
+            try { if (act != null && p.Data != null) act.ActPlugins.Remove(p.Data); }
+            catch (Exception ex) { SatelliteLogging.Log.LogError(LogEvents.PluginDeInit, ex, "[{Title}] ActPlugins remove failed", p.Title); }
+            try { p.Window?.Dispose(); }
+            catch (Exception ex) { SatelliteLogging.Log.LogError(LogEvents.PluginDeInit, ex, "[{Title}] window dispose failed", p.Title); }
+            SatelliteLogging.Log.LogInformation(LogEvents.PluginDeInit, "[{Title}] unloaded", p.Title);
+        }
+
         private static Type FindPluginType(Assembly asm)
         {
             Type[] types;

@@ -48,6 +48,7 @@
   <data name="Action_ManagePlugins" xml:space="preserve"><value>Gerenciar plugins</value></data>
   <data name="Action_OpenNotifications" xml:space="preserve"><value>Abrir notificações</value></data>
   <data name="Action_AddPlugin" xml:space="preserve"><value>Adicionar plugin</value></data>
+  <data name="Action_Remove" xml:space="preserve"><value>Remover</value></data>
   <data name="Action_ConfigurePlugins" xml:space="preserve"><value>Configurar plugins</value></data>
   <data name="Action_ViewEncounters" xml:space="preserve"><value>Ver combates</value></data>
   <data name="Action_Restart" xml:space="preserve"><value>Reiniciar</value></data>

@@ -48,6 +48,7 @@
   <data name="Action_ManagePlugins" xml:space="preserve"><value>Manage plugins</value></data>
   <data name="Action_OpenNotifications" xml:space="preserve"><value>Open notifications</value></data>
   <data name="Action_AddPlugin" xml:space="preserve"><value>Add plugin</value></data>
+  <data name="Action_Remove" xml:space="preserve"><value>Remove</value></data>
   <data name="Action_ConfigurePlugins" xml:space="preserve"><value>Configure plugins</value></data>
   <data name="Action_ViewEncounters" xml:space="preserve"><value>View encounters</value></data>
   <data name="Action_Restart" xml:space="preserve"><value>Restart</value></data>

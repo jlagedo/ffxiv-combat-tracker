@@ -52,6 +52,7 @@ public static class Resources
     public static string Action_ManagePlugins => Get(nameof(Action_ManagePlugins));
     public static string Action_OpenNotifications => Get(nameof(Action_OpenNotifications));
     public static string Action_AddPlugin => Get(nameof(Action_AddPlugin));
+    public static string Action_Remove => Get(nameof(Action_Remove));
     public static string Action_ConfigurePlugins => Get(nameof(Action_ConfigurePlugins));
     public static string Action_ViewEncounters => Get(nameof(Action_ViewEncounters));
     public static string Action_Restart => Get(nameof(Action_Restart));

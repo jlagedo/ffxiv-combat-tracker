@@ -21,9 +21,24 @@ internal sealed class RegistryService : IPluginRegistry
 
     public IReadOnlyList<PluginInfo> LoadedPlugins => _loaded;
 
+    /// <summary>Raised after the roster changes so the shell can reconcile its modern-plugin rows
+    /// live (load/unload without a restart).</summary>
+    public event Action? RosterChanged;
+
     /// <summary>Set by the <see cref="PluginManager"/> as plugins load/unload.</summary>
     public void SetRoster(IReadOnlyList<PluginInfo> plugins)
-        => _loaded = plugins ?? Array.Empty<PluginInfo>();
+    {
+        _loaded = plugins ?? Array.Empty<PluginInfo>();
+        RosterChanged?.Invoke();
+    }
+
+    /// <summary>Drop a plugin's published peer service on unload (there is no cooperative handle for
+    /// this, unlike callbacks/subscriptions), so it can't pin the unloaded plugin's ALC.</summary>
+    public void UnregisterPeerService(string pluginId)
+    {
+        if (pluginId is null) return;
+        lock (_gate) _peerServices.Remove(pluginId);
+    }
 
     public IDisposable RegisterCallback(string name, Action<object?> callback, object? owner = null, bool allowDuplicate = false)
     {

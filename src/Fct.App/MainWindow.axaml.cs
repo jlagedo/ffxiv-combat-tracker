@@ -45,6 +45,11 @@ public partial class MainWindow : Window
         // The shell owns the satellite lifecycle and the OS file picker; the view models raise intent.
         _vm.SatelliteRestartRequested += () => _ = StartSatelliteAsync();
         _vm.AddPluginRequested += () => _ = PickPluginAsync();
+        _vm.UnloadPluginRequested += row => _ = UnloadPluginAsync(row);
+
+        // Legacy plugins loaded/unloaded live on the satellite after startup reconcile the roster.
+        _satellite.PluginAnnounced += p => _vm.AddLegacyPlugin(p);
+        _satellite.PluginUnloaded += key => _vm.RemoveLegacyPlugin(key);
     }
 
     // Kick off the satellite once the shell is on screen, so the window paints first — unless the
@@ -72,51 +77,59 @@ public partial class MainWindow : Window
         coordinator.FlushRegisterUi(manager.Loaded.Select(p => (p.Manifest, p.Instance)));
     }
 
-    // Install a native plugin: a folder holding a plugin.json manifest, copied into the host's
-    // plugins directory. It loads on the next launch (the loader scans at startup).
+    // Add a plugin from a .zip package or a folder. The single installer classifies it (native /
+    // recompiled-shim / real-legacy), routes it to the right executor, loads it live, and persists it.
     private async Task PickPluginAsync()
     {
+        var files = await StorageProvider.OpenFilePickerAsync(new FilePickerOpenOptions
+        {
+            Title = Strings.Dialog_AddPluginFolderTitle,
+            AllowMultiple = false,
+            FileTypeFilter = new[] { new FilePickerFileType("Plugin package") { Patterns = new[] { "*.zip" } } },
+        });
+        if (files.FirstOrDefault() is { } file)
+        {
+            await InstallAsync(file.Path.LocalPath);
+            return;
+        }
+
+        // No zip chosen — offer a plugin folder instead (dev builds ship as a folder, not a zip).
         var folders = await StorageProvider.OpenFolderPickerAsync(new FolderPickerOpenOptions
         {
             Title = Strings.Dialog_AddPluginFolderTitle,
             AllowMultiple = false,
         });
-        if (folders.FirstOrDefault() is { } f)
-            InstallPlugin(f.Path.LocalPath);
+        if (folders.FirstOrDefault() is { } folder)
+            await InstallAsync(folder.Path.LocalPath);
     }
 
-    private void InstallPlugin(string sourceDir)
+    private async Task InstallAsync(string source)
     {
-        try
+        var installer = App.Services?.GetService<PluginInstaller>();
+        if (installer is null)
         {
-            if (!File.Exists(Path.Combine(sourceDir, "plugin.json")))
-            {
-                _notifications.Publish(NotificationSeverity.Warning, Strings.Notify_Source_Plugins, Strings.Notify_NotAPluginFolderTitle,
-                    Strings.Notify_NotAPluginFolderBody);
-                return;
-            }
-
-            var name = new DirectoryInfo(sourceDir).Name;
-            var dest = Path.Combine(AppContext.BaseDirectory, "plugins", name);
-            CopyDirectory(sourceDir, dest);
-            _log.LogInformation(LogEvents.NativePluginLoaded, "Installed plugin folder {Name} -> {Dest}", name, dest);
-            _notifications.Publish(NotificationSeverity.Success, Strings.Notify_Source_Plugins, string.Format(Strings.Notify_PluginInstalledTitleFormat, name),
-                Strings.Notify_PluginInstalledBody);
+            _notifications.Publish(NotificationSeverity.Error, Strings.Notify_Source_Plugins, Strings.Notify_PluginInstallFailedTitle, "Installer unavailable");
+            return;
         }
-        catch (Exception ex)
-        {
-            _log.LogWarning(LogEvents.NativePluginManifestRejected, ex, "Plugin install failed from {Source}", sourceDir);
-            _notifications.Publish(NotificationSeverity.Error, Strings.Notify_Source_Plugins, Strings.Notify_PluginInstallFailedTitle, ex.Message);
-        }
+        await installer.InstallAsync(source, default);   // installer surfaces its own notifications
     }
 
-    private static void CopyDirectory(string source, string dest)
+    // Unload = uninstall (no restart). For a legacy row, drop it first so its embedded HWND is
+    // un-parented before the satellite disposes the window; then delegate to the installer.
+    private async Task UnloadPluginAsync(PluginViewModel row)
     {
-        Directory.CreateDirectory(dest);
-        foreach (var file in Directory.GetFiles(source))
-            File.Copy(file, Path.Combine(dest, Path.GetFileName(file)), overwrite: true);
-        foreach (var dir in Directory.GetDirectories(source))
-            CopyDirectory(dir, Path.Combine(dest, Path.GetFileName(dir)));
+        var installer = App.Services?.GetService<PluginInstaller>();
+        if (installer is null) return;
+
+        if (row.Kind == PluginKind.Legacy)
+        {
+            _vm.RemoveLegacyPlugin(row.Key);
+            await installer.UninstallAsync(row.Key, default, LoadKind.RealLegacy);
+        }
+        else
+        {
+            await installer.UninstallAsync(row.Key, default, LoadKind.Native);
+        }
     }
 
     private async Task StartSatelliteAsync()
@@ -128,6 +141,8 @@ public partial class MainWindow : Window
             var pid = _satellite.Process?.Id ?? 0;
 
             _vm.SetOnline(result.Plugins);
+            // Re-load any persisted real-legacy plugins onto the now-online satellite.
+            App.Services?.GetService<PluginInstaller>()?.ReplayLegacyToSatellite();
             _log.LogInformation(LogEvents.SatelliteStarted,
                 "Satellite online: pid {Pid}, {PluginCount} plugin window(s) [{Handshake}]",
                 pid, result.Plugins.Count, result.Handshake);

@@ -36,10 +36,15 @@ public sealed partial class MainViewModel : ObservableObject
 
     private readonly Dictionary<Section, PageViewModel> _pages;
     private readonly INotificationHub? _hub;
+    private readonly IPluginRegistry? _registry;
+    private readonly IUiDispatcher? _dispatcher;
 
     // Raised when the user asks to (re)launch or add a plugin; the window owns those OS interactions.
     public event Action? SatelliteRestartRequested;
     public event Action? AddPluginRequested;
+
+    // Raised when the user asks to unload/uninstall a plugin row; the window runs the teardown.
+    public event Action<PluginViewModel>? UnloadPluginRequested;
 
     // ---- design-time ctor: seed a representative roster for the previewer ----
     public MainViewModel()
@@ -75,21 +80,12 @@ public sealed partial class MainViewModel : ObservableObject
         INotificationHub notifications, UiSettingsStore settings, PluginUiCoordinator? uiCoordinator = null)
     {
         _hub = notifications;
+        _registry = registry;
+        _dispatcher = uiCoordinator?.Dispatcher;
         Notifications = new NotificationCenterViewModel(notifications);
 
         foreach (var info in registry.LoadedPlugins)
-            ModernPlugins.Add(new PluginViewModel
-            {
-                Name = info.Name ?? info.Id,
-                Role = Resources.Plugins_ModernPluginRole,
-                Version = info.Version,
-                Kind = PluginKind.Native,
-                Key = info.Id,
-                ContractVersion = info.ContractVersion,
-                Description = info.Description ?? Resources.Plugins_ModernPluginDescription,
-                Author = info.Author ?? "",
-                Status = PluginStatus.Loaded,
-            });
+            ModernPlugins.Add(BuildModernRow(info));
 
         OverviewPage = new OverviewViewModel(this);
         PluginsPage = new PluginsViewModel(this);
@@ -101,12 +97,54 @@ public sealed partial class MainViewModel : ObservableObject
         if (uiCoordinator is not null)
         {
             uiCoordinator.SettingsPageAdded += OnPluginSettingsPageAdded;
+            uiCoordinator.SettingsPageRemoved += OnPluginSettingsPageRemoved;
             uiCoordinator.PageRevealRequested += OnPluginPageRevealRequested;
             uiCoordinator.CornerControlAdded += OnPluginCornerControlAdded;
             uiCoordinator.CornerControlRemoved += OnPluginCornerControlRemoved;
         }
 
+        // Reconcile the modern roster live as plugins hot-load/unload (the registry is no longer a
+        // one-time snapshot).
+        if (registry is RegistryService rs)
+            rs.RosterChanged += OnRosterChanged;
+
         SetStarting();
+    }
+
+    private PluginViewModel BuildModernRow(PluginInfo info) => new()
+    {
+        Name = info.Name ?? info.Id,
+        Role = Resources.Plugins_ModernPluginRole,
+        Version = info.Version,
+        Kind = PluginKind.Native,
+        Key = info.Id,
+        ContractVersion = info.ContractVersion,
+        Description = info.Description ?? Resources.Plugins_ModernPluginDescription,
+        Author = info.Author ?? "",
+        Status = PluginStatus.Loaded,
+    };
+
+    // The registry roster changed (a native/shim plugin loaded or unloaded); add/drop rows by id.
+    private void OnRosterChanged()
+    {
+        if (_registry is null) return;
+        PostToUi(() =>
+        {
+            var infos = _registry.LoadedPlugins;
+            for (int i = ModernPlugins.Count - 1; i >= 0; i--)
+                if (!infos.Any(x => x.Id == ModernPlugins[i].Key))
+                    ModernPlugins.RemoveAt(i);
+            foreach (var info in infos)
+                if (ModernPlugins.All(p => p.Key != info.Id))
+                    ModernPlugins.Add(BuildModernRow(info));
+            RaiseRosterChanged();
+        });
+    }
+
+    private void PostToUi(Action action)
+    {
+        if (_dispatcher is null || _dispatcher.CheckAccess()) action();
+        else _dispatcher.Post(action);
     }
 
     // ---- native plugin UI contributions (work item 9) ----
@@ -115,6 +153,13 @@ public sealed partial class MainViewModel : ObservableObject
         var row = ModernPlugins.FirstOrDefault(p => p.Key == pluginId);
         if (row is not null && row.SettingsSurface is null)
             row.SettingsSurface = page;
+    }
+
+    // A plugin unloaded — drop its contributed settings surface so its ALC isn't pinned by the control.
+    private void OnPluginSettingsPageRemoved(string pluginId)
+    {
+        var row = ModernPlugins.FirstOrDefault(p => p.Key == pluginId);
+        if (row is not null) row.SettingsSurface = null;
     }
 
     private void OnPluginPageRevealRequested(string pageId)
@@ -166,6 +211,10 @@ public sealed partial class MainViewModel : ObservableObject
     // ---- shell actions (owned by the window) ----
     [RelayCommand] private void RestartSatellite() => SatelliteRestartRequested?.Invoke();
     [RelayCommand] private void AddPlugin() => AddPluginRequested?.Invoke();
+    [RelayCommand] private void UnloadPlugin(PluginViewModel? row)
+    {
+        if (row is not null) UnloadPluginRequested?.Invoke(row);
+    }
 
     // ---- shared selection ----
     [ObservableProperty]
@@ -286,6 +335,45 @@ public sealed partial class MainViewModel : ObservableObject
 
         _hub?.Publish(NotificationSeverity.Success, Resources.Notify_Source_ClassicEngine, Resources.Notify_EngineRunningTitle,
             plugins.Count == 1 ? Resources.Notify_EngineReady_One : string.Format(Resources.Notify_EngineReady_Many, plugins.Count));
+    }
+
+    // A legacy plugin was loaded live on the satellite after startup (install / restart replay).
+    internal void AddLegacyPlugin(SatellitePlugin p)
+    {
+        PostToUi(() =>
+        {
+            if (LegacyPlugins.Any(x => x.Key == p.Key)) return;
+            var meta = LegacyPluginCatalog.For(p.Key, p.Title);
+            var hosted = p.Hwnd != IntPtr.Zero;
+            LegacyPlugins.Add(new PluginViewModel
+            {
+                Name = meta.Name,
+                Role = meta.Role,
+                Description = meta.Description,
+                Version = "—",
+                Kind = PluginKind.Legacy,
+                Key = p.Key,
+                Hwnd = p.Hwnd,
+                SatelliteStatusText = p.Status,
+                HasNativeConfig = hosted,
+                Status = hosted ? PluginStatus.Running : PluginStatus.NotLoaded,
+            });
+            RaiseRosterChanged();
+        });
+    }
+
+    // A legacy plugin was unloaded from the satellite (uninstall / satellite ack).
+    internal void RemoveLegacyPlugin(string key)
+    {
+        PostToUi(() =>
+        {
+            var row = LegacyPlugins.FirstOrDefault(x => x.Key == key);
+            if (row is null) return;
+            LegacyPlugins.Remove(row);
+            if (ReferenceEquals(SelectedPlugin, row))
+                SelectedPlugin = LegacyPlugins.FirstOrDefault() ?? (PluginViewModel?)ModernPlugins.FirstOrDefault();
+            RaiseRosterChanged();
+        });
     }
 
     public void SetOffline(string error)

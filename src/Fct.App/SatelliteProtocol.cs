@@ -28,6 +28,11 @@ internal static class SatelliteProtocol
     public const string PluginPrefix = "PLUGIN ";
     public const string PluginsEnd = "PLUGINS-END";
 
+    // Host -> satellite commands (over the separate command pipe), and the satellite's teardown ack.
+    public const string LoadPluginPrefix = "LOADPLUGIN ";
+    public const string UnloadPluginPrefix = "UNLOADPLUGIN ";
+    public const string UnloadedPrefix = "UNLOADED ";
+
     public static bool IsReady(string? line) =>
         line != null && line.StartsWith(ReadyPrefix, StringComparison.Ordinal);
 
@@ -73,4 +78,48 @@ internal static class SatelliteProtocol
         plugin = new PluginLine(parts[0].Trim(), new IntPtr(value), parts[2], parts[3]);
         return true;
     }
+
+    // ---- host -> satellite command frames ----
+
+    /// <summary>Format "LOADPLUGIN &lt;key&gt;|&lt;dllPath&gt;|&lt;title&gt;". '|' in fields is sanitized to '/'.</summary>
+    public static string FormatLoadPlugin(string key, string dllPath, string title)
+        => LoadPluginPrefix + $"{San(key)}|{San(dllPath)}|{San(title)}";
+
+    /// <summary>Format "UNLOADPLUGIN &lt;key&gt;".</summary>
+    public static string FormatUnloadPlugin(string key) => UnloadPluginPrefix + San(key);
+
+    /// <summary>Format the satellite's teardown ack "UNLOADED &lt;key&gt;|&lt;ok&gt;".</summary>
+    public static string FormatUnloaded(string key, bool ok) => UnloadedPrefix + $"{San(key)}|{(ok ? "1" : "0")}";
+
+    public static bool TryParseLoadPlugin(string? line, out string key, out string dllPath, out string title)
+    {
+        key = dllPath = title = "";
+        if (line == null || !line.StartsWith(LoadPluginPrefix, StringComparison.Ordinal)) return false;
+        var parts = line.Substring(LoadPluginPrefix.Length).Split(new[] { '|' }, 3);
+        if (parts.Length < 3) return false;
+        key = parts[0].Trim();
+        dllPath = parts[1];
+        title = parts[2];
+        return key.Length != 0 && dllPath.Length != 0;
+    }
+
+    public static bool TryParseUnloadPlugin(string? line, out string key)
+    {
+        key = "";
+        if (line == null || !line.StartsWith(UnloadPluginPrefix, StringComparison.Ordinal)) return false;
+        key = line.Substring(UnloadPluginPrefix.Length).Trim();
+        return key.Length != 0;
+    }
+
+    public static bool TryParseUnloaded(string? line, out string key, out bool ok)
+    {
+        key = ""; ok = false;
+        if (line == null || !line.StartsWith(UnloadedPrefix, StringComparison.Ordinal)) return false;
+        var parts = line.Substring(UnloadedPrefix.Length).Split(new[] { '|' }, 2);
+        key = parts[0].Trim();
+        ok = parts.Length > 1 && parts[1].Trim() == "1";
+        return key.Length != 0;
+    }
+
+    private static string San(string? value) => (value ?? "").Replace('|', '/');
 }

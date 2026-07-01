@@ -39,6 +39,7 @@ internal sealed class PluginManager
     private readonly ILogger<PluginManager> _log;
     private readonly LegacyPluginHostFactory? _legacyFactory;
     private readonly INotificationHub? _notifications;
+    private readonly PluginClassifier _classifier;
     private readonly List<LoadedPlugin> _loaded = new();
 
     public PluginManager(
@@ -51,7 +52,8 @@ internal sealed class PluginManager
         ILoggerFactory loggerFactory,
         LegacyPluginHostFactory? legacyFactory = null,
         INotificationHub? notifications = null,
-        RawPacketSource? rawPackets = null)
+        RawPacketSource? rawPackets = null,
+        PluginClassifier? classifier = null)
     {
         _game = game;
         _encounters = encounters;
@@ -63,6 +65,7 @@ internal sealed class PluginManager
         _clock = clock;
         _loggerFactory = loggerFactory;
         _notifications = notifications;
+        _classifier = classifier ?? new PluginClassifier();
         _log = loggerFactory.CreateLogger<PluginManager>();
         _legacyFactory = legacyFactory;
     }
@@ -88,42 +91,102 @@ internal sealed class PluginManager
         foreach (var dir in Directory.GetDirectories(PluginsRoot))
         {
             ct.ThrowIfCancellationRequested();
-            var manifestPath = Path.Combine(dir, "plugin.json");
-            if (!File.Exists(manifestPath)) continue;
-
-            if (!PluginManifest.TryLoad(manifestPath, out var manifest, out var error))
-            {
-                _log.LogWarning(LogEvents.NativePluginManifestRejected, "Rejected manifest {Path}: {Error}", manifestPath, error);
-                continue;
-            }
-
-            if (!HostContract.Accepts(manifest!.Contract))
-            {
-                _log.LogWarning(LogEvents.NativePluginManifestRejected,
-                    "Rejected plugin {Id}: contract {Contract} incompatible with host {Host}",
-                    manifest.Id, manifest.Contract, HostContract.Version);
-                continue;
-            }
-
-            await LoadOneAsync(dir, manifest, ct).ConfigureAwait(false);
+            if (TryResolveManifestForInProcessLoad(dir, out var manifest))
+                await LoadOneAsync(dir, manifest!, ct).ConfigureAwait(false);
         }
 
         UpdateRoster();
         _log.LogInformation(LogEvents.NativePluginsReady, "{Count} native plugin(s) ready", _loaded.Count);
     }
 
-    private async Task LoadOneAsync(string dir, PluginManifest manifest, CancellationToken ct)
+    /// <summary>
+    /// Hot-load one plugin directory after startup (the install path). Classifies + loads it and
+    /// refreshes the roster; a no-op if a plugin with the same id is already loaded. Returns the
+    /// loaded plugin, or null if it could not load in-process (rejected, faulted, or real-legacy).
+    /// </summary>
+    public async Task<LoadedPlugin?> LoadDirectoryAsync(string dir, CancellationToken ct)
+    {
+        if (!TryResolveManifestForInProcessLoad(dir, out var manifest)) return null;
+        if (_loaded.Any(p => string.Equals(p.Manifest.Id, manifest!.Id, StringComparison.OrdinalIgnoreCase)))
+        {
+            _log.LogInformation(LogEvents.NativePluginLoaded, "Plugin {Id} already loaded; skipping", manifest!.Id);
+            return _loaded.First(p => string.Equals(p.Manifest.Id, manifest.Id, StringComparison.OrdinalIgnoreCase));
+        }
+
+        var loaded = await LoadOneAsync(dir, manifest!, ct).ConfigureAwait(false);
+        UpdateRoster();
+        return loaded;
+    }
+
+    // Produce the manifest to load a directory in-process: the real plugin.json (contract-gated) when
+    // present, otherwise a synthetic one from metadata classification. Returns false when the dir has
+    // no valid manifest, is contract-incompatible, or is a real-legacy plugin (which the satellite
+    // hosts — never loaded in-process here).
+    private bool TryResolveManifestForInProcessLoad(string dir, out PluginManifest? manifest)
+    {
+        manifest = null;
+        var manifestPath = Path.Combine(dir, "plugin.json");
+        if (File.Exists(manifestPath))
+        {
+            if (!PluginManifest.TryLoad(manifestPath, out manifest, out var error))
+            {
+                _log.LogWarning(LogEvents.NativePluginManifestRejected, "Rejected manifest {Path}: {Error}", manifestPath, error);
+                return false;
+            }
+            if (!HostContract.Accepts(manifest!.Contract))
+            {
+                _log.LogWarning(LogEvents.NativePluginManifestRejected,
+                    "Rejected plugin {Id}: contract {Contract} incompatible with host {Host}",
+                    manifest.Id, manifest.Contract, HostContract.Version);
+                manifest = null;
+                return false;
+            }
+            return true;
+        }
+
+        // Manifest-less: classify by inspecting the assembly metadata (detect-if-absent).
+        PluginClassification classification;
+        try { classification = _classifier.Classify(dir, manifest: null); }
+        catch (Exception ex)
+        {
+            _log.LogWarning(LogEvents.NativePluginManifestRejected, "Could not classify plugin in {Dir}: {Error}", dir, ex.Message);
+            return false;
+        }
+
+        if (classification.Kind == LoadKind.RealLegacy)
+        {
+            _log.LogWarning(LogEvents.NativePluginManifestRejected,
+                "Plugin {Id} in {Dir} is a real net48 legacy plugin — the satellite hosts it, not the in-process loader",
+                classification.Id, dir);
+            return false;
+        }
+
+        manifest = ToManifest(classification);
+        return true;
+    }
+
+    // A synthetic manifest for a classified, manifest-less in-process plugin. Capabilities are empty
+    // (a manifest-less plugin declares none); contract is the host's own, since the kind was proven by
+    // the real IPlugin/IActPluginV1 identity rather than a declared contract string.
+    private static PluginManifest ToManifest(PluginClassification c) => new(
+        c.Id, c.Version, HostContract.Version, c.AssemblyFile,
+        Entry: c.Kind == LoadKind.Native ? c.EntryTypeName : null,
+        Capabilities: Array.Empty<string>(),
+        LegacyEntry: c.Kind == LoadKind.RecompiledShim ? c.EntryTypeName : null);
+
+    private async Task<LoadedPlugin?> LoadOneAsync(string dir, PluginManifest manifest, CancellationToken ct)
     {
         var assemblyPath = Path.Combine(dir, manifest.Assembly);
         if (!File.Exists(assemblyPath))
         {
             _log.LogWarning(LogEvents.NativePluginManifestRejected,
                 "Rejected plugin {Id}: entry assembly {Assembly} not found", manifest.Id, manifest.Assembly);
-            return;
+            return null;
         }
 
         PluginLoadContext? alc = null;
         IPlugin? instance = null;
+        ScopedPluginRegistry? scoped = null;
         try
         {
             alc = new PluginLoadContext(assemblyPath);
@@ -136,7 +199,7 @@ internal sealed class PluginManager
                     _log.LogWarning(LogEvents.NativePluginFaulted,
                         "Plugin {Id}: legacy entry {Entry} but the compat shim is not available", manifest.Id, manifest.LegacyEntry);
                     alc.Unload();
-                    return;
+                    return null;
                 }
 
                 instance = _legacyFactory(assembly, manifest.LegacyEntry);
@@ -145,7 +208,7 @@ internal sealed class PluginManager
                     _log.LogWarning(LogEvents.NativePluginFaulted,
                         "Plugin {Id}: compat shim could not host legacy entry {Entry}", manifest.Id, manifest.LegacyEntry);
                     alc.Unload();
-                    return;
+                    return null;
                 }
 
                 _log.LogInformation(LogEvents.NativePluginLoaded, "Loaded legacy plugin {Id} v{Version} ({Entry}) via compat shim",
@@ -159,7 +222,7 @@ internal sealed class PluginManager
                     _log.LogWarning(LogEvents.NativePluginFaulted,
                         "Plugin {Id}: entry type {Entry} is missing or not an IPlugin", manifest.Id, manifest.Entry);
                     alc.Unload();
-                    return;
+                    return null;
                 }
 
                 instance = (IPlugin)Activator.CreateInstance(type)!;
@@ -167,30 +230,37 @@ internal sealed class PluginManager
                     manifest.Id, manifest.Version, manifest.Entry);
             }
 
-            var host = BuildHost(manifest);
+            var host = BuildHost(manifest, out scoped);
             using var cts = CancellationTokenSource.CreateLinkedTokenSource(ct);
             cts.CancelAfter(InitTimeout);
             await instance.InitializeAsync(host, cts.Token).ConfigureAwait(false);
 
-            _loaded.Add(new LoadedPlugin(manifest, alc, instance));
+            var loaded = new LoadedPlugin(manifest, alc, instance, scoped);
+            _loaded.Add(loaded);
             _log.LogInformation(LogEvents.NativePluginInitialized, "Initialized plugin {Id}", manifest.Id);
             _notifications?.Publish(NotificationSeverity.Success, manifest.Id,
                 $"{manifest.Id} loaded", $"Native plugin v{manifest.Version} is running.");
+            return loaded;
         }
         catch (Exception ex)
         {
             _log.LogError(LogEvents.NativePluginFaulted, ex, "Plugin {Id} faulted during load/init — quarantined", manifest.Id);
             _notifications?.Publish(NotificationSeverity.Error, manifest.Id,
                 $"{manifest.Id} was quarantined", ex.Message);
+            if (scoped is not null)
+            {
+                try { scoped.Dispose(); } catch { /* best-effort */ }
+            }
             if (instance is not null)
             {
                 try { await instance.DisposeAsync().ConfigureAwait(false); } catch { /* best-effort */ }
             }
             try { alc?.Unload(); } catch { /* best-effort */ }
+            return null;
         }
     }
 
-    private PluginHost BuildHost(PluginManifest manifest)
+    private PluginHost BuildHost(PluginManifest manifest, out ScopedPluginRegistry scoped)
     {
         var self = new PluginInfo(manifest.Id, manifest.Version, manifest.Contract)
         {
@@ -203,7 +273,52 @@ internal sealed class PluginManager
         bool hasRaw = manifest.HasCapability("raw");
         IRawLogLineEmitter raw = hasRaw ? new RawLogLineEmitter(_sink, _clock) : RawLogLineEmitter.Noop;
         IRawPacketSource packets = hasRaw ? _rawPackets : RawPacketSource.Noop;
-        return new PluginHost(self, _game, _encounters, _audio, _registry, storage, logger, _clock, raw, packets);
+        // A per-plugin registry facade that tracks this plugin's registrations so unload can force
+        // them all closed — otherwise a leftover delegate pins the collectible ALC.
+        scoped = new ScopedPluginRegistry(_registry, manifest.Id);
+        return new PluginHost(self, _game, _encounters, _audio, scoped, storage, logger, _clock, raw, packets);
+    }
+
+    /// <summary>
+    /// Hot-unload a single in-process plugin: dispose its instance, force its registrations closed,
+    /// unload its collectible ALC, and wait (bounded) for the GC to collect it so its files are no
+    /// longer locked. Returns true if the ALC was collected (the caller may delete its files),
+    /// false if it is still alive (the caller should defer deletion). True immediately when no such
+    /// plugin is loaded (e.g. a real-legacy plugin the satellite hosts).
+    /// </summary>
+    public async Task<bool> UnloadAsync(string id)
+    {
+        int idx = _loaded.FindIndex(p => string.Equals(p.Manifest.Id, id, StringComparison.OrdinalIgnoreCase));
+        if (idx < 0) return true;
+
+        var p = _loaded[idx];
+        _loaded.RemoveAt(idx);
+        UpdateRoster();
+
+        try { await p.Instance.DisposeAsync().ConfigureAwait(false); }
+        catch (Exception ex) { _log.LogWarning(LogEvents.NativePluginFaulted, ex, "Plugin {Id} threw during dispose", id); }
+        try { p.Scoped.Dispose(); } catch { /* best-effort */ }
+
+        bool collected = UnloadAndWait(p.Alc);
+        p = null!; // drop the last strong ref so the ALC can be collected
+        _log.LogInformation(LogEvents.NativePluginUnloaded,
+            collected ? "Unloaded plugin {Id} (ALC collected)" : "Unloaded plugin {Id} (ALC not yet collected)", id);
+        return collected;
+    }
+
+    // Initiate collectible-ALC unload, then pump the GC a bounded number of times until the context is
+    // collected (its assemblies' file handles release) or the budget is exhausted.
+    private static bool UnloadAndWait(PluginLoadContext alc)
+    {
+        var weak = new WeakReference(alc);
+        try { alc.Unload(); } catch { /* best-effort */ }
+        alc = null!;
+        for (int i = 0; weak.IsAlive && i < 10; i++)
+        {
+            GC.Collect();
+            GC.WaitForPendingFinalizers();
+        }
+        return !weak.IsAlive;
     }
 
     public async Task UnloadAllAsync()
@@ -217,6 +332,7 @@ internal sealed class PluginManager
             var p = snapshot[i];
             try { await p.Instance.DisposeAsync().ConfigureAwait(false); }
             catch (Exception ex) { _log.LogWarning(LogEvents.NativePluginFaulted, ex, "Plugin {Id} threw during dispose", p.Manifest.Id); }
+            try { p.Scoped.Dispose(); } catch { /* best-effort */ }
             try { p.Alc.Unload(); } catch { /* best-effort */ }
             _log.LogInformation(LogEvents.NativePluginUnloaded, "Unloaded plugin {Id}", p.Manifest.Id);
         }
@@ -230,5 +346,5 @@ internal sealed class PluginManager
             Author = p.Manifest.Author,
         }).ToArray());
 
-    internal sealed record LoadedPlugin(PluginManifest Manifest, PluginLoadContext Alc, IPlugin Instance);
+    internal sealed record LoadedPlugin(PluginManifest Manifest, PluginLoadContext Alc, IPlugin Instance, ScopedPluginRegistry Scoped);
 }

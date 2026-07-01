@@ -34,7 +34,7 @@ public sealed class SatelliteStartResult
 // open for the host lifetime and becomes the live log channel: after startup the satellite
 // forwards its Serilog records as LOG frames, which we re-emit into the host's logging
 // pipeline so the whole stack logs to one place.
-public sealed class SatelliteHost
+public sealed class SatelliteHost : Fct.App.Plugins.ISatellitePluginChannel
 {
     // A single kill-on-close job for the host process: any satellite enrolled here (and the CEF
     // subprocesses it spawns) is terminated by the OS when the host exits or is killed, so no
@@ -50,9 +50,19 @@ public sealed class SatelliteHost
     private int _firstEventLogged;
 
     private NamedPipeServerStream? _server;     // satellite -> host: handshake + forwarded logs
+    private NamedPipeServerStream? _cmdServer;  // host -> satellite: load/unload commands
+    private StreamWriter? _cmdWriter;
+    private readonly object _cmdLock = new();
     private EventWaitHandle? _shutdownEvent;    // host -> satellite: graceful-shutdown signal
     private volatile bool _shuttingDown;        // suppress the "exited" notice during a requested drain
     public Process? Process { get; private set; }
+
+    // Raised when the satellite announces (PLUGIN) or tears down (UNLOADED) a plugin after startup —
+    // the shell reconciles its legacy roster live. Pending unload acks are matched by key.
+    public event Action<SatellitePlugin>? PluginAnnounced;
+    public event Action<string>? PluginUnloaded;
+    private readonly System.Collections.Concurrent.ConcurrentDictionary<string, TaskCompletionSource<bool>> _pendingUnloads
+        = new(StringComparer.OrdinalIgnoreCase);
 
     internal SatelliteHost(ILoggerFactory loggerFactory, IGameEventSink sink, INotificationHub? notifications = null)
     {
@@ -75,6 +85,12 @@ public sealed class SatelliteHost
 
         _server = new NamedPipeServerStream(
             pipeName, PipeDirection.In, 1, PipeTransmissionMode.Byte, PipeOptions.Asynchronous);
+
+        // A second, host->satellite pipe for load/unload commands. Kept separate from the log/EVT
+        // stream (which stays strictly satellite->host) so a user command never interleaves with the
+        // high-rate firehose. The satellite connects to it as a client after the log pipe.
+        _cmdServer = new NamedPipeServerStream(
+            pipeName + "-cmd", PipeDirection.Out, 1, PipeTransmissionMode.Byte, PipeOptions.Asynchronous);
 
         // Cross-process graceful-shutdown signal. A named event (not a second pipe) avoids any
         // connection rendezvous or stream contention — it is one bit the satellite waits on. Created
@@ -115,6 +131,10 @@ public sealed class SatelliteHost
 
         await _server.WaitForConnectionAsync(ct).ConfigureAwait(false);
         _log.LogDebug(LogEvents.BridgeConnected, "Satellite connected to bridge {Pipe}", pipeName);
+
+        // Accept the command-pipe connection in the background; the writer is ready once the satellite
+        // connects. User-initiated load/unload commands happen well after startup, so this races safely.
+        _ = AcceptCommandPipeAsync(ct);
 
         var reader = new StreamReader(_server);   // do not dispose: keeps the pipe open
         var result = new SatelliteStartResult();
@@ -177,6 +197,62 @@ public sealed class SatelliteHost
         return result;
     }
 
+    private async Task AcceptCommandPipeAsync(CancellationToken ct)
+    {
+        try
+        {
+            if (_cmdServer is null) return;
+            await _cmdServer.WaitForConnectionAsync(ct).ConfigureAwait(false);
+            var writer = new StreamWriter(_cmdServer) { AutoFlush = true };
+            lock (_cmdLock) _cmdWriter = writer;
+            _log.LogDebug(LogEvents.BridgeConnected, "Satellite connected to command pipe");
+        }
+        catch (OperationCanceledException) { /* host shutting down */ }
+        catch (Exception ex)
+        {
+            _log.LogWarning(LogEvents.BridgeReaderStopped, ex, "Command pipe accept faulted; live load/unload unavailable");
+        }
+    }
+
+    /// <summary>Ask the satellite to load a real-legacy plugin DLL and host it. Fire-and-forget: the
+    /// satellite announces the result with a PLUGIN frame (surfaced via <see cref="PluginAnnounced"/>).</summary>
+    public bool RequestLoadPlugin(string key, string dllPath, string title)
+        => SendCommand(SatelliteProtocol.FormatLoadPlugin(key, dllPath, title));
+
+    /// <summary>Ask the satellite to tear down and unload a legacy plugin, awaiting its UNLOADED ack.
+    /// Returns false if the satellite is unreachable or does not ack within <paramref name="timeout"/>.</summary>
+    public async Task<bool> RequestUnloadPluginAsync(string key, TimeSpan timeout)
+    {
+        var tcs = new TaskCompletionSource<bool>(TaskCreationOptions.RunContinuationsAsynchronously);
+        _pendingUnloads[key] = tcs;
+        try
+        {
+            if (!SendCommand(SatelliteProtocol.FormatUnloadPlugin(key))) return false;
+            using var cts = new CancellationTokenSource(timeout);
+            using (cts.Token.Register(() => tcs.TrySetResult(false)))
+                return await tcs.Task.ConfigureAwait(false);
+        }
+        finally { _pendingUnloads.TryRemove(key, out _); }
+    }
+
+    private bool SendCommand(string frame)
+    {
+        lock (_cmdLock)
+        {
+            if (_cmdWriter is null)
+            {
+                _log.LogWarning(LogEvents.BridgeReaderStopped, "Cannot send command; satellite command pipe not connected");
+                return false;
+            }
+            try { _cmdWriter.WriteLine(frame); return true; }
+            catch (Exception ex)
+            {
+                _log.LogWarning(LogEvents.BridgeReaderStopped, ex, "Failed to send satellite command");
+                return false;
+            }
+        }
+    }
+
     // Drain forwarded LOG frames for the rest of the host lifetime.
     private async Task PumpBridgeAsync(StreamReader reader, CancellationToken ct)
     {
@@ -189,6 +265,13 @@ public sealed class SatelliteHost
                     ReEmit(rec);
                 else if (TryEmitGameEvent(line))
                     continue;
+                else if (SatelliteProtocol.TryParsePlugin(line, out var p))
+                    PluginAnnounced?.Invoke(new SatellitePlugin { Key = p.Key, Title = p.Title, Status = p.Status, Hwnd = p.Hwnd });
+                else if (SatelliteProtocol.TryParseUnloaded(line, out var key, out var ok))
+                {
+                    if (_pendingUnloads.TryGetValue(key, out var tcs)) tcs.TrySetResult(ok);
+                    PluginUnloaded?.Invoke(key);
+                }
                 else
                     _log.LogDebug(LogEvents.BridgeFrameMalformed, "Unrecognized bridge frame after handshake: {Frame}", line);
             }

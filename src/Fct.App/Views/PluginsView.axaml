@@ -153,6 +153,10 @@
                                                FontFamily="{StaticResource MonoFont}" FontSize="11.5"
                                                VerticalAlignment="Center"
                                                Foreground="{Binding Shell.SelectedPlugin.Status, Converter={StaticResource StatusToBrush}}"/>
+                                    <Button Classes="ghost" Content="{x:Static lang:Resources.Action_Remove}" VerticalAlignment="Center"
+                                            AutomationProperties.AutomationId="plugin.unload"
+                                            Command="{Binding Shell.UnloadPluginCommand}"
+                                            CommandParameter="{Binding Shell.SelectedPlugin}"/>
                                 </StackPanel>
                             </Grid>
                         </Border>

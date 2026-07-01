@@ -75,6 +75,14 @@ class Program
         // Shell preferences (persisted JSON).
         builder.Services.AddSingleton<UiSettingsStore>();
 
+        // Plugin install/uninstall: metadata classification, the persisted installed-set registry,
+        // the install-dir convention, and the single install/uninstall entry point.
+        builder.Services.AddSingleton<PluginClassifier>();
+        builder.Services.AddSingleton<PluginRegistryStore>();
+        builder.Services.AddSingleton<PluginInstallPaths>();
+        builder.Services.AddSingleton<Fct.App.Plugins.ISatellitePluginChannel>(sp => sp.GetRequiredService<SatelliteHost>());
+        builder.Services.AddSingleton<PluginInstaller>();
+
         // The satellite decodes live game-event frames onto the bus (piece C) and surfaces notable
         // records as notifications.
         builder.Services.AddSingleton<SatelliteHost>(sp => new SatelliteHost(

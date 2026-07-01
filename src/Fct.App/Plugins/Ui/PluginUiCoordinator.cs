@@ -22,9 +22,9 @@ namespace Fct.App.Plugins.Ui;
 /// members that reference internal loader types (<see cref="PluginManifest"/>) stay internal.
 /// </summary>
 /// <remarks>
-/// Plugins unload only at process shutdown today (no hot-unload yet), so contributed surfaces are
-/// never retracted mid-session. When hot-unload (work item 11) lands, add a <c>RemovePlugin</c> seam
-/// here that clears this plugin's settings page and disposes its corner controls.
+/// <see cref="RemovePlugin"/> retracts a plugin's contributed surfaces on hot-unload: it clears the
+/// plugin's settings page and corner controls and forgets its page ids so a later re-install of the
+/// same plugin is not rejected as a duplicate.
 /// </remarks>
 public sealed class PluginUiCoordinator
 {
@@ -32,6 +32,9 @@ public sealed class PluginUiCoordinator
     private readonly ILogger<PluginUiCoordinator> _log;
     private readonly INotificationHub? _notifications;
     private readonly HashSet<string> _settingsPageIds = new(StringComparer.Ordinal);
+    // Per-plugin bookkeeping so a plugin's surfaces can be retracted on unload.
+    private readonly Dictionary<string, List<string>> _pageIdsByPlugin = new(StringComparer.Ordinal);
+    private readonly Dictionary<string, List<string>> _cornerIdsByPlugin = new(StringComparer.Ordinal);
 
     public PluginUiCoordinator(IUiDispatcher dispatcher, ILoggerFactory loggerFactory, INotificationHub? notifications = null)
     {
@@ -42,6 +45,9 @@ public sealed class PluginUiCoordinator
 
     /// <summary>Raised when a plugin's settings page is accepted (id, page).</summary>
     internal event Action<string, UiSurface>? SettingsPageAdded;
+
+    /// <summary>Raised when a plugin's settings surface is retracted on unload (plugin id).</summary>
+    internal event Action<string>? SettingsPageRemoved;
 
     /// <summary>Raised when a plugin asks to bring one of its pages to the foreground.</summary>
     internal event Action<string>? PageRevealRequested;
@@ -108,6 +114,7 @@ public sealed class PluginUiCoordinator
                     "Plugin {Id} tried to add a duplicate settings page id {PageId} — ignored", pluginId, page.Id);
                 return;
             }
+            Track(_pageIdsByPlugin, pluginId, page.Id);
             SettingsPageAdded?.Invoke(pluginId, page);
         });
     }
@@ -116,8 +123,38 @@ public sealed class PluginUiCoordinator
 
     internal IDisposable AddCornerControl(string pluginId, UiSurface control)
     {
-        RunOnUiThread(() => CornerControlAdded?.Invoke(pluginId, control));
+        RunOnUiThread(() =>
+        {
+            Track(_cornerIdsByPlugin, pluginId, control.Id);
+            CornerControlAdded?.Invoke(pluginId, control);
+        });
         return new CornerControlHandle(this, control.Id);
+    }
+
+    /// <summary>Retract everything <paramref name="pluginId"/> contributed (on hot-unload): its
+    /// corner controls and its settings surface, and forget its page ids so a re-install is accepted.</summary>
+    public void RemovePlugin(string pluginId)
+    {
+        RunOnUiThread(() =>
+        {
+            if (_cornerIdsByPlugin.TryGetValue(pluginId, out var corners))
+            {
+                foreach (var id in corners) CornerControlRemoved?.Invoke(id);
+                _cornerIdsByPlugin.Remove(pluginId);
+            }
+            if (_pageIdsByPlugin.TryGetValue(pluginId, out var pages))
+            {
+                foreach (var id in pages) _settingsPageIds.Remove(id);
+                _pageIdsByPlugin.Remove(pluginId);
+            }
+            SettingsPageRemoved?.Invoke(pluginId);
+        });
+    }
+
+    private static void Track(Dictionary<string, List<string>> map, string pluginId, string id)
+    {
+        if (!map.TryGetValue(pluginId, out var list)) { list = new List<string>(); map[pluginId] = list; }
+        list.Add(id);
     }
 
     internal void RemoveCornerControl(string id) => RunOnUiThread(() => CornerControlRemoved?.Invoke(id));

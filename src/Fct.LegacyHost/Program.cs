@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using System.IO;
 using System.IO.Pipes;
 using System.Linq;
@@ -26,6 +27,12 @@ namespace Fct.LegacyHost
         private static LoadedPlugin _overlay;
         private static LoadedPlugin _probe;
         private static BridgeForwarder _forwarder;
+
+        private static NamedPipeClientStream _cmdPipe;   // host -> satellite: load/unload commands
+        // Every plugin loaded into this satellite, keyed by the host-facing key, so a single one can
+        // be torn down on an UNLOADPLUGIN command.
+        private static readonly Dictionary<string, LoadedPlugin> _plugins =
+            new Dictionary<string, LoadedPlugin>(StringComparer.OrdinalIgnoreCase);
 
         [STAThread]
         private static void Main(string[] args)
@@ -91,7 +98,10 @@ namespace Fct.LegacyHost
 
             var pipeName = ParseBridgeArg(args);
             if (pipeName != null)
+            {
                 ConnectBridge(pipeName);
+                StartCommandReader(pipeName);
+            }
 
             // Must be installed before any plugin assembly is loaded.
             FacadeHost.InstallAssemblyResolver();
@@ -130,12 +140,14 @@ namespace Fct.LegacyHost
             _log.LogInformation(LogEvents.PluginLoading,
                 "Loading FFXIV_ACT_Plugin (wrapped) from {Path}", FacadeHost.FfxivPluginPath);
             _ffxiv = FacadeHost.LoadWrappedFfxivPlugin(FacadeHost.FfxivPluginPath);
+            _plugins[_ffxiv.Key] = _ffxiv;
             SendLine($"HWND {_ffxiv.Hwnd.ToInt64():X}");   // primary window (bridge-handshake compat)
             SendPlugin(_ffxiv);
 
             _log.LogInformation(LogEvents.PluginLoading,
                 "Loading OverlayPlugin from {Path}", FacadeHost.OverlayPluginPath);
             _overlay = FacadeHost.LoadPlugin("overlay", "OverlayPlugin", FacadeHost.OverlayPluginPath, null);
+            _plugins[_overlay.Key] = _overlay;
             SendPlugin(_overlay);
 
             // Headless diagnostic plugin: taps the full data path and logs to satellite\streamprobe.log.
@@ -393,6 +405,100 @@ namespace Fct.LegacyHost
                 _bridge = null; _writer = null;
                 _log.LogWarning(LogEvents.SatelliteBridgeConnectFailed, ex,
                     "Bridge connect failed on {Pipe}; running detached", pipeName);
+            }
+        }
+
+        // Connect the host->satellite command pipe and read LOADPLUGIN/UNLOADPLUGIN frames on a
+        // background thread, marshaling each onto the WinForms UI thread (plugin Init/DeInit build and
+        // destroy WinForms controls). Mirrors StartShutdownWaiter's thread + Invoke pattern.
+        private static void StartCommandReader(string pipeName)
+        {
+            var t = new System.Threading.Thread(() =>
+            {
+                try
+                {
+                    _cmdPipe = new NamedPipeClientStream(".", pipeName + "-cmd", PipeDirection.In);
+                    _cmdPipe.Connect(5000);
+                    using (var reader = new StreamReader(_cmdPipe))
+                    {
+                        string line;
+                        while ((line = reader.ReadLine()) != null)
+                            HandleCommand(line);
+                    }
+                }
+                catch (Exception ex)
+                {
+                    _log.LogWarning(LogEvents.SatelliteBridgeConnectFailed, ex, "Command pipe reader stopped");
+                }
+            })
+            { IsBackground = true, Name = "cmd-reader" };
+            t.Start();
+        }
+
+        private static void HandleCommand(string line)
+        {
+            if (line.StartsWith("LOADPLUGIN ", StringComparison.Ordinal))
+            {
+                var parts = line.Substring("LOADPLUGIN ".Length).Split(new[] { '|' }, 3);
+                if (parts.Length < 3) return;
+                var key = parts[0].Trim();
+                var dll = parts[1];
+                var title = parts[2];
+                InvokeOnUi(() =>
+                {
+                    try
+                    {
+                        var loaded = FacadeHost.LoadPlugin(key, title, dll, null);
+                        _plugins[key] = loaded;
+                        SendPlugin(loaded);
+                        _log.LogInformation(LogEvents.PluginInitialized, "Loaded plugin {Key} '{Title}' on command from {Dll}", key, title, dll);
+                    }
+                    catch (Exception ex)
+                    {
+                        _log.LogError(LogEvents.PluginLoadFailed, ex, "LOADPLUGIN {Key} failed", key);
+                    }
+                });
+            }
+            else if (line.StartsWith("UNLOADPLUGIN ", StringComparison.Ordinal))
+            {
+                var key = line.Substring("UNLOADPLUGIN ".Length).Trim();
+                InvokeOnUi(() =>
+                {
+                    bool ok = false;
+                    try
+                    {
+                        if (_plugins.TryGetValue(key, out var p))
+                        {
+                            FacadeHost.UnloadPlugin(p);
+                            _plugins.Remove(key);
+                            ok = true;
+                        }
+                        else
+                        {
+                            _log.LogWarning(LogEvents.PluginDeInit, "UNLOADPLUGIN {Key}: no such loaded plugin", key);
+                        }
+                    }
+                    catch (Exception ex)
+                    {
+                        _log.LogError(LogEvents.PluginDeInit, ex, "UNLOADPLUGIN {Key} failed", key);
+                    }
+                    SendLine($"UNLOADED {key}|{(ok ? "1" : "0")}");
+                });
+            }
+        }
+
+        // Run an action on the satellite's WinForms UI thread (where plugins were Init'd).
+        private static void InvokeOnUi(Action action)
+        {
+            var act = ActGlobals.oFormActMain;
+            try
+            {
+                if (act != null && act.IsHandleCreated) act.Invoke(action);
+                else action();
+            }
+            catch (Exception ex)
+            {
+                _log.LogError(LogEvents.PluginLoadFailed, ex, "UI-thread command dispatch failed");
             }
         }
 

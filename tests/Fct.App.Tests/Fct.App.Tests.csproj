@@ -14,6 +14,8 @@
     <ProjectReference Include="..\..\src\Fct.Abstractions.Testing\Fct.Abstractions.Testing.csproj" />
     <!-- IHostedService for the linked GameSnapshotAggregator (abstractions only — no Avalonia/host chain). -->
     <PackageReference Include="Microsoft.Extensions.Hosting.Abstractions" />
+    <!-- Metadata-only assembly inspection for the linked PluginClassifier. -->
+    <PackageReference Include="System.Reflection.MetadataLoadContext" />
     <!-- IUiContributor/IUiHost/UiSurface for the linked PluginUiCoordinator below. Pulls Avalonia in as
          a compile-time type source only; tests never build a Control or touch the UI thread. -->
     <ProjectReference Include="..\..\src\Fct.Abstractions.UI\Fct.Abstractions.UI.csproj" />
@@ -34,6 +36,10 @@
     <Compile Include="..\..\src\Fct.App\Plugins\PluginManifest.cs" Link="Plugins\PluginManifest.cs" />
     <Compile Include="..\..\src\Fct.App\Plugins\PluginLoadContext.cs" Link="Plugins\PluginLoadContext.cs" />
     <Compile Include="..\..\src\Fct.App\Plugins\PluginManager.cs" Link="Plugins\PluginManager.cs" />
+    <Compile Include="..\..\src\Fct.App\Plugins\LoadKind.cs" Link="Plugins\LoadKind.cs" />
+    <Compile Include="..\..\src\Fct.App\Plugins\PluginClassifier.cs" Link="Plugins\PluginClassifier.cs" />
+    <Compile Include="..\..\src\Fct.App\Plugins\ISatellitePluginChannel.cs" Link="Plugins\ISatellitePluginChannel.cs" />
+    <Compile Include="..\..\src\Fct.App\Plugins\PluginInstaller.cs" Link="Plugins\PluginInstaller.cs" />
     <Compile Include="..\..\src\Fct.App\Plugins\Ui\PluginUiCoordinator.cs" Link="Plugins\Ui\PluginUiCoordinator.cs" />
     <Compile Include="..\..\src\Fct.App\Plugins\Ui\PluginUiHost.cs" Link="Plugins\Ui\PluginUiHost.cs" />
     <Compile Include="..\..\shared\Logging\LogEvents.cs" Link="Logging\LogEvents.cs" />
