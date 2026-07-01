@@ -26,7 +26,7 @@ The pipe-delimited log line exists only because ACT had to be game-agnostic. Dro
 multi-game support and that whole string round-trip
 (packet → struct → string → regex → object → json) becomes optional.
 
-The reference decompiles for all of this live under `reference/` (see §11).
+The reference decompiles for all of this live under `E:\dev` (see §13).
 
 ---
 
@@ -189,7 +189,7 @@ we supply the ACT engine they plug into.
 
 ## 6. The v1 compat surface (the build scope, from the decompile)
 
-Reproduce faithfully (signatures verified against `reference/act-decompiled`):
+Reproduce faithfully (signatures verified against `E:\dev\ACT-decompiled`):
 
 - **Plugin host:** `IActPluginV1.InitPlugin(TabPage, Label)` / `DeInitPlugin()`;
   assembly scan + load; `ActPluginData` entries in `ActGlobals.oFormActMain.ActPlugins`.
@@ -327,14 +327,13 @@ exactly as before; the forward surface is additive.
 
 ## 13. Reference sources
 
-Hard-linked (Windows directory junctions) under `reference/` — searchable in-place,
-**read-only references, never modified**:
+**Read-only references, never modified**:
 
-- `reference/overlayplugin/` → `E:\dev\OverlayPlugin` — the current ngld OverlayPlugin
+- `E:\dev\OverlayPlugin` — the current ngld OverlayPlugin
   source (net48). Key: `OverlayPlugin.Core/NetworkProcessors/`,
   `Integration/FFXIVRepository.cs`, `WebSocket/WSServer.cs`,
   `resources/opcodes.jsonc`.
-- `reference/act-decompiled/` → `E:\dev\ACT-decompiled` — clean decompiles:
+- `E:\dev\ACT-decompiled` — clean decompiles:
   - `Advanced_Combat_Tracker/` — ACT itself (the compat-surface oracle):
     `Forms/FormActMain.cs`, `ActGlobals.cs`, `IActPluginV1.cs`, `Models/`, `Events/`.
   - `.audit/ffxiv_act_plugin/decompiled/` — FFXIV_ACT_Plugin sub-assemblies

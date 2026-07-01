@@ -76,18 +76,17 @@ The net10↔net48 **IPC bridge is not its own project** — host end in `Fct.App
 
 ## Reference sources (read-only)
 
-**Never modify anything under `reference/`** (Windows directory junctions to external repos) or the
-`E:\dev` source trees below. The ACT members each plugin consumes are mapped in
-[`docs/ACT-INTERFACE-MAP.md`](docs/ACT-INTERFACE-MAP.md).
+**Never modify anything under** the `E:\dev` source trees below. The ACT members each plugin consumes
+are mapped in [`docs/ACT-INTERFACE-MAP.md`](docs/ACT-INTERFACE-MAP.md).
 
-- `E:\dev\OverlayPlugin` (= `reference/overlayplugin/`) — ngld OverlayPlugin / MiniParse / cactbot host (net48).
+- `E:\dev\OverlayPlugin` — ngld OverlayPlugin / MiniParse / cactbot host (net48).
 - `E:\dev\Triggernometry` — trigger engine (net48). ACT contact isolated in `Source\TriggernometryProxy\ProxyPlugin.cs`.
 - `E:\dev\ACT-Discord-Triggers` — Discord audio/TTS bridge (net48). Hijacks ACT's `PlayTtsMethod`/`PlaySoundMethod`; consumes no combat data.
 - `E:\dev\ACT.Hojoring` — Japanese plugin suite (net48). Heaviest consumer; also drives ACT's built-in `oFormSpellTimers`.
 
 **Two separate decompiles — do not conflate:**
 
-- **`E:\dev\ACT-decompiled`** (= `reference/act-decompiled/`) is **Advanced Combat Tracker** only —
+- **`E:\dev\ACT-decompiled`** is **Advanced Combat Tracker** only —
   the generic host that does MasterSwing collection + encounter **aggregation**; no FFXIV parsing.
   With the empirical oracle (ACT's captured output), it is the authority for **our** aggregation behavior.
 - **`E:\dev\FFXIV_ACT_Plugin\ffxiv_act_plugin\decompiled\`** is the **FFXIV_ACT_Plugin** decompile,

@@ -22,7 +22,7 @@ install; **full live capture** as the acceptance bar.
   3.4.7.268`. Its bundled opcodes are stale, so OverlayPlugin's *own* network parsing
   (custom log lines / cactbot raidboss network triggers) may not match the current game —
   but core combat data flows through ACT's aggregation, not OverlayPlugin's opcodes, so
-  MiniParse DPS is unaffected. Building a current OverlayPlugin from `reference/overlayplugin`
+  MiniParse DPS is unaffected. Building a current OverlayPlugin from `E:\dev\OverlayPlugin`
   is the alternative if cactbot network triggers are needed.
 
 ### Assembly identity — the binding constraint

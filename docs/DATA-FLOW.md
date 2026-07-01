@@ -8,9 +8,9 @@ reproduce so the unmodified plugins "just work."
 
 It is reconstructed from the real sources:
 
-- `reference/act-decompiled/` → `E:\dev\ACT-decompiled` — ACT itself + the FFXIV_ACT_Plugin
+- `E:\dev\ACT-decompiled` — ACT itself + the FFXIV_ACT_Plugin
   decompile (`.audit/ffxiv_act_plugin/decompiled/`, mirrored at `E:\dev\FFXIV_ACT_Plugin\_decompiled`).
-- `reference/overlayplugin/` → `E:\dev\OverlayPlugin` — ngld OverlayPlugin (net48).
+- `E:\dev\OverlayPlugin` — ngld OverlayPlugin (net48).
 - `E:\dev\IINACT` — a working in-process re-host of the same stack (its `NotACT` is the
   independent proof that our from-scratch ACT approach is correct).
 
@@ -276,7 +276,7 @@ the FFXIV parser natively is an explicit non-goal.
 
 ### 3.3 The hub surface other plugins bind to — `ActGlobals.oFormActMain`
 
-Reproduce faithfully (signatures verified against `reference/act-decompiled`). `FormActMain`
+Reproduce faithfully (signatures verified against `E:\dev\ACT-decompiled`). `FormActMain`
 **is a real WinForms `Form`** — not a POCO hub. Consumers poll its form lifecycle and marshal
 onto its UI thread; the facade must be a live `Form` with a running message loop.
 
@@ -331,7 +331,7 @@ onto its UI thread; the facade must be a live `Form` with a running message loop
 ## 4. Leg 3 — OverlayPlugin consumes (real, hosted unmodified)
 
 OverlayPlugin uses **four distinct taps**. All file refs are under
-`reference/overlayplugin/OverlayPlugin.Core/`.
+`E:\dev\OverlayPlugin\OverlayPlugin.Core\`.
 
 ### 4.1 Discovery — reflect *through* ACT to find the plugin (`Integration/FFXIVRepository.cs`)
 

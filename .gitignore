@@ -1,6 +1,3 @@
-# Reference source junctions — external repos, not part of this repo
-/reference/
-
 # Third-party proprietary binaries — local build inputs only, never redistribute
 /lib/
 
