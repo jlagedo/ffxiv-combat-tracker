@@ -549,9 +549,60 @@ handle — the connection lives in the satellite); `GetResourceDictionary` is em
 **Pending:** live per-tick metric refresh into `IEncounterService.Active` (needs a host update seam);
 the remaining inert `IDataSubscription` events (`NetworkReceived`/`NetworkSent`, `PlayerStatsChanged`,
 `ParsedLogLine`, `ProcessChanged` — no typed-bus source); the WinForms `TabPage` embedding via Avalonia
-`NativeControlHost`; and the `_iocContainer` logging-bridge seam a recompiled OverlayPlugin/Hojoring
-reflects for its own log routing (a separate impersonation slice). Also under-specified:
-`Form`-inherited `oFormActMain` members.
+`NativeControlHost` (slice D8, design below); and the `_iocContainer` logging-bridge seam a recompiled
+OverlayPlugin/Hojoring reflects for its own log routing (a separate impersonation slice). Also
+under-specified: `Form`-inherited `oFormActMain` members.
+
+### D8 — WinForms `TabPage` embedding (planned next slice)
+
+D8 surfaces a recompiled plugin's own WinForms settings tab in the app's existing Plugins config bay.
+`LegacyPluginHost` already builds the `TabPage`/`Label` ACT hands a plugin and calls `InitPlugin`
+(`LegacyPluginHost.cs:54-55,68`) — the plugin fills the tab with its own WinForms controls — but the
+tab is built **detached and never shown**. D8 embeds that already-filled tab; it adds **no new UI**
+(the plugin supplies its settings screen) and reuses the config bay (`PluginsView.axaml` `EmbedSlot`)
+that already hosts satellite plugins' windows. It serves the migration half-step *ported to .NET 10, UI
+still WinForms* (WinForms is supported on `net10.0-windows`); the forward Avalonia `IUiContributor`
+surface is a separate, later slice.
+
+Approach:
+
+- **Shim (`Fct.Compat.Shim`)** — before `InitPlugin`, add `_tab` to a host-owned real `TabControl` (one
+  per plugin instance, `Dock=Fill`) so the tab's handle is created in a live control tree and
+  `pluginScreenSpace.Parent as TabControl` works (sibling-tab-adding plugins behave); mirrors real ACT's
+  order (TabPage added to `tcPlugins` before `InitPlugin`). Expose it via a new WinForms-typed
+  `ILegacyTabSurface { Control? TabRoot; string StatusText; event Action? StatusTextChanged }` that
+  `LegacyPluginHost` implements — `TabRoot` = the owned `TabControl`; `StatusText` reads `_statusLabel`,
+  hooking its `TextChanged`. Dispose the `TabControl` with `_tab`. `oFormActMain` stays a POCO.
+- **App (`Fct.App`)** — a new `EmbeddedWinFormsView : NativeControlHost` hosting an **in-process** WinForms
+  control we own (the plugin's `TabControl`): reparent under the Avalonia parent HWND via
+  `SetParent`/`WS_CHILD` (same P/Invoke block as `EmbeddedSatelliteView`), returning
+  `PlatformHandle(control.Handle,"HWND")`; on teardown **detach + hide, don't destroy** (the shim owns the
+  control). Ensure WinForms init once on the UI thread (`Application.EnableVisualStyles` +
+  `SetCompatibleTextRenderingDefault` + a `WindowsFormsSynchronizationContext`) so the control renders and
+  `Control.Invoke` marshals under Avalonia's Win32 pump.
+- **Routing** — a loaded shim plugin (`PluginManager.Loaded`, `IPlugin is ILegacyTabSurface`) becomes an
+  embeddable in-process row in `MainViewModel`/`PluginViewModel` (`HasNativeConfig=true`), distinct from a
+  plain `Kind.Native` row (which keeps the static `ShowNativeDetails` card). `PluginsView.axaml.cs`
+  `UpdateEmbed` (`:61-78`) gains a parallel branch that puts `EmbeddedWinFormsView(surface.TabRoot)` in
+  `EmbedSlot` (cached per plugin, like `_embeds`) and surfaces `StatusText`; the satellite-HWND branch is
+  untouched.
+- **Sample (`samples/Fct.SampleLegacyPlugin`)** — add a trivial marker control to
+  `pluginScreenSpace.Controls` in `InitPlugin` so the embed has visible, assertable content.
+
+Honest limit: `oFormActMain` stays a POCO (not a WinForms `Form`), so plugins that reach
+`oFormActMain.Handle`/`Invoke`/`InitActDone` (OverlayPlugin, Hojoring) remain satellite-hosted — CEF/net48
+pins them there regardless.
+
+Tests: `Fct.Compat.Shim.Tests` — after init, `ILegacyTabSurface.TabRoot` is a `TabControl` containing the
+plugin's `TabPage` with its marker control, `TabPage.Parent` is that `TabControl`, and
+`StatusText`/`StatusTextChanged` reflect the label. `Fct.App.Tests` — VM routing (an `ILegacyTabSurface`
+plugin yields an embeddable row; a plain native plugin does not), headless. The visual embed itself is a
+run-`Fct.App` check (a `NativeControlHost` needs a real window).
+
+Risk to watch: in-process WinForms child rendering under Avalonia's `NativeControlHost` + shared message
+pump (handle timing, WinForms init, sync context) — the satellite precedent covers foreign-HWND
+reparenting, not an owned in-process control. Fallback if the shared pump misbehaves: a dedicated WinForms
+host window/thread for the control.
 
 ## Open items / next steps
 
