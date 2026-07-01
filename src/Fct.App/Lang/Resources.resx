@@ -25,6 +25,7 @@
   <data name="Label_Identity" xml:space="preserve"><value>Identity</value></data>
   <data name="Label_Version" xml:space="preserve"><value>Version</value></data>
   <data name="Label_Contract" xml:space="preserve"><value>Contract</value></data>
+  <data name="Label_Author" xml:space="preserve"><value>Author</value></data>
   <data name="Label_Duration" xml:space="preserve"><value>duration</value></data>
   <data name="Label_RaidDps" xml:space="preserve"><value>raid dps</value></data>
   <data name="Label_JobFormat" xml:space="preserve"><value>Job {0}</value></data>
@@ -134,6 +135,8 @@
   <data name="Plugins_EngineDownBody" xml:space="preserve"><value>The classic engine isn't running, so this plugin's configuration can't be shown.</value></data>
   <data name="Plugins_ModernPluginRole" xml:space="preserve"><value>Modern plugin</value></data>
   <data name="Plugins_ModernPluginDescription" xml:space="preserve"><value>Runs inside the app in its own sandbox.</value></data>
+  <data name="Plugins_ModernUiErrorTitle" xml:space="preserve"><value>Couldn't load settings</value></data>
+  <data name="Plugins_ModernUiErrorBodyFormat" xml:space="preserve"><value>{0} failed to load its settings page: {1}</value></data>
 
   <!-- Encounters page -->
   <data name="Encounters_Subtitle" xml:space="preserve"><value>Live DPS and per-player metrics for the current fight.</value></data>

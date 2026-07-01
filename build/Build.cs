@@ -73,17 +73,31 @@ void Publish(string configuration, bool singleFile, bool readyToRun, string mode
         $"publish \"{satProj}\" -c {configuration} -o \"{satOut}\" --nologo -p:DebugType=portable -p:DebugSymbols=true",
         workingDirectory: root);
 
-    // 3. Verify both entry points exist.
+    // 3. SDK packages (local-only — dist/ is git-ignored, never pushed to a feed). Consumers add
+    // dist/<mode>/packages as a local NuGet folder source.
+    var pkgOut = Path.Combine(outDir, "packages");
+    foreach (var proj in new[]
+    {
+        Path.Combine(root, "src", "Fct.Abstractions", "Fct.Abstractions.csproj"),
+        Path.Combine(root, "src", "Fct.Abstractions.UI", "Fct.Abstractions.UI.csproj"),
+    })
+        Run("dotnet", $"pack \"{proj}\" -c {configuration} -o \"{pkgOut}\" --nologo", workingDirectory: root);
+
+    // 4. Verify entry points + packages exist.
     string hostExe = Path.Combine(outDir, "Fct.App.exe");
     string satExe = Path.Combine(satOut, "Fct.LegacyHost.exe");
     foreach (var exe in new[] { hostExe, satExe })
         if (!File.Exists(exe))
             throw new InvalidOperationException($"expected output missing: {exe}");
+    foreach (var pattern in new[] { "Fct.Abstractions.1.*.nupkg", "Fct.Abstractions.UI.1.*.nupkg" })
+        if (Directory.GetFiles(pkgOut, pattern).Length != 1)
+            throw new InvalidOperationException($"expected exactly one package matching {pattern} in {pkgOut}");
 
     long size = new DirectoryInfo(outDir).EnumerateFiles("*", SearchOption.AllDirectories).Sum(f => f.Length);
     Console.WriteLine("\nBuild complete.");
     Console.WriteLine($"  host:         {hostExe}");
     Console.WriteLine($"  satellite:    {satExe}");
+    Console.WriteLine($"  sdk packages: {pkgOut}");
     Console.WriteLine($"  size on disk: {size / 1024d / 1024d:N1} MB");
 }
 

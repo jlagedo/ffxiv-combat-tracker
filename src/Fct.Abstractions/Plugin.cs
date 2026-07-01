@@ -81,7 +81,17 @@ namespace Fct.Abstractions
     }
 
     /// <summary>Typed metadata projected from a plugin's <c>plugin.json</c> manifest.</summary>
-    public sealed record PluginInfo(string Id, string Version, string ContractVersion);
+    public sealed record PluginInfo(string Id, string Version, string ContractVersion)
+    {
+        /// <summary>Display name for the roster; falls back to <see cref="Id"/> when the manifest omits it.</summary>
+        public string? Name { get; init; }
+
+        /// <summary>One-line description for the roster.</summary>
+        public string? Description { get; init; }
+
+        /// <summary>Plugin author, as declared in the manifest.</summary>
+        public string? Author { get; init; }
+    }
 
     /// <summary>Game-time clock. <see cref="ServerNow"/> tracks the FFXIV server clock.</summary>
     public interface IClock

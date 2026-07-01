@@ -5,12 +5,15 @@ using System.Threading.Tasks;
 using Avalonia.Controls;
 using Avalonia.Platform.Storage;
 using Fct.App.Hosting;
+using Fct.App.Plugins;
+using Fct.App.Plugins.Ui;
 using Fct.App.ViewModels;
 // Aliased: MainWindow inherits Window.Resources (IResourceDictionary), which shadows the
 // Fct.App.Lang.Resources type name inside this class; "Lang" would itself collide with the
 // Fct.App.Lang namespace since this file's namespace (Fct.App) is its direct parent.
 using Strings = Fct.App.Lang.Resources;
 using Fct.Logging;
+using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Logging.Abstractions;
 
@@ -49,10 +52,24 @@ public partial class MainWindow : Window
     protected override void OnOpened(EventArgs e)
     {
         base.OnOpened(e);
+        FlushPluginUi();
         if (_vm.SettingsPage.LaunchSatelliteOnStartup)
             _ = StartSatelliteAsync();
         else
             _vm.SetIdle();
+    }
+
+    // Native plugins finish IPlugin.InitializeAsync before Avalonia starts (Program.cs runs
+    // host.Start() before StartWithClassicDesktopLifetime), so IUiContributor.RegisterUi — which the
+    // contract requires to run "on the UI thread, after init, with the shell live" — can only happen
+    // here, once the window is actually on screen.
+    private void FlushPluginUi()
+    {
+        var manager = App.Services?.GetService<PluginManager>();
+        var coordinator = App.Services?.GetService<PluginUiCoordinator>();
+        if (manager is null || coordinator is null) return;
+
+        coordinator.FlushRegisterUi(manager.Loaded.Select(p => (p.Manifest, p.Instance)));
     }
 
     // Install a native plugin: a folder holding a plugin.json manifest, copied into the host's

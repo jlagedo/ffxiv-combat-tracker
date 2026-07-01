@@ -85,7 +85,7 @@ is the spine of [What we must do](#what-we-must-do--the-work-list).
 | **Process lifecycle** | process event + handle | `ProcessChanged` + `GetCurrentFFXIVProcess` | SDK `ProcessChanged` | **missing on net10 (all faces)** |
 | **Resource catalog** (names) | `IResourceCatalog` | `GetResourceDictionary` | parser tables + a resource-provider plugin | **pipe filled by plugins; status/buff table + producer pending** |
 | **Host services** (storage/logger/clock) | `IPluginHost` | `AppDataFolder`/`WriteExceptionLog`/… | ACT globals | ✅ built |
-| **UI** | `IUiContributor` (Avalonia settings page + reveal/corner-control) | WinForms `TabPage` (slice D8) | WinForms `TabPage` in `Fct.LegacyHost` | modern: **contract defined, not wired** (wiring = work item); shim D8 ⏳; satellite HWND ✅ |
+| **UI** | `IUiContributor` (Avalonia settings page + reveal/corner-control) | WinForms `TabPage` (slice D8) | WinForms `TabPage` in `Fct.LegacyHost` | modern: ✅ wired (`PluginUiCoordinator`); shim D8 ⏳; satellite HWND ✅ |
 
 > **Typed semantic events stay on the RawLogLine pipe.** `StatusApplied/Removed`, `Cast*`,
 > `DeathOccurred`, and HP-as-event exist only as parsed log-line fields. The host **parses nothing**,
@@ -299,7 +299,9 @@ plugins were pinned to WinForms).
 
 UI is a **separate, opt-in contract** (`Fct.Abstractions.UI`, net10 + Avalonia) so headless plugins
 take no UI dependency. A plugin opts in by also implementing `IUiContributor` and declaring `"ui"` in
-its manifest (the host lazy-loads the UI assembly only when a surface is shown).
+its manifest — the `"ui"` capability gates whether the host calls `RegisterUi`, not whether the
+contract assembly loads (`Fct.Abstractions.UI` is always shared to the default ALC, same as
+`Fct.Abstractions` itself).
 
 ```csharp
 public interface IUiContributor { void RegisterUi(IUiHost ui); }   // once, on the UI thread
@@ -328,18 +330,45 @@ public interface IUiHost
 - Triggernometry's host-window mutations map onto `IUiHost.RevealPage` (`LocateTab`) and
   `AddCornerControl`/`RemoveCornerControl` ([G11](#contract-gaps-tracked), shipped).
 
-### Wiring & readiness (modern UI)
+### Wiring & readiness (modern UI) — ✅ built
 
-The `IUiContributor`/`IUiHost` surface is **defined but not yet wired**: there is no `IUiHost`
-implementation, the loader never calls `RegisterUi`, and `IPluginHost` exposes no UI member. v1 wires
-the surface: the host implements `IUiHost`, discovers `IUiContributor` on each loaded plugin, and calls
-`RegisterUi` on the UI thread after `InitializeAsync`. The **only contribution surfaces are the
-ACT-grounded ones** — a settings page (the `TabPage` replacement, rendered in the Plugins config bay
-next to the legacy embeds), plus Triggernometry's `RevealPage` and `AddCornerControl`/
-`RemoveCornerControl`. There are no nav-page / dashboard-widget / status-item surfaces — those were
-speculative and are removed from the contract — so no shell-nav refactor is required. The legacy
-satellite-HWND embedding (`NativeControlHost` into the config bay) and the shim D8 WinForms `TabPage`
-are the *other-face* UI paths and are unchanged by this.
+`Fct.App` implements `IUiHost` via `PluginUiCoordinator` (`src/Fct.App/Plugins/Ui/`) — the single
+owner of every contributed surface — plus a per-plugin `PluginUiHost` handle (attributes calls back
+to the owning plugin id) and `AvaloniaUiDispatcher` (`IUiDispatcher` over `Avalonia.Threading.
+Dispatcher.UIThread`). `IPluginHost` itself gains no UI member — `IUiContributor.RegisterUi` is a
+separate call the coordinator drives directly.
+
+- **Discovery + gating.** `PluginUiCoordinator.FlushRegisterUi` iterates every plugin `PluginManager`
+  loaded; a plugin is skipped unless its manifest declares `"ui"` (checked *before* the
+  `is IUiContributor` probe, per rule — a `"ui"` manifest without the interface is a logged no-op,
+  never a cast failure).
+- **Timing.** Plugin `InitializeAsync` runs at `host.Start()` (`Program.cs`), before Avalonia starts —
+  so `RegisterUi` ("on the UI thread, after init, shell live") cannot fire from the loader itself. It
+  is deferred to `MainWindow.OnOpened`, which resolves `PluginManager`/`PluginUiCoordinator` via
+  `App.Services` and flushes every loaded plugin once the window is on screen.
+- **Settings page.** A contributed page reaches `PluginViewModel.SettingsSurface` through the
+  coordinator's `SettingsPageAdded` event (subscribed by `MainViewModel`); `PluginsView.axaml` renders
+  it via `PluginSurfaceView` (`src/Fct.App/Views/`), a `ContentControl` that builds + caches the
+  surface's `Control` lazily and once. A plugin with a contributed page no longer shows the read-only
+  manifest details card (`PluginViewModel.ShowNativeDetails` is now that card's fallback state).
+- **RevealPage / corner controls.** `PageRevealRequested` navigates the shell to the Plugins page and
+  selects the owning row; `CornerControlAdded`/`Removed` drive `MainViewModel.CornerControls`,
+  rendered as a transient overlay (`MainWindow.axaml`, top-right under the title bar) — reusing the
+  same `PluginSurfaceView`.
+- **Fault containment.** A throwing `RegisterUi` is caught per-plugin (peers still register) and
+  surfaced as an inline error settings page attributed to the plugin id; a throwing `CreateView` is
+  caught by `PluginSurfaceView` into an inline placeholder. Neither takes down the shell.
+- **Honest limit:** surfaces are session-scoped — a plugin unload doesn't retract its settings page or
+  corner controls today (hot-unload isn't built; see work item 11). The **only contribution surfaces
+  are the ACT-grounded ones** — a settings page (the `TabPage` replacement, rendered in the Plugins
+  config bay next to the legacy embeds) plus Triggernometry's `RevealPage` and
+  `AddCornerControl`/`RemoveCornerControl`; no nav-page / dashboard-widget / status-item surfaces.
+
+`samples/Fct.SamplePlugin` is the reference `IUiContributor` (a settings page with a timed corner
+control and a reveal button), exercised by `tests/Fct.App.Tests` (`PluginUiCoordinatorTests`, and the
+extended `PluginLoaderTests`/`PluginManifestTests`). The legacy satellite-HWND embedding
+(`NativeControlHost` into the config bay) and the shim D8 WinForms `TabPage` are the *other-face* UI
+paths and are unchanged by this.
 
 ### Theme — a semantic token contract
 
@@ -712,13 +741,15 @@ are always resolved from the default ALC for one type identity (see
 
 ### Manifest
 
-`plugin.json` today carries `id`, `version`, `contract`, `assembly`, exactly one of
-`entry`/`legacyEntry`, and `capabilities[]`. For a complete install/roster/UI experience it gains:
+`plugin.json` carries `id`, `version`, `contract`, `assembly`, exactly one of `entry`/`legacyEntry`,
+`capabilities[]`, and optional display metadata / UI opt-in:
 
-- **Display metadata** — `name`, `description`, `author` (the install dialog + Plugins roster show only
-  the id today).
-- **UI opt-in** — a `"ui"` capability so the host lazy-loads `Fct.Abstractions.UI` and invokes
-  `IUiContributor` only for plugins that declare it.
+- **Display metadata** — `name`, `description`, `author` (all optional; the Plugins roster falls back
+  to `id` and a generic description when omitted). Projected onto `PluginInfo` and shown on the roster
+  row.
+- **UI opt-in** — a `"ui"` capability that gates whether the host calls `IUiContributor.RegisterUi`
+  (see [Wiring & readiness](#wiring--readiness-modern-ui--built)); declaring it without implementing
+  the interface is a logged no-op, not an error.
 
 The `contract` string is the single host gate (`HostContract.Accepts`, **major-version equality**); with
 NuGet SDK distribution it equals the SDK package major the plugin built against.
@@ -801,22 +832,29 @@ rule 1 requires it.
 plugins across the three faces (goal 2). Without these the host cannot yet accommodate an external
 modern plugin end-to-end:
 
-9. **Modern UI contribution surface.** Implement `IUiHost` in the shell, expose it (+ `IUiDispatcher`),
-   discover `IUiContributor` on loaded plugins and call `RegisterUi` on the UI thread post-init, and
-   render a plugin's settings page as an Avalonia control in the Plugins config bay (alongside the legacy
-   embeds), plus wire `RevealPage` + `AddCornerControl`/`RemoveCornerControl`. Grounded surfaces only —
-   no nav/dashboard/status, so no shell-nav refactor. The modern UI face is unwired today.
+9. **Modern UI contribution surface.** ✅ **Built.** `Fct.App` implements `IUiHost` (`PluginUiCoordinator`
+   + `AvaloniaUiDispatcher`), discovers `IUiContributor` on loaded plugins gated by the manifest `"ui"`
+   capability, and calls `RegisterUi` on the UI thread once the shell is live (`MainWindow.OnOpened`).
+   A contributed settings page renders in the Plugins config bay (alongside the legacy embeds);
+   `RevealPage` + `AddCornerControl`/`RemoveCornerControl` are wired end-to-end. Details:
+   [Wiring & readiness](#wiring--readiness-modern-ui--built).
 10. **Semantic theme token contract.** Add the stable token keys + style classes to
     `Fct.Abstractions.UI`, map them onto the shell's internal palette, and document them, so plugins
     theme against a stable seam and the shell can restyle (incl. a light variant) without breaking them.
 11. **Plugin lifecycle — uninstall + hot-reload.** Runtime load/unload/reload and an in-app *Remove*
     (unload ALC → delete folder), using the collectible ALC that already exists. Load is start-time-only
     today and there is no remove path.
-12. **SDK NuGet packaging.** Pack `Fct.Abstractions` + `Fct.Abstractions.UI` (only — never the ACT
-    facades) with package major = contract version; publish to **GitHub Packages**; repoint the samples
-    to consume them. External authors have no SDK artifact today.
-13. **Manifest metadata + UI opt-in.** Add `name`/`description`/`author` and a `"ui"` capability to
-    `plugin.json` (roster/install UX + lazy UI-assembly load).
+12. **SDK NuGet packaging.** **Partial — local pack only.** `dotnet run --project build` packs
+    `Fct.Abstractions` + `Fct.Abstractions.UI` (major = contract version, `1.0.0` today) into
+    `dist\<mode>\packages\*.nupkg` alongside the host/satellite publish (`build/Build.cs`); `dist/` is
+    git-ignored, so this is a **local-only** feed, never pushed anywhere. Publishing to **GitHub
+    Packages** is still pending. The in-repo samples keep using `ProjectReference` (they build against
+    source, not the package); an external plugin repo (e.g. the Discord-Triggers native port) adds
+    `dist\debug\packages` as a local NuGet folder source instead of vendoring DLLs.
+13. **Manifest metadata + UI opt-in.** ✅ **Built.** `plugin.json` carries optional `name`/`description`/
+    `author` (projected onto the roster's `PluginInfo`/`PluginViewModel`); the `"ui"` capability gates
+    `RegisterUi` discovery (work item 9) — declaring it without implementing `IUiContributor` is a
+    logged no-op, not an error.
 
 ### Decisions recorded
 

@@ -23,7 +23,10 @@ public class PluginManifestTests
           "contract": "1.0",
           "assembly": "Test.dll",
           "entry": "Test.Entry",
-          "capabilities": [ "raw", "ui" ]
+          "capabilities": [ "raw", "ui" ],
+          "name": "Test Plugin",
+          "description": "A plugin for testing.",
+          "author": "Test Author"
         }
         """);
         try
@@ -34,6 +37,32 @@ public class PluginManifestTests
             Assert.Equal("Test.Entry", m.Entry);
             Assert.True(m.HasCapability("RAW"));   // case-insensitive
             Assert.False(m.HasCapability("net"));
+            Assert.Equal("Test Plugin", m.Name);
+            Assert.Equal("A plugin for testing.", m.Description);
+            Assert.Equal("Test Author", m.Author);
+        }
+        finally { File.Delete(path); }
+    }
+
+    [Fact]
+    public void Display_metadata_is_optional()
+    {
+        var path = WriteTemp("""
+        {
+          "id": "com.test.plugin",
+          "version": "1.0.0",
+          "contract": "1.0",
+          "assembly": "Test.dll",
+          "entry": "Test.Entry"
+        }
+        """);
+        try
+        {
+            Assert.True(PluginManifest.TryLoad(path, out var m, out var err));
+            Assert.Null(err);
+            Assert.Null(m!.Name);
+            Assert.Null(m.Description);
+            Assert.Null(m.Author);
         }
         finally { File.Delete(path); }
     }

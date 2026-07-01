@@ -25,6 +25,7 @@
   <data name="Label_Identity" xml:space="preserve"><value>Identidade</value></data>
   <data name="Label_Version" xml:space="preserve"><value>Versão</value></data>
   <data name="Label_Contract" xml:space="preserve"><value>Contrato</value></data>
+  <data name="Label_Author" xml:space="preserve"><value>Autor</value></data>
   <data name="Label_Duration" xml:space="preserve"><value>duração</value></data>
   <data name="Label_RaidDps" xml:space="preserve"><value>dps de raide</value></data>
   <data name="Label_JobFormat" xml:space="preserve"><value>Job {0}</value></data>
@@ -134,6 +135,8 @@
   <data name="Plugins_EngineDownBody" xml:space="preserve"><value>O motor clássico não está em execução, então a configuração deste plugin não pode ser exibida.</value></data>
   <data name="Plugins_ModernPluginRole" xml:space="preserve"><value>Plugin moderno</value></data>
   <data name="Plugins_ModernPluginDescription" xml:space="preserve"><value>Roda dentro do app em seu próprio sandbox.</value></data>
+  <data name="Plugins_ModernUiErrorTitle" xml:space="preserve"><value>Não foi possível carregar as definições</value></data>
+  <data name="Plugins_ModernUiErrorBodyFormat" xml:space="preserve"><value>{0} falhou ao carregar sua página de definições: {1}</value></data>
 
   <!-- Encounters page -->
   <data name="Encounters_Subtitle" xml:space="preserve"><value>DPS ao vivo e métricas por jogador para a luta atual.</value></data>

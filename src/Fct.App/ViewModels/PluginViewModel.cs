@@ -1,5 +1,6 @@
 using System;
 using CommunityToolkit.Mvvm.ComponentModel;
+using Fct.Abstractions.UI;
 using Fct.App.Lang;
 
 namespace Fct.App.ViewModels;
@@ -34,6 +35,8 @@ public sealed partial class PluginViewModel : ObservableObject
     // Native: manifest identity shown in the details panel.
     public string ContractVersion { get; init; } = "";
     public string Capabilities { get; init; } = "";
+    public string Author { get; init; } = "";
+    public bool HasAuthor => !string.IsNullOrWhiteSpace(Author);
 
     // The satellite window to embed when this legacy plugin is selected (zero until reported).
     public IntPtr Hwnd { get; set; }
@@ -53,12 +56,20 @@ public sealed partial class PluginViewModel : ObservableObject
         nameof(ConfigPlaceholderTitle), nameof(ConfigPlaceholderBody))]
     private PluginStatus _status = PluginStatus.Loading;
 
+    // The Avalonia settings page this plugin contributed via IUiContributor.RegisterUi (work item 9),
+    // if any. Set once RegisterUi runs; null for plugins that never call AddSettingsPage.
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(HasModernUi), nameof(ShowNativeDetails))]
+    private UiSurface? _settingsSurface;
+
     public bool IsLegacy => Kind == PluginKind.Legacy;
     public bool IsNative => Kind == PluginKind.Native;
     public bool IsLive => Status == PluginStatus.Live;
+    public bool HasModernUi => SettingsSurface is not null;
 
-    // Which panel the config bay shows for this plugin.
-    public bool ShowNativeDetails => IsNative;
+    // Which panel the config bay shows for this plugin. A contributed settings page takes priority
+    // over the read-only manifest details card.
+    public bool ShowNativeDetails => IsNative && !HasModernUi;
     public bool ShowLegacyPlaceholder => IsLegacy && !HasNativeConfig;
     public bool HasStatusText => !string.IsNullOrWhiteSpace(SatelliteStatusText);
 

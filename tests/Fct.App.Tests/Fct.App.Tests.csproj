@@ -14,6 +14,9 @@
     <ProjectReference Include="..\..\src\Fct.Abstractions.Testing\Fct.Abstractions.Testing.csproj" />
     <!-- IHostedService for the linked GameSnapshotAggregator (abstractions only — no Avalonia/host chain). -->
     <PackageReference Include="Microsoft.Extensions.Hosting.Abstractions" />
+    <!-- IUiContributor/IUiHost/UiSurface for the linked PluginUiCoordinator below. Pulls Avalonia in as
+         a compile-time type source only; tests never build a Control or touch the UI thread. -->
+    <ProjectReference Include="..\..\src\Fct.Abstractions.UI\Fct.Abstractions.UI.csproj" />
   </ItemGroup>
 
   <!-- Existing linked host logic. -->
@@ -31,6 +34,8 @@
     <Compile Include="..\..\src\Fct.App\Plugins\PluginManifest.cs" Link="Plugins\PluginManifest.cs" />
     <Compile Include="..\..\src\Fct.App\Plugins\PluginLoadContext.cs" Link="Plugins\PluginLoadContext.cs" />
     <Compile Include="..\..\src\Fct.App\Plugins\PluginManager.cs" Link="Plugins\PluginManager.cs" />
+    <Compile Include="..\..\src\Fct.App\Plugins\Ui\PluginUiCoordinator.cs" Link="Plugins\Ui\PluginUiCoordinator.cs" />
+    <Compile Include="..\..\src\Fct.App\Plugins\Ui\PluginUiHost.cs" Link="Plugins\Ui\PluginUiHost.cs" />
     <Compile Include="..\..\shared\Logging\LogEvents.cs" Link="Logging\LogEvents.cs" />
     <Compile Include="..\..\shared\Logging\LogPaths.cs" Link="Logging\LogPaths.cs" />
     <Compile Include="..\..\shared\Bridge\GameEventFrame.cs" Link="Bridge\GameEventFrame.cs" />

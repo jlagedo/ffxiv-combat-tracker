@@ -40,9 +40,11 @@
   </ItemGroup>
 
   <!-- The plugin SDK — the host resolves it into the default ALC so contract types have one identity
-       across the host↔plugin boundary. -->
+       across the host↔plugin boundary. Fct.Abstractions.UI is the Avalonia UI contribution contract
+       (IUiContributor/IUiHost); the host implements IUiHost, so it needs a direct reference too. -->
   <ItemGroup>
     <ProjectReference Include="..\Fct.Abstractions\Fct.Abstractions.csproj" />
+    <ProjectReference Include="..\Fct.Abstractions.UI\Fct.Abstractions.UI.csproj" />
   </ItemGroup>
 
   <!-- The net10 compat shim + its two legacy-impersonating facades (Advanced Combat Tracker /

@@ -2,8 +2,9 @@
 
   <!--
     A minimal native plugin exercising the modern contract end-to-end (events, snapshot, registry,
-    audio, storage, raw write-back). References only Fct.Abstractions; loaded by the host into its own
-    collectible ALC. Not a library consumers reference — it ships as a staged plugin folder.
+    audio, storage, raw write-back, and the IUiContributor UI face). References Fct.Abstractions +
+    Fct.Abstractions.UI; loaded by the host into its own collectible ALC. Not a library consumers
+    reference — it ships as a staged plugin folder.
   -->
   <PropertyGroup>
     <TargetFramework>net10.0</TargetFramework>
@@ -13,6 +14,13 @@
 
   <ItemGroup>
     <ProjectReference Include="..\..\src\Fct.Abstractions\Fct.Abstractions.csproj" />
+    <ProjectReference Include="..\..\src\Fct.Abstractions.UI\Fct.Abstractions.UI.csproj" />
+  </ItemGroup>
+
+  <!-- Compile-time only: Avalonia is host-provided and shared to the default ALC (PluginLoadContext
+       .IsShared), so it must not ship as a private plugin dependency. -->
+  <ItemGroup>
+    <PackageReference Include="Avalonia" ExcludeAssets="runtime" />
   </ItemGroup>
 
   <ItemGroup>

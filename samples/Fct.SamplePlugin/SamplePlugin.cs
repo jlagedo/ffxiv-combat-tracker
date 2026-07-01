@@ -1,25 +1,35 @@
 using System;
 using System.Threading;
 using System.Threading.Tasks;
+using Avalonia;
+using Avalonia.Controls;
 using Fct.Abstractions;
+using Fct.Abstractions.UI;
 using Microsoft.Extensions.Logging;
 
 namespace Fct.SamplePlugin;
 
 /// <summary>
 /// A minimal native plugin: subscribes to the event bus, reads a snapshot, registers a named
-/// callback, produces audio, round-trips a setting through storage, taps the raw-packet firehose, and
-/// emits a synthetic custom line via the capability-gated write-back hatch. Everything it touches is
-/// the modern contract.
+/// callback, produces audio, round-trips a setting through storage, taps the raw-packet firehose,
+/// emits a synthetic custom line via the capability-gated write-back hatch, and contributes a
+/// settings page + a transient corner control (work item 9's <see cref="IUiContributor"/> face).
+/// Everything it touches is the modern contract.
 /// </summary>
-public sealed class SamplePlugin : IPlugin
+public sealed class SamplePlugin : IPlugin, IUiContributor
 {
+    private const string SettingsPageId = "com.fct.sample.settings";
+    private const string CornerControlId = "com.fct.sample.corner";
+
     private IPluginHost? _host;
+    private IUiHost? _ui;
     private IDisposable? _subscription;
     private IDisposable? _callback;
     private IDisposable? _packetSubscription;
+    private IDisposable? _cornerControl;
+    private int _launches;
 
-    public Task InitializeAsync(IPluginHost host, CancellationToken ct)
+    public async Task InitializeAsync(IPluginHost host, CancellationToken ct)
     {
         _host = host;
         host.Logger.LogInformation("SamplePlugin initializing (id {Id}, v{Version})", host.Self.Id, host.Self.Version);
@@ -47,16 +57,67 @@ public sealed class SamplePlugin : IPlugin
         // A synthetic custom (256+) line onto the live bus (requires the 'raw' capability).
         host.RawLogLines.Emit((LogMessageType)257, "257|sample-online");
 
-        return PersistLaunchAsync(host);
+        await PersistLaunchAsync(host);
     }
 
-    private static async Task PersistLaunchAsync(IPluginHost host)
+    // RegisterUi runs after InitializeAsync completes (see IUiContributor), so _launches already
+    // reflects this session's count by the time the settings page renders it.
+    public void RegisterUi(IUiHost ui)
+    {
+        _ui = ui;
+        ui.AddSettingsPage(new UiSurface(SettingsPageId, "Sample Plugin", BuildSettingsView));
+    }
+
+    private async Task PersistLaunchAsync(IPluginHost host)
     {
         var settings = await host.Storage.LoadSettingsAsync<SampleSettings>() ?? new SampleSettings();
         settings.Launches++;
         await host.Storage.SaveSettingsAsync(settings);
+        _launches = settings.Launches;
         host.Logger.LogInformation("SamplePlugin launch #{Count}", settings.Launches);
     }
+
+    private Control BuildSettingsView()
+    {
+        var showCorner = new Button { Content = "Show corner control (5s)" };
+        showCorner.Click += (_, _) => ShowCornerControl();
+
+        var reveal = new Button { Content = "Reveal this page" };
+        reveal.Click += (_, _) => _ui?.RevealPage(SettingsPageId);
+
+        return new StackPanel
+        {
+            Margin = new Thickness(16),
+            Spacing = 12,
+            Children =
+            {
+                new TextBlock { Text = $"Launched {_launches} time(s) this session." },
+                showCorner,
+                reveal,
+            },
+        };
+    }
+
+    private void ShowCornerControl()
+    {
+        if (_ui is null) return;
+        _cornerControl?.Dispose();
+        _cornerControl = _ui.AddCornerControl(new UiSurface(CornerControlId, "Sample corner control", BuildCornerView));
+
+        var ui = _ui;
+        _ = Task.Delay(TimeSpan.FromSeconds(5)).ContinueWith(_ =>
+            ui.Dispatcher.Post(() =>
+            {
+                _cornerControl?.Dispose();
+                _cornerControl = null;
+            }));
+    }
+
+    private static Control BuildCornerView() => new Border
+    {
+        Padding = new Thickness(12),
+        Child = new TextBlock { Text = "Hello from Fct.SamplePlugin!" },
+    };
 
     public ValueTask DisposeAsync()
     {
@@ -64,6 +125,7 @@ public sealed class SamplePlugin : IPlugin
         _subscription?.Dispose();
         _callback?.Dispose();
         _packetSubscription?.Dispose();
+        _cornerControl?.Dispose();
         return default;
     }
 

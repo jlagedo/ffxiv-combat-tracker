@@ -5,8 +5,10 @@ using System.Linq;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using Fct.Abstractions;
+using Fct.Abstractions.UI;
 using Fct.App.Hosting;
 using Fct.App.Lang;
+using Fct.App.Plugins.Ui;
 
 namespace Fct.App.ViewModels;
 
@@ -21,6 +23,9 @@ public sealed partial class MainViewModel : ObservableObject
     // the net10 plugin registry. Kept apart because they are two different runtimes.
     public ObservableCollection<PluginViewModel> LegacyPlugins { get; } = new();
     public ObservableCollection<PluginViewModel> ModernPlugins { get; } = new();
+
+    // Transient corner controls contributed by native plugins via IUiHost.AddCornerControl.
+    public ObservableCollection<CornerControlViewModel> CornerControls { get; } = new();
 
     public NotificationCenterViewModel Notifications { get; }
 
@@ -67,7 +72,7 @@ public sealed partial class MainViewModel : ObservableObject
 
     // ---- runtime ctor: bind the real host services ----
     public MainViewModel(IPluginRegistry registry, IEncounterService encounters,
-        INotificationHub notifications, UiSettingsStore settings)
+        INotificationHub notifications, UiSettingsStore settings, PluginUiCoordinator? uiCoordinator = null)
     {
         _hub = notifications;
         Notifications = new NotificationCenterViewModel(notifications);
@@ -75,12 +80,14 @@ public sealed partial class MainViewModel : ObservableObject
         foreach (var info in registry.LoadedPlugins)
             ModernPlugins.Add(new PluginViewModel
             {
-                Name = info.Id,
+                Name = info.Name ?? info.Id,
                 Role = Resources.Plugins_ModernPluginRole,
                 Version = info.Version,
                 Kind = PluginKind.Native,
+                Key = info.Id,
                 ContractVersion = info.ContractVersion,
-                Description = Resources.Plugins_ModernPluginDescription,
+                Description = info.Description ?? Resources.Plugins_ModernPluginDescription,
+                Author = info.Author ?? "",
                 Status = PluginStatus.Loaded,
             });
 
@@ -91,7 +98,40 @@ public sealed partial class MainViewModel : ObservableObject
         _pages = BuildPages();
         _currentPage = OverviewPage;
 
+        if (uiCoordinator is not null)
+        {
+            uiCoordinator.SettingsPageAdded += OnPluginSettingsPageAdded;
+            uiCoordinator.PageRevealRequested += OnPluginPageRevealRequested;
+            uiCoordinator.CornerControlAdded += OnPluginCornerControlAdded;
+            uiCoordinator.CornerControlRemoved += OnPluginCornerControlRemoved;
+        }
+
         SetStarting();
+    }
+
+    // ---- native plugin UI contributions (work item 9) ----
+    private void OnPluginSettingsPageAdded(string pluginId, UiSurface page)
+    {
+        var row = ModernPlugins.FirstOrDefault(p => p.Key == pluginId);
+        if (row is not null && row.SettingsSurface is null)
+            row.SettingsSurface = page;
+    }
+
+    private void OnPluginPageRevealRequested(string pageId)
+    {
+        var row = ModernPlugins.FirstOrDefault(p => p.SettingsSurface?.Id == pageId);
+        if (row is null) return;
+        CurrentPage = PluginsPage;
+        SelectedPlugin = row;
+    }
+
+    private void OnPluginCornerControlAdded(string pluginId, UiSurface control)
+        => CornerControls.Add(new CornerControlViewModel { PluginId = pluginId, Surface = control });
+
+    private void OnPluginCornerControlRemoved(string id)
+    {
+        var existing = CornerControls.FirstOrDefault(c => c.Surface.Id == id);
+        if (existing is not null) CornerControls.Remove(existing);
     }
 
     private Dictionary<Section, PageViewModel> BuildPages() => new()

@@ -2,6 +2,7 @@
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
              xmlns:vm="using:Fct.App.ViewModels"
              xmlns:lang="using:Fct.App.Lang"
+             xmlns:views="using:Fct.App.Views"
              xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
              xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
              mc:Ignorable="d" d:DesignWidth="860" d:DesignHeight="620"
@@ -174,7 +175,7 @@
                                 </Border>
                             </Grid>
 
-                            <!-- Native plugin details -->
+                            <!-- Native plugin details (fallback when the plugin contributed no settings page) -->
                             <Border IsVisible="{Binding Shell.SelectedPlugin.ShowNativeDetails}"
                                     Background="#0B1016" BorderBrush="{StaticResource HairlineBrush}"
                                     BorderThickness="1" CornerRadius="10" Padding="24,22">
@@ -182,7 +183,7 @@
                                     <TextBlock Text="{Binding Shell.SelectedPlugin.Description}" Classes="body" MaxWidth="520"
                                                HorizontalAlignment="Left"/>
                                     <Border Classes="rule" Width="52" HorizontalAlignment="Left"/>
-                                    <Grid ColumnDefinitions="120,*" RowDefinitions="Auto,Auto,Auto" RowSpacing="10">
+                                    <Grid ColumnDefinitions="120,*" RowDefinitions="Auto,Auto,Auto,Auto" RowSpacing="10">
                                         <TextBlock Grid.Row="0" Text="{x:Static lang:Resources.Label_Identity}" Classes="eyebrow" FontSize="9.5"/>
                                         <TextBlock Grid.Row="0" Grid.Column="1" Text="{Binding Shell.SelectedPlugin.Name}"
                                                    Classes="body" FontFamily="{StaticResource MonoFont}" FontSize="12.5"/>
@@ -192,11 +193,23 @@
                                         <TextBlock Grid.Row="2" Text="{x:Static lang:Resources.Label_Contract}" Classes="eyebrow" FontSize="9.5"/>
                                         <TextBlock Grid.Row="2" Grid.Column="1" Text="{Binding Shell.SelectedPlugin.ContractVersion}"
                                                    Classes="body" FontFamily="{StaticResource MonoFont}" FontSize="12.5"/>
+                                        <TextBlock Grid.Row="3" Text="{x:Static lang:Resources.Label_Author}" Classes="eyebrow" FontSize="9.5"
+                                                   IsVisible="{Binding Shell.SelectedPlugin.HasAuthor}"/>
+                                        <TextBlock Grid.Row="3" Grid.Column="1" Text="{Binding Shell.SelectedPlugin.Author}"
+                                                   Classes="body" FontFamily="{StaticResource MonoFont}" FontSize="12.5"
+                                                   IsVisible="{Binding Shell.SelectedPlugin.HasAuthor}"/>
                                     </Grid>
                                     <TextBlock Classes="meta" FontSize="11" TextWrapping="Wrap" MaxWidth="520"
                                                HorizontalAlignment="Left"
                                                Text="{x:Static lang:Resources.Plugins_ModernConfigNote}"/>
                                 </StackPanel>
+                            </Border>
+
+                            <!-- Plugin-contributed settings page (IUiContributor.RegisterUi, work item 9) -->
+                            <Border IsVisible="{Binding Shell.SelectedPlugin.HasModernUi}"
+                                    Background="#0B1016" BorderBrush="{StaticResource HairlineBrush}"
+                                    BorderThickness="1" CornerRadius="10" ClipToBounds="True">
+                                <views:PluginSurfaceView Surface="{Binding Shell.SelectedPlugin.SettingsSurface}"/>
                             </Border>
 
                             <!-- Legacy plugin with no embeddable window -->

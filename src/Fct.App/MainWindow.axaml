@@ -294,6 +294,18 @@
             </DockPanel>
         </Border>
 
+        <!-- Corner controls: transient plugin overlays (Triggernometry's CornerControlAdd, work item 9) -->
+        <ItemsControl ItemsSource="{Binding CornerControls}" HorizontalAlignment="Right"
+                      VerticalAlignment="Top" Margin="0,54,20,0" Width="320" IsHitTestVisible="True">
+            <ItemsControl.ItemTemplate>
+                <DataTemplate x:DataType="vm:CornerControlViewModel">
+                    <Border Classes="toast rise1" Margin="0,0,0,8">
+                        <views:PluginSurfaceView Surface="{Binding Surface}"/>
+                    </Border>
+                </DataTemplate>
+            </ItemsControl.ItemTemplate>
+        </ItemsControl>
+
         <!-- Toast host -->
         <ItemsControl ItemsSource="{Binding Notifications.Toasts}" HorizontalAlignment="Right"
                       VerticalAlignment="Bottom" Margin="0,0,20,44" Width="340" IsHitTestVisible="True">

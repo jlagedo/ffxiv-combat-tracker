@@ -105,6 +105,11 @@ class Program
         builder.Services.AddSingleton<PluginManager>();
         builder.Services.AddHostedService<PluginLifetime>();
 
+        // The modern plugin UI face (work item 9): IUiHost + the RegisterUi coordinator. Plugin init
+        // runs before Avalonia starts, so RegisterUi is deferred to MainWindow.OnOpened.
+        builder.Services.AddSingleton<Fct.Abstractions.UI.IUiDispatcher, Fct.App.Plugins.Ui.AvaloniaUiDispatcher>();
+        builder.Services.AddSingleton<Fct.App.Plugins.Ui.PluginUiCoordinator>();
+
         // Live game data reaches the bus via the net48→net10 bridge forwarder (piece C): SatelliteHost
         // decodes EVT frames from the satellite and publishes them through IGameEventSink.
 

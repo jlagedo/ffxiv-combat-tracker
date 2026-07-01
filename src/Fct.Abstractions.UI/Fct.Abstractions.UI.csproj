@@ -1,16 +1,18 @@
 <Project Sdk="Microsoft.NET.Sdk">
 
   <!--
-    The UI contribution contract: how a net10 plugin patches Avalonia surfaces (settings page,
-    nav page, dashboard widget, status item) into the host shell. net10-only + Avalonia, kept
-    OUT of Fct.Abstractions so headless plugins (parsers/triggers/audio sinks) take no UI dep.
-    The host's plugin loader shares Avalonia.* up to the default AssemblyLoadContext so plugin
-    Controls have one type identity with the shell (plugins are pinned to the host Avalonia version).
+    The UI contribution contract: how a net10 plugin patches Avalonia surfaces (a settings page,
+    Triggernometry-style RevealPage, and corner controls) into the host shell. net10-only +
+    Avalonia, kept OUT of Fct.Abstractions so headless plugins (parsers/triggers/audio sinks) take
+    no UI dep. The host's plugin loader shares Avalonia.* up to the default AssemblyLoadContext so
+    plugin Controls have one type identity with the shell (plugins are pinned to the host Avalonia version).
   -->
   <PropertyGroup>
     <TargetFramework>net10.0</TargetFramework>
     <ImplicitUsings>disable</ImplicitUsings>
     <RootNamespace>Fct.Abstractions.UI</RootNamespace>
+    <Version>1.0.0</Version>
+    <Description>FFXIV Combat Tracker plugin SDK — Avalonia UI contribution surfaces (settings page, RevealPage, corner controls).</Description>
   </PropertyGroup>
 
   <ItemGroup>

@@ -29,6 +29,7 @@ public static class Resources
     public static string Label_Identity => Get(nameof(Label_Identity));
     public static string Label_Version => Get(nameof(Label_Version));
     public static string Label_Contract => Get(nameof(Label_Contract));
+    public static string Label_Author => Get(nameof(Label_Author));
     public static string Label_Duration => Get(nameof(Label_Duration));
     public static string Label_RaidDps => Get(nameof(Label_RaidDps));
     public static string Label_JobFormat => Get(nameof(Label_JobFormat));
@@ -138,6 +139,8 @@ public static class Resources
     public static string Plugins_EngineDownBody => Get(nameof(Plugins_EngineDownBody));
     public static string Plugins_ModernPluginRole => Get(nameof(Plugins_ModernPluginRole));
     public static string Plugins_ModernPluginDescription => Get(nameof(Plugins_ModernPluginDescription));
+    public static string Plugins_ModernUiErrorTitle => Get(nameof(Plugins_ModernUiErrorTitle));
+    public static string Plugins_ModernUiErrorBodyFormat => Get(nameof(Plugins_ModernUiErrorBodyFormat));
 
     // ---- Encounters page ----
     public static string Encounters_Subtitle => Get(nameof(Encounters_Subtitle));

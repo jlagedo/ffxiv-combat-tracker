@@ -192,7 +192,12 @@ internal sealed class PluginManager
 
     private PluginHost BuildHost(PluginManifest manifest)
     {
-        var self = new PluginInfo(manifest.Id, manifest.Version, manifest.Contract);
+        var self = new PluginInfo(manifest.Id, manifest.Version, manifest.Contract)
+        {
+            Name = manifest.Name,
+            Description = manifest.Description,
+            Author = manifest.Author,
+        };
         var storage = new PluginStorage(manifest.Id);
         var logger = _loggerFactory.CreateLogger($"Fct.Plugin.{manifest.Id}");
         bool hasRaw = manifest.HasCapability("raw");
@@ -218,7 +223,12 @@ internal sealed class PluginManager
     }
 
     private void UpdateRoster()
-        => _registry.SetRoster(_loaded.Select(p => new PluginInfo(p.Manifest.Id, p.Manifest.Version, p.Manifest.Contract)).ToArray());
+        => _registry.SetRoster(_loaded.Select(p => new PluginInfo(p.Manifest.Id, p.Manifest.Version, p.Manifest.Contract)
+        {
+            Name = p.Manifest.Name,
+            Description = p.Manifest.Description,
+            Author = p.Manifest.Author,
+        }).ToArray());
 
     internal sealed record LoadedPlugin(PluginManifest Manifest, PluginLoadContext Alc, IPlugin Instance);
 }

@@ -56,7 +56,7 @@ Design docs — **read before proposing changes:**
 | Project | TFM | Role |
 |---|---|---|
 | `Fct.Abstractions` | net48;net10 | plugin SDK: contracts + domain records. No opcodes. |
-| `Fct.Abstractions.UI` | net10 | Avalonia UI contribution surfaces (`IUiContributor`/`IUiHost`); referenced only by UI-contributing net10 plugins. |
+| `Fct.Abstractions.UI` | net10 | Avalonia UI contribution surfaces (`IUiContributor`/`IUiHost`); referenced by UI-contributing net10 plugins and by `Fct.App` itself (the shell's `IUiHost` implementation). |
 | `Fct.Abstractions.Testing` | net48;net10 | in-memory fakes of every plugin-contract interface + the `ShimStub` seam; backs the headless flow tests. |
 | `Fct.App` | net10 | the **.NET 10 host**: Avalonia control panel + shell (MVVM); owns the IPC bridge client (`SatelliteHost`/`SatelliteProtocol`/`SatelliteLifetime`) and the net10 plugin host (`Hosting/` services, `Plugins/` ALC loader). |
 | `Fct.LegacyHost` | net48 | from-scratch ACT engine host; hosts the five real plugins; the net48 end of the bridge. |
@@ -159,7 +159,9 @@ tests skip without `FFXIV_ACT_Plugin.dll` installed. Details: [`docs/TESTING.md`
 ### Distributable builds — `build/` (C# / Bullseye)
 
 `build/` is a C# console project (Bullseye + SimpleExec) that publishes the two-process tree
-(host + `satellite\`) into `dist\<mode>\`, self-contained `win-x64` with portable PDBs. Legacy
+(host + `satellite\`) into `dist\<mode>\`, self-contained `win-x64` with portable PDBs, and packs the
+plugin SDK (`Fct.Abstractions` + `Fct.Abstractions.UI`) into `dist\<mode>\packages\*.nupkg` — a
+local-only feed (`dist/` is git-ignored; never published to GitHub Packages by this step). Legacy
 plugins are not bundled. **Windows-only** (the net48 satellite can't publish off Windows). The
 project opts out of central package management and is not in the solution.
 

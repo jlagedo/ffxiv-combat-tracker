@@ -51,6 +51,12 @@ namespace Fct.Logging
         public static readonly EventId NativePluginUnloaded = new EventId(1405, nameof(NativePluginUnloaded));
         public static readonly EventId NativePluginsReady = new EventId(1406, nameof(NativePluginsReady));
 
+        // -- 15xx native plugin UI face (RegisterUi coordinator, host side) --
+        public static readonly EventId NativePluginUiRegistered = new EventId(1500, nameof(NativePluginUiRegistered));
+        public static readonly EventId NativePluginUiNotContributor = new EventId(1501, nameof(NativePluginUiNotContributor));
+        public static readonly EventId NativePluginUiFaulted = new EventId(1502, nameof(NativePluginUiFaulted));
+        public static readonly EventId NativePluginUiDuplicateSurface = new EventId(1503, nameof(NativePluginUiDuplicateSurface));
+
         // -- 20xx satellite lifecycle (satellite side) --
         public static readonly EventId SatelliteBooting = new EventId(2000, nameof(SatelliteBooting));
         public static readonly EventId SatelliteBridgeConnected = new EventId(2001, nameof(SatelliteBridgeConnected));

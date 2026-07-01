@@ -4,5 +4,8 @@
   "contract": "1.0",
   "assembly": "Fct.SamplePlugin.dll",
   "entry": "Fct.SamplePlugin.SamplePlugin",
-  "capabilities": [ "raw" ]
+  "capabilities": [ "raw", "ui" ],
+  "name": "Sample Plugin",
+  "description": "Reference native plugin exercising the modern contract end-to-end.",
+  "author": "FFXIV Combat Tracker"
 }

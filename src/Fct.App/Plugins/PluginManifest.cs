@@ -24,6 +24,16 @@ internal sealed record PluginManifest(
     IReadOnlyList<string> Capabilities,
     string? LegacyEntry = null)
 {
+    /// <summary>Display name for the roster; falls back to <see cref="Id"/> when omitted.</summary>
+    public string? Name { get; init; }
+
+    /// <summary>One-line description for the roster.</summary>
+    public string? Description { get; init; }
+
+    /// <summary>Plugin author.</summary>
+    public string? Author { get; init; }
+
+
     public bool HasCapability(string capability)
         => Capabilities.Any(c => string.Equals(c, capability, StringComparison.OrdinalIgnoreCase));
 
@@ -52,7 +62,12 @@ internal sealed record PluginManifest(
                 dto.Id!, dto.Version!, dto.Contract!, dto.Assembly!,
                 hasEntry ? dto.Entry : null,
                 dto.Capabilities ?? Array.Empty<string>(),
-                hasLegacy ? dto.LegacyEntry : null);
+                hasLegacy ? dto.LegacyEntry : null)
+            {
+                Name = dto.Name,
+                Description = dto.Description,
+                Author = dto.Author,
+            };
             return true;
         }
         catch (Exception ex)
@@ -77,5 +92,8 @@ internal sealed record PluginManifest(
         public string? Entry { get; set; }
         public string? LegacyEntry { get; set; }
         public string[]? Capabilities { get; set; }
+        public string? Name { get; set; }
+        public string? Description { get; set; }
+        public string? Author { get; set; }
     }
 }

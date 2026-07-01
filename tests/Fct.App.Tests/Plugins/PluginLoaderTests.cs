@@ -89,10 +89,11 @@ public class PluginLoaderTests
 
         await manager.LoadAllAsync(CancellationToken.None);
 
-        // Loaded + initialized, and on the registry roster.
+        // Loaded + initialized, and on the registry roster with its manifest display metadata.
         Assert.Single(manager.Loaded);
         Assert.Equal(SampleId, manager.Loaded[0].Manifest.Id);
         Assert.Contains(registry.LoadedPlugins, p => p.Id == SampleId);
+        Assert.Equal("Sample Plugin", Assert.Single(registry.LoadedPlugins, p => p.Id == SampleId).Name);
 
         // Its InitializeAsync drove the audio + write-back paths end-to-end.
         Assert.Contains(sink.Speaks, s => s.Text == "Sample plugin online");
