@@ -22,6 +22,8 @@
   -->
   <ItemGroup>
     <Compile Include="..\..\src\Fct.Compat.Act\*.cs" />
+    <Compile Include="..\..\shared\Aggregation\*.cs" />
+    <Compile Include="..\Shared\ActEngineHarness.cs" Link="Shared\ActEngineHarness.cs" />
   </ItemGroup>
 
   <!-- The captured real-plugin swing stream + the real-ACT aggregation baseline (see

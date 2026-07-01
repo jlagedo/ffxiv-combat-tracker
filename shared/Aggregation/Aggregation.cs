@@ -373,7 +373,7 @@ namespace Advanced_Combat_Tracker
                 foreach (var s in at.Items)
                     if (max == null || (long)s.Damage > (long)max.Damage) max = s;
             if (max == null) return string.Empty;
-            var cds = ActGlobals.oFormActMain.CreateDamageString((long)max.Damage, useSuffix, useDecimals);
+            var cds = DamageString.Create((long)max.Damage, useSuffix, useDecimals);
             return showType ? $"{max.AttackType}-{cds}" : cds;
         }
 
@@ -604,7 +604,7 @@ namespace Advanced_Combat_Tracker
                 }
             }
             if (max == null) return string.Empty;
-            var cds = ActGlobals.oFormActMain.CreateDamageString((long)max.Damage, useSuffix, showType);
+            var cds = DamageString.Create((long)max.Damage, useSuffix, showType);
             return showType ? $"{owner}-{max.AttackType}-{cds}" : $"{owner}-{cds}";
         }
 

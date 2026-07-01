@@ -18,6 +18,12 @@
     <ProjectReference Include="..\..\src\Fct.Compat.Shim.SdkFacade\Fct.Compat.Shim.SdkFacade.csproj" />
   </ItemGroup>
 
+  <!-- Shared engine harness (routing tables + swing/encounter builders), also linked into the net48
+       Fct.Compat.Act.Tests, so the same input drives both compilations of the shared engine. -->
+  <ItemGroup>
+    <Compile Include="..\Shared\ActEngineHarness.cs" Link="Shared\ActEngineHarness.cs" />
+  </ItemGroup>
+
   <!-- Build the sample legacy plugin and stage it under plugins\ so the lifecycle test can load it
        from disk. No assembly reference: it must load through its own path, not the test's context. -->
   <ItemGroup>

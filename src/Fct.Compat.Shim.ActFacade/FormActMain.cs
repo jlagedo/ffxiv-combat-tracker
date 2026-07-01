@@ -13,8 +13,10 @@ namespace Advanced_Combat_Tracker
     /// The POCO re-projection of ACT's <c>FormActMain</c> host object. Unlike the net48 facade this is
     /// NOT a <see cref="Form"/>; it forwards the ACT host surface onto the modern <see cref="IPluginHost"/>.
     /// One instance is shared across all shimmed plugins (see <c>ActGlobals.oFormActMain</c>). The
-    /// surface grows slice-by-slice: this seed carries lifecycle/identity, logging, and window chrome;
-    /// audio, the raw-line event surface, and the encounter/aggregation reader arrive in later slices.
+    /// surface grows slice-by-slice: this carries lifecycle/identity, logging, window chrome, audio,
+    /// the raw-line event surface, and the encounter/aggregation driver (<see cref="AddCombatAction"/>
+    /// / <see cref="SetEncounter"/> over the shared engine); the SDK <c>IDataSubscription</c>/
+    /// <c>IDataRepository</c> projection arrives in later slices.
     /// </summary>
     public sealed class FormActMain : IDisposable
     {
@@ -23,6 +25,10 @@ namespace Advanced_Combat_Tracker
         public FormActMain(IPluginHost host)
         {
             Host = host ?? throw new ArgumentNullException(nameof(host));
+
+            // Register ACT's default ExportVariables so ActiveZone.ActiveEncounter carries the opaque
+            // cactbot bag (real ACT does this in the FormActMain ctor). Idempotent.
+            CombatTables.Setup();
 
             // Re-fire the modern raw-line firehose as ACT's Before/OnLogLineRead (the Trig/cactbot
             // regex lifeline). Typed events (ZoneChanged/PartyList/…) map onto the SDK's
@@ -144,6 +150,60 @@ namespace Advanced_Combat_Tracker
 
             BeforeLogLineRead?.Invoke(false, args);
             OnLogLineRead?.Invoke(false, args);
+        }
+
+        // --- Encounter / combat pipeline (feeds the shared aggregation engine) -------------
+
+        /// <summary>The live zone and its active encounter. cactbot/Triggernometry read
+        /// <c>ActiveZone.ActiveEncounter</c> + its <c>ExportVariables</c> exactly as under real ACT.</summary>
+        public ZoneData ActiveZone { get; } = new ZoneData();
+
+        public event CombatActionDelegate BeforeCombatAction;
+        public event CombatActionDelegate AfterCombatAction;
+        public event CombatToggleEventDelegate OnCombatStart;
+        public event CombatToggleEventDelegate OnCombatEnd;
+
+        /// <summary>Combat state, sourced from the modern encounter service (the shim opens/closes it
+        /// through <see cref="SetEncounter"/>/<see cref="EndCombat"/>, so the two never disagree).</summary>
+        public bool InCombat => Host.Encounters.InCombat;
+
+        /// <summary>Fold one swing into the active encounter (ACT's <c>AddCombatAction</c>); raises
+        /// Before/AfterCombatAction so peers (e.g. OverlayPlugin's post-aggregation tap) observe it.</summary>
+        public void AddCombatAction(MasterSwing action)
+        {
+            BeforeCombatAction?.Invoke(false, new CombatActionEventArgs(action));
+            ActiveZone.ActiveEncounter?.AddCombatAction(action);
+            AfterCombatAction?.Invoke(false, new CombatActionEventArgs(action));
+        }
+
+        /// <summary>Open (or continue) the active encounter (Triggernometry's combat-state driver).
+        /// Opens a fresh <see cref="EncounterData"/> and mirrors the state onto the modern
+        /// <see cref="IEncounterService"/> so native consumers see combat start + label.</summary>
+        public bool SetEncounter(DateTime time, string attacker, string victim)
+        {
+            if (!Host.Encounters.InCombat || ActiveZone.ActiveEncounter == null || !ActiveZone.ActiveEncounter.Active)
+            {
+                var zone = Host.Game.Snapshot().Zone.Name;
+                ActiveZone.ZoneName = zone;
+                var enc = new EncounterData(ActGlobals.charName, zone, ActiveZone) { Active = true };
+                enc.StartTimes.Add(time);
+                ActiveZone.ActiveEncounter = enc;
+                ActiveZone.Items.Add(enc);
+                Host.Encounters.StartCombat(enc.Title, zone);
+                OnCombatStart?.Invoke(false, new CombatToggleEventArgs(0, ActiveZone.Items.Count - 1, enc));
+            }
+            return true;
+        }
+
+        /// <summary>Close the active encounter (ACT's <c>EndCombat</c>) and mirror to the modern
+        /// <see cref="IEncounterService"/>.</summary>
+        public void EndCombat(bool actExport)
+        {
+            if (!Host.Encounters.InCombat) return;
+            var enc = ActiveZone.ActiveEncounter;
+            enc?.EndCombat(actExport);
+            Host.Encounters.EndCombat(actExport);
+            if (enc != null) OnCombatEnd?.Invoke(false, new CombatToggleEventArgs(0, 0, enc));
         }
 
         // --- Named callbacks (Triggernometry peer interop) ---------------------------------
