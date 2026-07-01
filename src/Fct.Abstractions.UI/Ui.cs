@@ -32,6 +32,22 @@ namespace Fct.Abstractions.UI
         /// <summary>A status-bar / toolbar item with a command.</summary>
         void AddStatusItem(UiStatusItem item);
 
+        /// <summary>
+        /// Bring a previously-contributed page (settings or nav) to the foreground — the modern form
+        /// of Triggernometry's <c>LocateTab</c> "reveal my page" request.
+        /// </summary>
+        void RevealPage(string pageId);
+
+        /// <summary>
+        /// Show a transient corner control/notification over the shell (Triggernometry's
+        /// <c>CornerControlAdd</c>). Dispose the handle, or call <see cref="RemoveCornerControl"/> with
+        /// the surface id, to remove it (<c>CornerControlRemove</c>).
+        /// </summary>
+        IDisposable AddCornerControl(UiSurface control);
+
+        /// <summary>Remove a corner control by id (Triggernometry's <c>CornerControlRemove</c>).</summary>
+        void RemoveCornerControl(string id);
+
         /// <summary>Marshal work onto the UI thread (the modern form of InvokeRequired/Invoke).</summary>
         IUiDispatcher Dispatcher { get; }
     }

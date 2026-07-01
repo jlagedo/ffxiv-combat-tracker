@@ -39,7 +39,12 @@ namespace Fct.FlowTests
             audio.RegisterSink(yukkuri);
             var host = new FakePluginHost(audio: audio);
 
-            var opts = new AudioOptions(Volume: 60, Voice: "Alex", Rate: 1.2f);
+            // G8: channel + synchronous flag ride along on AudioOptions (TTSYukkuri L/R/sync routing).
+            var opts = new AudioOptions(Volume: 60, Voice: "Alex", Rate: 1.2f)
+            {
+                Channel = AudioChannel.Left,
+                Synchronous = true,
+            };
             host.Audio.Speak("engage", opts);
 
             foreach (var sink in new[] { discord, yukkuri })
@@ -47,27 +52,26 @@ namespace Fct.FlowTests
                 var (text, options) = Assert.Single(sink.Speaks);
                 Assert.Equal("engage", text);
                 Assert.Equal(opts, options); // record equality: exact AudioOptions carried through
+                Assert.Equal(AudioChannel.Left, options.Channel);
+                Assert.True(options.Synchronous);
             }
         }
 
         // A2 (terminal variant) — Discord-Triggers / TTSYukkuri route audio *instead of* the speakers.
-        // The additive fan-out contract can't express that: a terminal sink would stop the chain so a
-        // lower-priority sink never fires. RED until G3 (terminal-sink capability) exists.
-        [Fact(Skip = "G3: terminal/route-instead-of sink capability not yet in the contract")]
+        // A terminal sink stops the chain so a lower-priority sink never fires (G3).
+        [Fact]
         public void A2_TerminalSink_StopsTheChain()
         {
             var audio = new RecordingAudioOutput();
             var terminal = new RecordingAudioSink("discord-terminal");
             var speakers = new RecordingAudioSink("builtin-speakers");
-            audio.RegisterSink(terminal, priority: 10 /*, terminal: true — G3 */);
+            audio.RegisterSink(terminal, priority: 10, terminal: true);
             audio.RegisterSink(speakers, priority: 0);
 
-            host_Speak(audio, "engage");
+            audio.Speak("engage");
 
             Assert.Single(terminal.Speaks);
-            Assert.Empty(speakers.Speaks); // would fail today: fan-out delivers to both
-
-            static void host_Speak(RecordingAudioOutput a, string t) => a.Speak(t);
+            Assert.Empty(speakers.Speaks); // terminal sink stopped the chain before the lower-priority sink
         }
     }
 }

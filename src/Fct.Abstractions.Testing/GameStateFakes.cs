@@ -71,7 +71,10 @@ namespace Fct.Abstractions.Testing
             bool inCombat = true,
             int job = 0,
             IReadOnlyList<StatusEffect>? statuses = null,
-            IReadOnlyList<EnmityEntry>? enmity = null)
+            IReadOnlyList<EnmityEntry>? enmity = null,
+            uint? currentCp = null, uint? maxCp = null,
+            uint? currentGp = null, uint? maxGp = null,
+            uint? currentWorldId = null, int? order = null)
             => new Actor(
                 Id: id,
                 OwnerId: 0,
@@ -90,6 +93,11 @@ namespace Fct.Abstractions.Testing
                 Party: PartyMembership.Party,
                 InCombat: inCombat,
                 Statuses: statuses ?? Array.Empty<StatusEffect>(),
-                Enmity: enmity ?? Array.Empty<EnmityEntry>());
+                Enmity: enmity ?? Array.Empty<EnmityEntry>())
+            {
+                CurrentCp = currentCp, MaxCp = maxCp,
+                CurrentGp = currentGp, MaxGp = maxGp,
+                CurrentWorldId = currentWorldId, Order = order,
+            };
     }
 }

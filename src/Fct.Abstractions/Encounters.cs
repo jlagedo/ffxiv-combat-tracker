@@ -12,8 +12,12 @@ namespace Fct.Abstractions
     {
         bool InCombat { get; }
 
-        /// <summary>Open (or continue) an encounter. Equivalent to <c>SetEncounter(now, me, me)</c>.</summary>
-        void StartCombat(string? title = null);
+        /// <summary>
+        /// Open (or continue) an encounter. Equivalent to <c>SetEncounter(now, me, me)</c>.
+        /// <paramref name="zone"/> labels the encounter's zone; Triggernometry passes the player name
+        /// as both <paramref name="title"/> and zone, so it defaults to <paramref name="title"/>.
+        /// </summary>
+        void StartCombat(string? title = null, string? zone = null);
 
         /// <summary>End the active encounter, optionally exporting it.</summary>
         void EndCombat(bool export = false);
@@ -50,6 +54,9 @@ namespace Fct.Abstractions
         /// Empty by default; native consumers use the typed fields.
         /// </summary>
         public IReadOnlyDictionary<string, string> ExportVariables { get; init; } = ExportVars.Empty;
+
+        /// <summary>The encounter's zone label (ACT's <c>ZoneName</c>). Null when unset.</summary>
+        public string? Zone { get; init; }
     }
 
     /// <summary>Per-combatant aggregated metrics within an <see cref="EncounterSnapshot"/>.</summary>
@@ -71,6 +78,15 @@ namespace Fct.Abstractions
         /// shim. Empty by default; native consumers use the typed fields.
         /// </summary>
         public IReadOnlyDictionary<string, string> ExportVariables { get; init; } = ExportVars.Empty;
+
+        /// <summary>Healing that landed on already-full HP (OverlayPlugin's <c>overHeal</c>). 0 by default.</summary>
+        public long Overheal { get; init; }
+
+        /// <summary>Incoming damage soaked by shields (OverlayPlugin's <c>damageShield</c>). 0 by default.</summary>
+        public long ShieldedDamage { get; init; }
+
+        /// <summary>Healing delivered as a shield/absorb (OverlayPlugin's <c>absorbHeal</c>). 0 by default.</summary>
+        public long Absorbed { get; init; }
     }
 
     /// <summary>Shared empty <c>ExportVariables</c> default (no per-instance allocation).</summary>

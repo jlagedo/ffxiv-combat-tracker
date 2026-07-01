@@ -42,6 +42,24 @@ namespace Fct.FlowTests
     }
 
     /// <summary>
+    /// OverlayPlugin as an IDataSubscription typed consumer: it binds ZoneChanged/PartyListChanged
+    /// (FFXIVRepository.cs:544,551). Here it binds the shim's mapped typed-event surface.
+    /// </summary>
+    internal sealed class OpTypedConsumerDouble
+    {
+        public uint? ZoneId { get; private set; }
+        public string? ZoneName { get; private set; }
+        public int? PartySize { get; private set; }
+        public IReadOnlyList<uint>? PartyList { get; private set; }
+
+        public void Attach(ShimStub shim)
+        {
+            shim.ZoneChanged += (id, name) => { ZoneId = id; ZoneName = name; };
+            shim.PartyListChanged += (list, size) => { PartyList = list; PartySize = size; };
+        }
+    }
+
+    /// <summary>
     /// OverlayPlugin (MiniParse) as an encounter reader: it reads ActiveZone.ActiveEncounter +
     /// CombatantData/EncounterData.ExportVariables per tick (MiniParseEventSource.cs:321-360).
     /// Here it reads through the shim's encounter surface.

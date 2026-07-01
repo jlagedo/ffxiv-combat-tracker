@@ -66,6 +66,9 @@ namespace Fct.Abstractions.Testing
             Logger = logger ?? NullLogger.Instance;
             Clock = clock ?? new FakeClock();
             Self = self ?? new PluginInfo("test.plugin", "1.0.0", "1.0");
+            RawLogLines = Bus != null
+                ? new FakeRawLogLineEmitter(Bus, Clock)
+                : (IRawLogLineEmitter)NoopRawLogLineEmitter.Instance;
         }
 
         public IGameSession Game { get; }
@@ -75,9 +78,43 @@ namespace Fct.Abstractions.Testing
         public IPluginStorage Storage { get; }
         public ILogger Logger { get; }
         public IClock Clock { get; }
+        public IRawLogLineEmitter RawLogLines { get; }
         public PluginInfo Self { get; }
 
         /// <summary>The concrete event bus, when <see cref="Game"/> is the default <see cref="FakeGameSession"/>.</summary>
         public InMemoryEventBus? Bus => (Game as FakeGameSession)?.Bus;
+    }
+
+    /// <summary>
+    /// In-memory <see cref="IRawLogLineEmitter"/>: builds a <c>RawLogLine</c> (monotonic sequence +
+    /// clock timestamp) and fans it onto the event bus, modeling OverlayPlugin's packet→custom-line
+    /// write-back.
+    /// </summary>
+    public sealed class FakeRawLogLineEmitter : IRawLogLineEmitter
+    {
+        private readonly InMemoryEventBus _bus;
+        private readonly IClock _clock;
+        private long _seq;
+
+        public FakeRawLogLineEmitter(InMemoryEventBus bus, IClock clock)
+        {
+            _bus = bus ?? throw new ArgumentNullException(nameof(bus));
+            _clock = clock ?? throw new ArgumentNullException(nameof(clock));
+        }
+
+        public void Emit(LogMessageType type, string line)
+        {
+            line ??= string.Empty;
+            var seq = System.Threading.Interlocked.Increment(ref _seq);
+            _bus.Emit(new RawLogLine(seq, _clock.LocalNow, type, line, line));
+        }
+    }
+
+    /// <summary>No-op emitter used when the host's game session is not the default event-bus fake.</summary>
+    internal sealed class NoopRawLogLineEmitter : IRawLogLineEmitter
+    {
+        public static readonly NoopRawLogLineEmitter Instance = new NoopRawLogLineEmitter();
+        private NoopRawLogLineEmitter() { }
+        public void Emit(LogMessageType type, string line) { }
     }
 }

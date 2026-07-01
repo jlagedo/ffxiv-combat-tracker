@@ -31,13 +31,14 @@ namespace Fct.Abstractions.Testing
         /// <summary>Override for <see cref="ExportText"/>; a canned string when unset.</summary>
         public Func<EncounterSnapshot, EncounterExportFormat, string>? Exporter { get; set; }
 
-        public void StartCombat(string? title = null)
+        public void StartCombat(string? title = null, string? zone = null)
         {
             InCombat = true;
             var start = Now?.Invoke() ?? DefaultStart;
             Active = new EncounterSnapshot(title ?? string.Empty, start, TimeSpan.Zero, true, 0, 0, SeedCombatants)
             {
                 ExportVariables = SeedExportVariables,
+                Zone = zone ?? title,
             };
         }
 

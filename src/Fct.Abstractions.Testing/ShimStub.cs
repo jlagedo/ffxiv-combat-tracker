@@ -17,14 +17,22 @@ namespace Fct.Abstractions.Testing
         public ShimStub(IPluginHost host)
         {
             _host = host ?? throw new ArgumentNullException(nameof(host));
-            // Re-fire the modern RawLogLine bus as the legacy Before/OnLogLineRead surface.
+            // Re-fire the modern typed/raw bus as the legacy Before/OnLogLineRead + IDataSubscription surface.
             _logSubscription = _host.Game.Events.Subscribe(GameEventFilter.All, e =>
             {
-                if (e is RawLogLine raw)
+                switch (e)
                 {
-                    var args = new LogLineEventArgs(raw.Line, (int)raw.Type);
-                    BeforeLogLineRead?.Invoke(false, args);
-                    OnLogLineRead?.Invoke(false, args);
+                    case RawLogLine raw:
+                        var args = new LogLineEventArgs(raw.Line, (int)raw.Type);
+                        BeforeLogLineRead?.Invoke(false, args);
+                        OnLogLineRead?.Invoke(false, args);
+                        break;
+                    case Fct.Abstractions.ZoneChanged z:
+                        ZoneChanged?.Invoke(z.ZoneId, z.ZoneName);
+                        break;
+                    case Fct.Abstractions.PartyChanged p:
+                        PartyListChanged?.Invoke(p.Members, p.Members.Count);
+                        break;
                 }
             });
         }
@@ -39,33 +47,39 @@ namespace Fct.Abstractions.Testing
         public void PlaySound(string soundFile, int volume = 100) => _host.Audio.Play(soundFile, volume);
 
         // --- Audio sink hijack slots (Discord-Triggers / TTSYukkuri route-instead-of pattern) ---
-        // Setting a slot registers an IAudioSink over the modern host. Current contract is additive
-        // fan-out; terminal/route-instead-of routing is G3 (out of scope, asserted RED in A2).
+        // Setting a slot registers a terminal IAudioSink over the modern host, reproducing the legacy
+        // save-and-replace behavior: audio routes to this sink *instead of* ACT's built-in speakers.
         public TextToSpeechDelegate? PlayTtsMethod
         {
-            set { if (value != null) _host.Audio.RegisterSink(new DelegateAudioSink(value, null)); }
+            set { if (value != null) _host.Audio.RegisterSink(new DelegateAudioSink(value, null), priority: 10, terminal: true); }
         }
 
         public PlaySoundDelegate? PlaySoundMethod
         {
-            set { if (value != null) _host.Audio.RegisterSink(new DelegateAudioSink(null, value)); }
+            set { if (value != null) _host.Audio.RegisterSink(new DelegateAudioSink(null, value), priority: 10, terminal: true); }
         }
 
         // --- Raw log line surface (Trig/cactbot regex lifeline) ---
         public event LogLineEventDelegate? BeforeLogLineRead;
         public event LogLineEventDelegate? OnLogLineRead;
 
+        // --- IDataSubscription typed surface (OverlayPlugin consumer, mapped from GameEvent records) ---
+        public delegate void ZoneChangedDelegate(uint zoneId, string zoneName);
+        public delegate void PartyListChangedDelegate(System.Collections.Generic.IReadOnlyList<uint> partyList, int partySize);
+        public event ZoneChangedDelegate? ZoneChanged;
+        public event PartyListChangedDelegate? PartyListChanged;
+
         // --- Encounter / combat-state driver (Triggernometry) ---
         public bool InCombat => _host.Encounters.InCombat;
-        public void SetEncounter(string? title = null) => _host.Encounters.StartCombat(title);
+        public void SetEncounter(string? title = null, string? zone = null) => _host.Encounters.StartCombat(title, zone);
         public void EndCombat(bool export = false) => _host.Encounters.EndCombat(export);
         public EncounterSnapshot? ActiveEncounter => _host.Encounters.Active;
         public EncounterSnapshot? LastEncounter => _host.Encounters.Last;
         public void ActEncounterLogAppend(string line) => _host.Encounters.AppendLogLine(line);
 
         // --- Named callbacks (Triggernometry peer interop) ---
-        public IDisposable RegisterNamedCallback(string name, Action<object?> callback)
-            => _host.Plugins.RegisterCallback(name, callback);
+        public IDisposable RegisterNamedCallback(string name, Action<object?> callback, object? owner = null, bool allowDuplicate = false)
+            => _host.Plugins.RegisterCallback(name, callback, owner, allowDuplicate);
 
         public void InvokeNamedCallback(string name, object? argument = null)
             => _host.Plugins.InvokeCallback(name, argument);

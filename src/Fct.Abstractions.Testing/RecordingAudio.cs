@@ -23,28 +23,36 @@ namespace Fct.Abstractions.Testing
         {
             var opts = options ?? AudioOptions.Default;
             Speaks.Add((text, opts));
-            foreach (var sink in SinksByPriority()) _ = sink.SpeakAsync(text, opts, CancellationToken.None);
+            foreach (var reg in SinksByPriority())
+            {
+                _ = reg.Sink.SpeakAsync(text, opts, CancellationToken.None);
+                if (reg.Terminal) break; // route-instead-of: a terminal sink stops the chain
+            }
         }
 
         public void Play(string filePath, int volume = 100)
         {
             Plays.Add((filePath, volume));
-            foreach (var sink in SinksByPriority()) _ = sink.PlayAsync(filePath, volume, CancellationToken.None);
+            foreach (var reg in SinksByPriority())
+            {
+                _ = reg.Sink.PlayAsync(filePath, volume, CancellationToken.None);
+                if (reg.Terminal) break; // route-instead-of: a terminal sink stops the chain
+            }
         }
 
-        public IDisposable RegisterSink(IAudioSink sink, int priority = 0)
+        public IDisposable RegisterSink(IAudioSink sink, int priority = 0, bool terminal = false)
         {
             if (sink == null) throw new ArgumentNullException(nameof(sink));
-            var reg = new Registration(sink, priority);
+            var reg = new Registration(sink, priority, terminal);
             lock (_gate) _sinks.Add(reg);
             return new ActionDisposable(() => { lock (_gate) _sinks.Remove(reg); });
         }
 
-        private IAudioSink[] SinksByPriority()
+        private Registration[] SinksByPriority()
         {
             lock (_gate)
             {
-                return _sinks.OrderByDescending(r => r.Priority).Select(r => r.Sink).ToArray();
+                return _sinks.OrderByDescending(r => r.Priority).ToArray();
             }
         }
 
@@ -52,7 +60,8 @@ namespace Fct.Abstractions.Testing
         {
             public IAudioSink Sink { get; }
             public int Priority { get; }
-            public Registration(IAudioSink sink, int priority) { Sink = sink; Priority = priority; }
+            public bool Terminal { get; }
+            public Registration(IAudioSink sink, int priority, bool terminal) { Sink = sink; Priority = priority; Terminal = terminal; }
         }
     }
 

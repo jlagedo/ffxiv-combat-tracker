@@ -49,8 +49,27 @@ namespace Fct.Abstractions
         /// <summary>Server + local time (replaces GetServerTimestamp).</summary>
         IClock Clock { get; }
 
+        /// <summary>
+        /// Emit synthetic custom (256+) log lines onto the live event bus. Capability-gated (same
+        /// posture as <see cref="IRawPacketSource"/>): the write-back path OverlayPlugin uses when it
+        /// turns a decoded raw packet into a custom line other consumers then read as a
+        /// <c>RawLogLine</c>.
+        /// </summary>
+        IRawLogLineEmitter RawLogLines { get; }
+
         /// <summary>This plugin's own manifest metadata.</summary>
         PluginInfo Self { get; }
+    }
+
+    /// <summary>
+    /// The gated write-back hatch for synthetic custom (256+) log lines. Complements the read-only
+    /// <see cref="IRawPacketSource"/>: a plugin that decodes raw packets can re-inject them as
+    /// <c>RawLogLine</c> events on the live bus (OverlayPlugin's custom-line round-trip).
+    /// </summary>
+    public interface IRawLogLineEmitter
+    {
+        /// <summary>Fan a synthetic log line onto the event bus as a <c>RawLogLine</c>.</summary>
+        void Emit(LogMessageType type, string line);
     }
 
     /// <summary>Typed metadata projected from a plugin's <c>plugin.json</c> manifest.</summary>
@@ -82,10 +101,24 @@ namespace Fct.Abstractions
     {
         System.Collections.Generic.IReadOnlyList<PluginInfo> LoadedPlugins { get; }
 
-        IDisposable RegisterCallback(string name, Action<object?> callback);
+        /// <summary>
+        /// Register a Triggernometry-style named callback. <paramref name="owner"/> tags the
+        /// registrant (for owner-scoped bookkeeping, as <c>RealPlugin</c> tracks callback owners);
+        /// unless <paramref name="allowDuplicate"/> is set, registering a name that already exists
+        /// throws. Dispose the returned handle to unregister (replaces the legacy int-id unregister).
+        /// </summary>
+        IDisposable RegisterCallback(string name, Action<object?> callback, object? owner = null, bool allowDuplicate = false);
         void InvokeCallback(string name, object? argument = null);
 
         void Publish<T>(T evt) where T : notnull;
         IDisposable Subscribe<T>(Action<T> handler) where T : notnull;
+
+        /// <summary>
+        /// Obtain a live, version-gated typed handle to a peer plugin's published service (e.g.
+        /// Triggernometry's <c>BridgeFFXIV</c> reaching the Started parser peer). Returns false when no
+        /// peer with <paramref name="pluginId"/> has published a service assignable to
+        /// <typeparamref name="T"/>.
+        /// </summary>
+        bool TryGetPeerService<T>(string pluginId, out T service) where T : class;
     }
 }

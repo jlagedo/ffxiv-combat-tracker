@@ -8,10 +8,9 @@ namespace Fct.FlowTests
     public sealed class RawPacketFlowTests
     {
         // B4 — OverlayPlugin turns a raw packet into a custom 256+ log line and re-injects it onto
-        // the live bus (LineBaseCustom.cs:80-86 → FFXIVRepository.cs:493-515). The contract has no
-        // emit/write-back hatch: IRawPacketSource is read-only and AppendLogLine targets the export
-        // log, not the event bus. RED until G4 (a gated IRawLogLineEmitter) exists.
-        [Fact(Skip = "G4: synthetic-line emit path (IRawLogLineEmitter) not yet in the contract")]
+        // the live bus (LineBaseCustom.cs:80-86 → FFXIVRepository.cs:493-515), which a native
+        // RawLogLine consumer then sees. The gated IRawLogLineEmitter (G4) is the write-back hatch.
+        [Fact]
         public void B4_RawPacket_BecomesSyntheticLine_OnTheBus()
         {
             var host = new FakePluginHost();
@@ -19,9 +18,8 @@ namespace Fct.FlowTests
             var custom = new TrigDouble(@"^257\|");
             custom.Attach(shim);
 
-            // What we WANT: OP decodes a packet and emits a custom 256+ line onto the live bus, which
-            // a native RawLogLine consumer then sees. No API exists to do this today.
-            // host.RawLogLines.Emit((LogMessageType)257, "257|customdata");  // <-- G4
+            // OP decodes a packet and emits a custom 256+ line onto the live bus.
+            host.RawLogLines.Emit((LogMessageType)257, "257|customdata");
 
             Assert.Single(custom.Fired);
         }

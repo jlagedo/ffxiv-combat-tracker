@@ -1,3 +1,4 @@
+using System;
 using System.Collections.Generic;
 
 namespace Fct.Abstractions
@@ -22,7 +23,17 @@ namespace Fct.Abstractions
     /// <see cref="RemainingSeconds"/> is the remaining duration; <see cref="SourceActorId"/> is who
     /// applied it.
     /// </summary>
-    public sealed record StatusEffect(ushort StatusId, string? Name, ushort Stacks, float RemainingSeconds, uint SourceActorId);
+    public sealed record StatusEffect(ushort StatusId, string? Name, ushort Stacks, float RemainingSeconds, uint SourceActorId)
+    {
+        /// <summary>
+        /// The SDK <c>NetworkBuff.RefreshPending</c> flag — the buff was re-applied and its duration is
+        /// being refreshed. False by default.
+        /// </summary>
+        public bool RefreshPending { get; init; }
+
+        /// <summary>When the status was applied (SDK <c>NetworkBuff.Timestamp</c>). Null when unknown.</summary>
+        public DateTimeOffset? AppliedAt { get; init; }
+    }
 
     /// <summary>One entry of an actor's enmity/hate table. Not provided by the FFXIV SDK; best-effort.</summary>
     public sealed record EnmityEntry(uint ActorId, string Name, uint Enmity, float HateRate);
@@ -52,5 +63,27 @@ namespace Fct.Abstractions
         PartyMembership Party,
         bool InCombat,
         IReadOnlyList<StatusEffect> Statuses,
-        IReadOnlyList<EnmityEntry> Enmity);
+        IReadOnlyList<EnmityEntry> Enmity)
+    {
+        /// <summary>Current crafting points (DoH). Null for actors the SDK reports no CP for.</summary>
+        public uint? CurrentCp { get; init; }
+
+        /// <summary>Maximum crafting points (DoH). Null when not applicable.</summary>
+        public uint? MaxCp { get; init; }
+
+        /// <summary>Current gathering points (DoL). Null when not applicable.</summary>
+        public uint? CurrentGp { get; init; }
+
+        /// <summary>Maximum gathering points (DoL). Null when not applicable.</summary>
+        public uint? MaxGp { get; init; }
+
+        /// <summary>
+        /// The actor's current-world id, distinct from home <see cref="WorldId"/> (SDK
+        /// <c>Combatant.CurrentWorldID</c>). Null when unknown.
+        /// </summary>
+        public uint? CurrentWorldId { get; init; }
+
+        /// <summary>Party/list ordering index (SDK <c>Combatant.Order</c>). Null when unset.</summary>
+        public int? Order { get; init; }
+    }
 }

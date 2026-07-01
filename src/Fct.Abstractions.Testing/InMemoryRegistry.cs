@@ -4,15 +4,16 @@ using System.Collections.Generic;
 namespace Fct.Abstractions.Testing
 {
     /// <summary>
-    /// In-memory <see cref="IPluginRegistry"/>: real dictionaries backing named callbacks and typed
-    /// publish/subscribe. Implements the shipped (thin) contract exactly — the richer G5 owner/dup
-    /// callback semantics are out of scope for this harness.
+    /// In-memory <see cref="IPluginRegistry"/>: real dictionaries backing named callbacks (with
+    /// owner + duplicate-name policy, G5), typed publish/subscribe, and version-gated peer service
+    /// handles (G6, via the <see cref="RegisterPeerService{T}"/> test seam).
     /// </summary>
     public sealed class InMemoryRegistry : IPluginRegistry
     {
         private readonly object _gate = new object();
-        private readonly Dictionary<string, List<Action<object?>>> _callbacks = new Dictionary<string, List<Action<object?>>>();
+        private readonly Dictionary<string, List<Registration>> _callbacks = new Dictionary<string, List<Registration>>();
         private readonly Dictionary<Type, List<Delegate>> _subscribers = new Dictionary<Type, List<Delegate>>();
+        private readonly Dictionary<string, object> _peerServices = new Dictionary<string, object>();
 
         public InMemoryRegistry(params PluginInfo[] loaded)
         {
@@ -21,18 +22,23 @@ namespace Fct.Abstractions.Testing
 
         public IReadOnlyList<PluginInfo> LoadedPlugins { get; }
 
-        public IDisposable RegisterCallback(string name, Action<object?> callback)
+        public IDisposable RegisterCallback(string name, Action<object?> callback, object? owner = null, bool allowDuplicate = false)
         {
             if (name == null) throw new ArgumentNullException(nameof(name));
             if (callback == null) throw new ArgumentNullException(nameof(callback));
+            var reg = new Registration(callback, owner);
             lock (_gate)
             {
                 if (!_callbacks.TryGetValue(name, out var list))
                 {
-                    list = new List<Action<object?>>();
+                    list = new List<Registration>();
                     _callbacks[name] = list;
                 }
-                list.Add(callback);
+                else if (!allowDuplicate)
+                {
+                    throw new InvalidOperationException($"A callback named '{name}' is already registered.");
+                }
+                list.Add(reg);
             }
             return new ActionDisposable(() =>
             {
@@ -40,7 +46,7 @@ namespace Fct.Abstractions.Testing
                 {
                     if (_callbacks.TryGetValue(name, out var list))
                     {
-                        list.Remove(callback);
+                        list.Remove(reg);
                         if (list.Count == 0) _callbacks.Remove(name);
                     }
                 }
@@ -49,13 +55,42 @@ namespace Fct.Abstractions.Testing
 
         public void InvokeCallback(string name, object? argument = null)
         {
-            Action<object?>[] targets;
+            Registration[] targets;
             lock (_gate)
             {
                 if (!_callbacks.TryGetValue(name, out var list)) return;
                 targets = list.ToArray();
             }
-            foreach (var cb in targets) cb(argument);
+            foreach (var reg in targets) reg.Callback(argument);
+        }
+
+        /// <summary>Test seam: publish a typed service handle for a peer plugin (backs G6 lookup).</summary>
+        public void RegisterPeerService<T>(string pluginId, T service) where T : class
+        {
+            if (pluginId == null) throw new ArgumentNullException(nameof(pluginId));
+            if (service == null) throw new ArgumentNullException(nameof(service));
+            lock (_gate) _peerServices[pluginId] = service;
+        }
+
+        public bool TryGetPeerService<T>(string pluginId, out T service) where T : class
+        {
+            lock (_gate)
+            {
+                if (_peerServices.TryGetValue(pluginId, out var obj) && obj is T typed)
+                {
+                    service = typed;
+                    return true;
+                }
+            }
+            service = null!;
+            return false;
+        }
+
+        private sealed class Registration
+        {
+            public Action<object?> Callback { get; }
+            public object? Owner { get; }
+            public Registration(Action<object?> callback, object? owner) { Callback = callback; Owner = owner; }
         }
 
         public void Publish<T>(T evt) where T : notnull
