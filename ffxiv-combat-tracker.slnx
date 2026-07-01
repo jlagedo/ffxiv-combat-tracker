@@ -6,14 +6,19 @@
     <Project Path="src/Fct.App/Fct.App.csproj" />
     <Project Path="src/Fct.LegacyHost/Fct.LegacyHost.csproj" />
     <Project Path="src/Fct.Compat.Act/Fct.Compat.Act.csproj" />
+    <Project Path="src/Fct.Compat.Shim/Fct.Compat.Shim.csproj" />
+    <Project Path="src/Fct.Compat.Shim.ActFacade/Fct.Compat.Shim.ActFacade.csproj" />
+    <Project Path="src/Fct.Compat.Shim.SdkFacade/Fct.Compat.Shim.SdkFacade.csproj" />
     <Project Path="src/Fct.Parser.Legacy/Fct.Parser.Legacy.csproj" />
     <Project Path="src/Fct.StreamProbe/Fct.StreamProbe.csproj" />
   </Folder>
   <Folder Name="/samples/">
     <Project Path="samples/Fct.SamplePlugin/Fct.SamplePlugin.csproj" />
+    <Project Path="samples/Fct.SampleLegacyPlugin/Fct.SampleLegacyPlugin.csproj" />
   </Folder>
   <Folder Name="/tests/">
     <Project Path="tests/Fct.Compat.Act.Tests/Fct.Compat.Act.Tests.csproj" />
+    <Project Path="tests/Fct.Compat.Shim.Tests/Fct.Compat.Shim.Tests.csproj" />
     <Project Path="tests/Fct.App.Tests/Fct.App.Tests.csproj" />
     <Project Path="tests/Fct.FlowTests/Fct.FlowTests.csproj" />
     <Project Path="tests/Fct.Integration.Tests/Fct.Integration.Tests.csproj" />

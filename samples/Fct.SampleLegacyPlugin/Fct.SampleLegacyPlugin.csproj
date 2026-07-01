@@ -1,0 +1,25 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!--
+    A minimal *legacy* plugin: it implements the ACT IActPluginV1 contract and is recompiled against
+    the compat shim's "Advanced Combat Tracker" facade — the migration on-ramp for ACT-era plugins.
+    Its manifest names `legacyEntry` (not `entry`), so the host drives it through the shim's
+    LegacyPluginHost. net10.0-windows because IActPluginV1.InitPlugin takes WinForms TabPage/Label.
+  -->
+  <PropertyGroup>
+    <TargetFramework>net10.0-windows</TargetFramework>
+    <UseWindowsForms>true</UseWindowsForms>
+    <IsPackable>false</IsPackable>
+    <EnableDynamicLoading>true</EnableDynamicLoading>
+    <RootNamespace>Fct.SampleLegacyPlugin</RootNamespace>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\..\src\Fct.Compat.Shim.ActFacade\Fct.Compat.Shim.ActFacade.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <None Include="plugin.json" CopyToOutputDirectory="PreserveNewest" />
+  </ItemGroup>
+
+</Project>

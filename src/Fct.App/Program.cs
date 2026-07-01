@@ -83,6 +83,10 @@ class Program
         builder.Services.AddSingleton<IAudioOutput, AudioService>();
         builder.Services.AddSingleton<IEncounterService, EncounterService>();
         builder.Services.AddSingleton<IClock, SystemClock>();
+        // The compat shim's legacy-plugin host factory (injected into PluginManager for `legacyEntry`
+        // manifests). Kept behind a delegate so the loader takes no compile-time shim dependency.
+        builder.Services.AddSingleton<LegacyPluginHostFactory>(
+            _ => (assembly, legacyEntry) => new Fct.Compat.Shim.LegacyPluginHost(assembly, legacyEntry));
         builder.Services.AddSingleton<PluginManager>();
         builder.Services.AddHostedService<PluginLifetime>();
 

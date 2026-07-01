@@ -1,7 +1,11 @@
 ﻿<Project Sdk="Microsoft.NET.Sdk">
   <PropertyGroup>
     <OutputType>WinExe</OutputType>
-    <TargetFramework>net10.0</TargetFramework>
+    <!-- net10.0-windows (WinForms) because the net10 compat shim hosts recompiled legacy plugins
+         in-process, and IActPluginV1.InitPlugin(TabPage, Label) requires the WindowsDesktop runtime.
+         The host is Windows-only regardless (the net48 satellite). -->
+    <TargetFramework>net10.0-windows</TargetFramework>
+    <UseWindowsForms>true</UseWindowsForms>
     <ApplicationManifest>app.manifest</ApplicationManifest>
     <AvaloniaUseCompiledBindingsByDefault>true</AvaloniaUseCompiledBindingsByDefault>
   </PropertyGroup>
@@ -39,6 +43,13 @@
        across the host↔plugin boundary. -->
   <ItemGroup>
     <ProjectReference Include="..\Fct.Abstractions\Fct.Abstractions.csproj" />
+  </ItemGroup>
+
+  <!-- The net10 compat shim + its two legacy-impersonating facades (Advanced Combat Tracker /
+       FFXIV_ACT_Plugin.Common). Referenced so they land in the host output + deps.json and the
+       default ALC resolves them for shimmed plugins (PluginLoadContext.IsShared shares them). -->
+  <ItemGroup>
+    <ProjectReference Include="..\Fct.Compat.Shim\Fct.Compat.Shim.csproj" />
   </ItemGroup>
 
   <!-- Build the net48 satellite as a dependency (no assembly reference: different runtime)

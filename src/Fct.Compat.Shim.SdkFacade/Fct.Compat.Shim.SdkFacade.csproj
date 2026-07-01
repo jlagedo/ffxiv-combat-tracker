@@ -1,0 +1,23 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!--
+    net10 facade for the FFXIV_ACT_Plugin SDK surface. Compiles to an assembly named
+    "FFXIV_ACT_Plugin.Common" so a legacy plugin recompiled against the net10 compat shim binds
+    its `using FFXIV_ACT_Plugin.Common;` references here (the net48 satellite unifies onto the real
+    embedded SDK instead; this is the net10-host counterpart). Re-declares the exact public surface
+    of lib/FFXIV_ACT_Plugin.Common.dll (identity 3.0.0.0): IDataSubscription (11 events),
+    IDataRepository (Get*), and the models Combatant/Player/NetworkBuff/PartyType. No behavior —
+    the shim adapters in Fct.Compat.Shim map these onto the modern host.
+  -->
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <ImplicitUsings>disable</ImplicitUsings>
+    <Nullable>disable</Nullable>
+    <AssemblyName>FFXIV_ACT_Plugin.Common</AssemblyName>
+    <RootNamespace>FFXIV_ACT_Plugin.Common</RootNamespace>
+    <!-- Match the real SDK's identity version so plugin version checks pass. Unsigned (see OQ-1). -->
+    <AssemblyVersion>3.0.0.0</AssemblyVersion>
+    <FileVersion>3.0.0.0</FileVersion>
+  </PropertyGroup>
+
+</Project>

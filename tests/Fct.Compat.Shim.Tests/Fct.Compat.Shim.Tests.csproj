@@ -1,0 +1,38 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!--
+    Tests for the net10 compat shim: assembly identity of the two legacy-impersonating facades, and
+    (in later slices) the shim's forwarding/projection behavior over the Fct.Abstractions.Testing
+    fakes. net10.0-windows because it references the WinForms-bearing ACT facade + shim.
+  -->
+  <PropertyGroup>
+    <TargetFramework>net10.0-windows</TargetFramework>
+    <UseWindowsForms>true</UseWindowsForms>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\..\src\Fct.Abstractions\Fct.Abstractions.csproj" />
+    <ProjectReference Include="..\..\src\Fct.Abstractions.Testing\Fct.Abstractions.Testing.csproj" />
+    <ProjectReference Include="..\..\src\Fct.Compat.Shim\Fct.Compat.Shim.csproj" />
+    <ProjectReference Include="..\..\src\Fct.Compat.Shim.ActFacade\Fct.Compat.Shim.ActFacade.csproj" />
+    <ProjectReference Include="..\..\src\Fct.Compat.Shim.SdkFacade\Fct.Compat.Shim.SdkFacade.csproj" />
+  </ItemGroup>
+
+  <!-- Build the sample legacy plugin and stage it under plugins\ so the lifecycle test can load it
+       from disk. No assembly reference: it must load through its own path, not the test's context. -->
+  <ItemGroup>
+    <ProjectReference Include="..\..\samples\Fct.SampleLegacyPlugin\Fct.SampleLegacyPlugin.csproj"
+                      ReferenceOutputAssembly="false"
+                      Private="false" />
+  </ItemGroup>
+
+  <Target Name="StageSampleLegacyPluginForTests" AfterTargets="Build">
+    <ItemGroup>
+      <SampleLegacyFiles Include="$(MSBuildThisFileDirectory)..\..\samples\Fct.SampleLegacyPlugin\bin\$(Configuration)\net10.0-windows\**\*" />
+    </ItemGroup>
+    <Copy SourceFiles="@(SampleLegacyFiles)"
+          DestinationFiles="@(SampleLegacyFiles->'$(OutDir)plugins\Fct.SampleLegacyPlugin\%(RecursiveDir)%(Filename)%(Extension)')"
+          SkipUnchangedFiles="true" />
+  </Target>
+
+</Project>

@@ -38,8 +38,11 @@ internal sealed class PluginLoadContext : AssemblyLoadContext
 
     /// <summary>
     /// Assemblies on the plugin-facing surface (or its transitive closure) that must have a single
-    /// identity across the boundary: the contract, the UI contract + Avalonia, and the logging
-    /// abstraction the <c>IPluginHost.Logger</c> type comes from.
+    /// identity across the boundary: the contract, the UI contract + Avalonia, the logging
+    /// abstraction the <c>IPluginHost.Logger</c> type comes from, and the compat shim + its two
+    /// legacy-impersonating facades (so a recompiled legacy plugin and the shim agree on the
+    /// <c>Advanced Combat Tracker</c> / <c>FFXIV_ACT_Plugin.Common</c> types the shim constructs and
+    /// hands across the boundary).
     /// </summary>
     internal static bool IsShared(string? name)
     {
@@ -47,6 +50,9 @@ internal sealed class PluginLoadContext : AssemblyLoadContext
         return name == "Fct.Abstractions"
             || name == "Fct.Abstractions.UI"
             || name == "Microsoft.Extensions.Logging.Abstractions"
+            || name == "Fct.Compat.Shim"
+            || name == "Advanced Combat Tracker"
+            || name == "FFXIV_ACT_Plugin.Common"
             || name.StartsWith("Avalonia", StringComparison.Ordinal);
     }
 }

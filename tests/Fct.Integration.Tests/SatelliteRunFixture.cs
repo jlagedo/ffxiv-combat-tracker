@@ -49,7 +49,7 @@ namespace Fct.Integration.Tests
                 if (File.Exists(Path.Combine(dir.FullName, "ffxiv-combat-tracker.slnx")))
                 {
                     var exe = Path.Combine(dir.FullName, "src", "Fct.App", "bin", config,
-                        "net10.0", "satellite", "Fct.LegacyHost.exe");
+                        "net10.0-windows", "satellite", "Fct.LegacyHost.exe");
                     return File.Exists(exe) ? exe : null;
                 }
                 dir = dir.Parent;

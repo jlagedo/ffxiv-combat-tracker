@@ -12,6 +12,15 @@ using Microsoft.Extensions.Logging;
 namespace Fct.App.Plugins;
 
 /// <summary>
+/// Builds the <see cref="IPlugin"/> that drives a legacy (compat-shim) plugin: given the plugin's
+/// loaded assembly and the <c>IActPluginV1</c> type named in its manifest, returns the shim's
+/// <c>LegacyPluginHost</c>. Supplied by the host composition root so <see cref="PluginManager"/> takes
+/// no compile-time dependency on the shim (keeps the headless loader tests shim-free); null when the
+/// shim is not wired, in which case legacy manifests are rejected.
+/// </summary>
+internal delegate IPlugin? LegacyPluginHostFactory(System.Reflection.Assembly pluginAssembly, string legacyEntry);
+
+/// <summary>
 /// Discovers, loads, initializes, and unloads native <see cref="IPlugin"/>s. Each plugin gets its own
 /// collectible <see cref="PluginLoadContext"/> and a per-plugin <see cref="PluginHost"/> over the
 /// shared services. Init is fault-guarded and time-boxed: a plugin that throws or overruns its budget
@@ -27,6 +36,7 @@ internal sealed class PluginManager
     private readonly IClock _clock;
     private readonly ILoggerFactory _loggerFactory;
     private readonly ILogger<PluginManager> _log;
+    private readonly LegacyPluginHostFactory? _legacyFactory;
     private readonly List<LoadedPlugin> _loaded = new();
 
     public PluginManager(
@@ -36,7 +46,8 @@ internal sealed class PluginManager
         RegistryService registry,
         GameEventBus bus,
         IClock clock,
-        ILoggerFactory loggerFactory)
+        ILoggerFactory loggerFactory,
+        LegacyPluginHostFactory? legacyFactory = null)
     {
         _game = game;
         _encounters = encounters;
@@ -46,6 +57,7 @@ internal sealed class PluginManager
         _clock = clock;
         _loggerFactory = loggerFactory;
         _log = loggerFactory.CreateLogger<PluginManager>();
+        _legacyFactory = legacyFactory;
     }
 
     /// <summary>Directory scanned for plugin folders (each holds a <c>plugin.json</c>). Overridable for tests.</summary>
@@ -109,18 +121,44 @@ internal sealed class PluginManager
         {
             alc = new PluginLoadContext(assemblyPath);
             var assembly = alc.LoadFromAssemblyPath(assemblyPath);
-            var type = assembly.GetType(manifest.Entry, throwOnError: false);
-            if (type is null || !typeof(IPlugin).IsAssignableFrom(type))
-            {
-                _log.LogWarning(LogEvents.NativePluginFaulted,
-                    "Plugin {Id}: entry type {Entry} is missing or not an IPlugin", manifest.Id, manifest.Entry);
-                alc.Unload();
-                return;
-            }
 
-            instance = (IPlugin)Activator.CreateInstance(type)!;
-            _log.LogInformation(LogEvents.NativePluginLoaded, "Loaded plugin {Id} v{Version} ({Entry})",
-                manifest.Id, manifest.Version, manifest.Entry);
+            if (manifest.LegacyEntry is not null)
+            {
+                if (_legacyFactory is null)
+                {
+                    _log.LogWarning(LogEvents.NativePluginFaulted,
+                        "Plugin {Id}: legacy entry {Entry} but the compat shim is not available", manifest.Id, manifest.LegacyEntry);
+                    alc.Unload();
+                    return;
+                }
+
+                instance = _legacyFactory(assembly, manifest.LegacyEntry);
+                if (instance is null)
+                {
+                    _log.LogWarning(LogEvents.NativePluginFaulted,
+                        "Plugin {Id}: compat shim could not host legacy entry {Entry}", manifest.Id, manifest.LegacyEntry);
+                    alc.Unload();
+                    return;
+                }
+
+                _log.LogInformation(LogEvents.NativePluginLoaded, "Loaded legacy plugin {Id} v{Version} ({Entry}) via compat shim",
+                    manifest.Id, manifest.Version, manifest.LegacyEntry);
+            }
+            else
+            {
+                var type = assembly.GetType(manifest.Entry!, throwOnError: false);
+                if (type is null || !typeof(IPlugin).IsAssignableFrom(type))
+                {
+                    _log.LogWarning(LogEvents.NativePluginFaulted,
+                        "Plugin {Id}: entry type {Entry} is missing or not an IPlugin", manifest.Id, manifest.Entry);
+                    alc.Unload();
+                    return;
+                }
+
+                instance = (IPlugin)Activator.CreateInstance(type)!;
+                _log.LogInformation(LogEvents.NativePluginLoaded, "Loaded plugin {Id} v{Version} ({Entry})",
+                    manifest.Id, manifest.Version, manifest.Entry);
+            }
 
             var host = BuildHost(manifest);
             using var cts = CancellationTokenSource.CreateLinkedTokenSource(ct);

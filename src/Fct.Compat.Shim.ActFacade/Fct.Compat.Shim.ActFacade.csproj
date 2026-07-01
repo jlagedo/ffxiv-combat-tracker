@@ -1,0 +1,28 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!--
+    net10 facade for the Advanced Combat Tracker host surface. Compiles to an assembly named
+    "Advanced Combat Tracker" so a legacy plugin recompiled against the net10 compat shim binds its
+    `using Advanced_Combat_Tracker;` references here (the net48 satellite uses Fct.Compat.Act
+    instead; this is the net10-host counterpart). Unlike the net48 facade, FormActMain is a POCO
+    (NOT a System.Windows.Forms.Form) that forwards to the modern IPluginHost. WinForms is still
+    referenced because IActPluginV1.InitPlugin(TabPage, Label) and ActPluginData require the control
+    types. Behavior is added slice-by-slice; the aggregation engine (shared/Aggregation) lands in D5.
+  -->
+  <PropertyGroup>
+    <TargetFramework>net10.0-windows</TargetFramework>
+    <UseWindowsForms>true</UseWindowsForms>
+    <ImplicitUsings>disable</ImplicitUsings>
+    <Nullable>disable</Nullable>
+    <AssemblyName>Advanced Combat Tracker</AssemblyName>
+    <RootNamespace>Advanced_Combat_Tracker</RootNamespace>
+    <!-- Impersonate ACT's file version so plugin GetVersion()/GetName().Version checks pass. Unsigned (OQ-1). -->
+    <AssemblyVersion>3.8.5.288</AssemblyVersion>
+    <FileVersion>3.8.5.288</FileVersion>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\Fct.Abstractions\Fct.Abstractions.csproj" />
+  </ItemGroup>
+
+</Project>

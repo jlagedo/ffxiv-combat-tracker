@@ -46,6 +46,24 @@ public class PluginLoaderTests
         }
     }
 
+    [Theory]
+    [InlineData("Fct.Abstractions")]
+    [InlineData("Fct.Abstractions.UI")]
+    [InlineData("Microsoft.Extensions.Logging.Abstractions")]
+    [InlineData("Avalonia.Controls")]
+    [InlineData("Fct.Compat.Shim")]
+    [InlineData("Advanced Combat Tracker")]
+    [InlineData("FFXIV_ACT_Plugin.Common")]
+    public void Shared_assemblies_resolve_up_to_the_default_context(string name)
+        => Assert.True(PluginLoadContext.IsShared(name));
+
+    [Theory]
+    [InlineData("Fct.SamplePlugin")]
+    [InlineData("Newtonsoft.Json")]
+    [InlineData(null)]
+    public void Private_assemblies_stay_isolated_in_the_plugin_alc(string? name)
+        => Assert.False(PluginLoadContext.IsShared(name));
+
     [Fact]
     public async Task Manager_loads_inits_and_unloads_the_sample_plugin()
     {
@@ -132,6 +150,87 @@ public class PluginLoaderTests
         finally
         {
             try { Directory.Delete(dir, recursive: true); } catch { /* best-effort */ }
+        }
+    }
+
+    [Fact]
+    public async Task Manager_routes_legacy_manifests_to_the_shim_factory()
+    {
+        // A `legacyEntry` manifest goes through the injected shim factory rather than the native
+        // entry-type path. Uses a stub factory (any loadable DLL as the plugin assembly) so the routing
+        // is proven without a compile dependency on the real shim.
+        var root = Path.Combine(Path.GetTempPath(), "fct-legacy-" + Path.GetRandomFileName());
+        var dir = Path.Combine(root, "legacy");
+        Directory.CreateDirectory(dir);
+        try
+        {
+            File.Copy(SampleDll, Path.Combine(dir, "Fct.SamplePlugin.dll"));
+            File.WriteAllText(Path.Combine(dir, "plugin.json"), """
+            {
+              "id": "com.test.legacy",
+              "version": "1.0.0",
+              "contract": "1.0",
+              "assembly": "Fct.SamplePlugin.dll",
+              "legacyEntry": "Some.Legacy.PluginType",
+              "capabilities": []
+            }
+            """);
+
+            string? capturedEntry = null;
+            var fake = new RecordingPlugin();
+            LegacyPluginHostFactory factory = (assembly, legacyEntry) =>
+            {
+                capturedEntry = legacyEntry;
+                return fake;
+            };
+
+            var bus = new GameEventBus();
+            var registry = new RegistryService();
+            var manager = new PluginManager(
+                new GameSession(bus, new GameSnapshotProvider()),
+                new EncounterService(new SystemClock()),
+                new AudioService(NullLogger<AudioService>.Instance),
+                registry,
+                bus,
+                new SystemClock(),
+                NullLoggerFactory.Instance,
+                factory)
+            {
+                PluginsRoot = root,
+            };
+
+            await manager.LoadAllAsync(CancellationToken.None);
+
+            // The factory was handed the manifest's legacyEntry, and the returned IPlugin was initialized.
+            Assert.Equal("Some.Legacy.PluginType", capturedEntry);
+            Assert.True(fake.Initialized);
+            Assert.Single(manager.Loaded);
+            Assert.Contains(registry.LoadedPlugins, p => p.Id == "com.test.legacy");
+
+            await manager.UnloadAllAsync();
+            Assert.True(fake.Disposed);
+        }
+        finally
+        {
+            try { Directory.Delete(root, recursive: true); } catch { /* best-effort */ }
+        }
+    }
+
+    private sealed class RecordingPlugin : IPlugin
+    {
+        public bool Initialized { get; private set; }
+        public bool Disposed { get; private set; }
+
+        public Task InitializeAsync(IPluginHost host, CancellationToken ct)
+        {
+            Initialized = true;
+            return Task.CompletedTask;
+        }
+
+        public ValueTask DisposeAsync()
+        {
+            Disposed = true;
+            return default;
         }
     }
 }

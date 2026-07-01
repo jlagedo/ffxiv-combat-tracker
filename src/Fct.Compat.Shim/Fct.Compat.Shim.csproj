@@ -1,0 +1,23 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!--
+    The net10 compat shim runtime: the adapter that re-projects the legacy ACT + FFXIV-SDK
+    programming model onto the modern IPluginHost. Hosts a recompiled legacy plugin
+    (LegacyPluginHost : IPlugin), wires ActGlobals.oFormActMain over the host, and maps the SDK's
+    IDataSubscription / IDataRepository / Combatant surface. WinForms because it constructs the
+    TabPage/Label a legacy IActPluginV1.InitPlugin demands. Shipped in the host output and shared to
+    the default ALC (with the two facades) so a shimmed plugin and the shim agree on type identity.
+  -->
+  <PropertyGroup>
+    <TargetFramework>net10.0-windows</TargetFramework>
+    <UseWindowsForms>true</UseWindowsForms>
+    <RootNamespace>Fct.Compat.Shim</RootNamespace>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\Fct.Abstractions\Fct.Abstractions.csproj" />
+    <ProjectReference Include="..\Fct.Compat.Shim.ActFacade\Fct.Compat.Shim.ActFacade.csproj" />
+    <ProjectReference Include="..\Fct.Compat.Shim.SdkFacade\Fct.Compat.Shim.SdkFacade.csproj" />
+  </ItemGroup>
+
+</Project>

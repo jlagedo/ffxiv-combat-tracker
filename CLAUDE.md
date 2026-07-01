@@ -142,8 +142,8 @@ net48 targeting pack, WindowsDesktop runtime, VS 2026 / MSBuild.
 
 ```powershell
 dotnet build src\Fct.App\Fct.App.csproj   # net10 host; a StageSatellite target chains + stages the
-                                          #   net48 satellite into bin\<cfg>\net10.0\satellite\.
-.\src\Fct.App\bin\Debug\net10.0\Fct.App.exe   # run e2e: host launches satellite\Fct.LegacyHost.exe
+                                          #   net48 satellite into bin\<cfg>\net10.0-windows\satellite\.
+.\src\Fct.App\bin\Debug\net10.0-windows\Fct.App.exe   # run e2e: host launches satellite\Fct.LegacyHost.exe
                                               #   --bridge <pipe>, loads the real plugins. Unified logs
                                               #   under %LOCALAPPDATA%\FFXIVCombatTracker\logs\.
 .\test.ps1                                    # build + stage + all suites under tests\.
