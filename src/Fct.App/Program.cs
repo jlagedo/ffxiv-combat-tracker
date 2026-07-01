@@ -22,6 +22,9 @@ class Program
     [STAThread]
     public static int Main(string[] args)
     {
+        // Resolve the UI culture before anything else touches Resources or formats a string.
+        Fct.App.Lang.LocalizationStartup.Initialize();
+
         // Stand the logger up first so even a failure building the host is recorded.
         Log.Logger = LoggingBootstrap.CreateLogger();
 

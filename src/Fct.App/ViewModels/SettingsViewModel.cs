@@ -1,5 +1,6 @@
 using CommunityToolkit.Mvvm.ComponentModel;
 using Fct.App.Hosting;
+using Fct.App.Lang;
 using Fct.Logging;
 
 namespace Fct.App.ViewModels;
@@ -20,9 +21,9 @@ public sealed partial class SettingsViewModel : PageViewModel
     }
 
     public override Section Section => Section.Settings;
-    public override string Eyebrow => "Settings";
-    public override string Title => "Settings";
-    public override string Subtitle => "How the app launches and where it keeps its files.";
+    public override string Eyebrow => Resources.Nav_Settings;
+    public override string Title => Resources.Nav_Settings;
+    public override string Subtitle => Resources.Settings_Subtitle;
 
     [ObservableProperty]
     private bool _launchSatelliteOnStartup;

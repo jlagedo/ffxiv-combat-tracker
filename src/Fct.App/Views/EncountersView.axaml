@@ -1,6 +1,7 @@
 <UserControl xmlns="https://github.com/avaloniaui"
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
              xmlns:vm="using:Fct.App.ViewModels"
+             xmlns:lang="using:Fct.App.Lang"
              xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
              xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
              mc:Ignorable="d" d:DesignWidth="820" d:DesignHeight="620"
@@ -14,14 +15,14 @@
             <StackPanel VerticalAlignment="Center" HorizontalAlignment="Center" Spacing="12" MaxWidth="440">
                 <Path Width="44" Height="44" Stretch="Uniform" Opacity="0.55" Fill="{StaticResource FrostDimBrush}"
                       Data="M3 20 V11 H6 V20 Z M9.5 20 V4 H12.5 V20 Z M16 20 V14 H19 V20 Z"/>
-                <TextBlock Text="Waiting for game data" Classes="h2" HorizontalAlignment="Center"/>
+                <TextBlock Text="{x:Static lang:Resources.Encounters_WaitingTitle}" Classes="h2" HorizontalAlignment="Center"/>
                 <TextBlock Classes="subtitle" HorizontalAlignment="Center" TextAlignment="Center"
-                           Text="Encounters and per-player DPS appear here once combat data starts flowing in."/>
+                           Text="{x:Static lang:Resources.Encounters_WaitingBody}"/>
                 <Border Background="{StaticResource RimeBrush}" CornerRadius="8" Padding="12,8" HorizontalAlignment="Center">
                     <StackPanel Orientation="Horizontal" Spacing="9">
                         <Ellipse Width="8" Height="8" VerticalAlignment="Center"
-                                 Fill="{Binding Shell.GameStateLabel, Converter={StaticResource StatusToBrush}}"/>
-                        <TextBlock Text="{Binding Shell.GameStateLabel, StringFormat='Game: {0}'}"
+                                 Fill="{Binding Shell.GameStatusKind, Converter={StaticResource StatusToBrush}}"/>
+                        <TextBlock Text="{Binding Shell.GameStateLabel, StringFormat={x:Static lang:Resources.Status_GameFormat}}"
                                    Classes="meta" FontSize="11.5" VerticalAlignment="Center"/>
                     </StackPanel>
                 </Border>
@@ -54,12 +55,12 @@
                         <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="26" VerticalAlignment="Center">
                             <StackPanel Spacing="2">
                                 <TextBlock Text="{Binding DurationLabel}" Classes="h2" FontFamily="{StaticResource MonoFont}"/>
-                                <TextBlock Text="duration" Classes="eyebrow" FontSize="9.5"/>
+                                <TextBlock Text="{x:Static lang:Resources.Label_Duration}" Classes="eyebrow" FontSize="9.5"/>
                             </StackPanel>
                             <StackPanel Spacing="2">
                                 <TextBlock Text="{Binding DpsLabel}" Classes="h2" FontFamily="{StaticResource MonoFont}"
                                            Foreground="{StaticResource FrostBrush}"/>
-                                <TextBlock Text="raid dps" Classes="eyebrow" FontSize="9.5"/>
+                                <TextBlock Text="{x:Static lang:Resources.Label_RaidDps}" Classes="eyebrow" FontSize="9.5"/>
                             </StackPanel>
                         </StackPanel>
                     </Grid>
@@ -68,12 +69,12 @@
                 <!-- Column header -->
                 <Grid DockPanel.Dock="Top" Margin="24,12,24,6"
                       ColumnDefinitions="28,*,90,120,80,54">
-                    <TextBlock Grid.Column="0" Text="#" Classes="eyebrow" FontSize="9.5"/>
-                    <TextBlock Grid.Column="1" Text="COMBATANT" Classes="eyebrow" FontSize="9.5"/>
-                    <TextBlock Grid.Column="2" Text="DPS" Classes="eyebrow" FontSize="9.5"/>
-                    <TextBlock Grid.Column="3" Text="DAMAGE" Classes="eyebrow" FontSize="9.5"/>
-                    <TextBlock Grid.Column="4" Text="HPS" Classes="eyebrow" FontSize="9.5"/>
-                    <TextBlock Grid.Column="5" Text="DEATHS" Classes="eyebrow" FontSize="9.5"/>
+                    <TextBlock Grid.Column="0" Text="{x:Static lang:Resources.Column_Rank}" Classes="eyebrow" FontSize="9.5"/>
+                    <TextBlock Grid.Column="1" Text="{x:Static lang:Resources.Column_Combatant}" Classes="eyebrow" FontSize="9.5"/>
+                    <TextBlock Grid.Column="2" Text="{x:Static lang:Resources.Column_Dps}" Classes="eyebrow" FontSize="9.5"/>
+                    <TextBlock Grid.Column="3" Text="{x:Static lang:Resources.Column_Damage}" Classes="eyebrow" FontSize="9.5"/>
+                    <TextBlock Grid.Column="4" Text="{x:Static lang:Resources.Column_Hps}" Classes="eyebrow" FontSize="9.5"/>
+                    <TextBlock Grid.Column="5" Text="{x:Static lang:Resources.Column_Deaths}" Classes="eyebrow" FontSize="9.5"/>
                 </Grid>
 
                 <ScrollViewer Padding="24,0,24,16">

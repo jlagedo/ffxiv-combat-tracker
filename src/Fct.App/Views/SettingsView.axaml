@@ -1,6 +1,7 @@
 <UserControl xmlns="https://github.com/avaloniaui"
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
              xmlns:vm="using:Fct.App.ViewModels"
+             xmlns:lang="using:Fct.App.Lang"
              xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
              xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
              mc:Ignorable="d" d:DesignWidth="820" d:DesignHeight="620"
@@ -13,27 +14,27 @@
 
             <Border Classes="card rise1" Padding="22,18">
                 <StackPanel Spacing="16">
-                    <TextBlock Text="Startup" Classes="h2"/>
+                    <TextBlock Text="{x:Static lang:Resources.Settings_StartupTitle}" Classes="h2"/>
                     <Grid ColumnDefinitions="*,Auto">
                         <StackPanel Spacing="2">
-                            <TextBlock Text="Start the classic engine automatically" Classes="body"/>
-                            <TextBlock Text="Starts the classic plugin engine when the app opens. Turn off to start it yourself from the Plugins page."
+                            <TextBlock Text="{x:Static lang:Resources.Settings_AutoStartLabel}" Classes="body"/>
+                            <TextBlock Text="{x:Static lang:Resources.Settings_AutoStartDescription}"
                                        Classes="meta" FontSize="11" TextWrapping="Wrap" MaxWidth="520" HorizontalAlignment="Left"/>
                         </StackPanel>
                         <ToggleSwitch Grid.Column="1" IsChecked="{Binding LaunchSatelliteOnStartup, Mode=TwoWay}"
                                       OnContent="" OffContent="" VerticalAlignment="Center"
-                                      AutomationProperties.Name="Start the classic engine automatically"/>
+                                      AutomationProperties.Name="{x:Static lang:Resources.Settings_AutoStartLabel}"/>
                     </Grid>
                 </StackPanel>
             </Border>
 
             <Border Classes="card rise2" Padding="22,18">
                 <StackPanel Spacing="14">
-                    <TextBlock Text="Appearance" Classes="h2"/>
+                    <TextBlock Text="{x:Static lang:Resources.Settings_AppearanceTitle}" Classes="h2"/>
                     <Grid ColumnDefinitions="*,Auto">
                         <StackPanel Spacing="2">
-                            <TextBlock Text="Theme" Classes="body"/>
-                            <TextBlock Text="The cold-field palette drawn from the game's crystal motif." Classes="meta" FontSize="11"/>
+                            <TextBlock Text="{x:Static lang:Resources.Settings_ThemeLabel}" Classes="body"/>
+                            <TextBlock Text="{x:Static lang:Resources.Settings_ThemeDescription}" Classes="meta" FontSize="11"/>
                         </StackPanel>
                         <Border Grid.Column="1" Background="{StaticResource RimeBrush}" CornerRadius="6"
                                 Padding="11,6" VerticalAlignment="Center">
@@ -50,14 +51,14 @@
 
             <Border Classes="card rise3" Padding="22,18">
                 <StackPanel Spacing="14">
-                    <TextBlock Text="Diagnostics" Classes="h2"/>
+                    <TextBlock Text="{x:Static lang:Resources.Settings_DiagnosticsTitle}" Classes="h2"/>
                     <Grid ColumnDefinitions="*,Auto">
                         <StackPanel Spacing="2" VerticalAlignment="Center">
-                            <TextBlock Text="Logs" Classes="body"/>
+                            <TextBlock Text="{x:Static lang:Resources.Settings_LogsLabel}" Classes="body"/>
                             <TextBlock Text="{Binding LogsDirectory}" Classes="meta" FontSize="11"
                                        TextTrimming="MiddleEllipsis"/>
                         </StackPanel>
-                        <Button Grid.Column="1" Classes="ghost small" Content="Open logs folder"
+                        <Button Grid.Column="1" Classes="ghost small" Content="{x:Static lang:Resources.Action_OpenLogsFolder}"
                                 VerticalAlignment="Center" Click="OnOpenLogs"/>
                     </Grid>
                 </StackPanel>
@@ -65,10 +66,10 @@
 
             <Border Classes="card rise4" Padding="22,18">
                 <StackPanel Spacing="6">
-                    <TextBlock Text="About" Classes="h2" Margin="0,0,0,6"/>
+                    <TextBlock Text="{x:Static lang:Resources.Settings_AboutTitle}" Classes="h2" Margin="0,0,0,6"/>
                     <TextBlock Classes="meta" Text="FFXIV Combat Tracker"/>
                     <TextBlock Classes="meta"
-                               Text="Runs your existing ACT plugins alongside modern ones, with an opt-in path from classic to modern."/>
+                               Text="{x:Static lang:Resources.Settings_AboutDescription}"/>
                 </StackPanel>
             </Border>
         </StackPanel>

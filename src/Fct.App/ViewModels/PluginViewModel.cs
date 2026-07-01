@@ -1,5 +1,6 @@
 using System;
 using CommunityToolkit.Mvvm.ComponentModel;
+using Fct.App.Lang;
 
 namespace Fct.App.ViewModels;
 
@@ -62,29 +63,29 @@ public sealed partial class PluginViewModel : ObservableObject
     public bool HasStatusText => !string.IsNullOrWhiteSpace(SatelliteStatusText);
 
     // Kind badge shown in the config bay header.
-    public string Runtime => Kind == PluginKind.Legacy ? "Classic" : "Modern";
+    public string Runtime => Kind == PluginKind.Legacy ? Resources.Label_ClassicRuntime : Resources.Label_ModernRuntime;
 
     public string StatusLabel => Status switch
     {
-        PluginStatus.Loading => "Starting…",
-        PluginStatus.Live => "Live",
-        PluginStatus.Running => "Running",
-        PluginStatus.Loaded => "Loaded",
-        PluginStatus.NotLoaded => "Not loaded",
-        PluginStatus.Unavailable => "Unavailable",
-        _ => "Error"
+        PluginStatus.Loading => Resources.Status_Starting,
+        PluginStatus.Live => Resources.Status_Live,
+        PluginStatus.Running => Resources.Status_Running,
+        PluginStatus.Loaded => Resources.Status_Loaded,
+        PluginStatus.NotLoaded => Resources.Status_NotLoaded,
+        PluginStatus.Unavailable => Resources.Status_Unavailable,
+        _ => Resources.Status_Error
     };
 
     // Shown in the config bay when there's nothing embeddable for this plugin.
     public string ConfigPlaceholderTitle =>
-        Kind == PluginKind.Native ? "Configured in the plugin"
-        : Status == PluginStatus.NotLoaded ? "No configuration to show"
-        : "Configuration unavailable";
+        Kind == PluginKind.Native ? Resources.Plugins_ConfiguredInPlugin
+        : Status == PluginStatus.NotLoaded ? Resources.Plugins_NoConfigToShow
+        : Resources.Plugins_ConfigUnavailable;
 
     public string ConfigPlaceholderBody =>
         Kind == PluginKind.Native
-            ? "Modern plugins run inside the app and bring their own settings — there's nothing to embed here."
+            ? Resources.Plugins_ModernNoEmbedBody
         : Status == PluginStatus.NotLoaded
-            ? "This classic plugin didn't provide a configuration window."
-            : "The classic engine isn't running, so this plugin's configuration can't be shown.";
+            ? Resources.Plugins_ClassicNoWindowBody
+            : Resources.Plugins_EngineDownBody;
 }

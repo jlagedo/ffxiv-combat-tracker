@@ -6,6 +6,7 @@ using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using Fct.Abstractions;
 using Fct.App.Hosting;
+using Fct.App.Lang;
 
 namespace Fct.App.ViewModels;
 
@@ -60,6 +61,7 @@ public sealed partial class MainViewModel : ObservableObject
         _selectedPlugin.IsSelected = true;
         Host = HostState.Online;
         SatelliteState = "Running";
+        SatelliteStatusKind = PluginStatus.Running;
         SatelliteSummary = "Classic plugin engine running · 3 plugins.";
     }
 
@@ -74,11 +76,11 @@ public sealed partial class MainViewModel : ObservableObject
             ModernPlugins.Add(new PluginViewModel
             {
                 Name = info.Id,
-                Role = "Modern plugin",
+                Role = Resources.Plugins_ModernPluginRole,
                 Version = info.Version,
                 Kind = PluginKind.Native,
                 ContractVersion = info.ContractVersion,
-                Description = "Runs inside the app in its own sandbox.",
+                Description = Resources.Plugins_ModernPluginDescription,
                 Status = PluginStatus.Loaded,
             });
 
@@ -141,7 +143,7 @@ public sealed partial class MainViewModel : ObservableObject
     // ---- satellite / host / game connection state ----
     [ObservableProperty]
     [NotifyPropertyChangedFor(nameof(IsOnline), nameof(IsOffline), nameof(GameLive),
-        nameof(GameStateLabel))]
+        nameof(GameStateLabel), nameof(GameStatusKind))]
     private HostState _host = HostState.Starting;
 
     public bool IsOnline => Host == HostState.Online;
@@ -153,6 +155,12 @@ public sealed partial class MainViewModel : ObservableObject
     [ObservableProperty]
     private string _satelliteState = "Starting";
 
+    // Drives the status-to-brush converter for the "Classic engine" chip. Kept separate from the
+    // (localized, free-form) SatelliteState text so the colour never depends on matching English
+    // literals — set alongside SatelliteState at every transition below.
+    [ObservableProperty]
+    private PluginStatus _satelliteStatusKind = PluginStatus.Loading;
+
     [ObservableProperty]
     private bool _configReady;
 
@@ -163,14 +171,16 @@ public sealed partial class MainViewModel : ObservableObject
     public bool HasError => !string.IsNullOrEmpty(ErrorMessage);
 
     // The app is running whenever this view model exists.
-    public string HostStateLabel => "Running";
+    public string HostStateLabel => Resources.Status_Running;
+    public PluginStatus HostStatusKind => PluginStatus.Running;
 
     // The game is "Live" when the classic engine is up AND the parser is streaming (reads Live).
     public bool GameLive => IsOnline && LegacyPlugins.Any(p => p.Key == "ffxiv" && p.IsLive);
     public string GameStateLabel =>
-        !IsOnline ? "Not connected"
-        : GameLive ? "Live"
-        : "Waiting for combat";
+        !IsOnline ? Resources.Status_NotConnected
+        : GameLive ? Resources.Status_Live
+        : Resources.Status_WaitingForCombat;
+    public PluginStatus GameStatusKind => GameLive ? PluginStatus.Live : PluginStatus.Loading;
 
     // ---- roster-derived figures ----
     public int LegacyLoadedCount =>
@@ -180,7 +190,7 @@ public sealed partial class MainViewModel : ObservableObject
     public int FaultCount => LegacyPlugins.Count(p => p.Status is PluginStatus.Error or PluginStatus.NotLoaded);
 
     public string LoadedSummary =>
-        $"{TotalLoadedCount} loaded · {LegacyLoadedCount} classic · {ModernLoadedCount} modern";
+        string.Format(Resources.Overview_LoadedSummaryFormat, TotalLoadedCount, LegacyLoadedCount, ModernLoadedCount);
 
     public bool HasModernPlugins => ModernPlugins.Count > 0;
     public bool HasLegacyPlugins => LegacyPlugins.Count > 0;
@@ -188,8 +198,9 @@ public sealed partial class MainViewModel : ObservableObject
     public void SetStarting()
     {
         Host = HostState.Starting;
-        SatelliteState = "Starting…";
-        SatelliteSummary = "Starting the classic plugin engine…";
+        SatelliteState = Resources.Status_Starting;
+        SatelliteStatusKind = PluginStatus.Loading;
+        SatelliteSummary = Resources.Status_StartingEngineSummary;
         ConfigReady = false;
         ErrorMessage = null;
         RaiseRosterChanged();
@@ -201,10 +212,11 @@ public sealed partial class MainViewModel : ObservableObject
     {
         Host = HostState.Online;
         ErrorMessage = null;
-        SatelliteState = "Running";
+        SatelliteState = Resources.Status_Running;
+        SatelliteStatusKind = PluginStatus.Running;
         SatelliteSummary = plugins.Count == 1
-            ? "Classic plugin engine running · 1 plugin."
-            : $"Classic plugin engine running · {plugins.Count} plugins.";
+            ? Resources.Status_EngineRunningSummary_One
+            : string.Format(Resources.Status_EngineRunningSummary_Many, plugins.Count);
 
         LegacyPlugins.Clear();
         foreach (var p in plugins)
@@ -232,16 +244,17 @@ public sealed partial class MainViewModel : ObservableObject
             SelectedPlugin = LegacyPlugins.FirstOrDefault() ?? ModernPlugins.FirstOrDefault();
         RaiseRosterChanged();
 
-        _hub?.Publish(NotificationSeverity.Success, "Classic engine", "Classic engine running",
-            plugins.Count == 1 ? "1 classic plugin ready." : $"{plugins.Count} classic plugins ready.");
+        _hub?.Publish(NotificationSeverity.Success, Resources.Notify_Source_ClassicEngine, Resources.Notify_EngineRunningTitle,
+            plugins.Count == 1 ? Resources.Notify_EngineReady_One : string.Format(Resources.Notify_EngineReady_Many, plugins.Count));
     }
 
     public void SetOffline(string error)
     {
         Host = HostState.Offline;
         ConfigReady = false;
-        SatelliteState = "Stopped";
-        SatelliteSummary = "Classic plugin engine stopped.";
+        SatelliteState = Resources.Status_Stopped;
+        SatelliteStatusKind = PluginStatus.Unavailable;
+        SatelliteSummary = Resources.Status_EngineStoppedSummary;
         ErrorMessage = error;
         foreach (var p in LegacyPlugins)
         {
@@ -251,7 +264,7 @@ public sealed partial class MainViewModel : ObservableObject
         }
         RaiseRosterChanged();
 
-        _hub?.Publish(NotificationSeverity.Error, "Classic engine", "Couldn't start the classic engine", error);
+        _hub?.Publish(NotificationSeverity.Error, Resources.Notify_Source_ClassicEngine, Resources.Notify_EngineStartFailedTitle, error);
     }
 
     // The classic engine is intentionally not running (auto-launch disabled). Neutral — no error.
@@ -259,8 +272,9 @@ public sealed partial class MainViewModel : ObservableObject
     {
         Host = HostState.Offline;
         ConfigReady = false;
-        SatelliteState = "Not started";
-        SatelliteSummary = "Classic plugin engine not started — start it from the Plugins page.";
+        SatelliteState = Resources.Status_NotStarted;
+        SatelliteStatusKind = PluginStatus.Loading;
+        SatelliteSummary = Resources.Status_EngineNotStartedSummary;
         ErrorMessage = null;
         LegacyPlugins.Clear();
         RaiseRosterChanged();
@@ -277,6 +291,7 @@ public sealed partial class MainViewModel : ObservableObject
         OnPropertyChanged(nameof(HasModernPlugins));
         OnPropertyChanged(nameof(GameLive));
         OnPropertyChanged(nameof(GameStateLabel));
+        OnPropertyChanged(nameof(GameStatusKind));
     }
 
     private static PluginViewModel DemoLegacy(string key, PluginStatus status)
