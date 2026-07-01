@@ -24,7 +24,7 @@
     <Grid>
         <!-- Frozen atmosphere: cold vertical wash + a faint crystal-needle fan at the crown -->
         <Rectangle Fill="{StaticResource AtmosphereBrush}"/>
-        <Path VerticalAlignment="Top" HorizontalAlignment="Center" Margin="0,-30,0,0"
+        <Path Classes="crownfan" VerticalAlignment="Top" HorizontalAlignment="Center" Margin="0,-30,0,0"
               Width="600" Stretch="Uniform" Opacity="0.06" Fill="{StaticResource FrostBrush}"
               Data="M260 0 L268 220 L276 0 Z M222 26 L264 210 L238 24 Z M298 26 L266 210 L282 24 Z M186 64 L260 200 L208 60 Z M334 64 L270 200 L312 60 Z M150 104 L256 188 L182 100 Z M370 104 L274 188 L338 100 Z"/>
 
@@ -75,7 +75,7 @@
                             <StackPanel Spacing="9">
                                 <StackPanel Orientation="Horizontal" Spacing="9">
                                     <Grid Width="14" Height="14" VerticalAlignment="Center">
-                                        <Ellipse Width="14" Height="14" Opacity="0.30"
+                                        <Ellipse Classes="pulse" Width="14" Height="14" Opacity="0.30"
                                                  Fill="{Binding SatelliteState, Converter={StaticResource StatusToBrush}}"/>
                                         <Ellipse Width="7" Height="7"
                                                  Fill="{Binding SatelliteState, Converter={StaticResource StatusToBrush}}"/>

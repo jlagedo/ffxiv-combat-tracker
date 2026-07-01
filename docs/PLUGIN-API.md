@@ -8,9 +8,16 @@ It is the counterpart to the *backward* surface: [`ACT-INTERFACE-MAP.md`](ACT-IN
 [`DATA-FLOW.md`](DATA-FLOW.md) document the legacy ACT host surface the net48 satellite impersonates
 to run the five plugins **unmodified**. This document is the **net10 contract** they migrate *to*.
 
-> **Status: design + scaffold.** `Fct.Abstractions` (net48;net10) and `Fct.Abstractions.UI`
-> (net10 + Avalonia) exist as compiling contract stubs — interfaces and domain records, **no host
-> implementation, no loader**. The shapes here are the reviewable target.
+> **Status: design + scaffold + flow-test harness.** `Fct.Abstractions`
+> (net48;net10) and `Fct.Abstractions.UI` (net10 + Avalonia) exist as compiling contract stubs —
+> interfaces and domain records, **no host implementation, no loader, no shim, no bus**. A headless
+> flow-test harness exercises the contract shapes end-to-end: `Fct.Abstractions.Testing` (net48;net10)
+> supplies in-memory fakes of every interface plus the `ShimStub` seam, and `Fct.FlowTests` (net10)
+> runs the legacy↔native flow suite. The archetype
+> shapes below are cross-checked against the actual source of all five supported plugins on `E:\dev`;
+> the concrete gaps that survived that check are
+> tracked in [Contract gaps](#contract-gaps-tracked), and the flow suite is documented in
+> [Testing the contract](#testing-the-contract--legacynative-flow-tests).
 
 ## Two interfaces, one contract
 
@@ -37,37 +44,46 @@ to run the five plugins **unmodified**. This document is the **net10 contract** 
 ## What the legacy plugins consume (the archetypes)
 
 Distilled from a sweep of all five trees. Each archetype is a real consumption pattern → its modern
-replacement. (FFXIV = FFXIV_ACT_Plugin · OP = OverlayPlugin/cactbot · Trig = Triggernometry ·
-Disc = ACT-Discord-Triggers · Hojo = ACT.Hojoring.)
+replacement, with the source-validation verdict. (FFXIV = FFXIV_ACT_Plugin · OP =
+OverlayPlugin/cactbot · Trig = Triggernometry · Disc = ACT-Discord-Triggers · Hojo = ACT.Hojoring.)
 
-| Archetype | Who | Today | Modern replacement |
-|---|---|---|---|
-| Raw log-line consumer | Trig, OP, Hojo | `Before/OnLogLineRead`, opaque `\|`-line, regex over `LogMessageType` 0–274 | `RawLogLine` event |
-| Typed event consumer | OP | `IDataSubscription` (LogLine/NetworkReceived/ZoneChanged/PartyListChanged/ProcessChanged) | `IGameEventStream` typed records |
-| State poller | Hojo, Trig | `IDataRepository.Get*` polled on bg threads | `IGameSnapshot` (free-threaded, immutable) |
-| DPS / encounter reader | OP | `ActiveZone.ActiveEncounter` + scrape both `ExportVariables` per tick | `IEncounterService` typed snapshot |
-| Combat-state driver | Trig | `SetEncounter`/`EndCombat`/`InCombat`; text export; append line | `IEncounterService` (read+write) |
-| Audio sink provider | Disc, Hojo | **hijack** global `PlayTtsMethod`/`PlaySoundMethod` (last-writer-wins) | `IAudioOutput.RegisterSink` |
-| Audio producer | Trig, OP, Hojo | call `TTS()`/`PlaySound()` | `IAudioOutput.Speak`/`Play` |
-| Raw packets | OP | `RegisterNetworkParser` → bytes → Machina → synthetic lines 256+ | `IRawPacketSource` (capability-gated) |
-| Host services | all | `PluginGetSelfData`, `AppDataFolder`, `WriteExceptionLog`, Trig named callbacks | `IPluginHost` (Storage/Logger/Registry) |
-| UI | all | one WinForms `TabPage` via `InitPlugin` | `IUiContributor` (Avalonia surfaces) |
+| Archetype | Who | Today | Modern replacement | Validated |
+|---|---|---|---|---|
+| Raw log-line consumer | Trig, OP, Hojo | `Before/OnLogLineRead`, opaque `\|`-line, regex over `LogMessageType` 0–274 | `RawLogLine` event | ✅ CONFIRMED |
+| Typed event consumer | OP | `IDataSubscription` (LogLine/NetworkReceived/ZoneChanged/PartyListChanged/ProcessChanged) | `IGameEventStream` typed records | ✅ CONFIRMED |
+| State poller | Hojo, Trig | `IDataRepository.Get*` polled on bg threads | `IGameSnapshot` (free-threaded, immutable) | ✅ CONFIRMED |
+| DPS / encounter reader | OP | `ActiveZone.ActiveEncounter` + scrape both `ExportVariables` per tick | `IEncounterService` typed snapshot + `ExportVariables` bag | ⚠️ PARTIAL — [G2](#contract-gaps-tracked) ([G1](#contract-gaps-tracked) shipped) |
+| Combat-state driver | Trig | `SetEncounter`/`EndCombat`/`InCombat`; text export; append line | `IEncounterService` (read+write) | ✅ CONFIRMED ([G7](#contract-gaps-tracked)) |
+| Audio sink provider | Disc, Hojo | **hijack** global `PlayTtsMethod`/`PlaySoundMethod` (save/restore, route-instead-of) | `IAudioOutput.RegisterSink` | ⚠️ PARTIAL — [G3](#contract-gaps-tracked) |
+| Audio producer | Trig, OP, Hojo | call `TTS()`/`PlaySound()` | `IAudioOutput.Speak`/`Play` | ✅ CONFIRMED |
+| Raw packets | OP | `RegisterNetworkParser` → bytes → Machina → synthetic lines 256+ | `IRawPacketSource` (capability-gated) | ⚠️ PARTIAL — read ✓; write-back [G4](#contract-gaps-tracked) |
+| Host services | all | `PluginGetSelfData`, `AppDataFolder`, `WriteExceptionLog`, Trig named callbacks | `IPluginHost` (Storage/Logger/Registry) | ✅ CONFIRMED ([G5](#contract-gaps-tracked)/[G6](#contract-gaps-tracked)) |
+| UI | all | one WinForms `TabPage` via `InitPlugin` | `IUiContributor` (Avalonia surfaces) | ✅ CONFIRMED ([G11](#contract-gaps-tracked)) |
 
 Three findings drove the shapes:
 
 1. **The actor model is a superset of the SDK, not a mirror.** The FFXIV SDK `Common.Models` is just
-   `Combatant`/`Player`/`NetworkBuff`/`PartyType`. But Hojoring/UltraScouter reach *past* it into
-   Sharlayan + OverlayPlugin for **status lists, focus/hover/target-of-target, enmity, and a reliable
-   in-combat flag** — none of which the SDK exposes. `Actor` carries these so the heaviest consumer
-   can drop its side-channels.
+   `Combatant`/`Player`/`NetworkBuff`/`PartyType`
+   (`FFXIV_ACT_Plugin.Common.Models/`; only these four types exist). Hojoring/UltraScouter reach *past*
+   it into Sharlayan + OverlayPlugin for **status lists, focus/hover/target-of-target, enmity, and a
+   reliable in-combat flag** — none of which the SDK exposes. `Actor` carries these so the heaviest
+   consumer can drop its side-channels.
 2. **The raw line cannot be dropped on day one.** Trig and cactbot are fundamentally
-   regex-over-the-pipe-line engines. `RawLogLine` is a first-class event *alongside* the typed ones —
-   both produced from one decoded packet, exactly as the legacy plugin emits a log line + an SDK event.
-3. **Today's fault model has fixable gaps.** OverlayPlugin holds one dispatch lock across all
-   receivers (one slow `HandleEvent` stalls everyone), has unguarded subscribe-time replay, unguarded
-   poll loops, and unguarded network-thread handlers. The `RingBufferDataSubscription` we already
-   shipped (bounded ring + single dispatch thread + per-subscriber try/catch + drop-oldest) is the
-   correct generalized model.
+   regex-over-the-pipe-line engines (Trig: `Trigger.cs:150,615` over lines queued from
+   `ProxyPlugin.cs:165-166`; OP: `FFXIVOptionalEventSource.cs:57-176`). `RawLogLine` is a first-class
+   event *alongside* the typed ones — both produced from one decoded packet, exactly as the legacy
+   plugin emits a log line + an SDK event.
+3. **Today's fault model has fixable gaps — narrower than a naive read suggests.** OverlayPlugin's
+   dispatch lock is **per event type**, not global: a slow `HandleEvent` stalls all receivers of the
+   *same* event type (and blocks that type's subscribe/unsubscribe), but not unrelated types
+   (`EventDispatcher.cs:128-141`, which *does* try/catch each receiver). The genuinely unguarded spot
+   is **subscribe-time cached-state replay** (`EventDispatcher.cs:71-75`, no try/catch, unlike
+   dispatch). Its timer poll loops and log-line handler *are* guarded
+   (`EventSourceBase.cs:40-61`; `FFXIVOptionalEventSource.cs:61-84`); the **raw-packet Machina
+   handlers on the `NetworkReceived` thread are not** (`NetworkParser.cs:50-73`,
+   `LineBaseCustom.cs:69-87`). The `RingBufferDataSubscription` we already shipped (bounded ring +
+   single dispatch thread + per-subscriber try/catch + drop-oldest) is the correct generalized model
+   that closes all of these uniformly.
 
 ## Project layout
 
@@ -75,6 +91,7 @@ Three findings drove the shapes:
 |---|---|---|
 | `Fct.Abstractions` | net48;net10 | core contract: lifecycle, events, snapshot, encounter, audio, registry, raw hatch. **No UI, no opcodes.** |
 | `Fct.Abstractions.UI` | net10 | Avalonia UI contribution surfaces. Referenced only by UI-contributing plugins. |
+| `Fct.Abstractions.Testing` | net48;net10 | in-memory fakes of every contract interface + the `ShimStub` seam, for the headless flow tests. |
 | net10 compat shim (planned) | net10 | the recompile-shim adapter over the modern contract. Distinct from the existing net48 `Fct.Compat.Act` (the satellite's ACT engine). |
 
 net48 support in the core uses `IsExternalInit.cs` (init-accessor shim) + `Microsoft.Bcl.AsyncInterfaces`
@@ -88,7 +105,8 @@ both sides of the bridge.
 A plugin ships a `plugin.json` manifest (`id`, `version`, `contract` version, `entry` type,
 `capabilities`). The host reads it **without loading the assembly**, gates the contract version, then
 loads the entry type into a dedicated ALC. This replaces the legacy discovery-by-reflection (matching
-`lblPluginTitle.Text` and `GetProperty("DataSubscription")`).
+`lblPluginTitle.Text` and `GetProperty("DataSubscription")` — the exact pattern OverlayPlugin uses at
+`FFXIVRepository.cs:89-97,120-139`).
 
 ```csharp
 public interface IPlugin : IAsyncDisposable
@@ -97,7 +115,9 @@ public interface IPlugin : IAsyncDisposable
 }
 ```
 
-One async entry (no split-brain `InitPlugin`+`Init()` like OverlayPlugin), `DisposeAsync` for teardown.
+One async entry, `DisposeAsync` for teardown. (Note: OverlayPlugin's own entry is a single
+`IActPluginV1.InitPlugin`; its *addons* get a second `IOverlayAddonV2.Init()` because OP is itself a
+mini plugin-host — see [G6](#contract-gaps-tracked) on peer discovery.)
 
 ### The host surface
 
@@ -107,7 +127,8 @@ One async entry (no split-brain `InitPlugin`+`Init()` like OverlayPlugin), `Disp
 ### Game data — typed stream + raw line on one bus
 
 `IGameSession` splits CQRS-style into `Events` (push) and `Snapshot()` (pull) — mirroring how
-consumers actually work (OP/Trig stream; Hojo polls).
+consumers actually work (OP/Trig stream; Hojo polls `DataRepository.GetCombatantList()` on a
+`ThreadWorker`, `XIVPluginHelper.cs:904-912`).
 
 ```csharp
 public interface IGameEventStream
@@ -131,15 +152,26 @@ complete 0–274 taxonomy (FFXIV native + OverlayPlugin's 256+ custom range).
 
 `IGameSnapshot` returns immutable records callable from any thread (no caller-side `lock`, unlike the
 legacy `lock (cd.Lock)`). `Actor` (`Actors.cs`) is the **superset** model — adding `Statuses`,
-`Enmity`, `TargetOfTargetId`, and `InCombat` on top of the SDK fields. `IResourceCatalog` provides
-typed, complete, all-locale name tables (skill/status/zone/world/item) — the data Hojoring patches
-with bundled CSVs today because the SDK's buff dictionary is never populated.
+`Enmity`, `TargetOfTargetId`, and `InCombat` on top of the SDK fields, and the snapshot itself
+carries `Focus`/`Hover` (`Session.cs:51-52`) — together closing Hojoring's Sharlayan/OverlayPlugin
+side-channels. `IResourceCatalog` provides typed, complete, all-locale name tables
+(skill/status/zone/world/item) — the data Hojoring patches with bundled CSVs today because the SDK's
+buff dictionary is never populated. (A crafter/gatherer projection is still lossy — see
+[G10](#contract-gaps-tracked).)
 
 ### Encounter / combat-state
 
-`IEncounterService` exposes `InCombat`, `StartCombat`/`EndCombat` (Trig's driver), `Active`/`Last`
-encounter snapshots, `ExportText`, and `AppendLogLine`. `EncounterSnapshot`/`CombatantMetrics`
-provide typed per-combatant metrics — no `ExportVariables` dictionary scrape per tick.
+`IEncounterService` exposes `InCombat`, `StartCombat`/`EndCombat` (Trig's driver at
+`ProxyPlugin.cs:323-334`), `Active`/`Last` encounter snapshots, `ExportText`, and `AppendLogLine`.
+`EncounterSnapshot`/`CombatantMetrics` provide typed per-combatant metrics — the ergonomic path for
+**native** consumers, replacing OverlayPlugin's whole-`ExportVariables`-dictionary scrape per tick
+(`MiniParseEventSource.cs:321-360,385-414`).
+
+> **cactbot fidelity requires more than the typed fields.** OverlayPlugin forwards the *entire*
+> opaque `CombatantData`/`EncounterData.ExportVariables` dictionary verbatim; the fixed metric records
+> cannot round-trip every key cactbot expects, so `EncounterSnapshot`/`CombatantMetrics` also carry an
+> `ExportVariables` bag ([G1](#contract-gaps-tracked), shipped) that the shim populates. OP's per-swing
+> `overHeal`/`damageShield`/`absorbHeal` remain outstanding ([G2](#contract-gaps-tracked)).
 
 ### Audio — multi-sink
 
@@ -148,19 +180,33 @@ provide typed per-combatant metrics — no `ExportVariables` dictionary scrape p
 into last-writer-wins. `IAudioSink` is async/fire-and-return so the host never blocks a producer on a
 slow out-of-process bridge.
 
+> Discord-Triggers and TTSYukkuri today *save the prior delegate and replace the slot*
+> (`DiscordTriggersView.xaml.cs:178-185`; TTSYukkuri `PluginCore.cs:174-206`) — i.e. route audio
+> **instead of** ACT's built-in speakers. The additive fan-out model plays on all sinks, so it needs
+> a **terminal-sink** capability to reproduce that exclusive routing — tracked as
+> [G3](#contract-gaps-tracked). Per-request channel/sync options are [G8](#contract-gaps-tracked).
+
 ### Registry, peer events, raw packets
 
-`IPluginRegistry`: enumerate peers (typed), Triggernometry-style `RegisterCallback`/`InvokeCallback`,
-and `Publish<T>`/`Subscribe<T>` so a plugin can put its own typed events on the bus for others.
-`IRawPacketSource` is the single opt-in, capability-gated raw-packet hatch (the typed path stays
-opcode-free for everyone else).
+`IPluginRegistry`: enumerate peers (typed metadata), Triggernometry-style
+`RegisterCallback`/`InvokeCallback`, and `Publish<T>`/`Subscribe<T>` so a plugin can put its own typed
+events on the bus for others. Triggernometry's named-callback surface is richer than the current
+stub (owner/registrant/duplicate-name/`(owner, val)` delegate) — tracked as
+[G5](#contract-gaps-tracked); enumerating peers as metadata is not enough for consumers that need a
+live, version-gated peer *handle* — tracked as [G6](#contract-gaps-tracked).
+
+`IRawPacketSource` is the single opt-in, capability-gated raw-packet **read** hatch (the typed path
+stays opcode-free for everyone else). OverlayPlugin also turns packets *back into* synthetic 256+ log
+lines (`LineBaseCustom.cs:80-86` → `FFXIVRepository.cs:493-515`); that write-back round-trip has no
+home yet — tracked as [G4](#contract-gaps-tracked).
 
 ## Threading, performance & fault model (the explicit contract)
 
 - **Event delivery** — each subscription owns a **bounded queue drained in order**; each handler
   call is fault-guarded (a throw can't kill the stream or starve peers); a slow/backed-up consumer
-  gets **drop-oldest + a dropped counter** (never stalls the producer or other plugins). Fixes OP's
-  "one dispatch lock across all receivers" stall.
+  gets **drop-oldest + a dropped counter** (never stalls the producer or other plugins). This closes
+  OP's per-type dispatch stall *and* its unguarded subscribe-time replay uniformly (see finding 3
+  above).
 - **Snapshots/queries** are **free-threaded, immutable** — safe from any background poll thread.
 - **Watchdog** — a handler over its time budget is logged; a repeatedly-throwing/hanging plugin is
   **quarantined** (unsubscribed) and may be **unloaded** (collectible ALC).
@@ -209,23 +255,27 @@ public interface IUiHost
   click-through game overlays remain unmodified OverlayPlugin in the net48 satellite
   ([`ARCHITECTURE.md`](ARCHITECTURE.md) §4a). Escape hatch only: a plugin may open its own top-level
   Avalonia window; the host provides no overlay scaffolding.
+- Triggernometry's host-window mutations (`CornerControlAdd/Remove`, `LocateTab`) have no `IUiHost`
+  member yet — tracked as [G11](#contract-gaps-tracked).
 
 ## The compat shim (adapter)
 
-The planned net10 compat shim (not the existing net48 `Fct.Compat.Act`) re-projects the exact ACT + FFXIV-SDK surface the plugins compile
-against, **implemented entirely over the modern host**:
+The planned net10 compat shim (not the existing net48 `Fct.Compat.Act`) re-projects the exact ACT +
+FFXIV-SDK surface the plugins compile against, **implemented entirely over the modern host**:
 
 | Legacy symbol (recompiled against shim) | Backed by |
 |---|---|
 | `ActGlobals.oFormActMain` (POCO hub, not a `Form`) | `IPluginHost` |
 | `IActPluginV1.InitPlugin/DeInitPlugin` | `IPlugin.InitializeAsync/DisposeAsync` |
 | `Before/OnLogLineRead` | `IGameEventStream` → `RawLogLine` |
-| `IDataSubscription` (11 events) | `IGameEventStream` mapped to SDK delegate shapes |
+| `IDataSubscription` (11 events: NetworkReceived/Sent, CombatantAdded/Removed, PrimaryPlayerChanged, ZoneChanged, PlayerStatsChanged, PartyListChanged, LogLine, ParsedLogLine, ProcessChanged) | `IGameEventStream` mapped to SDK delegate shapes |
 | `IDataRepository.Get*` | `IGameSnapshot` + `IResourceCatalog` |
-| `Combatant`/`Player`/`NetworkBuff` | projected from `Actor`/`StatusEffect` |
+| `Combatant`/`Player`/`NetworkBuff` | projected from `Actor`/`StatusEffect` (lossy: [G9](#contract-gaps-tracked)/[G10](#contract-gaps-tracked)) |
 | `AddCombatAction`/`SetEncounter`/`EndCombat`/`InCombat` | `IEncounterService` |
-| `PlayTtsMethod`/`PlaySoundMethod` delegate slots | setting a delegate registers an `IAudioSink`; `TTS()`/`PlaySound()` → `IAudioOutput` |
-| `RegisterNetworkParser` / custom lines 256+ | `IRawPacketSource` |
+| `CombatantData`/`EncounterData.ExportVariables` (opaque dict cactbot reads) | `EncounterSnapshot`/`CombatantMetrics` typed fields + the `ExportVariables` bag ([G1](#contract-gaps-tracked) shipped; [G2](#contract-gaps-tracked)) |
+| `RegisterNamedCallback`/`InvokeNamedCallback` (Trig peer interop) | `IPluginRegistry.RegisterCallback`/`InvokeCallback` ([G5](#contract-gaps-tracked)) |
+| `PlayTtsMethod`/`PlaySoundMethod` delegate slots | setting a delegate registers an `IAudioSink`; `TTS()`/`PlaySound()` → `IAudioOutput` (terminal routing: [G3](#contract-gaps-tracked)) |
+| `RegisterNetworkParser` / custom lines 256+ | `IRawPacketSource` (read) + a synthetic-line emitter ([G4](#contract-gaps-tracked)) |
 | `PluginGetSelfData`/`AppDataFolder`/`WriteExceptionLog` | `IPluginStorage`/`ILogger` |
 | WinForms `TabPage` | real WinForms TabPage embedded via Avalonia `NativeControlHost` |
 
@@ -234,29 +284,136 @@ incremental migration (swap one call at a time, then drop the shim).
 
 ### Per-plugin migration outlook
 
-- **Triggernometry — easiest.** `RealPlugin` already never references ACT (it calls injected delegate
-  hooks via `ProxyPlugin`). Re-point the proxy at the shim hub; the regex engine consumes `RawLogLine`
-  unchanged. Near-trivial recompile.
-- **Discord-Triggers — easy.** Pure audio sink → an `IAudioSink` registration instead of a delegate
-  hijack; its out-of-process Node bridge is unaffected.
-- **Hojoring — high value.** Recompile drops Sharlayan + OverlayPlugin side-channels *iff* `Actor`
-  carries status/enmity/focus/hover/in-combat (it does). Its poll-and-diff maps onto `IGameSnapshot`,
-  or it adopts typed events and stops diffing.
+- **Triggernometry — easiest, but not "trivial".** `RealPlugin` already never references ACT (grep
+  count 0; `mainform` is typed `System.Windows.Forms.Form`, `RealPlugin.cs:366`) — it calls **19
+  injected delegate hooks** via `ProxyPlugin` (`ProxyPlugin.cs:145-163`). Re-point the proxy at the
+  shim hub; the regex engine consumes `RawLogLine` unchanged. The recompile is mechanical but the
+  surface is real: 19 hooks + reflected ACT members (`defaultTextFormat`, `CornerControlAdd/Remove`,
+  `tc1`) must all be re-homed, and named callbacks need [G5](#contract-gaps-tracked).
+- **Discord-Triggers — easy.** Pure audio sink, consumes no combat data (grep for
+  LogLineRead/Encounter/CombatAction = 0). Its VM is already ACT-free and awaitable
+  (`DiscordTriggersViewModel.cs:596-615`); only ~6 lines of delegate-swap glue touch ACT. Becomes an
+  `IAudioSink` registration; its out-of-process Node bridge is unaffected. Needs terminal routing
+  ([G3](#contract-gaps-tracked)) to preserve route-instead-of-speakers behavior.
+- **Hojoring — high value.** Recompile drops Sharlayan + OverlayPlugin side-channels because `Actor`
+  carries status/enmity/in-combat and the snapshot carries focus/hover. Its poll-and-diff
+  (`XIVPluginHelper.cs:904-912`) maps onto `IGameSnapshot`, or it adopts typed events and stops
+  diffing. TTSYukkuri is both an audio producer and a sink provider ([G3](#contract-gaps-tracked)/[G8](#contract-gaps-tracked)).
 - **OverlayPlugin — stays in the satellite.** Its `IDataSubscription`/`ExportVariables` use recompiles
-  fine, but **CefSharp is net48-only**, so OP's CEF/Fleck rendering stays in the net48 satellite
-  (already embedded cross-process). The recompile path serves managed consumers; OP is why the
-  satellite persists longest — consistent with overlays = unmodified OP, hosted.
+  fine, but **CefSharp is net48-only** (pinned `95.7.141`, `HtmlRenderer.csproj:45-52`), so OP's
+  CEF/Fleck rendering stays in the net48 satellite (already embedded cross-process). It is also itself
+  a mini plugin-host (`IOverlayAddonV2.Init`, `PluginMain.cs:493-504`). The recompile path serves
+  managed consumers; OP is why the satellite persists longest — consistent with overlays = unmodified
+  OP, hosted. Full cactbot fidelity depends on [G2](#contract-gaps-tracked)/[G4](#contract-gaps-tracked) ([G1](#contract-gaps-tracked) shipped).
+
+## Contract gaps (tracked)
+
+Concrete gaps between the scaffold and what real plugin source consumes, ranked by severity. Each is
+an **additive** edit to `Fct.Abstractions` (semver-safe per [Versioning](#versioning)); none requires
+the not-yet-built host/loader/shim. `Focus`/`Hover` and `NetworkSent`/`PacketDirection.Sent` are
+**already present** in the scaffold and are *not* gaps.
+
+| ID | Sev | Gap | Evidence (real source) | Minimal additive fix |
+|---|---|---|---|---|
+| **G1** | ✅ shipped | The opaque `ExportVariables` dict cactbot consumes (`maxhit`, `tohit`, `swings`, `healstaken`, `damagetaken`, `critheal%`, `Last10/30/60/180DPS`) that the fixed metric records can't round-trip. | `MiniParseEventSource.cs:321-360,385-414,289-298` vs `Encounters.cs` | **Present:** `EncounterSnapshot` **and** `CombatantMetrics` carry an init-only `IReadOnlyDictionary<string,string> ExportVariables` (empty default); the shim populates it, native consumers use the typed fields. |
+| **G2** | 🟠 major | OP's own `overHeal`/`damageShield`/`absorbHeal` are computed from per-swing tags, absent from any typed metric. | `Integration/FFXIVExportVariables.cs:31-49,64-81,97-114` | Subsumed by G1's bag (reserve the three key names) — or add `Overheal`/`ShieldedDamage`/`Absorbed` to `CombatantMetrics`. |
+| **G3** | 🟠 major | Audio sinks today *replace* the slot (route-instead-of); `RegisterSink` only fans out → double playback. | `DiscordTriggersView.xaml.cs:178-185`; TTSYukkuri `PluginCore.cs:174-206`; `Audio.cs:18-19` | Let a sink stop the chain: `IAudioSink` returns `ValueTask<bool>` (handled) **or** `RegisterSink(sink, priority, bool terminal=false)`. |
+| **G4** | 🟠 major | Packet → custom 256+ line → `RawLogLine` round-trip absent. `IRawPacketSource` is read-only; `AppendLogLine` targets the export log, not the live bus. | `LineBaseCustom.cs:80-86` → `FFXIVRepository.cs:493-515`; `RawPackets.cs:11-18`; `Encounters.cs:28` | Add a gated emitter (e.g. `IRawLogLineEmitter { void Emit(LogMessageType, string); }` on `IPluginHost`) that fans a synthetic 256+ line onto the event bus. |
+| **G5** | 🟠 major | Trig named callbacks carry `(int id, name, delegate, object owner, registrant, allowDuplicatedName)` and a `(owner, string val)` delegate; `RegisterCallback(string, Action<object?>)` is too thin. | `RealPlugin.cs:71-74,4176-4249`; `ProxyPlugin.cs:37-77`; `Plugin.cs:85` | Overload `IDisposable RegisterCallback(string name, Action<object?> cb, object? owner = null, bool allowDuplicate = false)`; `IDisposable` replaces int-id unregister. |
+| **G6** | 🟡 minor | Live, version-gated typed peer *handle* — `LoadedPlugins` returns metadata only; Trig's `BridgeFFXIV` needs a Started-gated handle to the parser peer. | `ProxyPlugin.cs:431-477` (gate strings :444-446); `Plugin.cs:83` | Rely on `Publish<T>`/`Subscribe<T>`, or add `bool TryGetPeerService<T>(string pluginId, out T svc)`. Shrinks once the parser is the host's own snapshot. |
+| **G7** | 🟡 minor | `StartCombat(title)` — Trig passes player-name as both title and zone label. | `ProxyPlugin.cs:327-334`; `Encounters.cs:16` | Document title==zone-label mapping, or add a `zone` param. |
+| **G8** | 🟡 minor | TTSYukkuri `Speak` carries channel (L/R/Both) + sync flag; `AudioOptions` has Volume/Voice/Rate only. | TTSYukkuri `PluginCore.cs:248-260`; `Audio.cs:33` | Add `AudioChannel {Both,Left,Right}` + `bool Synchronous` to `AudioOptions`. |
+| **G9** | 🟡 minor | SDK `NetworkBuff` carries `RefreshPending`/`Timestamp`/`ActorName`/`TargetName`; `StatusEffect` drops them. | `Actors.cs:25` (vs `NetworkBuff`) | Add `RefreshPending`/applied-timestamp only if a shim must round-trip `NetworkBuff`; otherwise document as intentionally dropped ("is-own" is derivable from `SourceActorId`). |
+| **G10** | 🟡 minor | SDK `Combatant` has `CurrentCP/MaxCP/CurrentGP/MaxGP`, distinct `CurrentWorldID` vs `WorldID`, `Order`; `Actor` has none/one → lossy for DoL/DoH. | `Combatant.cs:29-35,55,57,73`; `Actors.cs:37-55` | Add nullable CP/GP + `CurrentWorldId` + `Order` if lossless `Combatant→Actor` projection is required. |
+| **G11** | 🟡 minor | Trig's `CornerControlAdd/Remove` transient notifications + `LocateTab` "reveal my page" have no `IUiHost` member. | `ProxyPlugin.cs:182-264`; `Ui.cs:21-37` | Add `IUiHost.RevealPage(id)` + a transient-notification surface if in scope for the shim. |
+
+## Testing the contract — legacy↔native flow tests
+
+The data path is **native `IPlugin` ⇄ in-process bus/registry/audio/encounter-service ⇄ net10
+compat shim ⇄ recompiled legacy plugin**. The real host/shim do not exist yet, so a **thin
+fake host + in-memory implementations of the shipped interfaces + a minimal shim stub** let the
+flows run in xUnit with zero satellite, zero CEF, zero live FFXIV. Legacy plugins are represented by
+**tiny doubles** that make the exact call the real plugin makes (proven by the cited file:line), not
+by loading the real net48 DLLs. The harness lives in `Fct.Abstractions.Testing`; the flow suite in
+`Fct.FlowTests`.
+
+### The harness
+
+`Fct.Abstractions.Testing` (net48;net10) + `Fct.FlowTests` (net10 xUnit) provide:
+
+1. **`FakePluginHost : IPluginHost`** — wires the fakes below; `Self` = a canned `PluginInfo`.
+2. **`InMemoryEventBus : IGameEventStream`** — a bounded per-subscriber ring (hand-rolled, mirroring
+   `RingBufferDataSubscription`; no `System.Threading.Channels` dependency on the net48 leg), in-order
+   synchronous drain, per-handler try/catch, drop-oldest + `DroppedCount`; test-only `Emit(GameEvent)`
+   producer side.
+3. **`InMemoryRegistry : IPluginRegistry`** — real dictionaries backing `RegisterCallback`/`InvokeCallback`
+   and `Publish<T>`/`Subscribe<T>`. Fully implementable from the shipped interface today.
+4. **`RecordingAudioOutput : IAudioOutput`** + **`RecordingAudioSink : IAudioSink`** — capture calls.
+5. **`FakeEncounterService : IEncounterService`** — mutable `Active`/`Last`, `AppendLogLine` capture,
+   `StartCombat/EndCombat` state.
+6. **`FakeSnapshot : IGameSnapshot`** — builder over immutable `Actor`/records.
+7. **`ShimStub`** — the seam under test: an `oFormActMain`-shaped surface exposing the legacy entry
+   points a recompiled plugin calls (`TTS`, `PlayTtsMethod`/`PlaySoundMethod` slots,
+   `Before/OnLogLineRead`, `SetEncounter`, `RegisterNamedCallback`) that forwards to/from the fakes.
+   This one stub is what lets flow tests exist before the real shim; it is the shim's seed.
+
+### (a) native → legacy — a new `IPlugin` produces, a shimmed legacy plugin consumes
+
+| # | Scenario (real plugin) | Seam under test | Fixture | Assertion | Headless |
+|---|---|---|---|---|---|
+| A1 | native `Publish<T>`/`InvokeCallback` → **Triggernometry** named callback (`RealPlugin.cs:4147`; `ProxyPlugin.cs:37-77`) | `IPluginRegistry` ↔ shim `RegisterNamedCallback` | `InMemoryRegistry` + Trig-double | Trig handler receives payload | ✅ |
+| A2 | native `Audio.Speak` → **Discord-Triggers**/**TTSYukkuri** sink (`DiscordTriggersView.xaml.cs:178`) | `IAudioOutput.Speak` → `IAudioSink.SpeakAsync` | `RecordingAudioOutput` + sink-double | Sink gets exact text+`AudioOptions`; **two sinks → G3 fan-out vs terminal** | ✅ |
+| A3 | native-emitted `RawLogLine` → **Triggernometry**/**cactbot** regex (`Trigger.cs:615`; `FFXIVOptionalEventSource.cs:57`) | `IGameEventStream` `RawLogLine` ↔ shim `OnLogLineRead` | `InMemoryEventBus.Emit` | Trig-double `rex.Match` fires; wrong-type filtered out | ✅ |
+| A4 | native `StartCombat` → **OverlayPlugin**/Trig encounter reader (`MiniParseEventSource.cs:300`) | `IEncounterService.StartCombat`/`Active` ↔ `ActiveZone.ActiveEncounter` | `FakeEncounterService` | Reader sees `InCombat==true` + labeled `Active`; G1 dict if testing cactbot payload | ✅ |
+| A5 | native `ZoneChanged`/`PartyChanged` → **OP** typed consumer (`FFXIVRepository.cs:544,551`) | `GameEvent` records ↔ shim `IDataSubscription` delegates | `InMemoryEventBus.Emit` | OP-double `ZoneChanged`/`PartyListChanged` gets mapped args | ✅ |
+
+### (b) legacy → native — a shimmed legacy plugin produces, a new `IPlugin` consumes
+
+| # | Scenario (real plugin) | Seam under test | Fixture | Assertion | Headless |
+|---|---|---|---|---|---|
+| B1 | **Triggernometry** `TTS()`/`PlaySound()` → native `IAudioSink` (`RealPlugin.cs:1650-1683`) | shim `oFormActMain.TTS/PlaySound` → `IAudioOutput` → `IAudioSink` | Trig-double + `RecordingAudioSink` | Native sink gets text/(file,volume); volume 0–100 preserved | ✅ |
+| B2 | **Trig** `SetCombatState`/`AddCombatAction`+`SetEncounter` → `IEncounterService` → native reader (`ProxyPlugin.cs:323-334`) | shim `SetEncounter/EndCombat` → `FakeEncounterService` | Trig-double + native reader | Native sees encounter open/close + label; `AppendLogLine` round-trip (G4 boundary) | ✅ |
+| B3 | **Trig** external `RegisterNamedCallback` → native `Subscribe<T>` (`ProxyPlugin.cs:37-77`) | shim `RegisterNamedCallback` ↔ `IPluginRegistry` | `InMemoryRegistry` | Native handler receives invocation; exercises G5 owner/dup semantics | ✅ |
+| B4 | **OP** raw packet → custom 256+ line → native `RawLogLine` consumer (`LineBaseCustom.cs:80-86`) | `IRawPacketSource` read + the **missing** emit path (G4) | `InMemoryEventBus` + emitter stub | Native `RawLogLine` subscriber sees the custom line — **RED until G4 is built** | ✅ (once emitter exists) |
+| B5 | legacy poll (`GetCombatantList`) → native `IGameSnapshot` (`XIVPluginHelper.cs:904`) | shim `Combatant→Actor` → `IGameSnapshot` | `FakeSnapshot` | Native sees actors incl. `Statuses/Enmity/InCombat/Focus/Hover`; asserts CP/GP loss (G10) | ✅ |
+
+### What can and cannot be tested now
+
+- **Implemented and green, headless:** B1, A2 (fan-out), A1, B3, A3, A4, B2, B5 — plus bus
+  filter/isolation checks and a G1 default/round-trip check (12 tests). They validate the contract
+  shapes end-to-end with zero new production code beyond the harness + G1.
+- **Written but skipped (proves a gap):** A2-with-two-sinks (`[Fact(Skip="G3")]`), B4
+  (`[Fact(Skip="G4")]`). This makes the gaps executable, not just prose.
+- **Cannot be tested until built:** *fidelity* of the real `Combatant→Actor` /
+  `ExportVariables→CombatData` projection — that logic lives in the not-yet-existent net10 shim; the
+  stub only proves the seam exists, not that mapping is bit-correct.
+- **Needs the net48 satellite / live game (out of scope here):** loading the *real* FFXIV_ACT_Plugin /
+  OverlayPlugin (CefSharp net48-only), real Machina packet decode, and real `MasterSwing` aggregation
+  parity (already covered by `tools/mass-compare`, see [`TESTING.md`](TESTING.md)). Flow tests assert
+  *routing*, not *parse/aggregation correctness*.
+
+### Build order
+
+The suite is built in dependency order, each step adding one harness piece:
+**B1** (audio fakes + `ShimStub.TTS/PlaySound`) **→ A2** (fan-out; the G3 terminal variant skipped)
+**→ A1/B3** (`InMemoryRegistry`; the Trig callback loop both ways) **→ A3** (`InMemoryEventBus`;
+`RawLogLine` one-way) **→ A4/B2** (`FakeEncounterService`; combat-state both ways) **→ B4** (the G4
+emit path; skipped) **→ B5** (`FakeSnapshot`; surfaces G10). The fakes are complete enough that the
+real net10 shim can reuse every one as its acceptance suite. **G1's `ExportVariables` bag** ships
+alongside the harness; every other fix follows test-first as its scenario goes RED→green.
 
 ## Versioning
 
 `Fct.Abstractions` is **semver, additive-only**, with a `contract` version the host gates against the
-manifest. New `GameEvent` records are additive (switch-and-ignore-unknown).
+manifest. New `GameEvent` records are additive (switch-and-ignore-unknown); every fix in
+[Contract gaps](#contract-gaps-tracked) is an additive edit.
 
 ## Open items / next steps
 
 - Complete the `GameEvent` hierarchy against the full 0–274 taxonomy.
 - `PluginLoadContext`: manifest gate + the `Fct.Abstractions`/`Avalonia` share-to-default mechanism,
   end-to-end.
+- The tracked [contract gaps](#contract-gaps-tracked) G2–G11 (G1 shipped; the rest test-first).
 - Config-UI sub-decision detail (Avalonia control vs. WebView) — deferred per
   [`ARCHITECTURE.md`](ARCHITECTURE.md) §4a; the contract is framework-agnostic enough to defer.
 - Whether `IResourceCatalog` ships our own complete name tables or proxies the plugin's

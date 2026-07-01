@@ -68,6 +68,12 @@ if ($SingleFile) {
     )
 }
 
+# ReadyToRun precompiles the host's IL to native images so launch skips the JIT — it roughly
+# halves warm startup. It only applies at publish time with a RID, so it never slows `dotnet
+# build`. Loose builds (-SingleFile:$false) start fastest because they also skip the single-file
+# self-extract step; single-file trades a slower first run (extract + AV scan) for one tidy exe.
+$hostR2RArgs = @("-p:PublishReadyToRun=true")
+
 $mode = if ($selfContained) { "self-contained" } else { "framework-dependent" }
 Write-Host "==> FFXIV Combat Tracker release" -ForegroundColor Cyan
 Write-Host "    configuration : $Configuration"
@@ -99,7 +105,8 @@ try {
         --nologo `
         @versionArgs `
         @symbolArgs `
-        @hostSingleFileArgs
+        @hostSingleFileArgs `
+        @hostR2RArgs
     if ($LASTEXITCODE -ne 0) { throw "host publish failed" }
 
     # The host build stages the satellite into its own bin (not here); drop any copy that

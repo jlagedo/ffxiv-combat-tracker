@@ -1,6 +1,7 @@
 <Solution>
   <Folder Name="/src/">
     <Project Path="src/Fct.Abstractions/Fct.Abstractions.csproj" />
+    <Project Path="src/Fct.Abstractions.Testing/Fct.Abstractions.Testing.csproj" />
     <Project Path="src/Fct.Abstractions.UI/Fct.Abstractions.UI.csproj" />
     <Project Path="src/Fct.App/Fct.App.csproj" />
     <Project Path="src/Fct.LegacyHost/Fct.LegacyHost.csproj" />
@@ -11,6 +12,7 @@
   <Folder Name="/tests/">
     <Project Path="tests/Fct.Compat.Act.Tests/Fct.Compat.Act.Tests.csproj" />
     <Project Path="tests/Fct.App.Tests/Fct.App.Tests.csproj" />
+    <Project Path="tests/Fct.FlowTests/Fct.FlowTests.csproj" />
     <Project Path="tests/Fct.Integration.Tests/Fct.Integration.Tests.csproj" />
     <Project Path="tests/Fct.Parser.Legacy.Tests/Fct.Parser.Legacy.Tests.csproj" />
   </Folder>

@@ -9,7 +9,7 @@
 
     <ScrollViewer>
         <StackPanel Spacing="16" MaxWidth="720" HorizontalAlignment="Left">
-            <Border Classes="card" Padding="22,18">
+            <Border Classes="card rise1" Padding="22,18">
                 <StackPanel Spacing="14">
                     <TextBlock Text="Appearance" Classes="h2"/>
                     <Grid ColumnDefinitions="*,Auto">
@@ -30,7 +30,7 @@
                 </StackPanel>
             </Border>
 
-            <Border Classes="card" Padding="22,18">
+            <Border Classes="card rise2" Padding="22,18">
                 <StackPanel Spacing="16">
                     <TextBlock Text="Startup" Classes="h2"/>
                     <Grid ColumnDefinitions="*,Auto">
@@ -51,7 +51,7 @@
                 </StackPanel>
             </Border>
 
-            <Border Classes="card" Padding="22,18">
+            <Border Classes="card rise3" Padding="22,18">
                 <StackPanel Spacing="6">
                     <TextBlock Text="About" Classes="h2" Margin="0,0,0,6"/>
                     <TextBlock Classes="meta" Text="FFXIV Combat Tracker · host shell"/>

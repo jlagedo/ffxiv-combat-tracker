@@ -11,7 +11,7 @@
 
         <!-- Compact page chrome (the shared header is hidden on this page) -->
         <Grid Grid.Row="0" Margin="0,0,0,16">
-            <StackPanel Spacing="4" VerticalAlignment="Center">
+            <StackPanel Classes="rise1" Spacing="4" VerticalAlignment="Center">
                 <TextBlock Text="PLUGINS" Classes="eyebrow"/>
                 <TextBlock Text="Plugin Setup" Classes="h2" FontSize="21"/>
             </StackPanel>
@@ -48,7 +48,7 @@
         <Grid Grid.Row="2" ColumnDefinitions="212,18,*">
 
             <!-- ===== Channel rail: quick switch between plugins ===== -->
-            <Border Grid.Column="0" Classes="card" Padding="0">
+            <Border Grid.Column="0" Classes="card rise2" Padding="0">
                 <DockPanel Margin="10">
                     <Grid DockPanel.Dock="Top" Margin="6,6,6,12">
                         <TextBlock Text="CHANNELS" Classes="eyebrow" VerticalAlignment="Center"/>
@@ -82,6 +82,9 @@
                                                 <Border Width="18" Height="18" CornerRadius="9"
                                                         Classes.pulse="{Binding IsLive}"
                                                         Background="{Binding Status, Converter={StaticResource StatusToBrush}, ConverterParameter=glow}"/>
+                                                <Ellipse Width="10" Height="10" Classes.ping="{Binding IsLive}"
+                                                         Stroke="{StaticResource EmberBrush}" StrokeThickness="1.4"
+                                                         Fill="Transparent" HorizontalAlignment="Center" VerticalAlignment="Center"/>
                                                 <Ellipse Width="8" Height="8"
                                                          Fill="{Binding Status, Converter={StaticResource StatusToBrush}}"/>
                                             </Grid>
@@ -112,6 +115,9 @@
                                 <Border Width="26" Height="26" CornerRadius="13"
                                         Classes.pulse="{Binding Shell.SelectedPlugin.IsLive}"
                                         Background="{Binding Shell.SelectedPlugin.Status, Converter={StaticResource StatusToBrush}, ConverterParameter=glow}"/>
+                                <Ellipse Width="14" Height="14" Classes.ping="{Binding Shell.SelectedPlugin.IsLive}"
+                                         Stroke="{StaticResource EmberBrush}" StrokeThickness="1.5"
+                                         Fill="Transparent" HorizontalAlignment="Center" VerticalAlignment="Center"/>
                                 <Ellipse Width="11" Height="11"
                                          Fill="{Binding Shell.SelectedPlugin.Status, Converter={StaticResource StatusToBrush}}"/>
                             </Grid>

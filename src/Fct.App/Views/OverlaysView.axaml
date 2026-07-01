@@ -7,7 +7,7 @@
              x:Class="Fct.App.Views.OverlaysView"
              x:DataType="vm:OverlaysViewModel">
 
-    <Border Classes="card" Padding="40">
+    <Border Classes="card rise1" Padding="40">
         <StackPanel VerticalAlignment="Center" HorizontalAlignment="Center" Spacing="12" MaxWidth="460">
             <Path Width="44" Height="44" Stretch="Uniform" Opacity="0.6"
                   Fill="{StaticResource FrostDimBrush}" Data="M4 4h16v5H4z M4 11h16v3H4z M4 16h16v3H4z"/>

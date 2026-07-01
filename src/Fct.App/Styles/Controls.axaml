@@ -37,6 +37,66 @@
         <Setter Property="TextWrapping" Value="Wrap"/>
     </Style>
 
+    <!-- ============================ Motion vocabulary ============================
+         One consistent language across the shell:
+           · entrance   — .rise1..6, a staggered fade + 16px lift (FillMode None so
+                          hover/press transforms still own RenderTransform afterwards)
+           · hover-lift — interactive surfaces float 4px and bloom frost
+           · press      — tactile scale to 0.97
+           · ambient    — slow, low-amplitude loops (orb pulse, crown breath, live ping)
+         Easing is CubicEaseOut for intent-driven motion, SineEaseInOut for ambient. -->
+    <!-- Each rise class carries its own complete animation (Avalonia runs the animations
+         from every matching style, so a shared base + delay-only override would double up
+         and cancel the stagger). Delay climbs 60ms per step to cascade a group in. -->
+    <Style Selector=":is(Control).rise1">
+        <Style.Animations>
+            <Animation Duration="0:0:0.46" Delay="0:0:0" Easing="CubicEaseOut" FillMode="None">
+                <KeyFrame Cue="0%"><Setter Property="Opacity" Value="0"/><Setter Property="TranslateTransform.Y" Value="16"/></KeyFrame>
+                <KeyFrame Cue="100%"><Setter Property="Opacity" Value="1"/><Setter Property="TranslateTransform.Y" Value="0"/></KeyFrame>
+            </Animation>
+        </Style.Animations>
+    </Style>
+    <Style Selector=":is(Control).rise2">
+        <Style.Animations>
+            <Animation Duration="0:0:0.46" Delay="0:0:0.06" Easing="CubicEaseOut" FillMode="None">
+                <KeyFrame Cue="0%"><Setter Property="Opacity" Value="0"/><Setter Property="TranslateTransform.Y" Value="16"/></KeyFrame>
+                <KeyFrame Cue="100%"><Setter Property="Opacity" Value="1"/><Setter Property="TranslateTransform.Y" Value="0"/></KeyFrame>
+            </Animation>
+        </Style.Animations>
+    </Style>
+    <Style Selector=":is(Control).rise3">
+        <Style.Animations>
+            <Animation Duration="0:0:0.46" Delay="0:0:0.12" Easing="CubicEaseOut" FillMode="None">
+                <KeyFrame Cue="0%"><Setter Property="Opacity" Value="0"/><Setter Property="TranslateTransform.Y" Value="16"/></KeyFrame>
+                <KeyFrame Cue="100%"><Setter Property="Opacity" Value="1"/><Setter Property="TranslateTransform.Y" Value="0"/></KeyFrame>
+            </Animation>
+        </Style.Animations>
+    </Style>
+    <Style Selector=":is(Control).rise4">
+        <Style.Animations>
+            <Animation Duration="0:0:0.46" Delay="0:0:0.18" Easing="CubicEaseOut" FillMode="None">
+                <KeyFrame Cue="0%"><Setter Property="Opacity" Value="0"/><Setter Property="TranslateTransform.Y" Value="16"/></KeyFrame>
+                <KeyFrame Cue="100%"><Setter Property="Opacity" Value="1"/><Setter Property="TranslateTransform.Y" Value="0"/></KeyFrame>
+            </Animation>
+        </Style.Animations>
+    </Style>
+    <Style Selector=":is(Control).rise5">
+        <Style.Animations>
+            <Animation Duration="0:0:0.46" Delay="0:0:0.24" Easing="CubicEaseOut" FillMode="None">
+                <KeyFrame Cue="0%"><Setter Property="Opacity" Value="0"/><Setter Property="TranslateTransform.Y" Value="16"/></KeyFrame>
+                <KeyFrame Cue="100%"><Setter Property="Opacity" Value="1"/><Setter Property="TranslateTransform.Y" Value="0"/></KeyFrame>
+            </Animation>
+        </Style.Animations>
+    </Style>
+    <Style Selector=":is(Control).rise6">
+        <Style.Animations>
+            <Animation Duration="0:0:0.46" Delay="0:0:0.30" Easing="CubicEaseOut" FillMode="None">
+                <KeyFrame Cue="0%"><Setter Property="Opacity" Value="0"/><Setter Property="TranslateTransform.Y" Value="16"/></KeyFrame>
+                <KeyFrame Cue="100%"><Setter Property="Opacity" Value="1"/><Setter Property="TranslateTransform.Y" Value="0"/></KeyFrame>
+            </Animation>
+        </Style.Animations>
+    </Style>
+
     <!-- ============================ Surfaces ============================ -->
     <Style Selector="Border.card">
         <Setter Property="Background" Value="{StaticResource GlacierBrush}"/>
@@ -49,6 +109,24 @@
         <Setter Property="Background" Value="{StaticResource FrostRuleBrush}"/>
     </Style>
 
+    <!-- Stat tile: a small, glanceable card that lifts and blooms frost on hover. -->
+    <Style Selector="Border.stat">
+        <Setter Property="RenderTransform" Value="translateY(0px)"/>
+        <Setter Property="BoxShadow" Value="0 0 0 0 #0014A0E0"/>
+        <Setter Property="Transitions">
+            <Transitions>
+                <TransformOperationsTransition Property="RenderTransform" Duration="0:0:0.19" Easing="CubicEaseOut"/>
+                <BoxShadowsTransition Property="BoxShadow" Duration="0:0:0.19"/>
+                <BrushTransition Property="BorderBrush" Duration="0:0:0.19"/>
+            </Transitions>
+        </Setter>
+    </Style>
+    <Style Selector="Border.stat:pointerover">
+        <Setter Property="RenderTransform" Value="translateY(-4px)"/>
+        <Setter Property="BoxShadow" Value="0 12 30 -8 #4014A0E0"/>
+        <Setter Property="BorderBrush" Value="{StaticResource FrostDimBrush}"/>
+    </Style>
+
     <!-- ============================ Nav rail ============================ -->
     <Style Selector="Button.nav">
         <Setter Property="Background" Value="Transparent"/>
@@ -56,15 +134,29 @@
         <Setter Property="HorizontalContentAlignment" Value="Stretch"/>
         <Setter Property="Padding" Value="0"/>
         <Setter Property="CornerRadius" Value="10"/>
+        <Setter Property="RenderTransform" Value="scale(1)"/>
+        <Setter Property="Transitions">
+            <Transitions>
+                <TransformOperationsTransition Property="RenderTransform" Duration="0:0:0.11" Easing="CubicEaseOut"/>
+            </Transitions>
+        </Setter>
+    </Style>
+    <Style Selector="Button.nav:pressed">
+        <Setter Property="RenderTransform" Value="scale(0.97)"/>
     </Style>
     <Style Selector="Button.nav /template/ ContentPresenter">
         <Setter Property="Background" Value="Transparent"/>
+        <Setter Property="RenderTransform" Value="translateX(0px)"/>
         <Setter Property="Transitions">
-            <Transitions><BrushTransition Property="Background" Duration="0:0:0.15"/></Transitions>
+            <Transitions>
+                <BrushTransition Property="Background" Duration="0:0:0.15"/>
+                <TransformOperationsTransition Property="RenderTransform" Duration="0:0:0.18" Easing="CubicEaseOut"/>
+            </Transitions>
         </Setter>
     </Style>
     <Style Selector="Button.nav:pointerover /template/ ContentPresenter">
         <Setter Property="Background" Value="{StaticResource RimeBrush}"/>
+        <Setter Property="RenderTransform" Value="translateX(3px)"/>
     </Style>
     <Style Selector="Button.nav.active /template/ ContentPresenter">
         <Setter Property="Background" Value="{StaticResource RimeBrush}"/>
@@ -87,11 +179,25 @@
     <Style Selector="Button.nav.active Path">
         <Setter Property="Fill" Value="{StaticResource FrostBrush}"/>
     </Style>
+    <Style Selector="Button.nav:focus-visible /template/ ContentPresenter">
+        <Setter Property="BorderBrush" Value="{StaticResource FrostBrush}"/>
+        <Setter Property="BorderThickness" Value="1"/>
+    </Style>
+
+    <!-- Active marker: grows in from the centre and holds. -->
     <Style Selector="Button.nav Rectangle.navbar">
         <Setter Property="Opacity" Value="0"/>
+        <Setter Property="RenderTransform" Value="scaleY(0.25)"/>
+        <Setter Property="Transitions">
+            <Transitions>
+                <DoubleTransition Property="Opacity" Duration="0:0:0.2"/>
+                <TransformOperationsTransition Property="RenderTransform" Duration="0:0:0.24" Easing="CubicEaseOut"/>
+            </Transitions>
+        </Setter>
     </Style>
     <Style Selector="Button.nav.active Rectangle.navbar">
         <Setter Property="Opacity" Value="1"/>
+        <Setter Property="RenderTransform" Value="scaleY(1)"/>
     </Style>
 
     <!-- ============================ Window chrome ============================ -->
@@ -105,9 +211,15 @@
     </Style>
     <Style Selector="Button.win /template/ ContentPresenter">
         <Setter Property="Background" Value="Transparent"/>
+        <Setter Property="Transitions">
+            <Transitions><BrushTransition Property="Background" Duration="0:0:0.13"/></Transitions>
+        </Setter>
     </Style>
     <Style Selector="Button.win Path">
         <Setter Property="Stroke" Value="{StaticResource HoarfrostBrush}"/>
+        <Setter Property="Transitions">
+            <Transitions><BrushTransition Property="Stroke" Duration="0:0:0.13"/></Transitions>
+        </Setter>
     </Style>
     <Style Selector="Button.win:pointerover /template/ ContentPresenter">
         <Setter Property="Background" Value="{StaticResource RimeBrush}"/>
@@ -178,9 +290,32 @@
         <Setter Property="CornerRadius" Value="8"/>
         <Setter Property="Padding" Value="16,9"/>
         <Setter Property="FontSize" Value="13"/>
+        <Setter Property="RenderTransform" Value="translateY(0px)"/>
+        <Setter Property="Transitions">
+            <Transitions>
+                <TransformOperationsTransition Property="RenderTransform" Duration="0:0:0.16" Easing="CubicEaseOut"/>
+            </Transitions>
+        </Setter>
+    </Style>
+    <Style Selector="Button.ghost /template/ ContentPresenter">
+        <Setter Property="Transitions">
+            <Transitions>
+                <BrushTransition Property="Background" Duration="0:0:0.16"/>
+                <BrushTransition Property="BorderBrush" Duration="0:0:0.16"/>
+            </Transitions>
+        </Setter>
+    </Style>
+    <Style Selector="Button.ghost:pointerover">
+        <Setter Property="RenderTransform" Value="translateY(-2px)"/>
     </Style>
     <Style Selector="Button.ghost:pointerover /template/ ContentPresenter">
         <Setter Property="Background" Value="{StaticResource RimeBrush}"/>
+        <Setter Property="BorderBrush" Value="{StaticResource FrostBrush}"/>
+    </Style>
+    <Style Selector="Button.ghost:pressed">
+        <Setter Property="RenderTransform" Value="scale(0.97)"/>
+    </Style>
+    <Style Selector="Button.ghost:focus-visible /template/ ContentPresenter">
         <Setter Property="BorderBrush" Value="{StaticResource FrostBrush}"/>
     </Style>
 
@@ -210,15 +345,18 @@
         <Setter Property="BorderThickness" Value="1"/>
         <Setter Property="CornerRadius" Value="10"/>
         <Setter Property="Padding" Value="10,9"/>
+        <Setter Property="RenderTransform" Value="translateX(0px)"/>
         <Setter Property="Transitions">
             <Transitions>
                 <BrushTransition Property="Background" Duration="0:0:0.15"/>
                 <BrushTransition Property="BorderBrush" Duration="0:0:0.15"/>
+                <TransformOperationsTransition Property="RenderTransform" Duration="0:0:0.18" Easing="CubicEaseOut"/>
             </Transitions>
         </Setter>
     </Style>
     <Style Selector="ListBox.rail ListBoxItem:pointerover Border.railcard">
         <Setter Property="Background" Value="{StaticResource RimeBrush}"/>
+        <Setter Property="RenderTransform" Value="translateX(3px)"/>
     </Style>
     <Style Selector="ListBox.rail ListBoxItem:selected Border.railcard">
         <Setter Property="Background" Value="{StaticResource RimeHiBrush}"/>
@@ -226,9 +364,17 @@
     </Style>
     <Style Selector="Rectangle.railbar">
         <Setter Property="Opacity" Value="0"/>
+        <Setter Property="RenderTransform" Value="scaleY(0.25)"/>
+        <Setter Property="Transitions">
+            <Transitions>
+                <DoubleTransition Property="Opacity" Duration="0:0:0.2"/>
+                <TransformOperationsTransition Property="RenderTransform" Duration="0:0:0.24" Easing="CubicEaseOut"/>
+            </Transitions>
+        </Setter>
     </Style>
     <Style Selector="ListBox.rail ListBoxItem:selected Rectangle.railbar">
         <Setter Property="Opacity" Value="1"/>
+        <Setter Property="RenderTransform" Value="scaleY(1)"/>
     </Style>
 
     <!-- Manage button at the foot of the rail -->
@@ -241,6 +387,15 @@
         <Setter Property="Height" Value="40"/>
         <Setter Property="HorizontalAlignment" Value="Stretch"/>
         <Setter Property="HorizontalContentAlignment" Value="Left"/>
+        <Setter Property="RenderTransform" Value="scale(1)"/>
+        <Setter Property="Transitions">
+            <Transitions>
+                <TransformOperationsTransition Property="RenderTransform" Duration="0:0:0.11" Easing="CubicEaseOut"/>
+            </Transitions>
+        </Setter>
+    </Style>
+    <Style Selector="Button.railmanage:pressed">
+        <Setter Property="RenderTransform" Value="scale(0.98)"/>
     </Style>
     <Style Selector="Button.railmanage /template/ ContentPresenter">
         <Setter Property="Background" Value="Transparent"/>
@@ -285,12 +440,19 @@
         <Setter Property="CornerRadius" Value="12"/>
         <Setter Property="Padding" Value="14,12"/>
         <Setter Property="Margin" Value="0,0,0,10"/>
+        <Setter Property="BoxShadow" Value="0 0 0 0 #00119ADB"/>
         <Setter Property="Transitions">
-            <Transitions><BrushTransition Property="Background" Duration="0:0:0.15"/></Transitions>
+            <Transitions>
+                <BrushTransition Property="Background" Duration="0:0:0.15"/>
+                <BrushTransition Property="BorderBrush" Duration="0:0:0.15"/>
+                <BoxShadowsTransition Property="BoxShadow" Duration="0:0:0.15"/>
+            </Transitions>
         </Setter>
     </Style>
     <Style Selector="Border.rackrow:pointerover">
         <Setter Property="Background" Value="{StaticResource RimeBrush}"/>
+        <Setter Property="BorderBrush" Value="{StaticResource FrostDimBrush}"/>
+        <Setter Property="BoxShadow" Value="0 6 18 -6 #33119ADB"/>
     </Style>
 
     <!-- Small icon buttons (reorder / remove) -->
@@ -300,12 +462,27 @@
         <Setter Property="Height" Value="22"/>
         <Setter Property="Padding" Value="0"/>
         <Setter Property="CornerRadius" Value="6"/>
+        <Setter Property="RenderTransform" Value="scale(1)"/>
+        <Setter Property="Transitions">
+            <Transitions>
+                <TransformOperationsTransition Property="RenderTransform" Duration="0:0:0.1" Easing="CubicEaseOut"/>
+            </Transitions>
+        </Setter>
+    </Style>
+    <Style Selector="Button.iconbtn:pressed">
+        <Setter Property="RenderTransform" Value="scale(0.88)"/>
     </Style>
     <Style Selector="Button.iconbtn /template/ ContentPresenter">
         <Setter Property="Background" Value="Transparent"/>
+        <Setter Property="Transitions">
+            <Transitions><BrushTransition Property="Background" Duration="0:0:0.13"/></Transitions>
+        </Setter>
     </Style>
     <Style Selector="Button.iconbtn Path">
         <Setter Property="Stroke" Value="{StaticResource HoarfrostBrush}"/>
+        <Setter Property="Transitions">
+            <Transitions><BrushTransition Property="Stroke" Duration="0:0:0.13"/></Transitions>
+        </Setter>
     </Style>
     <Style Selector="Button.iconbtn:pointerover /template/ ContentPresenter">
         <Setter Property="Background" Value="{StaticResource RimeHiBrush}"/>
@@ -321,11 +498,34 @@
     </Style>
 
     <!-- ============================ Status orb pulse ============================ -->
-    <Style Selector="Border.pulse">
+    <Style Selector=":is(Control).pulse">
         <Style.Animations>
-            <Animation Duration="0:0:2.6" IterationCount="INFINITE" PlaybackDirection="Alternate">
+            <Animation Duration="0:0:2.6" IterationCount="INFINITE" PlaybackDirection="Alternate" Easing="SineEaseInOut">
                 <KeyFrame Cue="0%"><Setter Property="Opacity" Value="0.4"/></KeyFrame>
                 <KeyFrame Cue="100%"><Setter Property="Opacity" Value="0.95"/></KeyFrame>
+            </Animation>
+        </Style.Animations>
+    </Style>
+
+    <!-- Live radar: a frost ring that expands and fades from the data-source orb.
+         Present only while the plugin binds IsLive; hidden (Opacity 0) otherwise. -->
+    <Style Selector="Ellipse.ping">
+        <Setter Property="Opacity" Value="0"/>
+        <Style.Animations>
+            <Animation Duration="0:0:1.9" IterationCount="INFINITE" Easing="CubicEaseOut">
+                <KeyFrame Cue="0%"><Setter Property="Opacity" Value="0.55"/><Setter Property="ScaleTransform.ScaleX" Value="0.55"/><Setter Property="ScaleTransform.ScaleY" Value="0.55"/></KeyFrame>
+                <KeyFrame Cue="75%"><Setter Property="Opacity" Value="0"/><Setter Property="ScaleTransform.ScaleX" Value="2.4"/><Setter Property="ScaleTransform.ScaleY" Value="2.4"/></KeyFrame>
+                <KeyFrame Cue="100%"><Setter Property="Opacity" Value="0"/><Setter Property="ScaleTransform.ScaleX" Value="2.4"/><Setter Property="ScaleTransform.ScaleY" Value="2.4"/></KeyFrame>
+            </Animation>
+        </Style.Animations>
+    </Style>
+
+    <!-- Ambient crown: the crystal-needle fan breathes, barely. -->
+    <Style Selector="Path.crownfan">
+        <Style.Animations>
+            <Animation Duration="0:0:7" IterationCount="INFINITE" PlaybackDirection="Alternate" Easing="SineEaseInOut">
+                <KeyFrame Cue="0%"><Setter Property="Opacity" Value="0.04"/></KeyFrame>
+                <KeyFrame Cue="100%"><Setter Property="Opacity" Value="0.1"/></KeyFrame>
             </Animation>
         </Style.Animations>
     </Style>

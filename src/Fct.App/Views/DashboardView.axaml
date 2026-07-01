@@ -10,14 +10,14 @@
     <ScrollViewer>
         <StackPanel Spacing="18">
             <Grid ColumnDefinitions="*,16,*,16,*,16,*">
-                <Border Grid.Column="0" Classes="card" Padding="18,16">
+                <Border Grid.Column="0" Classes="card stat rise1" Padding="18,16">
                     <StackPanel Spacing="7">
                         <TextBlock Text="HOST" Classes="eyebrow"/>
                         <TextBlock Text=".NET 10" Classes="h2" FontSize="24"/>
                         <TextBlock Text="Avalonia shell" Classes="meta" FontSize="11"/>
                     </StackPanel>
                 </Border>
-                <Border Grid.Column="2" Classes="card" Padding="18,16">
+                <Border Grid.Column="2" Classes="card stat rise2" Padding="18,16">
                     <StackPanel Spacing="7">
                         <TextBlock Text="SATELLITE" Classes="eyebrow"/>
                         <TextBlock Text="{Binding Shell.SatelliteState}" Classes="h2" FontSize="24"
@@ -26,14 +26,14 @@
                                    TextTrimming="CharacterEllipsis"/>
                     </StackPanel>
                 </Border>
-                <Border Grid.Column="4" Classes="card" Padding="18,16">
+                <Border Grid.Column="4" Classes="card stat rise3" Padding="18,16">
                     <StackPanel Spacing="7">
                         <TextBlock Text="PLUGINS" Classes="eyebrow"/>
                         <TextBlock Text="{Binding Shell.LoadedCount}" Classes="h2" FontSize="24"/>
                         <TextBlock Text="{Binding Shell.LoadedSummary}" Classes="meta" FontSize="11"/>
                     </StackPanel>
                 </Border>
-                <Border Grid.Column="6" Classes="card" Padding="18,16">
+                <Border Grid.Column="6" Classes="card stat rise4" Padding="18,16">
                     <StackPanel Spacing="7">
                         <TextBlock Text="DATA SOURCE" Classes="eyebrow"/>
                         <TextBlock Text="{Binding Shell.SelectedPlugin.StatusLabel}" Classes="h2" FontSize="24"/>
@@ -42,7 +42,7 @@
                 </Border>
             </Grid>
 
-            <Border Classes="card" Padding="26,24">
+            <Border Classes="card rise5" Padding="26,24">
                 <StackPanel Spacing="14">
                     <TextBlock Text="Welcome to the host" Classes="h2"/>
                     <Border Classes="rule" Width="64" HorizontalAlignment="Left"/>

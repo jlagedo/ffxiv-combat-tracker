@@ -42,7 +42,15 @@ namespace Fct.Abstractions
         bool Active,
         double Dps,
         long Damage,
-        IReadOnlyList<CombatantMetrics> Combatants);
+        IReadOnlyList<CombatantMetrics> Combatants)
+    {
+        /// <summary>
+        /// The opaque ACT <c>EncounterData.ExportVariables</c> dictionary, carried verbatim so the
+        /// compat shim can round-trip every key cactbot reads (the fixed metric fields above cannot).
+        /// Empty by default; native consumers use the typed fields.
+        /// </summary>
+        public IReadOnlyDictionary<string, string> ExportVariables { get; init; } = ExportVars.Empty;
+    }
 
     /// <summary>Per-combatant aggregated metrics within an <see cref="EncounterSnapshot"/>.</summary>
     public sealed record CombatantMetrics(
@@ -55,5 +63,19 @@ namespace Fct.Abstractions
         long Healing,
         double CritPercent,
         double DirectHitPercent,
-        int Deaths);
+        int Deaths)
+    {
+        /// <summary>
+        /// The opaque ACT <c>CombatantData.ExportVariables</c> dictionary (e.g. <c>maxhit</c>,
+        /// <c>tohit</c>, <c>swings</c>, <c>Last10/30/60/180DPS</c>), carried verbatim for the compat
+        /// shim. Empty by default; native consumers use the typed fields.
+        /// </summary>
+        public IReadOnlyDictionary<string, string> ExportVariables { get; init; } = ExportVars.Empty;
+    }
+
+    /// <summary>Shared empty <c>ExportVariables</c> default (no per-instance allocation).</summary>
+    internal static class ExportVars
+    {
+        public static readonly IReadOnlyDictionary<string, string> Empty = new Dictionary<string, string>();
+    }
 }
