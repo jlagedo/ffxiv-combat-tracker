@@ -1,3 +1,4 @@
+#nullable enable
 using System;
 using System.Globalization;
 using System.Text;
@@ -22,7 +23,7 @@ namespace Fct.Logging
         public int EventId { get; set; }
         public string EventName { get; set; } = "";
         public string Message { get; set; } = "";
-        public string Exception { get; set; }   // null when no exception
+        public string? Exception { get; set; }   // null when no exception
 
         public string ToWire()
         {
@@ -39,7 +40,7 @@ namespace Fct.Logging
         }
 
         // True only for a well-formed "LOG ..." line; any other line (handshake, malformed) → false.
-        public static bool TryParse(string line, out BridgeLogRecord record)
+        public static bool TryParse(string line, out BridgeLogRecord? record)
         {
             record = null;
             if (line == null || !line.StartsWith(Prefix, StringComparison.Ordinal))
@@ -71,9 +72,9 @@ namespace Fct.Logging
             return true;
         }
 
-        private static string Enc(string s)
+        private static string Enc(string? s)
         {
-            if (string.IsNullOrEmpty(s)) return "";
+            if (s is null || s.Length == 0) return "";
             var sb = new StringBuilder(s.Length);
             foreach (var ch in s)
             {

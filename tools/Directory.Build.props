@@ -1,0 +1,9 @@
+<Project>
+
+  <!--
+    Dev tools (mass-compare, act-oracle) — utilities, not in the solution and not shipped. Empty on
+    purpose: its presence stops MSBuild from walking up to the repo-root defaults, keeping the tools
+    isolated from the app's strict build graph.
+  -->
+
+</Project>

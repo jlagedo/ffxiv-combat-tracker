@@ -1,0 +1,21 @@
+<Project>
+
+  <!--
+    Test-project defaults. MSBuild stops at the first Directory.Build.props it finds walking up, so
+    this file must re-import the repo-root defaults itself, then layer the test specifics on top.
+  -->
+  <Import Project="$([MSBuild]::GetPathOfFileAbove('Directory.Build.props', '$(MSBuildThisFileDirectory)../'))" />
+
+  <PropertyGroup>
+    <IsPackable>false</IsPackable>
+    <IsTestProject>true</IsTestProject>
+  </PropertyGroup>
+
+  <!-- Every test project runs the same framework + runner (versions pinned in Directory.Packages.props). -->
+  <ItemGroup>
+    <PackageReference Include="Microsoft.NET.Test.Sdk" />
+    <PackageReference Include="xunit" />
+    <PackageReference Include="xunit.runner.visualstudio" />
+  </ItemGroup>
+
+</Project>

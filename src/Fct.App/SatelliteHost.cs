@@ -5,7 +5,9 @@ using System.IO;
 using System.IO.Pipes;
 using System.Threading;
 using System.Threading.Tasks;
+using Fct.Abstractions;
 using Fct.App.Hosting;
+using Fct.Bridge;
 using Fct.Logging;
 using Microsoft.Extensions.Logging;
 
@@ -42,18 +44,21 @@ public sealed class SatelliteHost
     private readonly ILoggerFactory _loggerFactory;
     private readonly ILogger<SatelliteHost> _log;
     private readonly ILogger _satelliteLog;   // category for records forwarded from the satellite
+    private readonly IGameEventSink _sink;     // decoded EVT frames land on the net10 event bus
     private readonly INotificationHub? _notifications;
+    private int _firstEventLogged;
 
     private NamedPipeServerStream? _server;     // satellite -> host: handshake + forwarded logs
     private EventWaitHandle? _shutdownEvent;    // host -> satellite: graceful-shutdown signal
     private volatile bool _shuttingDown;        // suppress the "exited" notice during a requested drain
     public Process? Process { get; private set; }
 
-    public SatelliteHost(ILoggerFactory loggerFactory, INotificationHub? notifications = null)
+    internal SatelliteHost(ILoggerFactory loggerFactory, IGameEventSink sink, INotificationHub? notifications = null)
     {
         _loggerFactory = loggerFactory;
         _log = loggerFactory.CreateLogger<SatelliteHost>();
         _satelliteLog = loggerFactory.CreateLogger(LogCategories.Satellite);
+        _sink = sink;
         _notifications = notifications;
     }
 
@@ -124,9 +129,13 @@ public sealed class SatelliteHost
             string? line;
             while ((line = await reader.ReadLineAsync(timeout.Token).ConfigureAwait(false)) != null)
             {
-                if (BridgeLogRecord.TryParse(line, out var rec))
+                if (BridgeLogRecord.TryParse(line, out var rec) && rec is not null)
                 {
                     ReEmit(rec);
+                }
+                else if (TryEmitGameEvent(line))
+                {
+                    // Live game event forwarded from the satellite (piece C).
                 }
                 else if (SatelliteProtocol.IsReady(line))
                 {
@@ -175,8 +184,10 @@ public sealed class SatelliteHost
             string? line;
             while (!ct.IsCancellationRequested && (line = await reader.ReadLineAsync(ct).ConfigureAwait(false)) != null)
             {
-                if (BridgeLogRecord.TryParse(line, out var rec))
+                if (BridgeLogRecord.TryParse(line, out var rec) && rec is not null)
                     ReEmit(rec);
+                else if (TryEmitGameEvent(line))
+                    continue;
                 else
                     _log.LogDebug(LogEvents.BridgeFrameMalformed, "Unrecognized bridge frame after handshake: {Frame}", line);
             }
@@ -279,6 +290,31 @@ public sealed class SatelliteHost
     {
         var m = message?.Trim() ?? string.Empty;
         return m.StartsWith("[Notify]", StringComparison.OrdinalIgnoreCase) ? m["[Notify]".Length..].Trim() : m;
+    }
+
+    // Decode an EVT frame forwarded from the satellite and publish it onto the net10 event bus. The
+    // host re-stamps Sequence from its own sink so the bus keeps one coherent per-session ordering
+    // (the frame carries only the timestamp). Returns false for any non-EVT line so the caller can
+    // fall through to handshake/malformed handling. The first event logs at Information as headless
+    // proof-of-wire; the rest at Trace so the high-rate firehose never floods the log.
+    private bool TryEmitGameEvent(string line)
+    {
+        if (!GameEventFrame.TryParse(line, out var evt) || evt is null)
+            return false;
+        try
+        {
+            _sink.Emit(evt with { Sequence = _sink.NextSequence() });
+            if (Interlocked.Exchange(ref _firstEventLogged, 1) == 0)
+                _log.LogInformation(LogEvents.BridgeEventDecoded,
+                    "First live game event forwarded from satellite: {EventType}", evt.GetType().Name);
+            else
+                _log.LogTrace(LogEvents.BridgeEventDecoded, "Bridge event {EventType}", evt.GetType().Name);
+        }
+        catch (Exception ex)
+        {
+            _log.LogWarning(LogEvents.BridgeEventDecodeFailed, ex, "Failed to emit decoded bridge event");
+        }
+        return true;
     }
 
     private static int SafePid(Process? p) { try { return p?.Id ?? -1; } catch { return -1; } }

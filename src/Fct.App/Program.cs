@@ -72,7 +72,11 @@ class Program
         // Shell preferences (persisted JSON).
         builder.Services.AddSingleton<UiSettingsStore>();
 
-        builder.Services.AddSingleton<SatelliteHost>();
+        // The satellite decodes live game-event frames onto the bus (piece C) and surfaces notable
+        // records as notifications.
+        builder.Services.AddSingleton<SatelliteHost>(sp => new SatelliteHost(
+            sp.GetRequiredService<ILoggerFactory>(), sp.GetRequiredService<IGameEventSink>(),
+            sp.GetRequiredService<INotificationHub>()));
         builder.Services.AddSingleton<MainViewModel>();
         builder.Services.AddSingleton<MainWindow>();
 
@@ -92,12 +96,8 @@ class Program
         builder.Services.AddSingleton<PluginManager>();
         builder.Services.AddHostedService<PluginLifetime>();
 
-#if DEBUG
-        // TEMPORARY: synthetic game data until the net48→net10 bridge forwarder (piece C) exists.
-        // Registered last so plugins are loaded + subscribed before it emits.
-        builder.Services.AddSingleton<DevGameEventSource>();
-        builder.Services.AddHostedService(sp => sp.GetRequiredService<DevGameEventSource>());
-#endif
+        // Live game data reaches the bus via the net48→net10 bridge forwarder (piece C): SatelliteHost
+        // decodes EVT frames from the satellite and publishes them through IGameEventSink.
 
         return builder.Build();
     }

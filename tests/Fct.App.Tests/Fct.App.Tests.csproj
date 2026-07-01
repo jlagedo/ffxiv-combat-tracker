@@ -7,16 +7,7 @@
   -->
   <PropertyGroup>
     <TargetFramework>net10.0</TargetFramework>
-    <Nullable>enable</Nullable>
-    <LangVersion>latest</LangVersion>
-    <IsPackable>false</IsPackable>
   </PropertyGroup>
-
-  <ItemGroup>
-    <PackageReference Include="Microsoft.NET.Test.Sdk" />
-    <PackageReference Include="xunit" />
-    <PackageReference Include="xunit.runner.visualstudio" />
-  </ItemGroup>
 
   <ItemGroup>
     <ProjectReference Include="..\..\src\Fct.Abstractions\Fct.Abstractions.csproj" />
@@ -30,17 +21,16 @@
   </ItemGroup>
 
   <!-- Plugin subsystem under test (headless, no Avalonia/IHostedService deps): the host services and
-       the ALC loader. DevGameEventSource + PluginLifetime (IHostedService) are intentionally excluded. -->
+       the ALC loader. PluginLifetime (IHostedService) is intentionally excluded. -->
   <ItemGroup>
-    <Compile Include="..\..\src\Fct.App\Hosting\*.cs"
-             Exclude="..\..\src\Fct.App\Hosting\DevGameEventSource.cs"
-             Link="Hosting\%(Filename)%(Extension)" />
+    <Compile Include="..\..\src\Fct.App\Hosting\*.cs" Link="Hosting\%(Filename)%(Extension)" />
     <Compile Include="..\..\src\Fct.App\Plugins\HostContract.cs" Link="Plugins\HostContract.cs" />
     <Compile Include="..\..\src\Fct.App\Plugins\PluginManifest.cs" Link="Plugins\PluginManifest.cs" />
     <Compile Include="..\..\src\Fct.App\Plugins\PluginLoadContext.cs" Link="Plugins\PluginLoadContext.cs" />
     <Compile Include="..\..\src\Fct.App\Plugins\PluginManager.cs" Link="Plugins\PluginManager.cs" />
     <Compile Include="..\..\shared\Logging\LogEvents.cs" Link="Logging\LogEvents.cs" />
     <Compile Include="..\..\shared\Logging\LogPaths.cs" Link="Logging\LogPaths.cs" />
+    <Compile Include="..\..\shared\Bridge\GameEventFrame.cs" Link="Bridge\GameEventFrame.cs" />
   </ItemGroup>
 
   <!-- Build the sample plugin and stage it under plugins\ so the loader tests can load it from disk.

@@ -20,7 +20,8 @@ public partial class MainWindow : Window
     private readonly INotificationHub _notifications;
 
     // Parameterless path is for the XAML previewer only; the running app resolves the DI ctor.
-    public MainWindow() : this(new MainViewModel(), new SatelliteHost(NullLoggerFactory.Instance),
+    public MainWindow() : this(new MainViewModel(),
+        new SatelliteHost(NullLoggerFactory.Instance, NullGameEventSink.Instance),
         NullLoggerFactory.Instance, new NotificationService()) { }
 
     public MainWindow(MainViewModel vm, SatelliteHost satellite, ILoggerFactory loggerFactory,

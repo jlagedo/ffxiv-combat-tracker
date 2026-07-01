@@ -35,6 +35,8 @@ namespace Fct.Logging
         public static readonly EventId BridgePluginAnnounced = new EventId(1202, nameof(BridgePluginAnnounced));
         public static readonly EventId BridgeReaderStopped = new EventId(1203, nameof(BridgeReaderStopped));
         public static readonly EventId BridgeFrameMalformed = new EventId(1204, nameof(BridgeFrameMalformed));
+        public static readonly EventId BridgeEventDecoded = new EventId(1205, nameof(BridgeEventDecoded));
+        public static readonly EventId BridgeEventDecodeFailed = new EventId(1206, nameof(BridgeEventDecodeFailed));
 
         // -- 13xx window embedding (host side) --
         public static readonly EventId WindowReparented = new EventId(1300, nameof(WindowReparented));
@@ -69,6 +71,10 @@ namespace Fct.Logging
         public static readonly EventId RealSubscriptionNull = new EventId(2201, nameof(RealSubscriptionNull));
         public static readonly EventId SubscriberThrew = new EventId(2202, nameof(SubscriberThrew));
         public static readonly EventId PacketsDropped = new EventId(2203, nameof(PacketsDropped));
+
+        // -- 221x bridge event forwarder (satellite side) --
+        public static readonly EventId ForwarderBound = new EventId(2210, nameof(ForwarderBound));
+        public static readonly EventId ForwarderDropped = new EventId(2211, nameof(ForwarderDropped));
 
         // -- 23xx diagnostics / self-test (satellite side) --
         public static readonly EventId SelfTest = new EventId(2300, nameof(SelfTest));

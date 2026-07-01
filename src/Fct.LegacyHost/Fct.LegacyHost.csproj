@@ -9,7 +9,6 @@
     <OutputType>WinExe</OutputType>
     <TargetFramework>net48</TargetFramework>
     <UseWindowsForms>true</UseWindowsForms>
-    <LangVersion>latest</LangVersion>
     <Nullable>disable</Nullable>
     <PlatformTarget>x64</PlatformTarget>
     <Prefer32Bit>false</Prefer32Bit>
@@ -24,12 +23,24 @@
   <ItemGroup>
     <ProjectReference Include="..\Fct.Compat.Act\Fct.Compat.Act.csproj" />
     <ProjectReference Include="..\Fct.Parser.Legacy\Fct.Parser.Legacy.csproj" />
+    <!-- The plugin SDK (multi-targets net48;net10): the BridgeForwarder projects the SDK/ACT stream
+         into the same GameEvent records the net10 host consumes. -->
+    <ProjectReference Include="..\Fct.Abstractions\Fct.Abstractions.csproj" />
     <!-- The diagnostic stream-probe plugin. ReferenceOutputAssembly=false: the satellite does NOT
          bind it at compile time — it is loaded at runtime via Assembly.LoadFrom, exactly like a
          third-party legacy plugin, so the discovery/binding seam is exercised for real. The target
          below stages its DLL into plugins\ next to the satellite. -->
     <ProjectReference Include="..\Fct.StreamProbe\Fct.StreamProbe.csproj"
                       ReferenceOutputAssembly="false" Private="false" />
+  </ItemGroup>
+
+  <!-- The FFXIV SDK model surface (Combatant/IDataSubscription/IDataRepository) the forwarder projects
+       from. Private=false: the real DLL is never copied to output. -->
+  <ItemGroup>
+    <Reference Include="FFXIV_ACT_Plugin.Common">
+      <HintPath>..\..\lib\FFXIV_ACT_Plugin.Common.dll</HintPath>
+      <Private>false</Private>
+    </Reference>
   </ItemGroup>
 
   <Target Name="StageStreamProbe" AfterTargets="Build">
@@ -54,6 +65,7 @@
     <Compile Include="..\..\shared\Logging\LogEvents.cs" Link="Logging\LogEvents.cs" />
     <Compile Include="..\..\shared\Logging\LogPaths.cs" Link="Logging\LogPaths.cs" />
     <Compile Include="..\..\shared\Logging\BridgeLogRecord.cs" Link="Logging\BridgeLogRecord.cs" />
+    <Compile Include="..\..\shared\Bridge\GameEventFrame.cs" Link="Bridge\GameEventFrame.cs" />
   </ItemGroup>
 
 </Project>
