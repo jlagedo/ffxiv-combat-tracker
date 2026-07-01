@@ -10,10 +10,11 @@ to run the five plugins **unmodified**. This document is the **net10 contract** 
 
 > **Status: contract + flow-test harness + net10 host & ALC loader (slice A+B) + the net48→net10
 > bridge data forwarder (C) built; the net10 compat shim (D) is in progress.** The shim's two
-> legacy-impersonating facades, the plugin lifecycle, the audio / registry / raw-line seams, and the
-> encounter driver over the shared aggregation engine (`ExportVariables` included) are built and load a
-> recompiled legacy plugin end-to-end; the `IDataSubscription`/`IDataRepository` mapping onto the bus +
-> snapshot and the UI embedding are pending (see
+> legacy-impersonating facades, the plugin lifecycle, the audio / registry / raw-line seams, the
+> encounter driver over the shared aggregation engine (`ExportVariables` included), and the
+> `IDataSubscription` event map (`LogLine`/`ZoneChanged`/`PartyListChanged`/`PrimaryPlayerChanged`) are
+> built and load a recompiled legacy plugin end-to-end; the `IDataRepository` + `Combatant*` projection
+> onto the snapshot and the UI embedding are pending (see
 > [The net10 compat shim](#the-net10-compat-shim-in-progress)). `Fct.Abstractions`
 > (net48;net10) and `Fct.Abstractions.UI` (net10 + Avalonia) are the compiling contract; a headless
 > flow-test harness exercises the contract shapes end-to-end: `Fct.Abstractions.Testing` supplies
@@ -285,7 +286,7 @@ live on `FormActMain`/`LegacyPluginHost`; **pending** rows are the remaining wor
 | `PluginGetSelfData`/`AppDataFolder`/`WriteExceptionLog` | `IPluginStorage`/`ILogger` | ✅ built |
 | `AddCombatAction`/`SetEncounter`/`EndCombat`/`InCombat` | shared aggregation engine (`ActiveZone.ActiveEncounter`) + mirrored onto `IEncounterService` | ✅ built |
 | `CombatantData`/`EncounterData.ExportVariables` (opaque dict cactbot reads) | shared engine's registered formatters, projected onto `EncounterSnapshot`/`CombatantMetrics` typed fields + the `ExportVariables` bag ([G1](#contract-gaps-tracked)/[G2](#contract-gaps-tracked)) | ✅ built |
-| `IDataSubscription` (11 events: NetworkReceived/Sent, CombatantAdded/Removed, PrimaryPlayerChanged, ZoneChanged, PlayerStatsChanged, PartyListChanged, LogLine, ParsedLogLine, ProcessChanged) | `IGameEventStream` mapped to SDK delegate shapes | ⏳ pending (interface declared) |
+| `IDataSubscription` (11 events: NetworkReceived/Sent, CombatantAdded/Removed, PrimaryPlayerChanged, ZoneChanged, PlayerStatsChanged, PartyListChanged, LogLine, ParsedLogLine, ProcessChanged) | `IGameEventStream` mapped to SDK delegate shapes | 🔨 partial: `LogLine`/`ZoneChanged`/`PartyListChanged`/`PrimaryPlayerChanged` mapped; `Combatant*` await the projection (D7); the rest inert (no typed-bus source) |
 | `IDataRepository.Get*` | `IGameSnapshot` + `IResourceCatalog` | ⏳ pending (interface declared) |
 | `Combatant`/`Player`/`NetworkBuff` | projected from `Actor`/`StatusEffect` (lossless: CP/GP/world/order [G10](#contract-gaps-tracked), refresh/timestamp [G9](#contract-gaps-tracked)) | ⏳ pending (types declared) |
 | `RegisterNetworkParser` / custom lines 256+ | `IRawPacketSource` (read) + `IRawLogLineEmitter` synthetic-line emit ([G4](#contract-gaps-tracked)) | ⏳ pending (host emit path built) |
@@ -500,8 +501,8 @@ optional `legacyEntry` (mutually exclusive with `entry`); `PluginManager` routes
 shares `Fct.Compat.Shim` + the two facades to the default ALC so the shim and the plugin agree on type
 identity. Hosting recompiled WinForms plugins in-process makes `Fct.App` a **net10-windows** app.
 `samples/Fct.SampleLegacyPlugin` is the reference recompiled plugin; `tests/Fct.Compat.Shim.Tests`
-covers identity, lifecycle, the audio/registry/raw-line seams, and the encounter driver +
-cross-TFM `ExportVariables` parity.
+covers identity, lifecycle, the audio/registry/raw-line seams, the encounter driver +
+cross-TFM `ExportVariables` parity, and the `IDataSubscription` event map.
 
 **Built:** the `FormActMain` hub over `IPluginHost`; `LegacyPluginHost` lifecycle; audio
 (`TTS`/`PlaySound` → `IAudioOutput`, `PlayTts`/`PlaySoundMethod` slots → terminal `IAudioSink`, G3);
@@ -512,11 +513,17 @@ named callbacks (`RegisterNamedCallback`/`InvokeNamedCallback` → `IPluginRegis
 `shared/Aggregation/` and linked identically into the net48 `Fct.Compat.Act` and the net10 ActFacade,
 so the `ExportVariables` bag cactbot reads is bit-identical across runtimes (`EncounterProjector` maps
 it plus the typed metrics onto `EncounterSnapshot`/`CombatantMetrics`, G1/G2; combat state mirrors onto
-`IEncounterService`).
+`IEncounterService`). The `IDataSubscription` event map: `DataSubscriptionAdapter` projects the
+`IGameEventStream` onto the SDK delegates a recompiled plugin binds — `LogLine`←`RawLogLine`,
+`ZoneChanged`, `PartyListChanged`←`PartyChanged`, `PrimaryPlayerChanged` — exposed on the hub via
+`FormActMain.DataSubscription`.
 
-**Pending:** the `IDataSubscription` 11-event mapping onto `IGameEventStream`; the
-`IDataRepository.Get*` + `Combatant`/`Player`/`NetworkBuff` projection over `IGameSnapshot` (partially
-blocked on the snapshot projection below); live per-tick metric refresh into `IEncounterService.Active`
+**Pending:** `CombatantAdded`/`CombatantRemoved` on `IDataSubscription` (await the `Actor`→`Combatant`
+projection) and the remaining inert events (`NetworkReceived`/`NetworkSent`, `PlayerStatsChanged`,
+`ParsedLogLine`, `ProcessChanged` — no typed-bus source); the `IDataRepository.Get*` +
+`Combatant`/`Player`/`NetworkBuff` projection over `IGameSnapshot` (partially blocked on the snapshot
+projection below), and the reflection-discovery stand-in that surfaces both `DataSubscription` and
+`DataRepository` off one plugin object; live per-tick metric refresh into `IEncounterService.Active`
 (needs a host update seam — deferred with the snapshot projection); and the WinForms `TabPage`
 embedding via Avalonia `NativeControlHost`. Also under-specified: `Form`-inherited `oFormActMain`
 members.

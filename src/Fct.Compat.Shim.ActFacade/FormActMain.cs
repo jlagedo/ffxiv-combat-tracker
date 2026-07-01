@@ -5,6 +5,7 @@ using System.Threading;
 using System.Threading.Tasks;
 using System.Windows.Forms;
 using Fct.Abstractions;
+using FFXIV_ACT_Plugin.Common;
 using Microsoft.Extensions.Logging;
 
 namespace Advanced_Combat_Tracker
@@ -14,9 +15,10 @@ namespace Advanced_Combat_Tracker
     /// NOT a <see cref="Form"/>; it forwards the ACT host surface onto the modern <see cref="IPluginHost"/>.
     /// One instance is shared across all shimmed plugins (see <c>ActGlobals.oFormActMain</c>). The
     /// surface grows slice-by-slice: this carries lifecycle/identity, logging, window chrome, audio,
-    /// the raw-line event surface, and the encounter/aggregation driver (<see cref="AddCombatAction"/>
-    /// / <see cref="SetEncounter"/> over the shared engine); the SDK <c>IDataSubscription</c>/
-    /// <c>IDataRepository</c> projection arrives in later slices.
+    /// the raw-line event surface, the encounter/aggregation driver (<see cref="AddCombatAction"/>
+    /// / <see cref="SetEncounter"/> over the shared engine), and the SDK <c>IDataSubscription</c>
+    /// projection (<see cref="DataSubscription"/>); the <c>IDataRepository</c> projection arrives in a
+    /// later slice.
     /// </summary>
     public sealed class FormActMain : IDisposable
     {
@@ -152,6 +154,17 @@ namespace Advanced_Combat_Tracker
             OnLogLineRead?.Invoke(false, args);
         }
 
+        // --- SDK typed event surface (IDataSubscription) -----------------------------------
+
+        /// <summary>The SDK's typed event surface, projected from the modern <c>IGameEventStream</c>.
+        /// OverlayPlugin reflects a plugin's <c>DataSubscription</c> property and binds its delegates;
+        /// wired once by <c>LegacyPluginHost</c> via <see cref="AttachDataSubscription"/>.</summary>
+        public IDataSubscription DataSubscription { get; private set; }
+
+        /// <summary>One-time wiring of the projected <see cref="DataSubscription"/> (the concrete adapter
+        /// lives in the shim runtime, so it is injected rather than constructed here).</summary>
+        public void AttachDataSubscription(IDataSubscription subscription) => DataSubscription = subscription;
+
         // --- Encounter / combat pipeline (feeds the shared aggregation engine) -------------
 
         /// <summary>The live zone and its active encounter. cactbot/Triggernometry read
@@ -217,7 +230,11 @@ namespace Advanced_Combat_Tracker
         public void InvokeNamedCallback(string name, object argument = null)
             => Host.Plugins.InvokeCallback(name, argument);
 
-        public void Dispose() => _busSubscription.Dispose();
+        public void Dispose()
+        {
+            _busSubscription.Dispose();
+            (DataSubscription as IDisposable)?.Dispose();
+        }
 
         // Adapts the legacy TTS/sound delegates to the modern IAudioSink (async/fire-and-return).
         private sealed class DelegateAudioSink : IAudioSink

@@ -28,7 +28,8 @@ try {
         "tests/Fct.Compat.Act.Tests/Fct.Compat.Act.Tests.csproj",
         "tests/Fct.App.Tests/Fct.App.Tests.csproj",
         "tests/Fct.Parser.Legacy.Tests/Fct.Parser.Legacy.Tests.csproj",
-        "tests/Fct.FlowTests/Fct.FlowTests.csproj"
+        "tests/Fct.FlowTests/Fct.FlowTests.csproj",
+        "tests/Fct.Compat.Shim.Tests/Fct.Compat.Shim.Tests.csproj"
     )
     if (-not $Unit) {
         $projects += "tests/Fct.Integration.Tests/Fct.Integration.Tests.csproj"

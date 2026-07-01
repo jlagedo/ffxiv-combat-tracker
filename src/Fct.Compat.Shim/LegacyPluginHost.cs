@@ -91,6 +91,13 @@ public sealed class LegacyPluginHost : IPlugin
     private static FormActMain EnsureHub(IPluginHost host)
     {
         ActGlobals.oFormActMain ??= new FormActMain(host);
-        return ActGlobals.oFormActMain;
+        var hub = ActGlobals.oFormActMain;
+
+        // Project the modern event stream onto the SDK's IDataSubscription surface (process-lifetime,
+        // like the hub itself). A recompiled plugin reflects hub-side DataSubscription to bind its events.
+        if (hub.DataSubscription is null)
+            hub.AttachDataSubscription(new DataSubscriptionAdapter(host.Game.Events));
+
+        return hub;
     }
 }
