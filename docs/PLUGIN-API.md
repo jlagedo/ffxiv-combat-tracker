@@ -9,26 +9,32 @@ It is the counterpart to the *backward* surface: [`ACT-INTERFACE-MAP.md`](ACT-IN
 to run the five plugins **unmodified**. This document is the **net10 contract** they migrate *to*.
 
 > **Status: contract + flow-test harness + net10 host & ALC loader (slice A+B) + the net48→net10
-> bridge data forwarder (C) built; the net10 compat shim (D) pending.** `Fct.Abstractions` (net48;net10) and `Fct.Abstractions.UI`
-> (net10 + Avalonia) are the compiling contract; a headless flow-test harness exercises the contract
-> shapes end-to-end: `Fct.Abstractions.Testing` supplies in-memory fakes of every interface plus the
-> `ShimStub` seam, and `Fct.FlowTests` (net10) runs the legacy↔native flow suite (**18 tests, all
-> green, 0 skipped**). The **real host services + ALC-per-plugin loader now exist in `Fct.App`** and
-> load a sample native plugin end-to-end (see [The net10 host & ALC loader](#the-net10-host--alc-loader-built)).
-> The archetype shapes below are cross-checked against the actual source of all five supported plugins
-> on `E:\dev`; the gaps that check surfaced (**G1–G11, all now shipped**) are tracked in
-> [Contract gaps](#contract-gaps-tracked), and the flow suite is documented in
+> bridge data forwarder (C) built; the net10 compat shim (D) is in progress.** The shim's two
+> legacy-impersonating facades, the plugin lifecycle, the audio / registry / raw-line seams, and the
+> encounter driver over the shared aggregation engine (`ExportVariables` included) are built and load a
+> recompiled legacy plugin end-to-end; the `IDataSubscription`/`IDataRepository` mapping onto the bus +
+> snapshot and the UI embedding are pending (see
+> [The net10 compat shim](#the-net10-compat-shim-in-progress)). `Fct.Abstractions`
+> (net48;net10) and `Fct.Abstractions.UI` (net10 + Avalonia) are the compiling contract; a headless
+> flow-test harness exercises the contract shapes end-to-end: `Fct.Abstractions.Testing` supplies
+> in-memory fakes of every interface plus the `ShimStub` seam, and `Fct.FlowTests` (net10) runs the
+> legacy↔native flow suite (**18 tests, all green, 0 skipped**). The **real host services +
+> ALC-per-plugin loader now exist in `Fct.App`** and load a sample native plugin end-to-end (see
+> [The net10 host & ALC loader](#the-net10-host--alc-loader-built)). The archetype shapes below are
+> cross-checked against the actual source of all five supported plugins on `E:\dev`; the gaps that
+> check surfaced (**G1–G11, all now shipped**) are tracked in [Contract gaps](#contract-gaps-tracked),
+> and the flow suite is documented in
 > [Testing the contract](#testing-the-contract--legacynative-flow-tests).
 
 ## Two interfaces, one contract
 
 1. **Modern** (`Fct.Abstractions` + `Fct.Abstractions.UI`) — typed, clean, best-practice. What new
    plugins target.
-2. **Compat** (a planned **net10** shim, not yet built — distinct from the existing **net48**
-   `Fct.Compat.Act`, which is the satellite's ACT engine) — a re-projection of the ACT + FFXIV-SDK
-   programming model, implemented **as an adapter over the modern contract**. An ACT-era plugin
-   **recompiles** against it (minimal changes), moves off the net48 satellite into the isolated
-   net10 host, then migrates compat→modern member-by-member and drops the shim.
+2. **Compat** (the **net10** shim `Fct.Compat.Shim` + its two legacy-impersonating facades — distinct
+   from the existing **net48** `Fct.Compat.Act`, which is the satellite's ACT engine) — a re-projection
+   of the ACT + FFXIV-SDK programming model, implemented **as an adapter over the modern contract**. An
+   ACT-era plugin **recompiles** against it (minimal changes), moves off the net48 satellite into the
+   isolated net10 host, then migrates compat→modern member-by-member and drops the shim.
 
 ## Locked decisions
 
@@ -93,7 +99,9 @@ Three findings drove the shapes:
 | `Fct.Abstractions` | net48;net10 | core contract: lifecycle, events, snapshot, encounter, audio, registry, raw hatch. **No UI, no opcodes.** |
 | `Fct.Abstractions.UI` | net10 | Avalonia UI contribution surfaces. Referenced only by UI-contributing plugins. |
 | `Fct.Abstractions.Testing` | net48;net10 | in-memory fakes of every contract interface + the `ShimStub` seam, for the headless flow tests. |
-| net10 compat shim (planned) | net10 | the recompile-shim adapter over the modern contract. Distinct from the existing net48 `Fct.Compat.Act` (the satellite's ACT engine). |
+| `Fct.Compat.Shim` | net10-windows | the recompile-shim adapter runtime over the modern contract (`LegacyPluginHost`, the SDK mappers/projectors). Distinct from the existing net48 `Fct.Compat.Act` (the satellite's ACT engine). |
+| `Fct.Compat.Shim.ActFacade` | net10-windows | assembly `Advanced Combat Tracker`: the POCO `ActGlobals`/`FormActMain` surface a recompiled plugin binds to, forwarding onto `IPluginHost`. |
+| `Fct.Compat.Shim.SdkFacade` | net10 | assembly `FFXIV_ACT_Plugin.Common`: re-declares the SDK surface (`IDataSubscription`, `IDataRepository`, `Combatant`/`Player`/`NetworkBuff`/`PartyType`) a recompiled plugin binds to. |
 
 net48 support in the core uses `IsExternalInit.cs` (init-accessor shim) + `Microsoft.Bcl.AsyncInterfaces`
 (records / `IAsyncEnumerable` / `IAsyncDisposable`), so the identical record/interface types exist on
@@ -262,24 +270,26 @@ public interface IUiHost
 
 ## The compat shim (adapter)
 
-The planned net10 compat shim (not the existing net48 `Fct.Compat.Act`) re-projects the exact ACT +
-FFXIV-SDK surface the plugins compile against, **implemented entirely over the modern host**:
+The net10 compat shim (not the existing net48 `Fct.Compat.Act`) re-projects the exact ACT + FFXIV-SDK
+surface the plugins compile against, **implemented entirely over the modern host**. **Built** rows are
+live on `FormActMain`/`LegacyPluginHost`; **pending** rows are the remaining work
+(see [The net10 compat shim](#the-net10-compat-shim-in-progress)):
 
-| Legacy symbol (recompiled against shim) | Backed by |
-|---|---|
-| `ActGlobals.oFormActMain` (POCO hub, not a `Form`) | `IPluginHost` |
-| `IActPluginV1.InitPlugin/DeInitPlugin` | `IPlugin.InitializeAsync/DisposeAsync` |
-| `Before/OnLogLineRead` | `IGameEventStream` → `RawLogLine` |
-| `IDataSubscription` (11 events: NetworkReceived/Sent, CombatantAdded/Removed, PrimaryPlayerChanged, ZoneChanged, PlayerStatsChanged, PartyListChanged, LogLine, ParsedLogLine, ProcessChanged) | `IGameEventStream` mapped to SDK delegate shapes |
-| `IDataRepository.Get*` | `IGameSnapshot` + `IResourceCatalog` |
-| `Combatant`/`Player`/`NetworkBuff` | projected from `Actor`/`StatusEffect` (lossless: CP/GP/world/order [G10](#contract-gaps-tracked), refresh/timestamp [G9](#contract-gaps-tracked), shipped) |
-| `AddCombatAction`/`SetEncounter`/`EndCombat`/`InCombat` | `IEncounterService` |
-| `CombatantData`/`EncounterData.ExportVariables` (opaque dict cactbot reads) | `EncounterSnapshot`/`CombatantMetrics` typed fields + the `ExportVariables` bag ([G1](#contract-gaps-tracked)/[G2](#contract-gaps-tracked) shipped) |
-| `RegisterNamedCallback`/`InvokeNamedCallback` (Trig peer interop) | `IPluginRegistry.RegisterCallback`/`InvokeCallback` ([G5](#contract-gaps-tracked) shipped) |
-| `PlayTtsMethod`/`PlaySoundMethod` delegate slots | setting a delegate registers a terminal `IAudioSink`; `TTS()`/`PlaySound()` → `IAudioOutput` ([G3](#contract-gaps-tracked) shipped) |
-| `RegisterNetworkParser` / custom lines 256+ | `IRawPacketSource` (read) + `IRawLogLineEmitter` synthetic-line emit ([G4](#contract-gaps-tracked) shipped) |
-| `PluginGetSelfData`/`AppDataFolder`/`WriteExceptionLog` | `IPluginStorage`/`ILogger` |
-| WinForms `TabPage` | real WinForms TabPage embedded via Avalonia `NativeControlHost` |
+| Legacy symbol (recompiled against shim) | Backed by | Status |
+|---|---|---|
+| `ActGlobals.oFormActMain` (POCO hub, not a `Form`) | `IPluginHost` | ✅ built |
+| `IActPluginV1.InitPlugin/DeInitPlugin` | `IPlugin.InitializeAsync/DisposeAsync` (via `LegacyPluginHost`) | ✅ built |
+| `Before/OnLogLineRead` | `IGameEventStream` → `RawLogLine` | ✅ built |
+| `RegisterNamedCallback`/`InvokeNamedCallback` (Trig peer interop) | `IPluginRegistry.RegisterCallback`/`InvokeCallback` ([G5](#contract-gaps-tracked)) | ✅ built |
+| `PlayTtsMethod`/`PlaySoundMethod` delegate slots | setting a delegate registers a terminal `IAudioSink`; `TTS()`/`PlaySound()` → `IAudioOutput` ([G3](#contract-gaps-tracked)) | ✅ built |
+| `PluginGetSelfData`/`AppDataFolder`/`WriteExceptionLog` | `IPluginStorage`/`ILogger` | ✅ built |
+| `AddCombatAction`/`SetEncounter`/`EndCombat`/`InCombat` | shared aggregation engine (`ActiveZone.ActiveEncounter`) + mirrored onto `IEncounterService` | ✅ built |
+| `CombatantData`/`EncounterData.ExportVariables` (opaque dict cactbot reads) | shared engine's registered formatters, projected onto `EncounterSnapshot`/`CombatantMetrics` typed fields + the `ExportVariables` bag ([G1](#contract-gaps-tracked)/[G2](#contract-gaps-tracked)) | ✅ built |
+| `IDataSubscription` (11 events: NetworkReceived/Sent, CombatantAdded/Removed, PrimaryPlayerChanged, ZoneChanged, PlayerStatsChanged, PartyListChanged, LogLine, ParsedLogLine, ProcessChanged) | `IGameEventStream` mapped to SDK delegate shapes | ⏳ pending (interface declared) |
+| `IDataRepository.Get*` | `IGameSnapshot` + `IResourceCatalog` | ⏳ pending (interface declared) |
+| `Combatant`/`Player`/`NetworkBuff` | projected from `Actor`/`StatusEffect` (lossless: CP/GP/world/order [G10](#contract-gaps-tracked), refresh/timestamp [G9](#contract-gaps-tracked)) | ⏳ pending (types declared) |
+| `RegisterNetworkParser` / custom lines 256+ | `IRawPacketSource` (read) + `IRawLogLineEmitter` synthetic-line emit ([G4](#contract-gaps-tracked)) | ⏳ pending (host emit path built) |
+| WinForms `TabPage` | real WinForms TabPage embedded via Avalonia `NativeControlHost` | ⏳ pending |
 
 The shim's hub *is* the modern API underneath, so a plugin can use both at once — the basis for
 incremental migration (swap one call at a time, then drop the shim).
@@ -333,12 +343,13 @@ scaffold and each is exercised by the flow suite (G11 is UI-contract-only, verif
 ## Testing the contract — legacy↔native flow tests
 
 The data path is **native `IPlugin` ⇄ in-process bus/registry/audio/encounter-service ⇄ net10
-compat shim ⇄ recompiled legacy plugin**. The real host/shim do not exist yet, so a **thin
-fake host + in-memory implementations of the shipped interfaces + a minimal shim stub** let the
-flows run in xUnit with zero satellite, zero CEF, zero live FFXIV. Legacy plugins are represented by
-**tiny doubles** that make the exact call the real plugin makes (proven by the cited file:line), not
-by loading the real net48 DLLs. The harness lives in `Fct.Abstractions.Testing`; the flow suite in
-`Fct.FlowTests`.
+compat shim ⇄ recompiled legacy plugin**. The flow suite runs headless against a **thin fake host +
+in-memory implementations of the shipped interfaces + a minimal shim stub** (`ShimStub`) — zero
+satellite, zero CEF, zero live FFXIV — so the contract shapes are exercised without the real shim.
+Legacy plugins are represented by **tiny doubles** that make the exact call the real plugin makes
+(proven by the cited file:line), not by loading the real net48 DLLs. The harness lives in
+`Fct.Abstractions.Testing`; the flow suite in `Fct.FlowTests`. (The real shim's own seams are covered
+separately by `Fct.Compat.Shim.Tests`; see [The net10 compat shim](#the-net10-compat-shim-in-progress).)
 
 ### The harness
 
@@ -425,16 +436,18 @@ production and loading a real native `IPlugin` from disk:
   per-plugin `PluginHost : IPluginHost`. Registered in `Program.BuildHost`.
 - **ALC loader** (`src/Fct.App/Plugins/`): `PluginManifest` (`plugin.json`, read without loading the
   assembly) + `HostContract` major-version gate; `PluginLoadContext` (collectible, `Fct.Abstractions`/
-  `Fct.Abstractions.UI`/`Microsoft.Extensions.Logging.Abstractions`/`Avalonia.*` shared to the default
-  context, everything else private via `AssemblyDependencyResolver`); `PluginManager` (discover →
-  gate → load → time-boxed fault-guarded init → quarantine/unload) driven by the `PluginLifetime`
-  hosted service.
+  `Fct.Abstractions.UI`/`Microsoft.Extensions.Logging.Abstractions`/`Avalonia.*` — plus the compat
+  shim (`Fct.Compat.Shim`) and its two legacy-identity facades (`Advanced Combat Tracker`,
+  `FFXIV_ACT_Plugin.Common`) — shared to the default context, everything else private via
+  `AssemblyDependencyResolver`); `PluginManager` (discover → gate → load → time-boxed fault-guarded
+  init → quarantine/unload) driven by the `PluginLifetime` hosted service.
 - **Sample plugin** (`samples/Fct.SamplePlugin`) loads end-to-end and exercises events/snapshot/
   registry/audio/storage/raw-write-back; covered by `tests/Fct.App.Tests` (bus, registry, audio,
   manifest gate, share-to-default identity, load/init/unload from disk).
 
 The net48→net10 **bridge data forwarder** (piece C) is built (see below); the net10 **compat shim**
-(`ShimStub` → real, piece D) is not yet built.
+(`ShimStub` → real, piece D) is in progress (see
+[The net10 compat shim](#the-net10-compat-shim-in-progress)).
 
 ## The bridge data forwarder (built)
 
@@ -462,16 +475,56 @@ DoL/DoH per [G10](#contract-gaps-tracked)), and `ActionEffect` (from the ACT hub
 `RawLogLine` firehose, exactly as in ACT today. Codec round-trip + decode-onto-bus are covered by
 `tests/Fct.App.Tests/BridgeEventFrameTests.cs`.
 
+## The net10 compat shim (in progress)
+
+The compat shim (piece D) is the real ACT/SDK re-projection the `ShimStub` seam seeds. It ships three
+assemblies plus a sample legacy plugin, loaded by the existing ALC loader:
+
+- **`Fct.Compat.Shim.ActFacade`** (assembly `Advanced Combat Tracker`, net10-windows) — the POCO
+  `ActGlobals`/`FormActMain` a recompiled plugin binds to. `FormActMain` holds an `IPluginHost` and
+  forwards to it; it is **not** a WinForms `Form`. Inert `FormImportProgress`/`FormSpellTimers` stubs
+  keep the spell-timer / custom-trigger subsystems out of the data path.
+- **`Fct.Compat.Shim.SdkFacade`** (assembly `FFXIV_ACT_Plugin.Common`, net10) — re-declares the SDK
+  surface a recompiled plugin binds to: `IDataSubscription` (11 events + delegates), `IDataRepository`,
+  and the models `Combatant`/`Player`/`NetworkBuff`/`PartyType`, matching the real DLL's identity.
+- **`Fct.Compat.Shim`** (net10-windows) — the adapter runtime. `LegacyPluginHost : IPlugin` resolves a
+  plugin's `IActPluginV1` (named by the manifest's `legacyEntry`), wires the process-shared
+  `ActGlobals.oFormActMain` over the host, and bridges the lifecycle (`InitPlugin`⇄`InitializeAsync`,
+  `DeInitPlugin`⇄`DisposeAsync`).
+
+The host loads a shimmed plugin through the same path as a native one: `PluginManifest` gains an
+optional `legacyEntry` (mutually exclusive with `entry`); `PluginManager` routes it through an injected
+`LegacyPluginHostFactory` (so the loader takes no compile-time shim dependency); `PluginLoadContext`
+shares `Fct.Compat.Shim` + the two facades to the default ALC so the shim and the plugin agree on type
+identity. Hosting recompiled WinForms plugins in-process makes `Fct.App` a **net10-windows** app.
+`samples/Fct.SampleLegacyPlugin` is the reference recompiled plugin; `tests/Fct.Compat.Shim.Tests`
+covers identity, lifecycle, the audio/registry/raw-line seams, and the encounter driver +
+cross-TFM `ExportVariables` parity.
+
+**Built:** the `FormActMain` hub over `IPluginHost`; `LegacyPluginHost` lifecycle; audio
+(`TTS`/`PlaySound` → `IAudioOutput`, `PlayTts`/`PlaySoundMethod` slots → terminal `IAudioSink`, G3);
+named callbacks (`RegisterNamedCallback`/`InvokeNamedCallback` → `IPluginRegistry`, G5);
+`Before/OnLogLineRead` re-fired from the `RawLogLine` firehose; logging + chrome
+(`WriteExceptionLog`/`CornerControlAdd`/…); the encounter driver (`AddCombatAction`/`SetEncounter`/
+`EndCombat`, `ActiveZone.ActiveEncounter`) over the ACT aggregation engine — factored into
+`shared/Aggregation/` and linked identically into the net48 `Fct.Compat.Act` and the net10 ActFacade,
+so the `ExportVariables` bag cactbot reads is bit-identical across runtimes (`EncounterProjector` maps
+it plus the typed metrics onto `EncounterSnapshot`/`CombatantMetrics`, G1/G2; combat state mirrors onto
+`IEncounterService`).
+
+**Pending:** the `IDataSubscription` 11-event mapping onto `IGameEventStream`; the
+`IDataRepository.Get*` + `Combatant`/`Player`/`NetworkBuff` projection over `IGameSnapshot` (partially
+blocked on the snapshot projection below); live per-tick metric refresh into `IEncounterService.Active`
+(needs a host update seam — deferred with the snapshot projection); and the WinForms `TabPage`
+embedding via Avalonia `NativeControlHost`. Also under-specified: `Form`-inherited `oFormActMain`
+members.
+
 ## Open items / next steps
 
-- The net10 compat shim that turns the `ShimStub` seam into the real ACT/SDK re-projection (piece D):
-  full `IDataSubscription` (11 events), `Combatant`/`Player`/`NetworkBuff` projection over
-  `Actor`/`StatusEffect`, `IDataRepository.Get*`, `IActPluginV1` lifecycle, `TabPage`-via-
-  `NativeControlHost`. Under-specified rows: the `AddCombatAction(MasterSwing)` sink, `Form`-inherited
-  `oFormActMain` members, spell-timer / custom-trigger subsystems.
 - Snapshot/encounter **projection** off the forwarded stream: wire `CombatantAdded`/`Removed` into a
   live `IGameSnapshot` and the encounter `ExportVariables` rollup into `IEncounterService` (piece C
-  forwards the event *stream*; the projection is the next increment).
+  forwards the event *stream*; the projection is the next increment). The shim's `IDataRepository`
+  projection depends on this.
 - Complete the `GameEvent` hierarchy against the full 0–274 taxonomy.
 - Config-UI sub-decision detail (Avalonia control vs. WebView) — deferred per
   [`ARCHITECTURE.md`](ARCHITECTURE.md) §4a; the contract is framework-agnostic enough to defer.

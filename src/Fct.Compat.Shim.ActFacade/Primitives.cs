@@ -38,6 +38,8 @@ namespace Advanced_Combat_Tracker
 
     public delegate void LogLineEventDelegate(bool isImport, LogLineEventArgs logInfo);
     public delegate void LogFileChangedDelegate(bool IsImport, string newLogFileName);
+    public delegate void CombatToggleEventDelegate(bool isImport, CombatToggleEventArgs encounterInfo);
+    public delegate void CombatActionDelegate(bool isImport, CombatActionEventArgs actionInfo);
 
     // --- Cross-cutting FormActMain event surface (ACT raises these from UI/clipboard/XML-share/URL
     // paths the shim does not have; declared as no-op publishers so plugin `+=` binds). ---
@@ -177,6 +179,57 @@ namespace Advanced_Combat_Tracker
             this.inCombat = inCombat;
             originalLogLine = logLine;
             this.companionLogName = companionLogName;
+        }
+    }
+
+    // Raised by OnCombatStart/OnCombatEnd (Triggernometry's SetCombatState driver reads the encounter
+    // index; cactbot toggles its in-combat state). encounter is the shim's aggregating EncounterData.
+    public class CombatToggleEventArgs : EventArgs
+    {
+        public readonly int zoneDataIndex;
+        public readonly int encounterDataIndex;
+        public readonly EncounterData encounter;
+
+        public CombatToggleEventArgs(int zoneDataIndex, int encounterDataIndex, EncounterData encounter)
+        {
+            this.zoneDataIndex = zoneDataIndex;
+            this.encounterDataIndex = encounterDataIndex;
+            this.encounter = encounter;
+        }
+    }
+
+    // Raised by Before/AfterCombatAction around each swing folded into the active encounter. Mirrors
+    // ACT's field-per-swing shape so a recompiled plugin's handler binds unchanged.
+    public class CombatActionEventArgs : EventArgs
+    {
+        public int swingType;
+        public bool critical;
+        public string attacker;
+        public string theAttackType;
+        public Dnum damage;
+        public DateTime time;
+        public int timeSorter;
+        public string victim;
+        public string theDamageType;
+        public string special;
+        public Dictionary<string, object> tags;
+        public readonly MasterSwing combatAction;
+        public bool cancelAction;
+
+        public CombatActionEventArgs(MasterSwing action)
+        {
+            combatAction = action;
+            swingType = action.SwingType;
+            critical = action.Critical;
+            attacker = action.Attacker;
+            theAttackType = action.AttackType;
+            damage = action.Damage;
+            time = action.Time;
+            timeSorter = action.TimeSorter;
+            victim = action.Victim;
+            theDamageType = action.DamageType;
+            special = action.Special;
+            tags = action.Tags;
         }
     }
 }

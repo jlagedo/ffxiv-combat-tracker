@@ -13,7 +13,7 @@ namespace Advanced_Combat_Tracker
 
         // ACT's suffixed number renderer (the "-*"/"-k|m|b" keys).
         private static string Cds(double v, bool dec) =>
-            ActGlobals.oFormActMain.CreateDamageString((long)v, true, dec);
+            DamageString.Create((long)v, true, dec);
         // ACT's NAME{n}: the name truncated to n characters (trimmed).
         private static string Short(string n, int k) =>
             n != null && n.Length > k ? n.Substring(0, k).Trim() : n;

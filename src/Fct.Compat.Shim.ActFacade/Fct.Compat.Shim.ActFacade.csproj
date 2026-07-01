@@ -25,4 +25,10 @@
     <ProjectReference Include="..\Fct.Abstractions\Fct.Abstractions.csproj" />
   </ItemGroup>
 
+  <!-- The ACT aggregation engine: the same shared source linked into the net48 Fct.Compat.Act, so
+       the net10 ActiveZone/EncounterData/ExportVariables path is provably identical to the satellite's. -->
+  <ItemGroup>
+    <Compile Include="..\..\shared\Aggregation\*.cs" Link="Aggregation\%(Filename)%(Extension)" />
+  </ItemGroup>
+
 </Project>
