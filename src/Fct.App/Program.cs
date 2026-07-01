@@ -65,8 +65,18 @@ class Program
         builder.Logging.ClearProviders();
         builder.Services.AddSerilog(Log.Logger, dispose: false);
 
+        // User-facing notifications: one hub the whole app publishes to and the shell subscribes to.
+        builder.Services.AddSingleton<NotificationService>();
+        builder.Services.AddSingleton<INotificationHub>(sp => sp.GetRequiredService<NotificationService>());
+
+        // Shell preferences (persisted JSON).
+        builder.Services.AddSingleton<UiSettingsStore>();
+
+        // The satellite decodes live game-event frames onto the bus (piece C) and surfaces notable
+        // records as notifications.
         builder.Services.AddSingleton<SatelliteHost>(sp => new SatelliteHost(
-            sp.GetRequiredService<ILoggerFactory>(), sp.GetRequiredService<IGameEventSink>()));
+            sp.GetRequiredService<ILoggerFactory>(), sp.GetRequiredService<IGameEventSink>(),
+            sp.GetRequiredService<INotificationHub>()));
         builder.Services.AddSingleton<MainViewModel>();
         builder.Services.AddSingleton<MainWindow>();
 
