@@ -37,14 +37,4 @@ internal sealed class GameSnapshotProvider
 
         public Actor? Find(uint actorId) => null;
     }
-
-    /// <summary>An empty id→name catalog until <see cref="IResourceCatalog"/> is sourced (see PLUGIN-API open items).</summary>
-    private sealed class EmptyResourceCatalog : IResourceCatalog
-    {
-        public static readonly EmptyResourceCatalog Instance = new();
-        private static readonly IReadOnlyDictionary<uint, string> Empty = new Dictionary<uint, string>();
-
-        public string? Name(ResourceKind kind, uint id) => null;
-        public IReadOnlyDictionary<uint, string> All(ResourceKind kind) => Empty;
-    }
 }

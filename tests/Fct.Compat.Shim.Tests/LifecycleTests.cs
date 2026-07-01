@@ -48,16 +48,18 @@ public class LifecycleTests
         Assert.Same(host, ActGlobals.oFormActMain.Host);
 
         // The plugin was registered in ActPlugins and received (and wrote to) its status label.
-        var data = Assert.Single(ActGlobals.oFormActMain.ActPlugins);
-        Assert.Same(legacyHost.Plugin, data.pluginObj);
+        // (The roster also carries the synthetic FFXIV_ACT_Plugin discovery stand-in; match on this plugin.)
+        var data = Assert.Single(ActGlobals.oFormActMain.ActPlugins,
+            d => ReferenceEquals(d.pluginObj, legacyHost.Plugin));
         Assert.Equal("Sample legacy plugin online", data.lblPluginStatus.Text);
         Assert.Equal("Fct.SampleLegacyPlugin.dll", data.pluginFile.Name);
 
         await legacyHost.DisposeAsync();
 
-        // DeInitPlugin ran and the plugin was removed from the roster.
+        // DeInitPlugin ran and the plugin was removed from the roster (the stand-in remains).
         Assert.Equal(1, (int)deinitField.GetValue(null)!);
-        Assert.Empty(ActGlobals.oFormActMain.ActPlugins);
+        Assert.DoesNotContain(ActGlobals.oFormActMain.ActPlugins,
+            d => ReferenceEquals(d.pluginObj, legacyHost.Plugin));
     }
 
     [Fact]

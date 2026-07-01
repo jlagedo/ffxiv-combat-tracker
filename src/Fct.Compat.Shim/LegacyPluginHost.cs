@@ -98,6 +98,22 @@ public sealed class LegacyPluginHost : IPlugin
         if (hub.DataSubscription is null)
             hub.AttachDataSubscription(new DataSubscriptionAdapter(host.Game.Events));
 
+        // Project the modern snapshot onto the SDK's IDataRepository surface, and publish a synthetic
+        // FFXIV_ACT_Plugin stand-in into ActPlugins so OverlayPlugin/Hojoring discover DataRepository +
+        // DataSubscription by reflection exactly as under real ACT (once per process, like the hub).
+        if (hub.DataRepository is null)
+        {
+            var repository = new DataRepository(host);
+            hub.AttachDataRepository(repository);
+            hub.ActPlugins.Add(new ActPluginData
+            {
+                lblPluginTitle = new Label { Text = "FFXIV_ACT_Plugin" },
+                pluginFile = new FileInfo("FFXIV_ACT_Plugin.dll"),
+                pluginVersion = "3.0.0.0",
+                pluginObj = new SyntheticFfxivPlugin(repository, hub.DataSubscription!),
+            });
+        }
+
         return hub;
     }
 }

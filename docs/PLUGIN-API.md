@@ -11,11 +11,12 @@ to run the five plugins **unmodified**. This document is the **net10 contract** 
 > **Status: contract + flow-test harness + net10 host & ALC loader (slice A+B) + the net48→net10
 > bridge data forwarder (C) built; the net10 compat shim (D) is in progress.** The shim's two
 > legacy-impersonating facades, the plugin lifecycle, the audio / registry / raw-line seams, the
-> encounter driver over the shared aggregation engine (`ExportVariables` included), and the
-> `IDataSubscription` event map (`LogLine`/`ZoneChanged`/`PartyListChanged`/`PrimaryPlayerChanged`) are
-> built and load a recompiled legacy plugin end-to-end; the `IDataRepository` + `Combatant*` projection
-> onto the snapshot and the UI embedding are pending (see
-> [The net10 compat shim](#the-net10-compat-shim-in-progress)). `Fct.Abstractions`
+> encounter driver over the shared aggregation engine (`ExportVariables` included), the full
+> `IDataSubscription` event map, and the `IDataRepository` + `Combatant`/`Player`/`NetworkBuff`
+> projection over a live host snapshot (with the FFXIV-plugin reflection-discovery stand-in) are built
+> and load a recompiled legacy plugin end-to-end; only the WinForms `TabPage` UI embedding is pending
+> (see [The net10 compat shim](#the-net10-compat-shim-in-progress)). The host's **live snapshot
+> aggregator** now folds the forwarded event stream into `IGameSnapshot`. `Fct.Abstractions`
 > (net48;net10) and `Fct.Abstractions.UI` (net10 + Avalonia) are the compiling contract; a headless
 > flow-test harness exercises the contract shapes end-to-end: `Fct.Abstractions.Testing` supplies
 > in-memory fakes of every interface plus the `ShimStub` seam, and `Fct.FlowTests` (net10) runs the
@@ -286,9 +287,9 @@ live on `FormActMain`/`LegacyPluginHost`; **pending** rows are the remaining wor
 | `PluginGetSelfData`/`AppDataFolder`/`WriteExceptionLog` | `IPluginStorage`/`ILogger` | ✅ built |
 | `AddCombatAction`/`SetEncounter`/`EndCombat`/`InCombat` | shared aggregation engine (`ActiveZone.ActiveEncounter`) + mirrored onto `IEncounterService` | ✅ built |
 | `CombatantData`/`EncounterData.ExportVariables` (opaque dict cactbot reads) | shared engine's registered formatters, projected onto `EncounterSnapshot`/`CombatantMetrics` typed fields + the `ExportVariables` bag ([G1](#contract-gaps-tracked)/[G2](#contract-gaps-tracked)) | ✅ built |
-| `IDataSubscription` (11 events: NetworkReceived/Sent, CombatantAdded/Removed, PrimaryPlayerChanged, ZoneChanged, PlayerStatsChanged, PartyListChanged, LogLine, ParsedLogLine, ProcessChanged) | `IGameEventStream` mapped to SDK delegate shapes | 🔨 partial: `LogLine`/`ZoneChanged`/`PartyListChanged`/`PrimaryPlayerChanged` mapped; `Combatant*` await the projection (D7); the rest inert (no typed-bus source) |
-| `IDataRepository.Get*` | `IGameSnapshot` + `IResourceCatalog` | ⏳ pending (interface declared) |
-| `Combatant`/`Player`/`NetworkBuff` | projected from `Actor`/`StatusEffect` (lossless: CP/GP/world/order [G10](#contract-gaps-tracked), refresh/timestamp [G9](#contract-gaps-tracked)) | ⏳ pending (types declared) |
+| `IDataSubscription` (11 events: NetworkReceived/Sent, CombatantAdded/Removed, PrimaryPlayerChanged, ZoneChanged, PlayerStatsChanged, PartyListChanged, LogLine, ParsedLogLine, ProcessChanged) | `IGameEventStream` mapped to SDK delegate shapes | ✅ built (6 mapped: `LogLine`/`ZoneChanged`/`PartyListChanged`/`PrimaryPlayerChanged`/`CombatantAdded`/`CombatantRemoved`; the other 5 inert — no typed-bus source) |
+| `IDataRepository.Get*` | `IGameSnapshot` + `IResourceCatalog` | ✅ built (name tables empty until `IResourceCatalog` is sourced; `GetCurrentFFXIVProcess` null — no net10 game handle) |
+| `Combatant`/`Player`/`NetworkBuff` | projected from `Actor`/`StatusEffect` (lossless: CP/GP/world/order [G10](#contract-gaps-tracked), refresh/timestamp [G9](#contract-gaps-tracked)) | ✅ built (`Player` carries `JobID` only — the modern model has no attribute block) |
 | `RegisterNetworkParser` / custom lines 256+ | `IRawPacketSource` (read) + `IRawLogLineEmitter` synthetic-line emit ([G4](#contract-gaps-tracked)) | ⏳ pending (host emit path built) |
 | WinForms `TabPage` | real WinForms TabPage embedded via Avalonia `NativeControlHost` | ⏳ pending |
 
@@ -401,14 +402,19 @@ separately by `Fct.Compat.Shim.Tests`; see [The net10 compat shim](#the-net10-co
   code. G11 (UI surfaces) is contract-only and verified by build, not a headless flow test.
 - **`ExportVariables` projection fidelity is covered by the real shim:** `Fct.Compat.Shim.Tests` feeds
   the same swing vector through the net10-compiled shared aggregation engine + `EncounterProjector` and
-  asserts the projected `ExportVariables` bag equals the net48 oracle values (cross-TFM parity). Still
-  pending: the real `Combatant→Actor` projection (D7) — the flow-test stub only proves that seam
-  exists, not that its mapping is bit-correct.
+  asserts the projected `ExportVariables` bag equals the net48 oracle values (cross-TFM parity).
 - **The `IDataSubscription` event map is covered by the real shim:** beyond A5's `ShimStub`,
   `Fct.Compat.Shim.Tests` drives `DataSubscriptionAdapter` off the in-memory bus and asserts each mapped
-  delegate (`LogLine`/`ZoneChanged`/`PartyListChanged`/`PrimaryPlayerChanged`) fires with the projected
-  args, that the `Combatant*` events stay inert pending D7, and that `FormActMain.DataSubscription`
-  delivers once wired.
+  delegate (`LogLine`/`ZoneChanged`/`PartyListChanged`/`PrimaryPlayerChanged`/`CombatantAdded`/
+  `CombatantRemoved`) fires with the projected args, and that `FormActMain.DataSubscription` delivers
+  once wired.
+- **The `IDataRepository` + `Combatant` projection + discovery are covered by the real shim:**
+  `Fct.Compat.Shim.Tests` asserts `CombatantProjector` maps `Actor`→`Combatant`/`NetworkBuff`/`Player`
+  field-by-field (incl. CP/GP/world/order and statuses→NetworkBuffs), drives `DataRepository`'s `Get*`
+  off a seeded snapshot, and exercises OverlayPlugin's exact discovery path (scan `ActPlugins` by title →
+  reflect `DataRepository`/`DataSubscription` off the synthetic FFXIV-plugin stand-in). The host's
+  `GameSnapshotAggregator` is covered in `Fct.App.Tests` (folding combatants/zone/party/player + HP
+  update + removal off the live bus).
 - **Needs the net48 satellite / live game (out of scope here):** loading the *real* FFXIV_ACT_Plugin /
   OverlayPlugin (CefSharp net48-only), real Machina packet decode, and real `MasterSwing` aggregation
   parity (already covered by `tools/mass-compare`, see [`TESTING.md`](TESTING.md)). Flow tests assert
@@ -442,6 +448,12 @@ production and loading a real native `IPlugin` from disk:
   seam; `RegistryService`, `AudioService` (priority fan-out + terminal-sink G3), `EncounterService`,
   disk-backed `PluginStorage`, `SystemClock`, the capability-gated `RawLogLineEmitter` (G4), and the
   per-plugin `PluginHost : IPluginHost`. Registered in `Program.BuildHost`.
+- **Live snapshot aggregator** (`src/Fct.App/Hosting/GameSnapshotAggregator.cs`): a hosted service that
+  subscribes to the state events on `GameEventBus` (raw log lines filtered out), folds
+  `CombatantAdded`/`CombatantRemoved`/`HpUpdated`/`ZoneChanged`/`PartyChanged`/`PrimaryPlayerChanged`
+  into an immutable `IGameSnapshot`, and publishes it through `GameSnapshotProvider` — so
+  `IGameSession.Snapshot()` (and the shim's `IDataRepository`) reads live actor/zone/party/player state
+  off the forwarded stream. `Target`/`Focus`/`Hover` and the resource catalog are not sourced yet.
 - **ALC loader** (`src/Fct.App/Plugins/`): `PluginManifest` (`plugin.json`, read without loading the
   assembly) + `HostContract` major-version gate; `PluginLoadContext` (collectible, `Fct.Abstractions`/
   `Fct.Abstractions.UI`/`Microsoft.Extensions.Logging.Abstractions`/`Avalonia.*` — plus the compat
@@ -507,7 +519,8 @@ shares `Fct.Compat.Shim` + the two facades to the default ALC so the shim and th
 identity. Hosting recompiled WinForms plugins in-process makes `Fct.App` a **net10-windows** app.
 `samples/Fct.SampleLegacyPlugin` is the reference recompiled plugin; `tests/Fct.Compat.Shim.Tests`
 covers identity, lifecycle, the audio/registry/raw-line seams, the encounter driver +
-cross-TFM `ExportVariables` parity, and the `IDataSubscription` event map.
+cross-TFM `ExportVariables` parity, the `IDataSubscription` event map, the `IDataRepository` +
+`Combatant` projection, and the reflection-discovery stand-in.
 
 **Built:** the `FormActMain` hub over `IPluginHost`; `LegacyPluginHost` lifecycle; audio
 (`TTS`/`PlaySound` → `IAudioOutput`, `PlayTts`/`PlaySoundMethod` slots → terminal `IAudioSink`, G3);
@@ -520,25 +533,31 @@ so the `ExportVariables` bag cactbot reads is bit-identical across runtimes (`En
 it plus the typed metrics onto `EncounterSnapshot`/`CombatantMetrics`, G1/G2; combat state mirrors onto
 `IEncounterService`). The `IDataSubscription` event map: `DataSubscriptionAdapter` projects the
 `IGameEventStream` onto the SDK delegates a recompiled plugin binds — `LogLine`←`RawLogLine`,
-`ZoneChanged`, `PartyListChanged`←`PartyChanged`, `PrimaryPlayerChanged` — exposed on the hub via
-`FormActMain.DataSubscription`.
+`ZoneChanged`, `PartyListChanged`←`PartyChanged`, `PrimaryPlayerChanged`, and
+`CombatantAdded`/`CombatantRemoved` (via `CombatantProjector`) — exposed on the hub via
+`FormActMain.DataSubscription`. The `IDataRepository` pull surface: `DataRepository` answers every
+`Get*` off `Host.Game.Snapshot()`, with `CombatantProjector` mapping `Actor`→`Combatant`/`NetworkBuff`
+and the player's `Actor`→`Player`. `LegacyPluginHost` publishes a `SyntheticFfxivPlugin` stand-in into
+`ActPlugins` so OverlayPlugin/Hojoring discover `DataRepository`/`DataSubscription` by reflection
+exactly as under real ACT.
 
-**Pending:** `CombatantAdded`/`CombatantRemoved` on `IDataSubscription` (await the `Actor`→`Combatant`
-projection) and the remaining inert events (`NetworkReceived`/`NetworkSent`, `PlayerStatsChanged`,
-`ParsedLogLine`, `ProcessChanged` — no typed-bus source); the `IDataRepository.Get*` +
-`Combatant`/`Player`/`NetworkBuff` projection over `IGameSnapshot` (partially blocked on the snapshot
-projection below), and the reflection-discovery stand-in that surfaces both `DataSubscription` and
-`DataRepository` off one plugin object; live per-tick metric refresh into `IEncounterService.Active`
-(needs a host update seam — deferred with the snapshot projection); and the WinForms `TabPage`
-embedding via Avalonia `NativeControlHost`. Also under-specified: `Form`-inherited `oFormActMain`
-members.
+**Honest limits (facts, not stubs):** `Player` carries `JobID` only — the modern model has no attribute
+block and `PlayerStatsChanged` has no source; `GetCurrentFFXIVProcess` returns null (no net10 game
+handle — the connection lives in the satellite); `GetResourceDictionary` is empty until
+`IResourceCatalog` is sourced.
+
+**Pending:** live per-tick metric refresh into `IEncounterService.Active` (needs a host update seam);
+the remaining inert `IDataSubscription` events (`NetworkReceived`/`NetworkSent`, `PlayerStatsChanged`,
+`ParsedLogLine`, `ProcessChanged` — no typed-bus source); the WinForms `TabPage` embedding via Avalonia
+`NativeControlHost`; and the `_iocContainer` logging-bridge seam a recompiled OverlayPlugin/Hojoring
+reflects for its own log routing (a separate impersonation slice). Also under-specified:
+`Form`-inherited `oFormActMain` members.
 
 ## Open items / next steps
 
-- Snapshot/encounter **projection** off the forwarded stream: wire `CombatantAdded`/`Removed` into a
-  live `IGameSnapshot` and the encounter `ExportVariables` rollup into `IEncounterService` (piece C
-  forwards the event *stream*; the projection is the next increment). The shim's `IDataRepository`
-  projection depends on this.
+- Encounter **`ExportVariables` rollup** into `IEncounterService.Active` off the forwarded stream (the
+  live actor/zone/party/player snapshot projection now lands via `GameSnapshotAggregator`; the per-tick
+  encounter-metric refresh is the remaining increment).
 - Complete the `GameEvent` hierarchy against the full 0–274 taxonomy.
 - Config-UI sub-decision detail (Avalonia control vs. WebView) — deferred per
   [`ARCHITECTURE.md`](ARCHITECTURE.md) §4a; the contract is framework-agnostic enough to defer.

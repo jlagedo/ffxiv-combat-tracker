@@ -17,8 +17,8 @@ namespace Advanced_Combat_Tracker
     /// surface grows slice-by-slice: this carries lifecycle/identity, logging, window chrome, audio,
     /// the raw-line event surface, the encounter/aggregation driver (<see cref="AddCombatAction"/>
     /// / <see cref="SetEncounter"/> over the shared engine), and the SDK <c>IDataSubscription</c>
-    /// projection (<see cref="DataSubscription"/>); the <c>IDataRepository</c> projection arrives in a
-    /// later slice.
+    /// (<see cref="DataSubscription"/>) + <c>IDataRepository</c> (<see cref="DataRepository"/>)
+    /// projections.
     /// </summary>
     public sealed class FormActMain : IDisposable
     {
@@ -164,6 +164,15 @@ namespace Advanced_Combat_Tracker
         /// <summary>One-time wiring of the projected <see cref="DataSubscription"/> (the concrete adapter
         /// lives in the shim runtime, so it is injected rather than constructed here).</summary>
         public void AttachDataSubscription(IDataSubscription subscription) => DataSubscription = subscription;
+
+        /// <summary>The SDK's pull-state surface, projected from the modern <c>IGameSnapshot</c>.
+        /// OverlayPlugin/Hojoring reflect a plugin's <c>DataRepository</c> property and poll it; wired
+        /// once by <c>LegacyPluginHost</c> via <see cref="AttachDataRepository"/>.</summary>
+        public IDataRepository DataRepository { get; private set; }
+
+        /// <summary>One-time wiring of the projected <see cref="DataRepository"/> (the concrete adapter
+        /// lives in the shim runtime, so it is injected rather than constructed here).</summary>
+        public void AttachDataRepository(IDataRepository repository) => DataRepository = repository;
 
         // --- Encounter / combat pipeline (feeds the shared aggregation engine) -------------
 

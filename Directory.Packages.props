@@ -22,6 +22,7 @@
   <!-- Hosting + logging. Serilog targets netstandard2.0, so the same versions load on net48. -->
   <ItemGroup>
     <PackageVersion Include="Microsoft.Extensions.Hosting" Version="10.0.9" />
+    <PackageVersion Include="Microsoft.Extensions.Hosting.Abstractions" Version="10.0.9" />
     <PackageVersion Include="Microsoft.Extensions.Logging.Abstractions" Version="10.0.9" />
     <!-- net48 shim for records/IAsyncEnumerable/IAsyncDisposable used by the net48;net10 SDK. -->
     <PackageVersion Include="Microsoft.Bcl.AsyncInterfaces" Version="10.0.9" />

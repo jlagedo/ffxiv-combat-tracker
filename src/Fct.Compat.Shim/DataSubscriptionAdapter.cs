@@ -3,6 +3,7 @@ using System.Collections.ObjectModel;
 using System.Linq;
 using Fct.Abstractions;
 using FFXIV_ACT_Plugin.Common;
+using SdkModels = FFXIV_ACT_Plugin.Common.Models;
 
 namespace Fct.Compat.Shim;
 
@@ -14,10 +15,10 @@ namespace Fct.Compat.Shim;
 /// SDK events off one decoded packet.
 /// </summary>
 /// <remarks>
-/// D6 maps the four events with a typed-bus source (<c>LogLine</c>, <c>ZoneChanged</c>,
-/// <c>PartyListChanged</c>, <c>PrimaryPlayerChanged</c>). The other seven are interface-required but
-/// inert: <c>CombatantAdded</c>/<c>CombatantRemoved</c> await the <c>Actor</c>→<c>Combatant</c>
-/// projection (D7); <c>NetworkReceived</c>/<c>NetworkSent</c> (raw packets), <c>PlayerStatsChanged</c>,
+/// Six events map from a typed-bus source: <c>LogLine</c>, <c>ZoneChanged</c>, <c>PartyListChanged</c>,
+/// <c>PrimaryPlayerChanged</c>, and <c>CombatantAdded</c>/<c>CombatantRemoved</c> (projected via
+/// <see cref="CombatantProjector"/>). The other five are interface-required but inert:
+/// <c>NetworkReceived</c>/<c>NetworkSent</c> (raw packets), <c>PlayerStatsChanged</c>,
 /// <c>ParsedLogLine</c>, and <c>ProcessChanged</c> have no typed-bus source. Their add/remove are
 /// no-ops — nothing raises them, so a handler would never be called.
 /// </remarks>
@@ -36,12 +37,12 @@ public sealed class DataSubscriptionAdapter : IDataSubscription, IDisposable
     public event PartyListChangedDelegate? PartyListChanged;
     public event LogLineDelegate? LogLine;
     public event PrimaryPlayerDelegate? PrimaryPlayerChanged;
+    public event CombatantAddedDelegate? CombatantAdded;
+    public event CombatantRemovedDelegate? CombatantRemoved;
 
     // --- Inert events (interface contract; nothing raises them — see remarks) ----------
     public event NetworkReceivedDelegate NetworkReceived { add { } remove { } }
     public event NetworkSentDelegate NetworkSent { add { } remove { } }
-    public event CombatantAddedDelegate CombatantAdded { add { } remove { } }          // → D7
-    public event CombatantRemovedDelegate CombatantRemoved { add { } remove { } }      // → D7
     public event PlayerStatsChangedDelegate PlayerStatsChanged { add { } remove { } }
     public event ParsedLogLineDelegate ParsedLogLine { add { } remove { } }
     public event ProcessChangedDelegate ProcessChanged { add { } remove { } }
@@ -67,6 +68,13 @@ public sealed class DataSubscriptionAdapter : IDataSubscription, IDisposable
             case Fct.Abstractions.PrimaryPlayerChanged:
                 // The SDK delegate is parameterless; consumers re-poll the repository for the new player.
                 PrimaryPlayerChanged?.Invoke();
+                break;
+            case Fct.Abstractions.CombatantAdded ca:
+                CombatantAdded?.Invoke(CombatantProjector.ToCombatant(ca.Combatant));
+                break;
+            case Fct.Abstractions.CombatantRemoved cr:
+                // The modern event carries only the id; the SDK delegate takes the removed Combatant.
+                CombatantRemoved?.Invoke(new SdkModels.Combatant { ID = cr.ActorId });
                 break;
         }
     }

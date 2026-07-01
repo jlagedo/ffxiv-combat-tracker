@@ -91,6 +91,8 @@ class Program
         builder.Services.AddSingleton<IGameEventSink>(sp => sp.GetRequiredService<GameEventBus>());
         builder.Services.AddSingleton<GameSnapshotProvider>();
         builder.Services.AddSingleton<IGameSession, GameSession>();
+        // Folds the live event stream into the pull snapshot IDataRepository/consumers read.
+        builder.Services.AddHostedService<GameSnapshotAggregator>();
         builder.Services.AddSingleton<RegistryService>();
         builder.Services.AddSingleton<IPluginRegistry>(sp => sp.GetRequiredService<RegistryService>());
         builder.Services.AddSingleton<IAudioOutput, AudioService>();

@@ -77,18 +77,30 @@ public class DataSubscriptionTests
     }
 
     [Fact]
-    public void Combatant_events_are_inert_pending_the_projection()
+    public void CombatantAdded_maps_the_actor_to_a_combatant()
     {
         var (sub, bus) = NewAdapter();
-        int added = 0, removed = 0;
-        sub.CombatantAdded += _ => added++;
-        sub.CombatantRemoved += _ => removed++;
+        object? got = null;
+        sub.CombatantAdded += c => got = c;
 
         bus.Emit(new CombatantAdded(1, T0, FakeActors.Player(7, "Dummy")));
+
+        var combatant = Assert.IsType<FFXIV_ACT_Plugin.Common.Models.Combatant>(got);
+        Assert.Equal(7u, combatant.ID);
+        Assert.Equal("Dummy", combatant.Name);
+    }
+
+    [Fact]
+    public void CombatantRemoved_carries_the_actor_id()
+    {
+        var (sub, bus) = NewAdapter();
+        object? got = null;
+        sub.CombatantRemoved += c => got = c;
+
         bus.Emit(new CombatantRemoved(2, T0, 7));
 
-        Assert.Equal(0, added);
-        Assert.Equal(0, removed);
+        var combatant = Assert.IsType<FFXIV_ACT_Plugin.Common.Models.Combatant>(got);
+        Assert.Equal(7u, combatant.ID);
     }
 
     [Fact]

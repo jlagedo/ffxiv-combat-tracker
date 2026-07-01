@@ -12,6 +12,8 @@
   <ItemGroup>
     <ProjectReference Include="..\..\src\Fct.Abstractions\Fct.Abstractions.csproj" />
     <ProjectReference Include="..\..\src\Fct.Abstractions.Testing\Fct.Abstractions.Testing.csproj" />
+    <!-- IHostedService for the linked GameSnapshotAggregator (abstractions only — no Avalonia/host chain). -->
+    <PackageReference Include="Microsoft.Extensions.Hosting.Abstractions" />
   </ItemGroup>
 
   <!-- Existing linked host logic. -->
@@ -20,8 +22,9 @@
     <Compile Include="..\..\src\Fct.App\ProcessJob.cs" Link="ProcessJob.cs" />
   </ItemGroup>
 
-  <!-- Plugin subsystem under test (headless, no Avalonia/IHostedService deps): the host services and
-       the ALC loader. PluginLifetime (IHostedService) is intentionally excluded. -->
+  <!-- Host subsystem under test (headless, no Avalonia): the host services + ALC loader. The
+       GameSnapshotAggregator is an IHostedService but headless, so it links (its abstractions package
+       is referenced above); PluginLifetime (Avalonia-coupled) stays out via the explicit Plugins list. -->
   <ItemGroup>
     <Compile Include="..\..\src\Fct.App\Hosting\*.cs" Link="Hosting\%(Filename)%(Extension)" />
     <Compile Include="..\..\src\Fct.App\Plugins\HostContract.cs" Link="Plugins\HostContract.cs" />
