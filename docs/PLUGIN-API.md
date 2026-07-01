@@ -398,9 +398,11 @@ separately by `Fct.Compat.Shim.Tests`; see [The net10 compat shim](#the-net10-co
   G2/G5/G6/G7/G8/G9/G10 round-trip checks — plus bus filter/isolation checks and the G1
   default/round-trip check. They validate every contract gap end-to-end with only the harness as new
   code. G11 (UI surfaces) is contract-only and verified by build, not a headless flow test.
-- **Cannot be tested until built:** *fidelity* of the real `Combatant→Actor` /
-  `ExportVariables→CombatData` projection — that logic lives in the not-yet-existent net10 shim; the
-  stub only proves the seam exists, not that mapping is bit-correct.
+- **`ExportVariables` projection fidelity is covered by the real shim:** `Fct.Compat.Shim.Tests` feeds
+  the same swing vector through the net10-compiled shared aggregation engine + `EncounterProjector` and
+  asserts the projected `ExportVariables` bag equals the net48 oracle values (cross-TFM parity). Still
+  pending: the real `Combatant→Actor` projection (D7) — the flow-test stub only proves that seam
+  exists, not that its mapping is bit-correct.
 - **Needs the net48 satellite / live game (out of scope here):** loading the *real* FFXIV_ACT_Plugin /
   OverlayPlugin (CefSharp net48-only), real Machina packet decode, and real `MasterSwing` aggregation
   parity (already covered by `tools/mass-compare`, see [`TESTING.md`](TESTING.md)). Flow tests assert
