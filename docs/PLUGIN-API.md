@@ -404,6 +404,11 @@ separately by `Fct.Compat.Shim.Tests`; see [The net10 compat shim](#the-net10-co
   asserts the projected `ExportVariables` bag equals the net48 oracle values (cross-TFM parity). Still
   pending: the real `Combatant→Actor` projection (D7) — the flow-test stub only proves that seam
   exists, not that its mapping is bit-correct.
+- **The `IDataSubscription` event map is covered by the real shim:** beyond A5's `ShimStub`,
+  `Fct.Compat.Shim.Tests` drives `DataSubscriptionAdapter` off the in-memory bus and asserts each mapped
+  delegate (`LogLine`/`ZoneChanged`/`PartyListChanged`/`PrimaryPlayerChanged`) fires with the projected
+  args, that the `Combatant*` events stay inert pending D7, and that `FormActMain.DataSubscription`
+  delivers once wired.
 - **Needs the net48 satellite / live game (out of scope here):** loading the *real* FFXIV_ACT_Plugin /
   OverlayPlugin (CefSharp net48-only), real Machina packet decode, and real `MasterSwing` aggregation
   parity (already covered by `tools/mass-compare`, see [`TESTING.md`](TESTING.md)). Flow tests assert
