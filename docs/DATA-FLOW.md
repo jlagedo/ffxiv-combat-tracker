@@ -6,10 +6,11 @@ Discord triggers — run **unmodified**. This document is the authoritative map 
 flows through the real upstream stack today, and the exact integration seams we must
 reproduce so the unmodified plugins "just work."
 
-It is reconstructed from the real sources:
+It is reconstructed from the real sources (two separate decompiles — do not conflate):
 
-- `E:\dev\ACT-decompiled` — ACT itself + the FFXIV_ACT_Plugin
-  decompile (`.audit/ffxiv_act_plugin/decompiled/`, mirrored at `E:\dev\FFXIV_ACT_Plugin\_decompiled`).
+- `E:\dev\ACT-decompiled` — **Advanced Combat Tracker only** (ACT's compat surface + aggregation).
+- `E:\dev\FFXIV_ACT_Plugin\ffxiv_act_plugin\decompiled\` — the **FFXIV_ACT_Plugin** decompile (the
+  legacy stack we host unmodified; never a source to port parsing logic from).
 - `E:\dev\OverlayPlugin` — ngld OverlayPlugin (net48).
 - `E:\dev\IINACT` — a working in-process re-host of the same stack (its `NotACT` is the
   independent proof that our from-scratch ACT approach is correct).
@@ -258,10 +259,10 @@ log line ──regex──► MasterSwing ──AddCombatAction──► Combata
 > tests in `docs/TESTING.md`). The lazy `xxxCached` flag pattern, the `GetAllies` graph-walk,
 > the `Dnum` semantics, and the `ExportVariables`/`ColumnDefs` formatter tables all match.
 
-### 3.2 The MasterSwing boundary (resolved)
+### 3.2 The MasterSwing boundary
 
 For FFXIV, **the `FFXIV_ACT_Plugin` produces the encounter input; ACT does not re-derive
-damage from raw packets.** Two facts settle ARCHITECTURE open-question #1:
+damage from raw packets.** Two facts pin the split:
 
 1. The canonical path the decompile documents is **log-line → ACT regex → MasterSwing**
    (`FormActMain` owns the regex; `OpenLog` drives the tail).

@@ -119,7 +119,7 @@ then reflect the FFXIV `pluginObj` for live data (§14).
 | ✅ | `ActPluginData.{pluginObj,pluginFile,lblPluginTitle,lblPluginStatus,cbEnabled,tpPluginSpace}` | OP, Trig, Disc, Hojo, FFXIV | identity, FFXIV-plugin status/checkbox/tab, the reflection seam |
 | ✅ | `PluginGetSelfData(this)` | all | self-locate own `ActPluginData` / install dir |
 
-**Strategy.** All present (Slice 1). `Invoke`/`Handle` come free from `FormActMain : Form`. The
+**Strategy.** All present. `Invoke`/`Handle` come free from `FormActMain : Form`. The
 load-bearing requirement is that the host populates `ActPlugins` with the FFXIV entry whose
 `pluginObj` is our `WrappedFfxivPlugin` and whose `lblPluginStatus.Text` is the exact "…Started"
 string (🟡 **VERIFY** — shared by Trig/OP/Hojoring init). `GetVersion()` returns `3.8.5.288`.
@@ -147,7 +147,7 @@ model so the rollup exposes the FFXIV columns + the `ExportVariables` keys OP la
 | ✅ | `ActLocalization.LocalizationStrings["attackTypeTerm-all"]` | FFXIV | localized "All" bucket key |
 
 **Strategy.** Done — verified bit-for-bit on captured combat (`Aggregation.cs` + `CombatTables.cs`;
-Slice 1 S5; TESTING.md "Differential ACT-engine compat"), and corpus-wide by `tools/mass-compare`
+TESTING.md "Differential ACT-engine compat"), and corpus-wide by `tools/mass-compare`
 (our engine vs real ACT, identical plugin swings). DoT/HoT/shield *values* are the plugin's synthesis,
 baked into the swings both engines receive — not an interface concern.
 

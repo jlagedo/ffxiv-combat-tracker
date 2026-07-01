@@ -33,13 +33,12 @@ pipe-delimited log line. This project explores collapsing that into two cooperat
 processes:
 
 - **A real .NET Framework 4.8 satellite** (`Fct.LegacyHost`) that hosts the legacy plugins
-  **unmodified** behind a from-scratch ACT engine facade. The target set is five
-  (FFXIV_ACT_Plugin, OverlayPlugin/cactbot, Triggernometry, ACT-Discord-Triggers,
-  ACT.Hojoring); Slice 1 loads the first two today.
-- **A .NET 10 host** (`Fct.App`, Avalonia) that today launches and embeds the satellite. By
-  design it will also run new typed plugins and receive combat data over IPC — that host
-  layer is not built yet. The two CLRs cannot share a process, so the OS process boundary
-  *is* the runtime boundary; only data crosses.
+  **unmodified** behind a from-scratch ACT engine facade. The target set is five:
+  FFXIV_ACT_Plugin, OverlayPlugin/cactbot, Triggernometry, ACT-Discord-Triggers, ACT.Hojoring.
+- **A .NET 10 host** (`Fct.App`, Avalonia) that launches and embeds the satellite, runs new
+  typed plugins in isolated load contexts, and receives combat data over the IPC bridge. The
+  two CLRs cannot share a process, so the OS process boundary *is* the runtime boundary; only
+  data crosses.
 
 Two hard directives gate every decision:
 
@@ -71,10 +70,10 @@ ACT binary, both fed the same plugin-produced swings, on recorded logs.
 
 ## Status
 
-Slice 1 (loading the real FFXIV_ACT_Plugin + OverlayPlugin in the two-process host) is built
-and exercised through run logs and tests, pending a live-game capture. Everything remains
-subject to change. See [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md) §11 for the milestone
-map.
+An exploratory prototype: the two-process host loads the real plugins and the forward typed
+contract is in place, but large parts are unfinished or stubbed and everything is subject to
+change. See [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md) §11 for the milestone map and
+[`docs/PLUGIN-API.md`](docs/PLUGIN-API.md) for the forward surface + remaining work.
 
 ## Validation — ACT-engine output parity
 

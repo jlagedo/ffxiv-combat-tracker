@@ -23,18 +23,9 @@ namespace Fct.Abstractions.UI
         /// <summary>A config page in the Plugins section (the WinForms TabPage replacement).</summary>
         void AddSettingsPage(UiSurface page);
 
-        /// <summary>A top-level page with its own entry in the shell's left navigation.</summary>
-        void AddNavPage(UiSurface page);
-
-        /// <summary>A tile/card on the dashboard.</summary>
-        void AddDashboardWidget(UiWidget widget);
-
-        /// <summary>A status-bar / toolbar item with a command.</summary>
-        void AddStatusItem(UiStatusItem item);
-
         /// <summary>
-        /// Bring a previously-contributed page (settings or nav) to the foreground — the modern form
-        /// of Triggernometry's <c>LocateTab</c> "reveal my page" request.
+        /// Bring a previously-contributed settings page to the foreground — the modern form of
+        /// Triggernometry's <c>LocateTab</c> "reveal my page" request.
         /// </summary>
         void RevealPage(string pageId);
 
@@ -66,13 +57,4 @@ namespace Fct.Abstractions.UI
     /// the surface is shown; a throw is contained to an error placeholder, never a dead shell.
     /// </summary>
     public sealed record UiSurface(string Id, string Title, Func<Control> CreateView, string? IconGlyph = null, int Order = 0);
-
-    /// <summary>Relative size hint for a dashboard widget.</summary>
-    public enum UiWidgetSize { Small, Medium, Large, Wide }
-
-    /// <summary>A contributed dashboard widget (lazy view, like <see cref="UiSurface"/>).</summary>
-    public sealed record UiWidget(string Id, string Title, Func<Control> CreateView, UiWidgetSize Size = UiWidgetSize.Medium, int Order = 0);
-
-    /// <summary>A contributed status-bar/toolbar item.</summary>
-    public sealed record UiStatusItem(string Id, string Text, Action OnInvoke, string? IconGlyph = null, int Order = 0);
 }

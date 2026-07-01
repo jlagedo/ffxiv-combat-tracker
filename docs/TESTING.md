@@ -116,11 +116,11 @@ asserts our `CombatTables` formatters reproduce every one. That pinned ACT's exa
 `NaN`. (Four EQ-legacy keys — `NAME`/`crittypes`/`threatstr`/`threatdelta` for the anchor — throw in
 the headless harness and are excluded from the baseline; our facade still registers them.)
 
-This pinned several behaviours our first-cut engine got wrong, each now matched exactly: `blockIsHit`
-defaults **true**; per-combatant `StartTime`/`EndTime` span all outgoing swings via the
-"`All … (Ref)`" bucket (not just damage); the encounter's allied party comes from ACT's friend/foe
-graph (`GetAllies`, including its index-instability quirk over the growing `SortedList`); and
-`DamagePercent`/`HealedPercent` read `--` for non-allies. Regenerate the baseline (needs the ACT
+The engine reproduces several non-obvious ACT behaviours exactly: `blockIsHit` defaults **true**;
+per-combatant `StartTime`/`EndTime` span all outgoing swings via the "`All … (Ref)`" bucket (not
+just damage); the encounter's allied party comes from ACT's friend/foe graph (`GetAllies`, including
+its index-instability quirk over the growing `SortedList`); and `DamagePercent`/`HealedPercent` read
+`--` for non-allies. Regenerate the baseline (needs the ACT
 install) with `tools/act-oracle/build-and-run.ps1`; the committed baseline keeps the diff test
 running everywhere without ACT.
 

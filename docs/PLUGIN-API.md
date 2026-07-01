@@ -8,35 +8,90 @@ It is the counterpart to the *backward* surface: [`ACT-INTERFACE-MAP.md`](ACT-IN
 [`DATA-FLOW.md`](DATA-FLOW.md) document the legacy ACT host surface the net48 satellite impersonates
 to run the five plugins **unmodified**. This document is the **net10 contract** they migrate *to*.
 
-> **Status: contract + flow-test harness + net10 host & ALC loader (slice A+B) + the net48→net10
-> bridge data forwarder (C) built; the net10 compat shim (D) is in progress.** The shim's two
-> legacy-impersonating facades, the plugin lifecycle, the audio / registry / raw-line seams, the
-> encounter driver over the shared aggregation engine (`ExportVariables` included), the full
-> `IDataSubscription` event map, and the `IDataRepository` + `Combatant`/`Player`/`NetworkBuff`
-> projection over a live host snapshot (with the FFXIV-plugin reflection-discovery stand-in) are built
-> and load a recompiled legacy plugin end-to-end; only the WinForms `TabPage` UI embedding is pending
-> (see [The net10 compat shim](#the-net10-compat-shim-in-progress)). The host's **live snapshot
-> aggregator** now folds the forwarded event stream into `IGameSnapshot`. `Fct.Abstractions`
-> (net48;net10) and `Fct.Abstractions.UI` (net10 + Avalonia) are the compiling contract; a headless
-> flow-test harness exercises the contract shapes end-to-end: `Fct.Abstractions.Testing` supplies
-> in-memory fakes of every interface plus the `ShimStub` seam, and `Fct.FlowTests` (net10) runs the
-> legacy↔native flow suite (**18 tests, all green, 0 skipped**). The **real host services +
-> ALC-per-plugin loader now exist in `Fct.App`** and load a sample native plugin end-to-end (see
-> [The net10 host & ALC loader](#the-net10-host--alc-loader-built)). The archetype shapes below are
-> cross-checked against the actual source of all five supported plugins on `E:\dev`; the gaps that
-> check surfaced (**G1–G11, all now shipped**) are tracked in [Contract gaps](#contract-gaps-tracked),
-> and the flow suite is documented in
-> [Testing the contract](#testing-the-contract--legacynative-flow-tests).
+> **Status.** The contract (`Fct.Abstractions` + `.UI`), the flow-test harness, the net10 host +
+> ALC loader, the net48→net10 bridge forwarder, and most of the compat shim are built and load real
+> plugins end-to-end (**18 flow tests + `Fct.Compat.Shim.Tests`, all green**). What remains is a small,
+> **named set of missing pipes and faces** — read [The model](#the-model--one-set-of-pipes-three-faces),
+> the [Pipe inventory](#pipe-inventory--every-pipe-three-faces), and
+> [What we must do](#what-we-must-do--the-work-list) first. Per-piece build state is in
+> [The net10 host & ALC loader](#the-net10-host--alc-loader-built),
+> [The bridge data forwarder](#the-bridge-data-forwarder-built), and
+> [The net10 compat shim](#the-net10-compat-shim-in-progress); the contract gaps that the source sweep
+> surfaced (**G1–G11, all shipped**) are in [Contract gaps](#contract-gaps-tracked).
 
-## Two interfaces, one contract
+## The model — one set of pipes, three faces
 
-1. **Modern** (`Fct.Abstractions` + `Fct.Abstractions.UI`) — typed, clean, best-practice. What new
-   plugins target.
-2. **Compat** (the **net10** shim `Fct.Compat.Shim` + its two legacy-impersonating facades — distinct
-   from the existing **net48** `Fct.Compat.Act`, which is the satellite's ACT engine) — a re-projection
-   of the ACT + FFXIV-SDK programming model, implemented **as an adapter over the modern contract**. An
-   ACT-era plugin **recompiles** against it (minimal changes), moves off the net48 satellite into the
-   isolated net10 host, then migrates compat→modern member-by-member and drops the shim.
+The host is a **router**. It knows nothing about the game and nothing about any plugin. It provides a
+fixed set of **pipes** — event streams, pull snapshots, service seams — and moves data through them;
+how a pipe is *filled* and how it is *consumed* is entirely a plugin's concern. Four rules gate every
+decision:
+
+1. **The host knows nothing about the game.** It never parses a log line or decodes a packet. Raw bytes
+   and raw lines pass through verbatim. The sole parser (FFXIV_ACT_Plugin) is the only thing that turns
+   packets into lines and swings.
+2. **The host knows nothing about plugins.** No plugin identity, semantics, or data-intent reaches it.
+   It loads opaque units into isolated ALCs and exposes pipes; what binds to a pipe is invisible to it.
+   Shared-assembly identity is **manifest-declared**, so the loader names no plugin- or shim-specific
+   assembly (see [Isolation](#isolation--assembly-loading)).
+3. **The host provides every pipe the tested plugins need — on both sides of the satellite.** A pipe is
+   not "done" until every face a real tested plugin will use exists.
+4. **The only host intelligence is ACT-mirror aggregation.** Its one game-touching behavior is
+   reproducing the two things old ACT maintains — the combatant/zone/party **repository snapshot**
+   (`IGameSnapshot`) and the **encounter/DPS rollup** (`IEncounterService` + `ExportVariables`) — as a
+   simplification consumers already expect. Everything else is pure transport.
+
+Three non-negotiables gate every entry in this document:
+
+- **Every real inter-plugin data path is a host pipe — no exception, no simplification, no deferral.**
+  If two of the tested plugins exchange data or signals, the host exposes the pipe they exchange it
+  through. "Nobody consumes it natively yet", "it's high-bandwidth", "it's an ugly ACT internal" are
+  never grounds to omit, sample, or postpone a pipe.
+- **The goal is a host that accommodates *all* the tested plugins — inside and outside the satellite,
+  no exceptions.** A pipe is complete only when every face a real plugin will use exists (see the
+  faces below).
+- **This models reality, not a greenfield.** These plugins evolved over years and some of their
+  couplings should never have existed — but we cannot change reality. We adapt each coupling into a
+  clean, documented pipe rather than wish it away.
+
+**Three faces, one set of pipes.** A plugin binds to the same host pipes through one of three faces:
+
+| Face | Runtime | Binds to | Home |
+|---|---|---|---|
+| **Satellite** | net48 | real ACT/SDK, unmodified | `Fct.LegacyHost`; data crosses to the net10 bus via the [bridge forwarder](#the-bridge-data-forwarder-built) |
+| **Compat-shim (native)** | net10 | legacy ACT/SDK identity re-projected (`Fct.Compat.Shim` + its two facades, distinct from the net48 `Fct.Compat.Act` ACT engine) | in-process, ALC-per-plugin; a recompiled legacy plugin migrating **without breaking its interface** |
+| **Modern (native)** | net10 | the typed `Fct.Abstractions` contract | in-process; new plugins and fully-migrated ones |
+
+The satellite is a **temporary workaround** — the destination is native. So the fact that a consumer
+runs in the satellite *today* never justifies leaving its native faces unbuilt; the migration path
+requires every pipe to be reachable natively too. A shimmed plugin migrates compat→modern
+member-by-member, then drops the shim.
+
+## Pipe inventory — every pipe, three faces
+
+Every pipe the five tested plugins consume, its shape on each face, and what is built vs. missing.
+"Missing" means a face a tested plugin will need once it migrates — not an unused surface. This table
+is the spine of [What we must do](#what-we-must-do--the-work-list).
+
+| Pipe | Modern face | Compat-shim face | Satellite face | Status |
+|---|---|---|---|---|
+| **Raw log line** | `RawLogLine` event | `Before/OnLogLineRead` + `IDataSubscription.LogLine` | ACT `OnLogLineRead` (bridged) | ✅ built; shim `ParsedLogLine` event ⏳ |
+| **Repository snapshot** (combatant/zone/party/player) | `IGameSnapshot` | `IDataRepository.Get*` + state `IDataSubscription` events | SDK `IDataRepository` (bridged) | ✅ built; name tables empty |
+| **Actor side-channel state** (statuses/enmity/target-of-target/focus/hover/reliable in-combat) | `Actor` superset fields + snapshot `Focus`/`Hover` | consumed via the snapshot | today Hojoring reads OverlayPlugin + Sharlayan directly | contract fields ✅; **source = satellite forwards (pending)** |
+| **Encounter / DPS** (+`ExportVariables`) | `IEncounterService` + `ExportVariables` bag | `ActiveZone.ActiveEncounter` + `EncounterProjector` | ACT `EncounterData`/`CombatantData` | ✅ built; per-tick `Active` refresh ⏳ |
+| **Action event** | `ActionEffect` (+ typed records) | via events | ACT `AfterCombatAction` (bridged) | ✅ `ActionEffect`; status/cast/death/hp → **RawLogLine only** (note below) |
+| **Audio** | `IAudioOutput` | `TTS`/`PlaySound` + `PlayTts`/`PlaySound` slots | ACT `PlayTts`/`PlaySound` | ✅ built |
+| **Registry / peer** | `IPluginRegistry` | `RegisterNamedCallback`/`InvokeNamedCallback` | ACT named callbacks | ✅ built |
+| **Raw packets** | `IRawPacketSource` + `RawLogLines.Emit` | `RegisterNetworkParser` / `NetworkReceived` | SDK `NetworkReceived` (in-satellite) | **satellite only — net10 bus tap + shim + modern faces missing** |
+| **Process lifecycle** | process event + handle | `ProcessChanged` + `GetCurrentFFXIVProcess` | SDK `ProcessChanged` | **missing on net10 (all faces)** |
+| **Resource catalog** (names) | `IResourceCatalog` | `GetResourceDictionary` | parser tables + a resource-provider plugin | **pipe filled by plugins; status/buff table + producer pending** |
+| **Host services** (storage/logger/clock) | `IPluginHost` | `AppDataFolder`/`WriteExceptionLog`/… | ACT globals | ✅ built |
+| **UI** | `IUiContributor` (Avalonia settings page + reveal/corner-control) | WinForms `TabPage` (slice D8) | WinForms `TabPage` in `Fct.LegacyHost` | modern: **contract defined, not wired** (wiring = work item); shim D8 ⏳; satellite HWND ✅ |
+
+> **Typed semantic events stay on the RawLogLine pipe.** `StatusApplied/Removed`, `Cast*`,
+> `DeathOccurred`, and HP-as-event exist only as parsed log-line fields. The host **parses nothing**,
+> and the sole parser emits them only as raw lines, so **no face synthesizes them** — every tested
+> consumer regexes the `RawLogLine` pipe, exactly as under ACT. Any typed re-shape of that data is a
+> *plugin's* job (parse `RawLogLine` → publish typed events, per rule 1), never the host's.
 
 ## Locked decisions
 
@@ -44,9 +99,8 @@ to run the five plugins **unmodified**. This document is the **net10 contract** 
   `AssemblyLoadContext` → assembly/version isolation + hot-unload. Fault containment is
   **cooperative** (fault-guarded boundaries, watchdog timeouts, quarantine/unload). Honest limit: a
   hard native crash (AccessViolation/StackOverflow/OOM) still takes the host — ALC is not a fault
-  boundary. The contract is callback/record-based and **location-transparent**, so an out-of-process
-  tier can sit behind the same interfaces later with no plugin code change (designed-for, not built).
-- **Compat = net10 recompile-shim adapter** (option above), not a second unmodified-host. The
+  boundary.
+- **Compat = net10 recompile-shim adapter** (the compat-shim face above), not a second unmodified-host. The
   existing net48 unmodified-drop-in path is unchanged and remains the zero-effort on-ramp; the shim
   is the on-ramp for authors leaving net48.
 
@@ -165,10 +219,11 @@ complete 0–274 taxonomy (FFXIV native + OverlayPlugin's 256+ custom range).
 legacy `lock (cd.Lock)`). `Actor` (`Actors.cs`) is the **superset** model — adding `Statuses`,
 `Enmity`, `TargetOfTargetId`, and `InCombat` on top of the SDK fields, and the snapshot itself
 carries `Focus`/`Hover` (`Session.cs:51-52`) — together closing Hojoring's Sharlayan/OverlayPlugin
-side-channels. `IResourceCatalog` provides typed, complete, all-locale name tables
-(skill/status/zone/world/item) — the data Hojoring patches with bundled CSVs today because the SDK's
-buff dictionary is never populated. (A crafter/gatherer projection is still lossy — see
-[G10](#contract-gaps-tracked).)
+side-channels. `IResourceCatalog` is the **pipe** for typed, all-locale name tables (skill/status/zone/world/item);
+the host owns no tables and **plugins fill it** — the parser supplies skill/zone/world via
+`GetResourceDictionary`, and a first-party resource-provider plugin supplies the status/buff table the
+SDK leaves empty (the gap Hojoring patches with a private XIVAPI/CSV side-channel today, promoted to a
+shared pipe — see [What we must do](#what-we-must-do--the-work-list) and its recorded decision).
 
 ### Encounter / combat-state
 
@@ -230,12 +285,15 @@ lines (`LineBaseCustom.cs:80-86` → `FFXIVRepository.cs:493-515`); that write-b
 ## Isolation & assembly loading
 
 One **collectible `AssemblyLoadContext` per plugin** is the "isolate the assemblies" answer. The
-host's load context resolves **`Fct.Abstractions` / `Fct.Abstractions.UI` / `Avalonia.*` up to the
-default context** so contract + UI types have one identity across the boundary; everything else (the
-plugin's own Newtonsoft, etc.) stays private to its ALC via `AssemblyDependencyResolver`/`.deps.json`.
-No strong-name impersonation, no `AssemblyResolve` games — the legacy ACT-load problem does not exist
-in this model. Plugins are pinned to the host's Avalonia version (as legacy plugins were pinned to
-WinForms).
+host's load context resolves a **fixed contract set** — `Fct.Abstractions` / `Fct.Abstractions.UI` /
+`Avalonia.*` — up to the default context so contract + UI types have one identity across the boundary;
+everything else (the plugin's own Newtonsoft, etc.) stays private to its ALC via
+`AssemblyDependencyResolver`/`.deps.json`. **Any assembly beyond that fixed set is shared only because
+the plugin's manifest declares it** — so a shimmed plugin's manifest names `Fct.Compat.Shim` + its two
+facades, and the **loader itself has zero name-knowledge of the shim** (rule 2: the host stays a
+generic router/loader). No strong-name impersonation, no `AssemblyResolve` games — the legacy ACT-load
+problem does not exist in this model. Plugins are pinned to the host's Avalonia version (as legacy
+plugins were pinned to WinForms).
 
 ## UI strategy — plugins contribute Avalonia surfaces
 
@@ -248,11 +306,11 @@ public interface IUiContributor { void RegisterUi(IUiHost ui); }   // once, on t
 
 public interface IUiHost
 {
-    void AddSettingsPage(UiSurface page);     // the WinForms TabPage replacement
-    void AddNavPage(UiSurface page);          // its own left-nav entry
-    void AddDashboardWidget(UiWidget widget); // a dashboard tile
-    void AddStatusItem(UiStatusItem item);    // status-bar / toolbar item
-    IUiDispatcher Dispatcher { get; }         // explicit UI-thread marshaling
+    void AddSettingsPage(UiSurface page);        // the WinForms TabPage replacement
+    void RevealPage(string pageId);              // Triggernometry LocateTab
+    IDisposable AddCornerControl(UiSurface ctl); // Triggernometry CornerControlAdd
+    void RemoveCornerControl(string id);         // Triggernometry CornerControlRemove
+    IUiDispatcher Dispatcher { get; }            // explicit UI-thread marshaling
 }
 ```
 
@@ -269,6 +327,32 @@ public interface IUiHost
   Avalonia window; the host provides no overlay scaffolding.
 - Triggernometry's host-window mutations map onto `IUiHost.RevealPage` (`LocateTab`) and
   `AddCornerControl`/`RemoveCornerControl` ([G11](#contract-gaps-tracked), shipped).
+
+### Wiring & readiness (modern UI)
+
+The `IUiContributor`/`IUiHost` surface is **defined but not yet wired**: there is no `IUiHost`
+implementation, the loader never calls `RegisterUi`, and `IPluginHost` exposes no UI member. v1 wires
+the surface: the host implements `IUiHost`, discovers `IUiContributor` on each loaded plugin, and calls
+`RegisterUi` on the UI thread after `InitializeAsync`. The **only contribution surfaces are the
+ACT-grounded ones** — a settings page (the `TabPage` replacement, rendered in the Plugins config bay
+next to the legacy embeds), plus Triggernometry's `RevealPage` and `AddCornerControl`/
+`RemoveCornerControl`. There are no nav-page / dashboard-widget / status-item surfaces — those were
+speculative and are removed from the contract — so no shell-nav refactor is required. The legacy
+satellite-HWND embedding (`NativeControlHost` into the config bay) and the shim D8 WinForms `TabPage`
+are the *other-face* UI paths and are unchanged by this.
+
+### Theme — a semantic token contract
+
+A plugin `Control` inherits the shell's Avalonia theme automatically once attached: Avalonia is shared
+to the default ALC, so a plugin's `Control` **is** the shell's `Control` type, and application-level
+styles/resources (the shell's `FluentTheme` + palette) flow into any attached subtree. But the shell's
+actual resource keys (its internal "Evercold" palette, fonts, style classes) are **implementation, not
+contract** — so plugins do not bind them directly. Instead `Fct.Abstractions.UI` exposes a **stable
+semantic token contract**: a documented set of resource keys (surface / accent / text / danger brushes,
+typography, spacing) and a few style classes, which the shell maps onto its internal palette. Plugins
+bind the stable tokens; the shell can restyle, re-accent, or add a light variant (it is Dark-pinned
+today) without breaking any plugin. This is the theming equivalent of the typed data contract — a
+documented seam, never the internal implementation.
 
 ## The compat shim (adapter)
 
@@ -287,7 +371,7 @@ live on `FormActMain`/`LegacyPluginHost`; **pending** rows are the remaining wor
 | `PluginGetSelfData`/`AppDataFolder`/`WriteExceptionLog` | `IPluginStorage`/`ILogger` | ✅ built |
 | `AddCombatAction`/`SetEncounter`/`EndCombat`/`InCombat` | shared aggregation engine (`ActiveZone.ActiveEncounter`) + mirrored onto `IEncounterService` | ✅ built |
 | `CombatantData`/`EncounterData.ExportVariables` (opaque dict cactbot reads) | shared engine's registered formatters, projected onto `EncounterSnapshot`/`CombatantMetrics` typed fields + the `ExportVariables` bag ([G1](#contract-gaps-tracked)/[G2](#contract-gaps-tracked)) | ✅ built |
-| `IDataSubscription` (11 events: NetworkReceived/Sent, CombatantAdded/Removed, PrimaryPlayerChanged, ZoneChanged, PlayerStatsChanged, PartyListChanged, LogLine, ParsedLogLine, ProcessChanged) | `IGameEventStream` mapped to SDK delegate shapes | ✅ built (6 mapped: `LogLine`/`ZoneChanged`/`PartyListChanged`/`PrimaryPlayerChanged`/`CombatantAdded`/`CombatantRemoved`; the other 5 inert — no typed-bus source) |
+| `IDataSubscription` (11 events: NetworkReceived/Sent, CombatantAdded/Removed, PrimaryPlayerChanged, ZoneChanged, PlayerStatsChanged, PartyListChanged, LogLine, ParsedLogLine, ProcessChanged) | `IGameEventStream` mapped to SDK delegate shapes | ✅ built (6 mapped: `LogLine`/`ZoneChanged`/`PartyListChanged`/`PrimaryPlayerChanged`/`CombatantAdded`/`CombatantRemoved`; of the other 5, `ParsedLogLine`/`NetworkReceived`/`NetworkSent`/`ProcessChanged` await their **source pipe** (see [What we must do](#what-we-must-do--the-work-list)) and `PlayerStatsChanged` is **dropped** — no tested consumer) |
 | `IDataRepository.Get*` | `IGameSnapshot` + `IResourceCatalog` | ✅ built (name tables empty until `IResourceCatalog` is sourced; `GetCurrentFFXIVProcess` null — no net10 game handle) |
 | `Combatant`/`Player`/`NetworkBuff` | projected from `Actor`/`StatusEffect` (lossless: CP/GP/world/order [G10](#contract-gaps-tracked), refresh/timestamp [G9](#contract-gaps-tracked)) | ✅ built (`Player` carries `JobID` only — the modern model has no attribute block) |
 | `RegisterNetworkParser` / custom lines 256+ | `IRawPacketSource` (read) + `IRawLogLineEmitter` synthetic-line emit ([G4](#contract-gaps-tracked)) | ⏳ pending (host emit path built) |
@@ -453,13 +537,17 @@ production and loading a real native `IPlugin` from disk:
   `CombatantAdded`/`CombatantRemoved`/`HpUpdated`/`ZoneChanged`/`PartyChanged`/`PrimaryPlayerChanged`
   into an immutable `IGameSnapshot`, and publishes it through `GameSnapshotProvider` — so
   `IGameSession.Snapshot()` (and the shim's `IDataRepository`) reads live actor/zone/party/player state
-  off the forwarded stream. `Target`/`Focus`/`Hover` and the resource catalog are not sourced yet.
+  off the forwarded stream. `Target`/`Focus`/`Hover`, the actor side-channel fields, and the resource
+  catalog are not sourced yet — their producers are decided (satellite forward; resource-provider
+  plugin) and tracked in [What we must do](#what-we-must-do--the-work-list).
 - **ALC loader** (`src/Fct.App/Plugins/`): `PluginManifest` (`plugin.json`, read without loading the
   assembly) + `HostContract` major-version gate; `PluginLoadContext` (collectible, `Fct.Abstractions`/
   `Fct.Abstractions.UI`/`Microsoft.Extensions.Logging.Abstractions`/`Avalonia.*` — plus the compat
   shim (`Fct.Compat.Shim`) and its two legacy-identity facades (`Advanced Combat Tracker`,
   `FFXIV_ACT_Plugin.Common`) — shared to the default context, everything else private via
-  `AssemblyDependencyResolver`); `PluginManager` (discover → gate → load → time-boxed fault-guarded
+  `AssemblyDependencyResolver`; **the shim/facade sharing is currently by-name and must move to
+  manifest-declared** so the loader names only the fixed contract set, item 8 in
+  [What we must do](#what-we-must-do--the-work-list)); `PluginManager` (discover → gate → load → time-boxed fault-guarded
   init → quarantine/unload) driven by the `PluginLifetime` hosted service.
 - **Sample plugin** (`samples/Fct.SamplePlugin`) loads end-to-end and exercises events/snapshot/
   registry/audio/storage/raw-write-back; covered by `tests/Fct.App.Tests` (bus, registry, audio,
@@ -541,17 +629,19 @@ and the player's `Actor`→`Player`. `LegacyPluginHost` publishes a `SyntheticFf
 `ActPlugins` so OverlayPlugin/Hojoring discover `DataRepository`/`DataSubscription` by reflection
 exactly as under real ACT.
 
-**Honest limits (facts, not stubs):** `Player` carries `JobID` only — the modern model has no attribute
-block and `PlayerStatsChanged` has no source; `GetCurrentFFXIVProcess` returns null (no net10 game
+**Honest limits (facts, not stubs):** `Player` carries `JobID` only — the attribute block +
+`PlayerStatsChanged` are **dropped by decision** (no tested consumer), not a gap; `GetCurrentFFXIVProcess` returns null (no net10 game
 handle — the connection lives in the satellite); `GetResourceDictionary` is empty until
 `IResourceCatalog` is sourced.
 
-**Pending:** live per-tick metric refresh into `IEncounterService.Active` (needs a host update seam);
-the remaining inert `IDataSubscription` events (`NetworkReceived`/`NetworkSent`, `PlayerStatsChanged`,
-`ParsedLogLine`, `ProcessChanged` — no typed-bus source); the WinForms `TabPage` embedding via Avalonia
-`NativeControlHost` (slice D8, design below); and the `_iocContainer` logging-bridge seam a recompiled
-OverlayPlugin/Hojoring reflects for its own log routing (a separate impersonation slice). Also
-under-specified: `Form`-inherited `oFormActMain` members.
+**Pending — each maps to a named pipe in [What we must do](#what-we-must-do--the-work-list), not to a
+"no source" gap:** live per-tick metric refresh into `IEncounterService.Active` (host update seam);
+`ParsedLogLine` (fire off the existing `RawLogLine` firehose, for Trig's `BridgeFFXIV`);
+`NetworkReceived`/`NetworkSent` (the raw-packet pipe forwarded from the satellite); `ProcessChanged`
+(the process-lifecycle pipe); the WinForms `TabPage` embedding via Avalonia `NativeControlHost` (slice
+D8, design below); and the `_iocContainer` logging-bridge seam a recompiled OverlayPlugin/Hojoring
+reflects for its own log routing — **the reflected container routes to `IPluginHost.Logger`/`ILogger`**
+(decided). Also under-specified: `Form`-inherited `oFormActMain` members (accepted limit — see below).
 
 ### D8 — WinForms `TabPage` embedding (planned next slice)
 
@@ -604,13 +694,170 @@ pump (handle timing, WinForms init, sync context) — the satellite precedent co
 reparenting, not an owned in-process control. Fallback if the shared pump misbehaves: a dedicated WinForms
 host window/thread for the control.
 
-## Open items / next steps
+## Plugin lifecycle, packaging & SDK distribution
 
-- Encounter **`ExportVariables` rollup** into `IEncounterService.Active` off the forwarded stream (the
-  live actor/zone/party/player snapshot projection now lands via `GameSnapshotAggregator`; the per-tick
-  encounter-metric refresh is the remaining increment).
-- Complete the `GameEvent` hierarchy against the full 0–274 taxonomy.
-- Config-UI sub-decision detail (Avalonia control vs. WebView) — deferred per
-  [`ARCHITECTURE.md`](ARCHITECTURE.md) §4a; the contract is framework-agnostic enough to defer.
-- Whether `IResourceCatalog` ships our own complete name tables or proxies the plugin's
-  `GetResourceDictionary` for v1.
+How a plugin is authored, packaged, installed, discovered, updated, and removed — across the three
+faces. Pieces not yet built are numbered items in [What we must do](#what-we-must-do--the-work-list).
+
+### Package format — a loose plugin folder
+
+A plugin is a **folder** under the host's `plugins/` root (`<host-exe-dir>/plugins/<name>/`) holding
+`plugin.json` (read **without loading any assembly**), the entry assembly + its private dependency
+closure, and the `*.deps.json` / `*.runtimeconfig.json` the ALC's `AssemblyDependencyResolver` consumes.
+**No archive and no signing in v1** — install is a folder copy; isolation and type identity are the
+ALC's job, not a signature's. Shared assemblies (contract, Avalonia, shim/facades) may physically sit in the folder but
+are always resolved from the default ALC for one type identity (see
+[Isolation](#isolation--assembly-loading)).
+
+### Manifest
+
+`plugin.json` today carries `id`, `version`, `contract`, `assembly`, exactly one of
+`entry`/`legacyEntry`, and `capabilities[]`. For a complete install/roster/UI experience it gains:
+
+- **Display metadata** — `name`, `description`, `author` (the install dialog + Plugins roster show only
+  the id today).
+- **UI opt-in** — a `"ui"` capability so the host lazy-loads `Fct.Abstractions.UI` and invokes
+  `IUiContributor` only for plugins that declare it.
+
+The `contract` string is the single host gate (`HostContract.Accepts`, **major-version equality**); with
+NuGet SDK distribution it equals the SDK package major the plugin built against.
+
+### Install, discover, update, remove — full lifecycle
+
+The **collectible ALC** already exists for exactly this; the lifecycle uses it end-to-end:
+
+- **Install** — the shell's *Add plugin* copies a plugin folder into `plugins/`.
+- **Discover + load** — `PluginManager` scans each `plugins/<name>/plugin.json`, gates `contract`, loads
+  the entry into a fresh collectible ALC, time-boxes init, quarantines on fault.
+- **Hot-load / unload / reload at runtime** — installing loads immediately; removing disposes the
+  instance and unloads its ALC; updating = unload → swap folder → load. (Today load is start-time only
+  and there is no remove — this is the lifecycle work item.)
+- **Uninstall** — a Plugins-roster *Remove* unloads the ALC, then deletes the folder.
+
+Honest limit unchanged from [Locked decisions](#locked-decisions): a hard native crash still takes the
+host; hot-unload is cooperative (quarantine + collectible ALC), not a fault boundary.
+
+### SDK distribution — the modern contract on GitHub NuGet
+
+The **only** published SDK is the modern contract; nothing that impersonates ACT is ever published.
+
+- **`Fct.Abstractions`** (core contract) and **`Fct.Abstractions.UI`** (Avalonia surfaces + theme
+  tokens) ship as versioned **NuGet packages on GitHub Packages**, with the **major version *= the
+  contract version*** the host gates — so an author's `PackageReference` version and the manifest
+  `contract` string are the same number, closing today's hand-declared-string gap. These references are
+  marked **not copy-local** (the host shares them via manifest-declared sharing, work item 8).
+- **The ACT/SDK facades (`Advanced Combat Tracker`, `FFXIV_ACT_Plugin.Common`) are never published and
+  never built against as our SDK.** They exist only so a legacy plugin *loads* — they satisfy the
+  plugin's own existing ACT/SDK references by assembly identity at runtime. A recompiled legacy plugin
+  compiles against the real ACT/SDK references it already has; our facade substitutes at load time. We
+  do not redistribute or expose ACT's contracts.
+- **Satellite face needs no SDK** — those are the *unmodified* net48 binaries loaded from the user's ACT
+  install; they reference the real ACT/SDK, never ours.
+
+## What we must do — the work list
+
+The remaining work, read straight off the [Pipe inventory](#pipe-inventory--every-pipe-three-faces):
+the missing pipes and faces, ordered by how directly a tested plugin is blocked. Everything is additive
+to the contract or new host/shim/bridge wiring — no redesign, and nothing that makes the host parse or
+know a plugin. **None of these is optional or deferrable** — each is a real inter-plugin data path, so
+rule 1 requires it.
+
+1. **Raw-packet pipe on net10 (all three faces).** Forward the satellite's `IRawPacketSource` firehose
+   across the bridge; expose it on the net10 bus; project it into the modern `IRawPacketSource` and the
+   shim's `RegisterNetworkParser`/`NetworkReceived`. Largest missing pipe: OverlayPlugin's entire
+   network-processor subtree (Machina line parsers, custom 256+ lines) cannot leave the satellite
+   without it. The pipe carries the **complete** stream — capability-gating controls whether a plugin
+   *opts in* to the load, never a lossy sample at the source (rule 1). Pairs with the already-built
+   write-back (`IRawLogLineEmitter`, [G4](#contract-gaps-tracked)).
+2. **Process-lifecycle pipe on net10.** The satellite forwards game process attach/detach (PID) as a
+   typed event; the host exposes it; the shim's `ProcessChanged` + `GetCurrentFFXIVProcess` resolve from
+   it. Low-rate. OverlayPlugin's memory processors / overlay hider / FateWatcher need it to migrate.
+3. **Actor side-channel state pipe** (statuses/enmity/target-of-target/focus/hover/reliable in-combat).
+   **The satellite forwards these onto the bus** (decision below), folded into the `Actor` superset
+   fields + snapshot `Focus`/`Hover` the contract already carries. This is Hojoring's OP + Sharlayan
+   side-channel promoted to a first-class host pipe — a migrated Hojoring drops those side-channels and
+   reads the snapshot. Native producers may supersede the satellite later with no contract change.
+4. **Resource catalog pipe.** **Filled by plugins** (decision below): the parser supplies
+   skill/zone/world via `GetResourceDictionary`; a first-party **resource-provider plugin** supplies the
+   status/buff table the SDK leaves empty. The host exposes `IResourceCatalog` / the shim
+   `GetResourceDictionary` as a pure pipe and owns no game data. Deliver that provider plugin + wire the
+   pipe. Unblocks Hojoring's name lookups.
+5. **`ParsedLogLine` shim event.** Declare it on the shim `IDataSubscription` and fire it off the
+   existing `RawLogLine` firehose so Triggernometry's `BridgeFFXIV` reflection binds. (Hojoring already
+   works — it reconstructs the parsed form itself off `OnLogLineRead` + `detectedType`, both built.)
+6. **Per-tick encounter refresh** into `IEncounterService.Active` (a host update seam off the forwarded
+   stream), so native consumers see live DPS, not just encounter open/close.
+7. **D8 — WinForms `TabPage` embedding** (shim UI face). Fully specced in
+   [§D8](#d8--winforms-tabpage-embedding-planned-next-slice); the last piece for a recompiled-but-still-
+   WinForms plugin to show its settings tab.
+8. **Manifest-declared shared assemblies.** Move the loader off naming `Fct.Compat.Shim` + its two
+   facades: share the fixed contract set (`Fct.Abstractions*`/`Avalonia.*`) plus whatever the manifest
+   declares, so the host has zero name-knowledge of the shim and stays a generic router/loader (rule 2).
+
+**Host & authoring readiness** — not data pipes, but the machinery to *build, install, and surface*
+plugins across the three faces (goal 2). Without these the host cannot yet accommodate an external
+modern plugin end-to-end:
+
+9. **Modern UI contribution surface.** Implement `IUiHost` in the shell, expose it (+ `IUiDispatcher`),
+   discover `IUiContributor` on loaded plugins and call `RegisterUi` on the UI thread post-init, and
+   render a plugin's settings page as an Avalonia control in the Plugins config bay (alongside the legacy
+   embeds), plus wire `RevealPage` + `AddCornerControl`/`RemoveCornerControl`. Grounded surfaces only —
+   no nav/dashboard/status, so no shell-nav refactor. The modern UI face is unwired today.
+10. **Semantic theme token contract.** Add the stable token keys + style classes to
+    `Fct.Abstractions.UI`, map them onto the shell's internal palette, and document them, so plugins
+    theme against a stable seam and the shell can restyle (incl. a light variant) without breaking them.
+11. **Plugin lifecycle — uninstall + hot-reload.** Runtime load/unload/reload and an in-app *Remove*
+    (unload ALC → delete folder), using the collectible ALC that already exists. Load is start-time-only
+    today and there is no remove path.
+12. **SDK NuGet packaging.** Pack `Fct.Abstractions` + `Fct.Abstractions.UI` (only — never the ACT
+    facades) with package major = contract version; publish to **GitHub Packages**; repoint the samples
+    to consume them. External authors have no SDK artifact today.
+13. **Manifest metadata + UI opt-in.** Add `name`/`description`/`author` and a `"ui"` capability to
+    `plugin.json` (roster/install UX + lazy UI-assembly load).
+
+### Decisions recorded
+
+- **Resource catalog — filled by plugins, not the host.** `IResourceCatalog` is a pure pipe. The parser
+  fills skill/zone/world (as today); a first-party **resource-provider plugin** fills the status/buff
+  table the SDK leaves empty — Hojoring's private XIVAPI/CSV side-channel promoted to a shared pipe. The
+  host owns no name tables, keeping rule 1 intact. (Rejected: host-owns-tables and proxy-only — the
+  former makes the host own a patch-drifting game asset; the latter leaves the buff table empty and so
+  fails to accommodate Hojoring, violating goal 2.)
+- **Actor side-channel state — satellite forwards for v1.** The satellite already hosts real
+  OverlayPlugin + the real FFXIV plugin with memory/network access, so it is the v1 producer of
+  statuses/enmity/target/focus/hover/in-combat onto the bus. A dedicated native memory-reader plugin may
+  replace it later; because the data lands in the same `Actor`/snapshot fields, that swap is a
+  producer change with **no contract change**.
+- **Packaging & lifecycle — loose folder + full lifecycle.** A plugin stays a loose folder under
+  `plugins/`; no archive/signing in v1. The host adds runtime hot-load/unload/reload and in-app
+  uninstall over the existing collectible ALC. (Rejected: an archive/signing format — loose folder is
+  the v1 format; start-time-only loading — wastes the collectible ALC already built.)
+- **SDK distribution — modern contract on GitHub NuGet; facades never published.** Only
+  `Fct.Abstractions` / `Fct.Abstractions.UI` ship (GitHub Packages), package major = gated contract
+  version. The ACT-impersonating facades are **never** published or built against as our SDK — they only
+  substitute a legacy plugin's existing ACT references by identity at load time. We do not expose ACT's
+  contracts. (Rejected: ProjectReference-only — external authors get no artifact; publishing the facades
+  — we never redistribute ACT's identity.)
+- **Modern plugin UI — ACT-grounded surfaces only.** The host wires `IUiHost` + `IUiContributor` for
+  the surfaces real plugins use: a settings page (the `TabPage` replacement, in the Plugins config bay)
+  plus Triggernometry's `RevealPage`/`AddCornerControl`/`RemoveCornerControl`. The speculative
+  `AddNavPage`/`AddDashboardWidget`/`AddStatusItem` (and `UiWidget`/`UiWidgetSize`/`UiStatusItem`) had no
+  ACT precedent and no tested-plugin consumer and are **removed from `Fct.Abstractions.UI`**. v1 adds no
+  new UI concepts.
+- **Theme sharing — semantic token contract.** `Fct.Abstractions.UI` exposes documented, stable theme
+  tokens (brushes/typography/spacing + style classes) mapped onto the shell palette; plugins bind the
+  tokens, never the shell's internal keys. (Rejected: document-internal-keys — couples plugins to keys
+  that can't change; base-style-dict-only — no token seam for custom controls.)
+
+- **Legacy log-routing seam — route to `ILogger`.** The `_iocContainer` a recompiled
+  OverlayPlugin/Hojoring reflects for its own log routing resolves to a container whose logger routes to
+  `IPluginHost.Logger`/`ILogger` — the same taxonomy as every other log source, no ACT logging internals
+  impersonated.
+- **Faulted-plugin quarantine — session-only, user-managed.** A plugin that faults init or the watchdog
+  is quarantined for the session and surfaced in the Plugins roster; there is **no automatic persisted
+  blocklist**. Re-enabling, updating, or removing it is a user action (the loose-folder + full-lifecycle
+  model), not a host policy.
+- **Player attribute block — dropped from v1.** No tested plugin consumes `PlayerStatsChanged` or the
+  SDK `Player` attribute block (STR/DEX/derived stats); HP/MP/GP/CP/level/job flow via the `Combatant`
+  projection. `Player` carries `JobID` only — by decision, not as a gap. (Re-add only if a real consumer
+  appears.)
