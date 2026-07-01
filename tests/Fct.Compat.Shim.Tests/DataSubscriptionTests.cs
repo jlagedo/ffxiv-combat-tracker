@@ -9,10 +9,12 @@ using Xunit;
 namespace Fct.Compat.Shim.Tests;
 
 /// <summary>
-/// D6: <see cref="DataSubscriptionAdapter"/> projects the modern <c>IGameEventStream</c> onto the
-/// SDK's <see cref="IDataSubscription"/> delegates. Four events map from a typed-bus source
-/// (<c>LogLine</c>/<c>ZoneChanged</c>/<c>PartyListChanged</c>/<c>PrimaryPlayerChanged</c>); the other
-/// seven are inert. Mirrors the emit→assert shape of <see cref="RawLogLineTests"/>.
+/// D6: <see cref="DataSubscriptionAdapter"/> projects the modern host surfaces onto the SDK's
+/// <see cref="IDataSubscription"/> delegates. Six events map from the typed bus
+/// (<c>LogLine</c>/<c>ZoneChanged</c>/<c>PartyListChanged</c>/<c>PrimaryPlayerChanged</c>/
+/// <c>CombatantAdded</c>/<c>CombatantRemoved</c>) and <c>NetworkReceived</c>/<c>NetworkSent</c> from the
+/// raw-packet firehose; the remaining three are inert. Mirrors the emit→assert shape of
+/// <see cref="RawLogLineTests"/>.
 /// </summary>
 public class DataSubscriptionTests
 {
@@ -23,6 +25,13 @@ public class DataSubscriptionTests
         var host = new FakePluginHost();
         var adapter = new DataSubscriptionAdapter(host.Game.Events);
         return (adapter, host.Bus!);
+    }
+
+    private static (DataSubscriptionAdapter sub, FakeRawPacketSource packets) NewAdapterWithPackets()
+    {
+        var host = new FakePluginHost();
+        var adapter = new DataSubscriptionAdapter(host.Game.Events, host.RawPackets);
+        return (adapter, host.RawPacketsFake!);
     }
 
     [Fact]
@@ -101,6 +110,47 @@ public class DataSubscriptionTests
 
         var combatant = Assert.IsType<FFXIV_ACT_Plugin.Common.Models.Combatant>(got);
         Assert.Equal(7u, combatant.ID);
+    }
+
+    [Fact]
+    public void NetworkReceived_fires_with_the_connection_epoch_bytes_triple()
+    {
+        var (sub, packets) = NewAdapterWithPackets();
+        string conn = null!; long epoch = 0; byte[] msg = null!;
+        sub.NetworkReceived += (c, e, m) => { conn = c; epoch = e; msg = m; };
+
+        var bytes = new byte[] { 1, 2, 3 };
+        packets.Push(new RawPacket("tcp-1", 55L, bytes, PacketDirection.Received));
+
+        Assert.Equal("tcp-1", conn);
+        Assert.Equal(55L, epoch);
+        Assert.Same(bytes, msg);
+    }
+
+    [Fact]
+    public void NetworkSent_fires_only_for_outbound_packets()
+    {
+        var (sub, packets) = NewAdapterWithPackets();
+        int received = 0, sent = 0;
+        sub.NetworkReceived += (_, _, _) => received++;
+        sub.NetworkSent += (_, _, _) => sent++;
+
+        packets.Push(new RawPacket("c", 1L, new byte[] { 9 }, PacketDirection.Sent));
+
+        Assert.Equal(0, received);
+        Assert.Equal(1, sent);
+    }
+
+    [Fact]
+    public void Packet_events_are_inert_and_dispose_is_clean_without_a_source()
+    {
+        var (sub, _) = NewAdapter();   // no raw-packet source supplied
+        int fired = 0;
+        sub.NetworkReceived += (_, _, _) => fired++;
+
+        sub.Dispose();   // must not throw despite the null packet subscription
+
+        Assert.Equal(0, fired);
     }
 
     [Fact]

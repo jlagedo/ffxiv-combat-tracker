@@ -34,11 +34,13 @@ namespace Fct.Abstractions
 
     /// <summary>
     /// Selects which events a subscription receives. Empty <see cref="Types"/> = all typed events;
-    /// <see cref="IncludeRawLogLines"/> toggles the <see cref="RawLogLine"/> firehose.
+    /// <see cref="IncludeRawLogLines"/> toggles the <see cref="RawLogLine"/> firehose;
+    /// <see cref="IncludeRawPackets"/> toggles the higher-bandwidth <see cref="RawPacketReceived"/>
+    /// firehose (off by default — opt-in, capability-gated at the host).
     /// </summary>
-    public sealed record GameEventFilter(IReadOnlyCollection<Type>? Types = null, bool IncludeRawLogLines = true)
+    public sealed record GameEventFilter(IReadOnlyCollection<Type>? Types = null, bool IncludeRawLogLines = true, bool IncludeRawPackets = false)
     {
-        /// <summary>Everything: all typed events plus raw log lines.</summary>
+        /// <summary>Everything except the opt-in raw-packet firehose: all typed events plus raw log lines.</summary>
         public static readonly GameEventFilter All = new GameEventFilter();
     }
 

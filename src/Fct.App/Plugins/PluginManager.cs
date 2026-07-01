@@ -33,6 +33,7 @@ internal sealed class PluginManager
     private readonly IAudioOutput _audio;
     private readonly RegistryService _registry;
     private readonly IGameEventSink _sink;
+    private readonly RawPacketSource _rawPackets;
     private readonly IClock _clock;
     private readonly ILoggerFactory _loggerFactory;
     private readonly ILogger<PluginManager> _log;
@@ -49,13 +50,16 @@ internal sealed class PluginManager
         IClock clock,
         ILoggerFactory loggerFactory,
         LegacyPluginHostFactory? legacyFactory = null,
-        INotificationHub? notifications = null)
+        INotificationHub? notifications = null,
+        RawPacketSource? rawPackets = null)
     {
         _game = game;
         _encounters = encounters;
         _audio = audio;
         _registry = registry;
         _sink = bus;
+        // One process-wide raw-packet reader over the bus firehose; handed out gated per plugin.
+        _rawPackets = rawPackets ?? new RawPacketSource(bus);
         _clock = clock;
         _loggerFactory = loggerFactory;
         _notifications = notifications;
@@ -191,10 +195,10 @@ internal sealed class PluginManager
         var self = new PluginInfo(manifest.Id, manifest.Version, manifest.Contract);
         var storage = new PluginStorage(manifest.Id);
         var logger = _loggerFactory.CreateLogger($"Fct.Plugin.{manifest.Id}");
-        IRawLogLineEmitter raw = manifest.HasCapability("raw")
-            ? new RawLogLineEmitter(_sink, _clock)
-            : RawLogLineEmitter.Noop;
-        return new PluginHost(self, _game, _encounters, _audio, _registry, storage, logger, _clock, raw);
+        bool hasRaw = manifest.HasCapability("raw");
+        IRawLogLineEmitter raw = hasRaw ? new RawLogLineEmitter(_sink, _clock) : RawLogLineEmitter.Noop;
+        IRawPacketSource packets = hasRaw ? _rawPackets : RawPacketSource.Noop;
+        return new PluginHost(self, _game, _encounters, _audio, _registry, storage, logger, _clock, raw, packets);
     }
 
     public async Task UnloadAllAsync()

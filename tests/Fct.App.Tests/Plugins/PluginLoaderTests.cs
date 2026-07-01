@@ -98,6 +98,12 @@ public class PluginLoaderTests
         Assert.Contains(sink.Speaks, s => s.Text == "Sample plugin online");
         Assert.True(TestWait.Until(() => { lock (rawLines) return rawLines.Exists(r => r.Line == "257|sample-online"); }));
 
+        // Read hatch: a raw packet on the bus reaches the (raw-capability) plugin's IRawPacketSource
+        // subscriber, which re-emits a synthetic 258 line — proving gating handed it a live source.
+        bus.Emit(new RawPacketReceived(bus.NextSequence(), clock.LocalNow, "tcp-1", 1L,
+            PacketDirection.Received, new byte[] { 0xAB, 0xCD, 0xEF }));
+        Assert.True(TestWait.Until(() => { lock (rawLines) return rawLines.Exists(r => r.Line == "258|packet-seen|3"); }));
+
         // And persisted a setting to its private storage dir.
         var settings = Path.Combine(
             Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),

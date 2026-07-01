@@ -8,14 +8,16 @@ namespace Fct.SamplePlugin;
 
 /// <summary>
 /// A minimal native plugin: subscribes to the event bus, reads a snapshot, registers a named
-/// callback, produces audio, round-trips a setting through storage, and emits a synthetic custom line
-/// via the capability-gated write-back hatch. Everything it touches is the modern contract.
+/// callback, produces audio, round-trips a setting through storage, taps the raw-packet firehose, and
+/// emits a synthetic custom line via the capability-gated write-back hatch. Everything it touches is
+/// the modern contract.
 /// </summary>
 public sealed class SamplePlugin : IPlugin
 {
     private IPluginHost? _host;
     private IDisposable? _subscription;
     private IDisposable? _callback;
+    private IDisposable? _packetSubscription;
 
     public Task InitializeAsync(IPluginHost host, CancellationToken ct)
     {
@@ -33,6 +35,14 @@ public sealed class SamplePlugin : IPlugin
             host.Logger.LogInformation("SamplePlugin callback ping: {Arg}", arg));
 
         host.Audio.Speak("Sample plugin online");
+
+        // Tap the raw-packet read hatch (requires the 'raw' capability): on an inbound packet, re-emit a
+        // synthetic custom line — OverlayPlugin's RegisterNetworkParser → custom-line pattern in miniature.
+        _packetSubscription = host.RawPackets.Subscribe(p =>
+        {
+            if (p.Direction == PacketDirection.Received)
+                host.RawLogLines.Emit((LogMessageType)258, $"258|packet-seen|{p.Bytes.Length}");
+        });
 
         // A synthetic custom (256+) line onto the live bus (requires the 'raw' capability).
         host.RawLogLines.Emit((LogMessageType)257, "257|sample-online");
@@ -53,6 +63,7 @@ public sealed class SamplePlugin : IPlugin
         _host?.Logger.LogInformation("SamplePlugin disposing");
         _subscription?.Dispose();
         _callback?.Dispose();
+        _packetSubscription?.Dispose();
         return default;
     }
 

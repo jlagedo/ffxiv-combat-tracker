@@ -152,6 +152,48 @@ namespace Fct.App.Tests
         }
 
         [Fact]
+        public void RawPacketReceived_roundtrips_bytes_via_base64()
+        {
+            var bytes = new byte[] { 0x00, 0x01, 0x7F, 0x80, 0xFF, 0x0A, 0x09, 0x5C };  // incl. \n, \t, backslash
+            var src = new RawPacketReceived(7, Ts, "tcp-conn\t1", 1_700_000_000_000L, PacketDirection.Received, bytes);
+            var e = Assert.IsType<RawPacketReceived>(RoundTrip(src));
+            Assert.Equal("tcp-conn\t1", e.Connection);
+            Assert.Equal(1_700_000_000_000L, e.Epoch);
+            Assert.Equal(PacketDirection.Received, e.Direction);
+            Assert.Equal(bytes, e.Bytes);
+        }
+
+        [Fact]
+        public void RawPacketReceived_roundtrips_empty_payload_and_sent_direction()
+        {
+            var e = Assert.IsType<RawPacketReceived>(
+                RoundTrip(new RawPacketReceived(1, Ts, "c", 0L, PacketDirection.Sent, Array.Empty<byte>())));
+            Assert.Equal(PacketDirection.Sent, e.Direction);
+            Assert.Empty(e.Bytes);
+        }
+
+        [Fact]
+        public void DecodedPacket_reaches_the_bus_only_when_opted_in()
+        {
+            using var bus = new GameEventBus();
+            GameEvent? optedIn = null;
+            GameEvent? defaultSub = null;
+            using var _1 = bus.Subscribe(new GameEventFilter(IncludeRawPackets: true), e => optedIn = e);
+            using var _2 = bus.Subscribe(GameEventFilter.All, e => defaultSub = e);
+
+            var wire = GameEventFrame.ToWire(
+                new RawPacketReceived(0, Ts, "tcp-1", 99L, PacketDirection.Received, new byte[] { 0xDE, 0xAD }))!;
+            Assert.True(GameEventFrame.TryParse(wire, out var evt));
+            bus.Emit(evt! with { Sequence = bus.NextSequence() });
+
+            Assert.True(TestWait.Until(() => optedIn is RawPacketReceived));
+            var p = Assert.IsType<RawPacketReceived>(optedIn);
+            Assert.Equal(new byte[] { 0xDE, 0xAD }, p.Bytes);
+            Assert.True(p.Sequence > 0);                 // re-stamped by the host sink
+            Assert.Null(defaultSub);                     // GameEventFilter.All excludes the packet firehose
+        }
+
+        [Fact]
         public void ToWire_returns_null_for_firehose_only_events()
         {
             // Events with no structured SDK/ACT source are not forwarded as typed frames — they reach

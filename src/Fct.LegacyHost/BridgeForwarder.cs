@@ -119,6 +119,8 @@ namespace Fct.LegacyHost
             sub.PrimaryPlayerChanged += OnPrimaryPlayerChanged;
             sub.CombatantAdded += OnCombatantAdded;
             sub.CombatantRemoved += OnCombatantRemoved;
+            sub.NetworkReceived += OnNetworkReceived;
+            sub.NetworkSent += OnNetworkSent;
         }
 
         // ---- SDK / ACT handlers → GameEvent projection (no parsing) ---------------------------------
@@ -161,6 +163,14 @@ namespace Fct.LegacyHost
             if (combatant is SdkModels.Combatant c)
                 Enqueue(new CombatantRemoved(0, DateTimeOffset.Now, c.ID));
         }
+
+        // Raw packet firehose (opcode escape hatch OverlayPlugin's network processors consume). Bytes
+        // cross verbatim — never decoded here. The ring's drop-oldest keeps this high rate off the SDK thread.
+        private void OnNetworkReceived(string connection, long epoch, byte[] message) =>
+            Enqueue(new RawPacketReceived(0, DateTimeOffset.Now, connection ?? "", epoch, PacketDirection.Received, message ?? Array.Empty<byte>()));
+
+        private void OnNetworkSent(string connection, long epoch, byte[] message) =>
+            Enqueue(new RawPacketReceived(0, DateTimeOffset.Now, connection ?? "", epoch, PacketDirection.Sent, message ?? Array.Empty<byte>()));
 
         // ACT's post-aggregation swing. attacker/victim are names (the ACT model is name-based), so the
         // ActorRef ids are 0; damage is the resolved amount, critical → EffectFlags.Critical.
@@ -283,6 +293,8 @@ namespace Fct.LegacyHost
                 try { _sub.PrimaryPlayerChanged -= OnPrimaryPlayerChanged; } catch { }
                 try { _sub.CombatantAdded -= OnCombatantAdded; } catch { }
                 try { _sub.CombatantRemoved -= OnCombatantRemoved; } catch { }
+                try { _sub.NetworkReceived -= OnNetworkReceived; } catch { }
+                try { _sub.NetworkSent -= OnNetworkSent; } catch { }
             }
             try { _signal.Dispose(); } catch { }
         }

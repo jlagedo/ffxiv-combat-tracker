@@ -56,7 +56,8 @@ namespace Fct.Abstractions.Testing
             IPluginStorage? storage = null,
             ILogger? logger = null,
             IClock? clock = null,
-            PluginInfo? self = null)
+            PluginInfo? self = null,
+            IRawPacketSource? rawPackets = null)
         {
             Game = game ?? new FakeGameSession();
             Encounters = encounters ?? new FakeEncounterService();
@@ -69,6 +70,7 @@ namespace Fct.Abstractions.Testing
             RawLogLines = Bus != null
                 ? new FakeRawLogLineEmitter(Bus, Clock)
                 : (IRawLogLineEmitter)NoopRawLogLineEmitter.Instance;
+            RawPackets = rawPackets ?? new FakeRawPacketSource();
         }
 
         public IGameSession Game { get; }
@@ -79,10 +81,71 @@ namespace Fct.Abstractions.Testing
         public ILogger Logger { get; }
         public IClock Clock { get; }
         public IRawLogLineEmitter RawLogLines { get; }
+        public IRawPacketSource RawPackets { get; }
         public PluginInfo Self { get; }
 
         /// <summary>The concrete event bus, when <see cref="Game"/> is the default <see cref="FakeGameSession"/>.</summary>
         public InMemoryEventBus? Bus => (Game as FakeGameSession)?.Bus;
+
+        /// <summary>The concrete raw-packet source, when <see cref="RawPackets"/> is the default fake — a test
+        /// pushes packets through <see cref="FakeRawPacketSource.Push"/> to drive <c>NetworkReceived</c>.</summary>
+        public FakeRawPacketSource? RawPacketsFake => RawPackets as FakeRawPacketSource;
+    }
+
+    /// <summary>
+    /// In-memory <see cref="IRawPacketSource"/>: a test <see cref="Push"/>es a <see cref="RawPacket"/> and
+    /// every subscriber is fanned it synchronously (a throwing subscriber is isolated). Models the
+    /// satellite's <c>NetworkReceived</c>/<c>NetworkSent</c> firehose reaching the host.
+    /// </summary>
+    public sealed class FakeRawPacketSource : IRawPacketSource
+    {
+        private readonly object _gate = new object();
+        private readonly List<Action<RawPacket>> _handlers = new List<Action<RawPacket>>();
+        private long _dropped;
+
+        public IDisposable Subscribe(Action<RawPacket> handler)
+        {
+            if (handler is null) throw new ArgumentNullException(nameof(handler));
+            lock (_gate) _handlers.Add(handler);
+            return new Sub(this, handler);
+        }
+
+        public long DroppedCount => System.Threading.Interlocked.Read(ref _dropped);
+
+        /// <summary>Test producer: fan a packet to every current subscriber.</summary>
+        public void Push(RawPacket packet)
+        {
+            Action<RawPacket>[] snapshot;
+            lock (_gate) snapshot = _handlers.ToArray();
+            foreach (var h in snapshot)
+            {
+                try { h(packet); }
+                catch { /* isolated */ }
+            }
+        }
+
+        /// <summary>Test helper: record a dropped packet, so <see cref="DroppedCount"/> is assertable.</summary>
+        public void RecordDropped() => System.Threading.Interlocked.Increment(ref _dropped);
+
+        private sealed class Sub : IDisposable
+        {
+            private readonly FakeRawPacketSource _owner;
+            private Action<RawPacket>? _handler;
+
+            public Sub(FakeRawPacketSource owner, Action<RawPacket> handler)
+            {
+                _owner = owner;
+                _handler = handler;
+            }
+
+            public void Dispose()
+            {
+                var h = _handler;
+                if (h is null) return;
+                _handler = null;
+                lock (_owner._gate) _owner._handlers.Remove(h);
+            }
+        }
     }
 
     /// <summary>

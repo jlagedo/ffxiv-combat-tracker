@@ -96,7 +96,7 @@ public sealed class LegacyPluginHost : IPlugin
         // Project the modern event stream onto the SDK's IDataSubscription surface (process-lifetime,
         // like the hub itself). A recompiled plugin reflects hub-side DataSubscription to bind its events.
         if (hub.DataSubscription is null)
-            hub.AttachDataSubscription(new DataSubscriptionAdapter(host.Game.Events));
+            hub.AttachDataSubscription(new DataSubscriptionAdapter(host.Game.Events, host.RawPackets));
 
         // Project the modern snapshot onto the SDK's IDataRepository surface, and publish a synthetic
         // FFXIV_ACT_Plugin stand-in into ActPlugins so OverlayPlugin/Hojoring discover DataRepository +

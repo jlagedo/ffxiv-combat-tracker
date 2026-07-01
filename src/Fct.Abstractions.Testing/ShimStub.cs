@@ -13,6 +13,7 @@ namespace Fct.Abstractions.Testing
     {
         private readonly IPluginHost _host;
         private readonly IDisposable _logSubscription;
+        private IDisposable? _packetSubscription;
 
         public ShimStub(IPluginHost host)
         {
@@ -84,7 +85,24 @@ namespace Fct.Abstractions.Testing
         public void InvokeNamedCallback(string name, object? argument = null)
             => _host.Plugins.InvokeCallback(name, argument);
 
-        public void Dispose() => _logSubscription.Dispose();
+        // --- Raw packet surface (OverlayPlugin's RegisterNetworkParser read path) ---
+        // Binds the inbound firehose exactly as FFXIVRepository.RegisterNetworkParser does
+        // (sub.NetworkReceived += handler); the handler gets the (connection, epoch, bytes) triple.
+        public void RegisterNetworkParser(Action<string, long, byte[]> handler)
+        {
+            if (handler is null) throw new ArgumentNullException(nameof(handler));
+            _packetSubscription = _host.RawPackets.Subscribe(p =>
+            {
+                if (p.Direction == PacketDirection.Received)
+                    handler(p.Connection, p.Epoch, p.Bytes);
+            });
+        }
+
+        public void Dispose()
+        {
+            _logSubscription.Dispose();
+            _packetSubscription?.Dispose();
+        }
 
         private sealed class DelegateAudioSink : IAudioSink
         {

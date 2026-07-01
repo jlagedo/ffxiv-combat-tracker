@@ -57,6 +57,14 @@ namespace Fct.Abstractions
         /// </summary>
         IRawLogLineEmitter RawLogLines { get; }
 
+        /// <summary>
+        /// The raw inbound/outbound packet firehose (OverlayPlugin's <c>RegisterNetworkParser</c> read
+        /// path). Capability-gated (same <c>raw</c> capability as <see cref="RawLogLines"/>): plugins
+        /// without it receive an inert source. The typed <see cref="IGameSession.Events"/> path stays
+        /// opcode-free for everyone else.
+        /// </summary>
+        IRawPacketSource RawPackets { get; }
+
         /// <summary>This plugin's own manifest metadata.</summary>
         PluginInfo Self { get; }
     }

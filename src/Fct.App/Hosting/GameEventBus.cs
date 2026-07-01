@@ -8,6 +8,13 @@ using Fct.Abstractions;
 
 namespace Fct.App.Hosting;
 
+/// <summary>A subscription handle that also surfaces its own drop-oldest counter (a single consumer's
+/// backpressure loss, distinct from the bus-wide aggregate).</summary>
+internal interface ISubscriptionHandle : IDisposable
+{
+    long Dropped { get; }
+}
+
 /// <summary>
 /// Production <see cref="IGameEventStream"/> — the real form of the reference
 /// <c>InMemoryEventBus</c>, generalizing the shipped RingBufferDataSubscription dispatch model.
@@ -87,10 +94,12 @@ internal sealed class GameEventBus : IGameEventStream, IGameEventSink, IDisposab
     }
 
     /// <summary>Filter semantics: raw log lines gate on <see cref="GameEventFilter.IncludeRawLogLines"/>;
+    /// raw packets gate on <see cref="GameEventFilter.IncludeRawPackets"/> (opt-in);
     /// typed events gate on <see cref="GameEventFilter.Types"/> (null/empty = all typed).</summary>
     internal static bool Matches(GameEventFilter filter, GameEvent evt)
     {
         if (evt is RawLogLine) return filter.IncludeRawLogLines;
+        if (evt is RawPacketReceived) return filter.IncludeRawPackets;
         if (filter.Types is null || filter.Types.Count == 0) return true;
         var actual = evt.GetType();
         foreach (var t in filter.Types)
@@ -128,7 +137,7 @@ internal sealed class GameEventBus : IGameEventStream, IGameEventSink, IDisposab
     }
 
     /// <summary>A live subscription: a bounded channel + drop-oldest counter, drained off the producer.</summary>
-    private abstract class Subscription : IDisposable
+    private abstract class Subscription : ISubscriptionHandle
     {
         protected readonly GameEventBus Bus;
         protected readonly Channel<GameEvent> Channel;

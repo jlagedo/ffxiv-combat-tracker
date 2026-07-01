@@ -81,7 +81,7 @@ is the spine of [What we must do](#what-we-must-do--the-work-list).
 | **Action event** | `ActionEffect` (+ typed records) | via events | ACT `AfterCombatAction` (bridged) | ✅ `ActionEffect`; status/cast/death/hp → **RawLogLine only** (note below) |
 | **Audio** | `IAudioOutput` | `TTS`/`PlaySound` + `PlayTts`/`PlaySound` slots | ACT `PlayTts`/`PlaySound` | ✅ built |
 | **Registry / peer** | `IPluginRegistry` | `RegisterNamedCallback`/`InvokeNamedCallback` | ACT named callbacks | ✅ built |
-| **Raw packets** | `IRawPacketSource` + `RawLogLines.Emit` | `RegisterNetworkParser` / `NetworkReceived` | SDK `NetworkReceived` (in-satellite) | **satellite only — net10 bus tap + shim + modern faces missing** |
+| **Raw packets** | `IRawPacketSource` + `RawLogLines.Emit` | `RegisterNetworkParser` / `NetworkReceived` | SDK `NetworkReceived` (in-satellite) | ✅ built (satellite forwards `RawPacketReceived` → bus → `IRawPacketSource` + shim `NetworkReceived`/`Sent`; read + G4 write-back) |
 | **Process lifecycle** | process event + handle | `ProcessChanged` + `GetCurrentFFXIVProcess` | SDK `ProcessChanged` | **missing on net10 (all faces)** |
 | **Resource catalog** (names) | `IResourceCatalog` | `GetResourceDictionary` | parser tables + a resource-provider plugin | **pipe filled by plugins; status/buff table + producer pending** |
 | **Host services** (storage/logger/clock) | `IPluginHost` | `AppDataFolder`/`WriteExceptionLog`/… | ACT globals | ✅ built |
@@ -371,10 +371,10 @@ live on `FormActMain`/`LegacyPluginHost`; **pending** rows are the remaining wor
 | `PluginGetSelfData`/`AppDataFolder`/`WriteExceptionLog` | `IPluginStorage`/`ILogger` | ✅ built |
 | `AddCombatAction`/`SetEncounter`/`EndCombat`/`InCombat` | shared aggregation engine (`ActiveZone.ActiveEncounter`) + mirrored onto `IEncounterService` | ✅ built |
 | `CombatantData`/`EncounterData.ExportVariables` (opaque dict cactbot reads) | shared engine's registered formatters, projected onto `EncounterSnapshot`/`CombatantMetrics` typed fields + the `ExportVariables` bag ([G1](#contract-gaps-tracked)/[G2](#contract-gaps-tracked)) | ✅ built |
-| `IDataSubscription` (11 events: NetworkReceived/Sent, CombatantAdded/Removed, PrimaryPlayerChanged, ZoneChanged, PlayerStatsChanged, PartyListChanged, LogLine, ParsedLogLine, ProcessChanged) | `IGameEventStream` mapped to SDK delegate shapes | ✅ built (6 mapped: `LogLine`/`ZoneChanged`/`PartyListChanged`/`PrimaryPlayerChanged`/`CombatantAdded`/`CombatantRemoved`; of the other 5, `ParsedLogLine`/`NetworkReceived`/`NetworkSent`/`ProcessChanged` await their **source pipe** (see [What we must do](#what-we-must-do--the-work-list)) and `PlayerStatsChanged` is **dropped** — no tested consumer) |
+| `IDataSubscription` (11 events: NetworkReceived/Sent, CombatantAdded/Removed, PrimaryPlayerChanged, ZoneChanged, PlayerStatsChanged, PartyListChanged, LogLine, ParsedLogLine, ProcessChanged) | `IGameEventStream` + `IRawPacketSource` mapped to SDK delegate shapes | ✅ built (8 mapped: `LogLine`/`ZoneChanged`/`PartyListChanged`/`PrimaryPlayerChanged`/`CombatantAdded`/`CombatantRemoved` from the bus, `NetworkReceived`/`NetworkSent` from the raw-packet firehose; of the other 3, `ParsedLogLine`/`ProcessChanged` await their **source pipe** (see [What we must do](#what-we-must-do--the-work-list)) and `PlayerStatsChanged` is **dropped** — no tested consumer) |
 | `IDataRepository.Get*` | `IGameSnapshot` + `IResourceCatalog` | ✅ built (name tables empty until `IResourceCatalog` is sourced; `GetCurrentFFXIVProcess` null — no net10 game handle) |
 | `Combatant`/`Player`/`NetworkBuff` | projected from `Actor`/`StatusEffect` (lossless: CP/GP/world/order [G10](#contract-gaps-tracked), refresh/timestamp [G9](#contract-gaps-tracked)) | ✅ built (`Player` carries `JobID` only — the modern model has no attribute block) |
-| `RegisterNetworkParser` / custom lines 256+ | `IRawPacketSource` (read) + `IRawLogLineEmitter` synthetic-line emit ([G4](#contract-gaps-tracked)) | ⏳ pending (host emit path built) |
+| `RegisterNetworkParser` / custom lines 256+ | `IRawPacketSource` (read) + `IRawLogLineEmitter` synthetic-line emit ([G4](#contract-gaps-tracked)) | ✅ built (read via `NetworkReceived`/`Sent` off `IRawPacketSource`; G4 write-back) |
 | WinForms `TabPage` | real WinForms TabPage embedded via Avalonia `NativeControlHost` | ⏳ pending |
 
 The shim's hub *is* the modern API underneath, so a plugin can use both at once — the basis for
@@ -574,14 +574,15 @@ Live game data reaches the net10 bus over the existing satellite→host pipe (pi
   `IGameEventSink.Emit`, so bridge events flow to every subscription exactly like any in-process source.
 
 **What the forwarder can carry is bounded by the sole-parser directive** — it may only project data the
-SDK/ACT hub exposes *post-parse*, never re-parse a log line. Forwarded today: `RawLogLine` (the SDK
-`LogLine` firehose that Trig/cactbot regex over), `ZoneChanged`, `PartyChanged`,
-`PrimaryPlayerChanged`, `CombatantAdded`/`CombatantRemoved` (`Combatant`→`Actor`, lossless for
-DoL/DoH per [G10](#contract-gaps-tracked)), and `ActionEffect` (from the ACT hub's post-aggregation
-`AfterCombatAction`). Events that exist only as parsed log-line fields — `StatusApplied`/`Removed`,
-`Cast*`, `DeathOccurred`, `HpUpdated` — are **not** synthesized; consumers reach them through the
-`RawLogLine` firehose, exactly as in ACT today. Codec round-trip + decode-onto-bus are covered by
-`tests/Fct.App.Tests/BridgeEventFrameTests.cs`.
+SDK/ACT hub exposes (post-parse aggregates, or the untouched raw firehose), never re-parse a log line.
+Forwarded today: `RawLogLine` (the SDK `LogLine` firehose that Trig/cactbot regex over), `ZoneChanged`,
+`PartyChanged`, `PrimaryPlayerChanged`, `CombatantAdded`/`CombatantRemoved` (`Combatant`→`Actor`,
+lossless for DoL/DoH per [G10](#contract-gaps-tracked)), `ActionEffect` (from the ACT hub's
+post-aggregation `AfterCombatAction`), and `RawPacketReceived` (the SDK `NetworkReceived`/`NetworkSent`
+firehose — raw bytes carried base64 on the wire, never decoded). Events that exist only as parsed
+log-line fields — `StatusApplied`/`Removed`, `Cast*`, `DeathOccurred`, `HpUpdated` — are **not**
+synthesized; consumers reach them through the `RawLogLine` firehose, exactly as in ACT today. Codec
+round-trip + decode-onto-bus are covered by `tests/Fct.App.Tests/BridgeEventFrameTests.cs`.
 
 ## The net10 compat shim (in progress)
 
@@ -622,7 +623,8 @@ it plus the typed metrics onto `EncounterSnapshot`/`CombatantMetrics`, G1/G2; co
 `IEncounterService`). The `IDataSubscription` event map: `DataSubscriptionAdapter` projects the
 `IGameEventStream` onto the SDK delegates a recompiled plugin binds — `LogLine`←`RawLogLine`,
 `ZoneChanged`, `PartyListChanged`←`PartyChanged`, `PrimaryPlayerChanged`, and
-`CombatantAdded`/`CombatantRemoved` (via `CombatantProjector`) — exposed on the hub via
+`CombatantAdded`/`CombatantRemoved` (via `CombatantProjector`) — plus `NetworkReceived`/`NetworkSent`
+routed by direction off `IPluginHost.RawPackets` (`IRawPacketSource`), exposed on the hub via
 `FormActMain.DataSubscription`. The `IDataRepository` pull surface: `DataRepository` answers every
 `Get*` off `Host.Game.Snapshot()`, with `CombatantProjector` mapping `Actor`→`Combatant`/`NetworkBuff`
 and the player's `Actor`→`Player`. `LegacyPluginHost` publishes a `SyntheticFfxivPlugin` stand-in into
@@ -636,8 +638,7 @@ handle — the connection lives in the satellite); `GetResourceDictionary` is em
 
 **Pending — each maps to a named pipe in [What we must do](#what-we-must-do--the-work-list), not to a
 "no source" gap:** live per-tick metric refresh into `IEncounterService.Active` (host update seam);
-`ParsedLogLine` (fire off the existing `RawLogLine` firehose, for Trig's `BridgeFFXIV`);
-`NetworkReceived`/`NetworkSent` (the raw-packet pipe forwarded from the satellite); `ProcessChanged`
+`ParsedLogLine` (fire off the existing `RawLogLine` firehose, for Trig's `BridgeFFXIV`); `ProcessChanged`
 (the process-lifecycle pipe); the WinForms `TabPage` embedding via Avalonia `NativeControlHost` (slice
 D8, design below); and the `_iocContainer` logging-bridge seam a recompiled OverlayPlugin/Hojoring
 reflects for its own log routing — **the reflected container routes to `IPluginHost.Logger`/`ILogger`**
@@ -762,13 +763,15 @@ to the contract or new host/shim/bridge wiring — no redesign, and nothing that
 know a plugin. **None of these is optional or deferrable** — each is a real inter-plugin data path, so
 rule 1 requires it.
 
-1. **Raw-packet pipe on net10 (all three faces).** Forward the satellite's `IRawPacketSource` firehose
-   across the bridge; expose it on the net10 bus; project it into the modern `IRawPacketSource` and the
-   shim's `RegisterNetworkParser`/`NetworkReceived`. Largest missing pipe: OverlayPlugin's entire
-   network-processor subtree (Machina line parsers, custom 256+ lines) cannot leave the satellite
-   without it. The pipe carries the **complete** stream — capability-gating controls whether a plugin
-   *opts in* to the load, never a lossy sample at the source (rule 1). Pairs with the already-built
-   write-back (`IRawLogLineEmitter`, [G4](#contract-gaps-tracked)).
+1. **Raw-packet pipe on net10 (all three faces).** ✅ **Built.** The satellite's `BridgeForwarder`
+   taps the SDK `NetworkReceived`/`NetworkSent` firehose and forwards each packet as a
+   `RawPacketReceived` `GameEvent` (bytes base64 on the wire); the host bus carries it opt-in
+   (`GameEventFilter.IncludeRawPackets`); the capability-gated `RawPacketSource` republishes it as the
+   modern `IRawPacketSource` (`IPluginHost.RawPackets`, `raw` capability), and the shim's
+   `DataSubscriptionAdapter` routes it by direction to `NetworkReceived`/`NetworkSent` — so
+   OverlayPlugin's `RegisterNetworkParser` binds unchanged. The pipe carries the **complete** stream —
+   capability-gating controls whether a plugin *opts in* to the load, never a lossy sample at the source
+   (rule 1). Pairs with the already-built write-back (`IRawLogLineEmitter`, [G4](#contract-gaps-tracked)).
 2. **Process-lifecycle pipe on net10.** The satellite forwards game process attach/detach (PID) as a
    typed event; the host exposes it; the shim's `ProcessChanged` + `GetCurrentFFXIVProcess` resolve from
    it. Low-rate. OverlayPlugin's memory processors / overlay hider / FateWatcher need it to migrate.

@@ -6,8 +6,8 @@ namespace Fct.App.Hosting;
 /// <summary>
 /// A per-plugin <see cref="IPluginHost"/>. Shares the process-wide game/encounter/audio/registry
 /// singletons, but scopes <see cref="Self"/>, <see cref="Storage"/>, <see cref="Logger"/>, and the
-/// capability-gated <see cref="RawLogLines"/> to the one plugin. Constructed by the
-/// <see cref="PluginManager"/> at load.
+/// capability-gated <see cref="RawLogLines"/>/<see cref="RawPackets"/> to the one plugin. Constructed
+/// by the <see cref="PluginManager"/> at load.
 /// </summary>
 internal sealed class PluginHost : IPluginHost
 {
@@ -20,7 +20,8 @@ internal sealed class PluginHost : IPluginHost
         IPluginStorage storage,
         ILogger logger,
         IClock clock,
-        IRawLogLineEmitter rawLogLines)
+        IRawLogLineEmitter rawLogLines,
+        IRawPacketSource rawPackets)
     {
         Self = self;
         Game = game;
@@ -31,6 +32,7 @@ internal sealed class PluginHost : IPluginHost
         Logger = logger;
         Clock = clock;
         RawLogLines = rawLogLines;
+        RawPackets = rawPackets;
     }
 
     public IGameSession Game { get; }
@@ -41,5 +43,6 @@ internal sealed class PluginHost : IPluginHost
     public ILogger Logger { get; }
     public IClock Clock { get; }
     public IRawLogLineEmitter RawLogLines { get; }
+    public IRawPacketSource RawPackets { get; }
     public PluginInfo Self { get; }
 }

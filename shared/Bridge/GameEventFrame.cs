@@ -19,11 +19,12 @@ namespace Fct.Bridge
     // IGameEventSink.NextSequence() so the bus keeps one coherent per-session sequence space. TryParse
     // therefore yields records with Sequence == 0.
     //
-    // Only the events the satellite SDK/ACT hub structurally exposes post-parse are representable here
-    // (RawLogLine, ZoneChanged, PartyChanged, PrimaryPlayerChanged, CombatantAdded/Removed,
-    // ActionEffect). The plugin is the sole parser, so events that exist only as parsed log-line fields
-    // (StatusApplied/Removed, Cast*, DeathOccurred, HpUpdated) are not synthesized here — consumers
-    // reach them through the RawLogLine firehose. ToWire returns null for any unsupported record.
+    // Only the events the satellite SDK/ACT hub structurally exposes are representable here (RawLogLine,
+    // ZoneChanged, PartyChanged, PrimaryPlayerChanged, CombatantAdded/Removed, ActionEffect, and the
+    // RawPacketReceived firehose — raw bytes, never decoded on this side). The plugin is the sole parser,
+    // so events that exist only as parsed log-line fields (StatusApplied/Removed, Cast*, DeathOccurred,
+    // HpUpdated) are not synthesized here — consumers reach them through the RawLogLine firehose. ToWire
+    // returns null for any unsupported record.
     internal static class GameEventFrame
     {
         public const string Prefix = "EVT ";
@@ -35,6 +36,7 @@ namespace Fct.Bridge
         private const string TagCombatantAdded = "CBADD";
         private const string TagCombatantRemoved = "CBDEL";
         private const string TagAction = "ACT";
+        private const string TagPacket = "PKT";
 
         private static readonly CultureInfo Inv = CultureInfo.InvariantCulture;
 
@@ -72,6 +74,14 @@ namespace Fct.Bridge
 
                 case ActionEffect e:
                     return Head(TagAction, e.Timestamp) + '\t' + EncodeAction(e);
+
+                case RawPacketReceived e:
+                    // Bytes are base64 — the tab/backslash escaping (Enc) cannot carry arbitrary binary.
+                    return Head(TagPacket, e.Timestamp)
+                        + '\t' + Enc(e.Connection)
+                        + '\t' + e.Epoch.ToString(Inv)
+                        + '\t' + ((byte)e.Direction).ToString(Inv)
+                        + '\t' + Convert.ToBase64String(e.Bytes ?? Array.Empty<byte>());
 
                 default:
                     return null;
@@ -122,6 +132,9 @@ namespace Fct.Bridge
 
                 case TagAction:
                     return TryDecodeAction(ts, f, out evt);
+
+                case TagPacket:
+                    return TryDecodePacket(ts, f, out evt);
 
                 default:
                     return false;
@@ -251,6 +264,23 @@ namespace Fct.Bridge
                 targets.Add(new EffectTarget(new ActorRef(tid, tname), amount, (EffectFlags)flags));
             }
             evt = new ActionEffect(0, ts, new ActorRef(srcId, srcName), actionId, actionName, targets);
+            return true;
+        }
+
+        // ---- RawPacketReceived (the NetworkReceived/Sent firehose) — bytes carried as base64. ----
+
+        private static bool TryDecodePacket(DateTimeOffset ts, string[] f, out GameEvent? evt)
+        {
+            evt = null;
+            // 2 header + 4 fields (connection, epoch, direction, base64 bytes).
+            if (f.Length < 6) return false;
+            var connection = Dec(f[2]);
+            if (!TryL(f[3], out var epoch)) return false;
+            if (!TryB(f[4], out var dir)) return false;
+            byte[] bytes;
+            try { bytes = f[5].Length == 0 ? Array.Empty<byte>() : Convert.FromBase64String(f[5]); }
+            catch (FormatException) { return false; }
+            evt = new RawPacketReceived(0, ts, connection, epoch, (PacketDirection)dir, bytes);
             return true;
         }
 

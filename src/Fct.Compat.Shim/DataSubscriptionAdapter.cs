@@ -15,37 +15,50 @@ namespace Fct.Compat.Shim;
 /// SDK events off one decoded packet.
 /// </summary>
 /// <remarks>
-/// Six events map from a typed-bus source: <c>LogLine</c>, <c>ZoneChanged</c>, <c>PartyListChanged</c>,
+/// Eight events map from a host source: <c>LogLine</c>, <c>ZoneChanged</c>, <c>PartyListChanged</c>,
 /// <c>PrimaryPlayerChanged</c>, and <c>CombatantAdded</c>/<c>CombatantRemoved</c> (projected via
-/// <see cref="CombatantProjector"/>). The other five are interface-required but inert:
-/// <c>NetworkReceived</c>/<c>NetworkSent</c> (raw packets), <c>PlayerStatsChanged</c>,
-/// <c>ParsedLogLine</c>, and <c>ProcessChanged</c> have no typed-bus source. Their add/remove are
-/// no-ops — nothing raises them, so a handler would never be called.
+/// <see cref="CombatantProjector"/>) from the typed bus, plus <c>NetworkReceived</c>/<c>NetworkSent</c>
+/// from the raw-packet firehose (<see cref="IRawPacketSource"/>) — OverlayPlugin's
+/// <c>RegisterNetworkParser</c> read path. The remaining three are interface-required but inert:
+/// <c>PlayerStatsChanged</c>, <c>ParsedLogLine</c>, and <c>ProcessChanged</c> have no source yet. Their
+/// add/remove are no-ops — nothing raises them, so a handler would never be called.
 /// </remarks>
 public sealed class DataSubscriptionAdapter : IDataSubscription, IDisposable
 {
     private readonly IDisposable _subscription;
+    private readonly IDisposable? _packetSubscription;
 
-    public DataSubscriptionAdapter(IGameEventStream stream)
+    public DataSubscriptionAdapter(IGameEventStream stream, IRawPacketSource? rawPackets = null)
     {
         if (stream is null) throw new ArgumentNullException(nameof(stream));
         _subscription = stream.Subscribe(GameEventFilter.All, OnGameEvent);
+        _packetSubscription = rawPackets?.Subscribe(OnRawPacket);
     }
 
-    // --- Mapped events (raised from OnGameEvent) ---------------------------------------
+    // --- Mapped events (raised from OnGameEvent / OnRawPacket) --------------------------
     public event ZoneChangedDelegate? ZoneChanged;
     public event PartyListChangedDelegate? PartyListChanged;
     public event LogLineDelegate? LogLine;
     public event PrimaryPlayerDelegate? PrimaryPlayerChanged;
     public event CombatantAddedDelegate? CombatantAdded;
     public event CombatantRemovedDelegate? CombatantRemoved;
+    public event NetworkReceivedDelegate? NetworkReceived;
+    public event NetworkSentDelegate? NetworkSent;
 
     // --- Inert events (interface contract; nothing raises them — see remarks) ----------
-    public event NetworkReceivedDelegate NetworkReceived { add { } remove { } }
-    public event NetworkSentDelegate NetworkSent { add { } remove { } }
     public event PlayerStatsChangedDelegate PlayerStatsChanged { add { } remove { } }
     public event ParsedLogLineDelegate ParsedLogLine { add { } remove { } }
     public event ProcessChangedDelegate ProcessChanged { add { } remove { } }
+
+    // Runs on the raw-packet source's fan-out thread (serialized per source). Routes by direction to
+    // the SDK delegates OverlayPlugin's network processors bind — the exact (connection, epoch, bytes) triple.
+    private void OnRawPacket(RawPacket p)
+    {
+        if (p.Direction == PacketDirection.Sent)
+            NetworkSent?.Invoke(p.Connection, p.Epoch, p.Bytes);
+        else
+            NetworkReceived?.Invoke(p.Connection, p.Epoch, p.Bytes);
+    }
 
     // Runs on the bus pump thread (serialized), so a plain field read + null-conditional invoke is safe.
     private void OnGameEvent(GameEvent e)
@@ -79,5 +92,9 @@ public sealed class DataSubscriptionAdapter : IDataSubscription, IDisposable
         }
     }
 
-    public void Dispose() => _subscription.Dispose();
+    public void Dispose()
+    {
+        _subscription.Dispose();
+        _packetSubscription?.Dispose();
+    }
 }

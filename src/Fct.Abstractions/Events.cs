@@ -84,4 +84,13 @@ namespace Fct.Abstractions
     /// <summary>The local player identity changed (ChangePrimaryPlayer).</summary>
     public sealed record PrimaryPlayerChanged(long Sequence, DateTimeOffset Timestamp, uint ActorId, string Name)
         : GameEvent(Sequence, Timestamp);
+
+    /// <summary>
+    /// A raw on-wire network packet (the SDK <c>NetworkReceived</c>/<c>NetworkSent</c> firehose). The
+    /// opcode-bearing escape hatch OverlayPlugin's network processors consume; gated off the bus by
+    /// <see cref="GameEventFilter.IncludeRawPackets"/> and republished to plugins through
+    /// <see cref="IRawPacketSource"/>. The host never decodes it — bytes cross verbatim.
+    /// </summary>
+    public sealed record RawPacketReceived(long Sequence, DateTimeOffset Timestamp, string Connection, long Epoch, PacketDirection Direction, byte[] Bytes)
+        : GameEvent(Sequence, Timestamp);
 }
