@@ -12,6 +12,6 @@ public sealed class PluginsViewModel : PageViewModel
     public override string Eyebrow => "Plugins";
     public override string Title => "Plugins";
     public override string Subtitle =>
-        "Legacy plugins run unmodified in the satellite; native plugins run in the host. Select one to configure it.";
+        "Classic plugins are the ACT plugins you already use; modern plugins are built for this app. Select one to configure it.";
     public override bool ShowGenericHeader => false;
 }

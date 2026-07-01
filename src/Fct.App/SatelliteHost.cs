@@ -96,8 +96,8 @@ public sealed class SatelliteHost
                 _log.LogWarning(LogEvents.SatelliteExited, "Satellite process {Pid} exited with code {ExitCode}",
                     SafePid(Process), SafeExitCode(Process));
                 if (!_shuttingDown)
-                    _notifications?.Publish(NotificationSeverity.Warning, "Satellite",
-                        "The satellite stopped", "Legacy plugins are no longer running. Restart it from the Plugins page.");
+                    _notifications?.Publish(NotificationSeverity.Warning, "Classic engine",
+                        "The classic engine stopped", "Classic plugins are no longer running. Restart it from the Plugins page.");
             };
 
             // Tie the satellite to the host's lifetime before it spawns its own children (CEF), so
@@ -269,21 +269,21 @@ public sealed class SatelliteHost
         switch (rec.EventId)
         {
             case 2403: // ActNotification — ACT NotificationAdd
-                _notifications.Publish(NotificationSeverity.Info, "Legacy plugin", StripNotifyPrefix(rec.Message));
+                _notifications.Publish(NotificationSeverity.Info, "Classic plugin", StripNotifyPrefix(rec.Message));
                 return;
             case 2402: // ActException
-                _notifications.Publish(NotificationSeverity.Error, "Legacy plugin", "A legacy plugin reported an error", message);
+                _notifications.Publish(NotificationSeverity.Error, "Classic plugin", "A classic plugin reported an error", message);
                 return;
             case 2103: // PluginLoadFailed
             case 2104: // PluginNotFound
-                _notifications.Publish(NotificationSeverity.Warning, "Satellite", "A legacy plugin failed to load", message);
+                _notifications.Publish(NotificationSeverity.Warning, "Classic engine", "A classic plugin failed to load", message);
                 return;
         }
 
         if (rec.Level >= LogLevel.Error)
-            _notifications.Publish(NotificationSeverity.Error, "Satellite", "Satellite error", message);
+            _notifications.Publish(NotificationSeverity.Error, "Classic engine", "Classic engine error", message);
         else if (rec.Level == LogLevel.Warning)
-            _notifications.Publish(NotificationSeverity.Warning, "Satellite", "Satellite warning", message);
+            _notifications.Publish(NotificationSeverity.Warning, "Classic engine", "Classic engine warning", message);
     }
 
     private static string StripNotifyPrefix(string message)

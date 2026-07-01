@@ -16,12 +16,12 @@
                       Data="M3 20 V11 H6 V20 Z M9.5 20 V4 H12.5 V20 Z M16 20 V14 H19 V20 Z"/>
                 <TextBlock Text="Waiting for game data" Classes="h2" HorizontalAlignment="Center"/>
                 <TextBlock Classes="subtitle" HorizontalAlignment="Center" TextAlignment="Center"
-                           Text="Encounters and per-combatant DPS appear here once combat data streams into the host."/>
+                           Text="Encounters and per-player DPS appear here once combat data starts flowing in."/>
                 <Border Background="{StaticResource RimeBrush}" CornerRadius="8" Padding="12,8" HorizontalAlignment="Center">
                     <StackPanel Orientation="Horizontal" Spacing="9">
                         <Ellipse Width="8" Height="8" VerticalAlignment="Center"
                                  Fill="{Binding Shell.GameStateLabel, Converter={StaticResource StatusToBrush}}"/>
-                        <TextBlock Text="{Binding Shell.GameStateLabel, StringFormat='Game data: {0}'}"
+                        <TextBlock Text="{Binding Shell.GameStateLabel, StringFormat='Game: {0}'}"
                                    Classes="meta" FontSize="11.5" VerticalAlignment="Center"/>
                     </StackPanel>
                 </Border>

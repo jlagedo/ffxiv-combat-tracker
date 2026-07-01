@@ -30,7 +30,7 @@ public sealed partial class EncountersViewModel : PageViewModel
     public override string Eyebrow => "Encounters";
     public override string Title => "Encounters";
     public override string Subtitle =>
-        "Live DPS and per-combatant metrics for the current fight, aggregated by the host engine.";
+        "Live DPS and per-player metrics for the current fight.";
 
     public ObservableCollection<EncounterCombatantViewModel> Combatants { get; } = new();
 

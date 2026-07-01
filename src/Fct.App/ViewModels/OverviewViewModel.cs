@@ -10,5 +10,5 @@ public sealed class OverviewViewModel : PageViewModel
     public override string Eyebrow => "Overview";
     public override string Title => "Overview";
     public override string Subtitle =>
-        "The state of the host at a glance — connection, the plugins it carries, and what's happened lately.";
+        "The state of the app at a glance — connection, the plugins it runs, and what's happened lately.";
 }

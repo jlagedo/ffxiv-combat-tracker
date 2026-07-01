@@ -16,13 +16,13 @@
                     <TextBlock Text="Startup" Classes="h2"/>
                     <Grid ColumnDefinitions="*,Auto">
                         <StackPanel Spacing="2">
-                            <TextBlock Text="Start the satellite automatically" Classes="body"/>
-                            <TextBlock Text="Launches the .NET 4.8 satellite when the app opens. Turn off to start it yourself from the Plugins page."
+                            <TextBlock Text="Start the classic engine automatically" Classes="body"/>
+                            <TextBlock Text="Starts the classic plugin engine when the app opens. Turn off to start it yourself from the Plugins page."
                                        Classes="meta" FontSize="11" TextWrapping="Wrap" MaxWidth="520" HorizontalAlignment="Left"/>
                         </StackPanel>
                         <ToggleSwitch Grid.Column="1" IsChecked="{Binding LaunchSatelliteOnStartup, Mode=TwoWay}"
                                       OnContent="" OffContent="" VerticalAlignment="Center"
-                                      AutomationProperties.Name="Start the satellite automatically"/>
+                                      AutomationProperties.Name="Start the classic engine automatically"/>
                     </Grid>
                 </StackPanel>
             </Border>
@@ -60,20 +60,15 @@
                         <Button Grid.Column="1" Classes="ghost small" Content="Open logs folder"
                                 VerticalAlignment="Center" Click="OnOpenLogs"/>
                     </Grid>
-                    <Border Height="1" Background="{StaticResource HairlineBrush}"/>
-                    <StackPanel Spacing="2">
-                        <TextBlock Text="Runtimes" Classes="body"/>
-                        <TextBlock Text="{Binding RuntimeSummary}" Classes="meta" FontSize="11"/>
-                    </StackPanel>
                 </StackPanel>
             </Border>
 
             <Border Classes="card rise4" Padding="22,18">
                 <StackPanel Spacing="6">
                     <TextBlock Text="About" Classes="h2" Margin="0,0,0,6"/>
-                    <TextBlock Classes="meta" Text="FFXIV Combat Tracker · host shell"/>
+                    <TextBlock Classes="meta" Text="FFXIV Combat Tracker"/>
                     <TextBlock Classes="meta"
-                               Text="Runs today's ACT plugin ecosystem unmodified on current .NET, with an opt-in path to a typed modern API."/>
+                               Text="Runs your existing ACT plugins alongside modern ones, with an opt-in path from classic to modern."/>
                 </StackPanel>
             </Border>
         </StackPanel>

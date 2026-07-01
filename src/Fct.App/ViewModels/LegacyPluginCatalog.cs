@@ -42,6 +42,6 @@ internal static class LegacyPluginCatalog
             ? e
             : new Entry(
                 string.IsNullOrWhiteSpace(reportedTitle) ? key : reportedTitle,
-                "Legacy plugin",
-                "A legacy plugin hosted in the .NET Framework 4.8 satellite.");
+                "Classic plugin",
+                "A classic ACT plugin, running in the compatibility engine.");
 }

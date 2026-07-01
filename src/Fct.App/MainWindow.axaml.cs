@@ -106,7 +106,7 @@ public partial class MainWindow : Window
             var result = await _satellite.StartAsync();
             var pid = _satellite.Process?.Id ?? 0;
 
-            _vm.SetOnline(result.Handshake, pid, result.Plugins);
+            _vm.SetOnline(result.Plugins);
             _log.LogInformation(LogEvents.SatelliteStarted,
                 "Satellite online: pid {Pid}, {PluginCount} plugin window(s) [{Handshake}]",
                 pid, result.Plugins.Count, result.Handshake);

@@ -60,7 +60,7 @@
                 BorderThickness="1" CornerRadius="12" Padding="18,14">
             <Grid ColumnDefinitions="*,Auto">
                 <StackPanel Spacing="3">
-                    <TextBlock Text="The satellite isn't running" Foreground="{StaticResource GlintBrush}"
+                    <TextBlock Text="The classic engine isn't running" Foreground="{StaticResource GlintBrush}"
                                FontSize="14" FontWeight="SemiBold"/>
                     <TextBlock Text="{Binding Shell.ErrorMessage}" Classes="meta" FontSize="11.5"
                                TextWrapping="Wrap" MaxWidth="620" HorizontalAlignment="Left"/>
@@ -81,7 +81,7 @@
                 <ScrollViewer HorizontalScrollBarVisibility="Disabled" Padding="10,12">
                     <StackPanel Spacing="6">
                         <Grid Margin="6,0,6,2">
-                            <TextBlock Text="LEGACY · satellite" Classes="eyebrow"/>
+                            <TextBlock Text="CLASSIC" Classes="eyebrow"/>
                             <TextBlock Text="{Binding Shell.LegacyLoadedCount}" Classes="meta" FontSize="11"
                                        Foreground="{StaticResource FrostBrush}" HorizontalAlignment="Right"/>
                         </Grid>
@@ -89,12 +89,12 @@
                                  ItemTemplate="{StaticResource RailItem}"
                                  SelectedItem="{Binding Shell.SelectedPlugin, Mode=TwoWay}"
                                  AutomationProperties.AutomationId="plugin.rail.legacy"
-                                 AutomationProperties.Name="Legacy plugins"/>
-                        <TextBlock Text="No legacy plugins loaded." Classes="meta" FontSize="11" Margin="8,2,0,4"
+                                 AutomationProperties.Name="Classic plugins"/>
+                        <TextBlock Text="No classic plugins loaded." Classes="meta" FontSize="11" Margin="8,2,0,4"
                                    IsVisible="{Binding !Shell.HasLegacyPlugins}"/>
 
                         <Grid Margin="6,12,6,2">
-                            <TextBlock Text="MODERN · host" Classes="eyebrow"/>
+                            <TextBlock Text="MODERN" Classes="eyebrow"/>
                             <TextBlock Text="{Binding Shell.ModernLoadedCount}" Classes="meta" FontSize="11"
                                        Foreground="{StaticResource FrostBrush}" HorizontalAlignment="Right"/>
                         </Grid>
@@ -103,7 +103,7 @@
                                  SelectedItem="{Binding Shell.SelectedPlugin, Mode=TwoWay}"
                                  AutomationProperties.AutomationId="plugin.rail.modern"
                                  AutomationProperties.Name="Modern plugins"/>
-                        <TextBlock Text="No native plugins installed." Classes="meta" FontSize="11" Margin="8,2,0,0"
+                        <TextBlock Text="No modern plugins installed." Classes="meta" FontSize="11" Margin="8,2,0,0"
                                    IsVisible="{Binding !Shell.HasModernPlugins}"/>
                     </StackPanel>
                 </ScrollViewer>
@@ -167,7 +167,7 @@
                                     <StackPanel VerticalAlignment="Center" HorizontalAlignment="Center" Spacing="8">
                                         <Path Width="34" Height="34" Stretch="Uniform" Opacity="0.5"
                                               Fill="{StaticResource HoarfrostBrush}" Data="M12 2 L20 9 L12 22 L4 9 Z"/>
-                                        <TextBlock Text="Configuration loads when the satellite is online"
+                                        <TextBlock Text="Configuration loads when the classic engine is running"
                                                    Classes="meta" HorizontalAlignment="Center"/>
                                     </StackPanel>
                                 </Border>
@@ -194,7 +194,7 @@
                                     </Grid>
                                     <TextBlock Classes="meta" FontSize="11" TextWrapping="Wrap" MaxWidth="520"
                                                HorizontalAlignment="Left"
-                                               Text="Native plugins configure themselves through their own typed settings surface."/>
+                                               Text="Modern plugins configure themselves through their own settings."/>
                                 </StackPanel>
                             </Border>
 

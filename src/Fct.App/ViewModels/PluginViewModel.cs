@@ -61,8 +61,8 @@ public sealed partial class PluginViewModel : ObservableObject
     public bool ShowLegacyPlaceholder => IsLegacy && !HasNativeConfig;
     public bool HasStatusText => !string.IsNullOrWhiteSpace(SatelliteStatusText);
 
-    // Runtime badge, e.g. "net48 · satellite" / "net10 · host".
-    public string Runtime => Kind == PluginKind.Legacy ? "net48 · satellite" : "net10 · host";
+    // Kind badge shown in the config bay header.
+    public string Runtime => Kind == PluginKind.Legacy ? "Classic" : "Modern";
 
     public string StatusLabel => Status switch
     {
@@ -83,8 +83,8 @@ public sealed partial class PluginViewModel : ObservableObject
 
     public string ConfigPlaceholderBody =>
         Kind == PluginKind.Native
-            ? "Native plugins run in the .NET 10 host and ship their own typed settings. There's no legacy tab to embed."
+            ? "Modern plugins run inside the app and bring their own settings — there's nothing to embed here."
         : Status == PluginStatus.NotLoaded
-            ? "The satellite reported this plugin but exposed no configuration window."
-            : "The satellite isn't online, so this plugin's configuration can't be shown.";
+            ? "This classic plugin didn't provide a configuration window."
+            : "The classic engine isn't running, so this plugin's configuration can't be shown.";
 }

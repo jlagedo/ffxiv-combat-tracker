@@ -22,7 +22,7 @@ public sealed partial class SettingsViewModel : PageViewModel
     public override Section Section => Section.Settings;
     public override string Eyebrow => "Settings";
     public override string Title => "Settings";
-    public override string Subtitle => "How the host launches and where it keeps its files.";
+    public override string Subtitle => "How the app launches and where it keeps its files.";
 
     [ObservableProperty]
     private bool _launchSatelliteOnStartup;
@@ -35,7 +35,6 @@ public sealed partial class SettingsViewModel : PageViewModel
         _store.Save(s);
     }
 
-    // Read-only environment info shown in the About/Diagnostics card.
+    // Read-only environment info shown in the Diagnostics card.
     public string LogsDirectory => LogPaths.LogsDirectory;
-    public string RuntimeSummary => "net10 host · net48 satellite, bridged over a named pipe";
 }

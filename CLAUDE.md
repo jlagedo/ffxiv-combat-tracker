@@ -140,6 +140,9 @@ backend — one API and one `EventId` taxonomy across the bridge.
 Solution: `ffxiv-combat-tracker.slnx`. Projects under `src/`. Toolchain: .NET 10 SDK (10.0.301),
 net48 targeting pack, WindowsDesktop runtime, VS 2026 / MSBuild.
 
+**"Build" means `dotnet run --project build`** — the distributable build project (see below), not
+a bare `dotnet build`.
+
 ```powershell
 dotnet build src\Fct.App\Fct.App.csproj   # net10 host; a StageSatellite target chains + stages the
                                           #   net48 satellite into bin\<cfg>\net10.0\satellite\.

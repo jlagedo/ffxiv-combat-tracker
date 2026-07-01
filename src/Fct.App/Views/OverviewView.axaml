@@ -23,25 +23,27 @@
                         <Grid ColumnDefinitions="Auto,*,Auto" RowDefinitions="Auto,Auto,Auto" RowSpacing="13">
                             <Ellipse Grid.Row="0" Width="9" Height="9" VerticalAlignment="Center" Margin="0,0,11,0"
                                      Fill="{Binding Shell.HostStateLabel, Converter={StaticResource StatusToBrush}}"/>
-                            <TextBlock Grid.Row="0" Grid.Column="1" Text="Host" Classes="body" VerticalAlignment="Center"/>
-                            <TextBlock Grid.Row="0" Grid.Column="2" Text="online · .NET 10" Classes="meta" VerticalAlignment="Center"/>
+                            <TextBlock Grid.Row="0" Grid.Column="1" Text="App" Classes="body" VerticalAlignment="Center"/>
+                            <TextBlock Grid.Row="0" Grid.Column="2" Text="{Binding Shell.HostStateLabel}" Classes="meta"
+                                       VerticalAlignment="Center"
+                                       Foreground="{Binding Shell.HostStateLabel, Converter={StaticResource StatusToBrush}}"/>
 
                             <Ellipse Grid.Row="1" Width="9" Height="9" VerticalAlignment="Center" Margin="0,0,11,0"
                                      Fill="{Binding Shell.SatelliteState, Converter={StaticResource StatusToBrush}}"/>
-                            <TextBlock Grid.Row="1" Grid.Column="1" Text="Satellite" Classes="body" VerticalAlignment="Center"/>
+                            <TextBlock Grid.Row="1" Grid.Column="1" Text="Classic engine" Classes="body" VerticalAlignment="Center"/>
                             <TextBlock Grid.Row="1" Grid.Column="2" Text="{Binding Shell.SatelliteState}" Classes="meta"
                                        VerticalAlignment="Center"
                                        Foreground="{Binding Shell.SatelliteState, Converter={StaticResource StatusToBrush}}"/>
 
                             <Ellipse Grid.Row="2" Width="9" Height="9" VerticalAlignment="Center" Margin="0,0,11,0"
                                      Fill="{Binding Shell.GameStateLabel, Converter={StaticResource StatusToBrush}}"/>
-                            <TextBlock Grid.Row="2" Grid.Column="1" Text="Game data" Classes="body" VerticalAlignment="Center"/>
+                            <TextBlock Grid.Row="2" Grid.Column="1" Text="Game" Classes="body" VerticalAlignment="Center"/>
                             <TextBlock Grid.Row="2" Grid.Column="2" Text="{Binding Shell.GameStateLabel}" Classes="meta"
                                        VerticalAlignment="Center"
                                        Foreground="{Binding Shell.GameStateLabel, Converter={StaticResource StatusToBrush}}"/>
                         </Grid>
 
-                        <Button Classes="ghost small" Content="Restart satellite" HorizontalAlignment="Left"
+                        <Button Classes="ghost small" Content="Restart classic engine" HorizontalAlignment="Left"
                                 Command="{Binding Shell.RestartSatelliteCommand}"/>
                     </StackPanel>
                 </Border>
@@ -55,7 +57,7 @@
                         <Grid ColumnDefinitions="*,*,*">
                             <StackPanel Grid.Column="0" Spacing="3">
                                 <TextBlock Text="{Binding Shell.LegacyLoadedCount}" Classes="h1" FontSize="30"/>
-                                <TextBlock Text="legacy" Classes="meta" FontSize="11"/>
+                                <TextBlock Text="classic" Classes="meta" FontSize="11"/>
                             </StackPanel>
                             <StackPanel Grid.Column="1" Spacing="3">
                                 <TextBlock Text="{Binding Shell.ModernLoadedCount}" Classes="h1" FontSize="30"/>
@@ -64,7 +66,7 @@
                             <StackPanel Grid.Column="2" Spacing="3">
                                 <TextBlock Text="{Binding Shell.FaultCount}" Classes="h1" FontSize="30"
                                            Foreground="{StaticResource WarnBrush}"/>
-                                <TextBlock Text="faults" Classes="meta" FontSize="11"/>
+                                <TextBlock Text="issues" Classes="meta" FontSize="11"/>
                             </StackPanel>
                         </Grid>
 

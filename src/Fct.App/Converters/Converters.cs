@@ -14,16 +14,19 @@ public sealed class StatusToBrushConverter : IValueConverter
 {
     public object Convert(object? value, Type targetType, object? parameter, CultureInfo culture)
     {
-        // Status chips bind plain strings: the satellite chip ("Online"/"Offline"/"Starting") and
-        // the game-data chip ("Streaming"/"Waiting"/"Offline").
+        // Status chips bind plain friendly strings: the App/Classic-engine chip
+        // ("Running"/"Stopped"/"Not started"/"Starting…") and the game chip
+        // ("Live"/"Waiting for combat"/"Not connected").
         if (value is string s)
             value = s switch
             {
-                "Online" => PluginStatus.Running,
-                "Streaming" => PluginStatus.Live,
-                "Waiting" => PluginStatus.Loading,
-                "Offline" => PluginStatus.Unavailable,
-                "Unavailable" => PluginStatus.Unavailable,
+                "Running" => PluginStatus.Running,
+                "Live" => PluginStatus.Live,
+                "Waiting for combat" => PluginStatus.Loading,
+                "Starting…" => PluginStatus.Loading,
+                "Not started" => PluginStatus.Loading,
+                "Not connected" => PluginStatus.Loading,
+                "Stopped" => PluginStatus.Unavailable,
                 _ => PluginStatus.Loading,
             };
 

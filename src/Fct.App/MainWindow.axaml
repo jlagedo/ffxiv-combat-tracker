@@ -49,6 +49,7 @@
                     <StackPanel Orientation="Horizontal" HorizontalAlignment="Right">
                         <!-- Notification bell + unread badge -->
                         <Button Classes="win bell" Command="{Binding Notifications.ToggleCenterCommand}"
+                                WindowDecorationProperties.ElementRole="User"
                                 AutomationProperties.Name="Notifications"
                                 AutomationProperties.AutomationId="titlebar.notifications">
                             <Grid Width="20" Height="20">
@@ -92,10 +93,10 @@
                                 <StackPanel Orientation="Horizontal" Spacing="9">
                                     <Ellipse Width="8" Height="8" VerticalAlignment="Center"
                                              Fill="{Binding HostStateLabel, Converter={StaticResource StatusToBrush}}"/>
-                                    <TextBlock Text="Host" Foreground="{StaticResource GlintBrush}" FontSize="12.5"
+                                    <TextBlock Text="App" Foreground="{StaticResource GlintBrush}" FontSize="12.5"
                                                VerticalAlignment="Center"/>
-                                    <TextBlock Text="net10" Classes="meta" FontSize="10.5" VerticalAlignment="Center"
-                                               Margin="2,1,0,0"/>
+                                    <TextBlock Text="{Binding HostStateLabel}" Classes="meta" FontSize="10.5"
+                                               VerticalAlignment="Center" Margin="2,1,0,0"/>
                                 </StackPanel>
                                 <StackPanel Orientation="Horizontal" Spacing="9">
                                     <Grid Width="10" Height="10" VerticalAlignment="Center">
@@ -104,7 +105,7 @@
                                         <Ellipse Width="8" Height="8"
                                                  Fill="{Binding GameStateLabel, Converter={StaticResource StatusToBrush}}"/>
                                     </Grid>
-                                    <TextBlock Text="Game data" Foreground="{StaticResource GlintBrush}" FontSize="12.5"
+                                    <TextBlock Text="Game" Foreground="{StaticResource GlintBrush}" FontSize="12.5"
                                                VerticalAlignment="Center"/>
                                     <TextBlock Text="{Binding GameStateLabel}" Classes="meta" FontSize="10.5"
                                                VerticalAlignment="Center" Margin="2,1,0,0"
@@ -206,7 +207,7 @@
                                 <StackPanel Orientation="Horizontal" Spacing="7">
                                     <Ellipse Width="7" Height="7" VerticalAlignment="Center"
                                              Fill="{Binding HostStateLabel, Converter={StaticResource StatusToBrush}}"/>
-                                    <TextBlock Text="Host online" Classes="statusitem"/>
+                                    <TextBlock Text="App running" Classes="statusitem"/>
                                 </StackPanel>
                                 <StackPanel Orientation="Horizontal" Spacing="7">
                                     <Ellipse Width="7" Height="7" VerticalAlignment="Center"
