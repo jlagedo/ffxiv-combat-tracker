@@ -11,7 +11,11 @@ public static class LocalizationStartup
 {
     // Every culture with a Resources.<culture>.resx satellite. English is the neutral default and
     // always first; add an entry here when a translated satellite resx is added for a new language.
-    public static readonly CultureInfo[] SupportedCultures = { CultureInfo.GetCultureInfo("en") };
+    public static readonly CultureInfo[] SupportedCultures =
+    {
+        CultureInfo.GetCultureInfo("en"),
+        CultureInfo.GetCultureInfo("pt-BR"),
+    };
 
     public static void Initialize()
     {
