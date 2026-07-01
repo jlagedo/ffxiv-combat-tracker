@@ -14,12 +14,16 @@ public sealed class StatusToBrushConverter : IValueConverter
 {
     public object Convert(object? value, Type targetType, object? parameter, CultureInfo culture)
     {
-        // The satellite chip binds a plain string ("Online"/"Offline"/"Starting").
+        // Status chips bind plain strings: the satellite chip ("Online"/"Offline"/"Starting") and
+        // the game-data chip ("Streaming"/"Waiting"/"Offline").
         if (value is string s)
             value = s switch
             {
                 "Online" => PluginStatus.Running,
+                "Streaming" => PluginStatus.Live,
+                "Waiting" => PluginStatus.Loading,
                 "Offline" => PluginStatus.Unavailable,
+                "Unavailable" => PluginStatus.Unavailable,
                 _ => PluginStatus.Loading,
             };
 
@@ -30,9 +34,8 @@ public sealed class StatusToBrushConverter : IValueConverter
             PluginStatus.Running => "Frost",
             PluginStatus.Loaded => "FrostDim",
             PluginStatus.Loading => "Hoarfrost",
-            PluginStatus.Disabled => "Hoarfrost",
-            PluginStatus.Preview => "Hoarfrost",
             PluginStatus.NotLoaded => "Hoarfrost",
+            PluginStatus.Unavailable => "Warn",
             _ => "Warn",
         };
 
@@ -56,6 +59,42 @@ public sealed class StatusToBrushConverter : IValueConverter
         if (GlowCache.TryGetValue(key, out var cached)) return cached;
         var glow = Brush(key + "Brush") is ISolidColorBrush scb
             ? new SolidColorBrush(Color.FromArgb(0x33, scb.Color.R, scb.Color.G, scb.Color.B))
+            : Brush(key + "Brush");
+        GlowCache[key] = glow;
+        return glow;
+    }
+}
+
+// Maps a NotificationSeverity to a themed accent brush (with a "glow" halo variant), so toasts and
+// notification rows wear the palette's success/info/warn/error colours.
+public sealed class SeverityToBrushConverter : IValueConverter
+{
+    private static readonly Dictionary<string, IBrush> GlowCache = new();
+
+    public object Convert(object? value, Type targetType, object? parameter, CultureInfo culture)
+    {
+        var key = (value as Fct.App.Hosting.NotificationSeverity?) switch
+        {
+            Fct.App.Hosting.NotificationSeverity.Success => "Frost",
+            Fct.App.Hosting.NotificationSeverity.Warning => "Ember",
+            Fct.App.Hosting.NotificationSeverity.Error => "Warn",
+            _ => "FrostDim",
+        };
+        return (parameter as string) == "glow" ? Glow(key) : Brush(key + "Brush");
+    }
+
+    public object ConvertBack(object? value, Type targetType, object? parameter, CultureInfo culture)
+        => throw new NotSupportedException();
+
+    private static IBrush Brush(string key) =>
+        Application.Current?.Resources.TryGetResource(key, null, out var r) == true && r is IBrush b
+            ? b : Brushes.Gray;
+
+    private static IBrush Glow(string key)
+    {
+        if (GlowCache.TryGetValue(key, out var cached)) return cached;
+        var glow = Brush(key + "Brush") is ISolidColorBrush scb
+            ? new SolidColorBrush(Color.FromArgb(0x2E, scb.Color.R, scb.Color.G, scb.Color.B))
             : Brush(key + "Brush");
         GlowCache[key] = glow;
         return glow;

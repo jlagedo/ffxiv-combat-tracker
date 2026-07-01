@@ -1,0 +1,115 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:vm="using:Fct.App.ViewModels"
+             xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+             xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+             mc:Ignorable="d" d:DesignWidth="820" d:DesignHeight="620"
+             x:Class="Fct.App.Views.EncountersView"
+             x:DataType="vm:EncountersViewModel"
+             d:DataContext="{x:Static vm:DesignData.Encounters}">
+
+    <Grid>
+        <!-- ===== Waiting state (no combat data yet) ===== -->
+        <Border Classes="card rise1" IsVisible="{Binding !HasData}" Padding="40">
+            <StackPanel VerticalAlignment="Center" HorizontalAlignment="Center" Spacing="12" MaxWidth="440">
+                <Path Width="44" Height="44" Stretch="Uniform" Opacity="0.55" Fill="{StaticResource FrostDimBrush}"
+                      Data="M3 20 V11 H6 V20 Z M9.5 20 V4 H12.5 V20 Z M16 20 V14 H19 V20 Z"/>
+                <TextBlock Text="Waiting for game data" Classes="h2" HorizontalAlignment="Center"/>
+                <TextBlock Classes="subtitle" HorizontalAlignment="Center" TextAlignment="Center"
+                           Text="Encounters and per-combatant DPS appear here once combat data streams into the host."/>
+                <Border Background="{StaticResource RimeBrush}" CornerRadius="8" Padding="12,8" HorizontalAlignment="Center">
+                    <StackPanel Orientation="Horizontal" Spacing="9">
+                        <Ellipse Width="8" Height="8" VerticalAlignment="Center"
+                                 Fill="{Binding Shell.GameStateLabel, Converter={StaticResource StatusToBrush}}"/>
+                        <TextBlock Text="{Binding Shell.GameStateLabel, StringFormat='Game data: {0}'}"
+                                   Classes="meta" FontSize="11.5" VerticalAlignment="Center"/>
+                    </StackPanel>
+                </Border>
+            </StackPanel>
+        </Border>
+
+        <!-- ===== Live meter ===== -->
+        <Border Classes="card rise1" IsVisible="{Binding HasData}" Padding="0">
+            <DockPanel>
+                <!-- Header -->
+                <Border DockPanel.Dock="Top" BorderBrush="{StaticResource HairlineBrush}"
+                        BorderThickness="0,0,0,1" Padding="24,18">
+                    <Grid ColumnDefinitions="*,Auto">
+                        <StackPanel Spacing="4" VerticalAlignment="Center">
+                            <StackPanel Orientation="Horizontal" Spacing="12">
+                                <TextBlock Text="{Binding EncounterTitle}" Classes="h2"/>
+                                <Border Background="{StaticResource RimeBrush}" CornerRadius="6" Padding="9,3"
+                                        VerticalAlignment="Center">
+                                    <StackPanel Orientation="Horizontal" Spacing="7">
+                                        <Ellipse Width="7" Height="7" VerticalAlignment="Center"
+                                                 Fill="{StaticResource EmberBrush}" IsVisible="{Binding IsLive}"/>
+                                        <TextBlock Text="{Binding SourceLabel}" FontFamily="{StaticResource MonoFont}"
+                                                   FontSize="10.5" Foreground="{StaticResource GlintBrush}"/>
+                                    </StackPanel>
+                                </Border>
+                            </StackPanel>
+                            <TextBlock Text="{Binding Zone}" Classes="meta" FontSize="11"/>
+                        </StackPanel>
+
+                        <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="26" VerticalAlignment="Center">
+                            <StackPanel Spacing="2">
+                                <TextBlock Text="{Binding DurationLabel}" Classes="h2" FontFamily="{StaticResource MonoFont}"/>
+                                <TextBlock Text="duration" Classes="eyebrow" FontSize="9.5"/>
+                            </StackPanel>
+                            <StackPanel Spacing="2">
+                                <TextBlock Text="{Binding DpsLabel}" Classes="h2" FontFamily="{StaticResource MonoFont}"
+                                           Foreground="{StaticResource FrostBrush}"/>
+                                <TextBlock Text="raid dps" Classes="eyebrow" FontSize="9.5"/>
+                            </StackPanel>
+                        </StackPanel>
+                    </Grid>
+                </Border>
+
+                <!-- Column header -->
+                <Grid DockPanel.Dock="Top" Margin="24,12,24,6"
+                      ColumnDefinitions="28,*,90,120,80,54">
+                    <TextBlock Grid.Column="0" Text="#" Classes="eyebrow" FontSize="9.5"/>
+                    <TextBlock Grid.Column="1" Text="COMBATANT" Classes="eyebrow" FontSize="9.5"/>
+                    <TextBlock Grid.Column="2" Text="DPS" Classes="eyebrow" FontSize="9.5"/>
+                    <TextBlock Grid.Column="3" Text="DAMAGE" Classes="eyebrow" FontSize="9.5"/>
+                    <TextBlock Grid.Column="4" Text="HPS" Classes="eyebrow" FontSize="9.5"/>
+                    <TextBlock Grid.Column="5" Text="DEATHS" Classes="eyebrow" FontSize="9.5"/>
+                </Grid>
+
+                <ScrollViewer Padding="24,0,24,16">
+                    <ItemsControl ItemsSource="{Binding Combatants}">
+                        <ItemsControl.ItemTemplate>
+                            <DataTemplate x:DataType="vm:EncounterCombatantViewModel">
+                                <Border Classes="combatrow">
+                                    <Grid ColumnDefinitions="28,*,90,120,80,54" VerticalAlignment="Center">
+                                        <TextBlock Grid.Column="0" Text="{Binding Rank}" Classes="meta"
+                                                   VerticalAlignment="Center"/>
+                                        <StackPanel Grid.Column="1" Spacing="1" VerticalAlignment="Center">
+                                            <TextBlock Text="{Binding Name}" FontSize="13" FontWeight="SemiBold"
+                                                       Foreground="{StaticResource GlintBrush}" TextTrimming="CharacterEllipsis"/>
+                                            <TextBlock Text="{Binding JobLabel}" Classes="meta" FontSize="10"/>
+                                        </StackPanel>
+                                        <TextBlock Grid.Column="2" Text="{Binding DpsLabel}" VerticalAlignment="Center"
+                                                   FontFamily="{StaticResource MonoFont}" FontSize="13"
+                                                   Foreground="{StaticResource FrostBrush}"/>
+                                        <StackPanel Grid.Column="3" Spacing="4" VerticalAlignment="Center" Margin="0,0,16,0">
+                                            <TextBlock Text="{Binding DamagePercentLabel}" Classes="meta" FontSize="11"/>
+                                            <ProgressBar Classes="dmgbar" Minimum="0" Maximum="1"
+                                                         Value="{Binding DamageFraction}"/>
+                                        </StackPanel>
+                                        <TextBlock Grid.Column="4" Text="{Binding HpsLabel}" VerticalAlignment="Center"
+                                                   FontFamily="{StaticResource MonoFont}" FontSize="12"
+                                                   Foreground="{StaticResource HoarfrostBrush}"/>
+                                        <TextBlock Grid.Column="5" Text="{Binding Deaths}" VerticalAlignment="Center"
+                                                   FontFamily="{StaticResource MonoFont}" FontSize="12"
+                                                   Foreground="{StaticResource HoarfrostBrush}"/>
+                                    </Grid>
+                                </Border>
+                            </DataTemplate>
+                        </ItemsControl.ItemTemplate>
+                    </ItemsControl>
+                </ScrollViewer>
+            </DockPanel>
+        </Border>
+    </Grid>
+</UserControl>

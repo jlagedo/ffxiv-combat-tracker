@@ -3,8 +3,6 @@ using System.Collections.Generic;
 using System.ComponentModel;
 using Avalonia;
 using Avalonia.Controls;
-using Avalonia.Input;
-using Avalonia.Interactivity;
 using Avalonia.VisualTree;
 using Fct.App.ViewModels;
 using Microsoft.Extensions.DependencyInjection;
@@ -19,7 +17,6 @@ public partial class PluginsView : UserControl
     private readonly Dictionary<IntPtr, EmbeddedSatelliteView> _embeds = new();
     private readonly ILoggerFactory _loggerFactory;
 
-    private PluginsViewModel? _vm;
     private MainViewModel? _shell;
 
     public PluginsView()
@@ -28,20 +25,13 @@ public partial class PluginsView : UserControl
         _loggerFactory = App.Services?.GetService<ILoggerFactory>() ?? NullLoggerFactory.Instance;
     }
 
-    // The config bay reacts to the plugin selection (shell), the embed readiness (shell), and
-    // the Configure/Manage mode (this page). Subscribe to both view models and refresh the embed.
+    // The config bay reacts to the plugin selection and embed readiness (both on the shell).
     protected override void OnDataContextChanged(EventArgs e)
     {
         base.OnDataContextChanged(e);
-        if (_vm is not null) _vm.PropertyChanged -= OnPageChanged;
         if (_shell is not null) _shell.PropertyChanged -= OnShellChanged;
-
-        _vm = DataContext as PluginsViewModel;
-        _shell = _vm?.Shell;
-
-        if (_vm is not null) _vm.PropertyChanged += OnPageChanged;
+        _shell = (DataContext as PluginsViewModel)?.Shell;
         if (_shell is not null) _shell.PropertyChanged += OnShellChanged;
-
         UpdateEmbed();
     }
 
@@ -59,34 +49,22 @@ public partial class PluginsView : UserControl
         base.OnDetachedFromVisualTree(e);
     }
 
-    private void OnPageChanged(object? sender, PropertyChangedEventArgs e)
-    {
-        if (e.PropertyName is nameof(PluginsViewModel.IsConfigure) or nameof(PluginsViewModel.PluginsMode))
-            UpdateEmbed();
-    }
-
     private void OnShellChanged(object? sender, PropertyChangedEventArgs e)
     {
         if (e.PropertyName is nameof(MainViewModel.SelectedPlugin) or nameof(MainViewModel.ConfigReady))
             UpdateEmbed();
     }
 
-    // Tapping a channel in the rail patches that plugin into the bay (leaving Manage).
-    private void OnRailTapped(object? sender, TappedEventArgs e)
-    {
-        if (_vm is not null) _vm.PluginsMode = "Configure";
-    }
-
-    // Show the selected plugin's own configuration window in the bay — but only in Configure mode
-    // with the satellite up. The embedded HWND paints over Avalonia content, so detach it whenever
-    // the Manage rack or a not-ready state needs that space.
+    // Show the selected legacy plugin's own configuration window in the bay, but only with the
+    // satellite up. The embedded HWND paints over Avalonia content, so detach it whenever the
+    // selection has no window or the host isn't ready.
     private void UpdateEmbed()
     {
         if (!this.IsAttachedToVisualTree())
             return;
 
         var p = _shell?.SelectedPlugin;
-        var canEmbed = _vm is { IsConfigure: true } && _shell is { ConfigReady: true };
+        var canEmbed = _shell is { ConfigReady: true } && p is { HasNativeConfig: true };
         EmbedSlot.Child = canEmbed && p is { Hwnd: var h } && h != IntPtr.Zero
             ? GetEmbed(h)
             : null;

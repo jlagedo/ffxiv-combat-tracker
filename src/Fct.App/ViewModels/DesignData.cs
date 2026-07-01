@@ -8,8 +8,8 @@ internal static class DesignData
 {
     public static MainViewModel Shell { get; } = new();
 
-    public static DashboardViewModel Dashboard => Shell.DashboardPage;
+    public static OverviewViewModel Overview => Shell.OverviewPage;
     public static PluginsViewModel Plugins => Shell.PluginsPage;
-    public static OverlaysViewModel Overlays => Shell.OverlaysPage;
+    public static EncountersViewModel Encounters => Shell.EncountersPage;
     public static SettingsViewModel Settings => Shell.SettingsPage;
 }

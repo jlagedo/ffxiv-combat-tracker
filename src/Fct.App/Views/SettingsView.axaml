@@ -10,13 +10,30 @@
 
     <ScrollViewer>
         <StackPanel Spacing="16" MaxWidth="720" HorizontalAlignment="Left">
+
             <Border Classes="card rise1" Padding="22,18">
+                <StackPanel Spacing="16">
+                    <TextBlock Text="Startup" Classes="h2"/>
+                    <Grid ColumnDefinitions="*,Auto">
+                        <StackPanel Spacing="2">
+                            <TextBlock Text="Start the satellite automatically" Classes="body"/>
+                            <TextBlock Text="Launches the .NET 4.8 satellite when the app opens. Turn off to start it yourself from the Plugins page."
+                                       Classes="meta" FontSize="11" TextWrapping="Wrap" MaxWidth="520" HorizontalAlignment="Left"/>
+                        </StackPanel>
+                        <ToggleSwitch Grid.Column="1" IsChecked="{Binding LaunchSatelliteOnStartup, Mode=TwoWay}"
+                                      OnContent="" OffContent="" VerticalAlignment="Center"
+                                      AutomationProperties.Name="Start the satellite automatically"/>
+                    </Grid>
+                </StackPanel>
+            </Border>
+
+            <Border Classes="card rise2" Padding="22,18">
                 <StackPanel Spacing="14">
                     <TextBlock Text="Appearance" Classes="h2"/>
                     <Grid ColumnDefinitions="*,Auto">
                         <StackPanel Spacing="2">
                             <TextBlock Text="Theme" Classes="body"/>
-                            <TextBlock Text="The cold-field palette drawn from the key art." Classes="meta" FontSize="11"/>
+                            <TextBlock Text="The cold-field palette drawn from the game's crystal motif." Classes="meta" FontSize="11"/>
                         </StackPanel>
                         <Border Grid.Column="1" Background="{StaticResource RimeBrush}" CornerRadius="6"
                                 Padding="11,6" VerticalAlignment="Center">
@@ -31,36 +48,32 @@
                 </StackPanel>
             </Border>
 
-            <Border Classes="card rise2" Padding="22,18">
-                <StackPanel Spacing="16">
-                    <TextBlock Text="Startup" Classes="h2"/>
+            <Border Classes="card rise3" Padding="22,18">
+                <StackPanel Spacing="14">
+                    <TextBlock Text="Diagnostics" Classes="h2"/>
                     <Grid ColumnDefinitions="*,Auto">
-                        <StackPanel Spacing="2">
-                            <TextBlock Text="Launch the satellite with the host" Classes="body"/>
-                            <TextBlock Text="Starts the .NET 4.8 process automatically on open." Classes="meta" FontSize="11"/>
+                        <StackPanel Spacing="2" VerticalAlignment="Center">
+                            <TextBlock Text="Logs" Classes="body"/>
+                            <TextBlock Text="{Binding LogsDirectory}" Classes="meta" FontSize="11"
+                                       TextTrimming="MiddleEllipsis"/>
                         </StackPanel>
-                        <ToggleSwitch Grid.Column="1" IsChecked="{Binding LaunchSatelliteWithHost, Mode=TwoWay}"
-                                      OnContent="" OffContent=""
-                                      AutomationProperties.Name="Launch the satellite with the host"/>
+                        <Button Grid.Column="1" Classes="ghost small" Content="Open logs folder"
+                                VerticalAlignment="Center" Click="OnOpenLogs"/>
                     </Grid>
                     <Border Height="1" Background="{StaticResource HairlineBrush}"/>
-                    <Grid ColumnDefinitions="*,Auto">
-                        <StackPanel Spacing="2">
-                            <TextBlock Text="Embed plugin tabs in the host window" Classes="body"/>
-                            <TextBlock Text="Reparents each plugin's WinForms tabs into this shell." Classes="meta" FontSize="11"/>
-                        </StackPanel>
-                        <ToggleSwitch Grid.Column="1" IsChecked="{Binding EmbedPluginTabs, Mode=TwoWay}"
-                                      OnContent="" OffContent=""
-                                      AutomationProperties.Name="Embed plugin tabs in the host window"/>
-                    </Grid>
+                    <StackPanel Spacing="2">
+                        <TextBlock Text="Runtimes" Classes="body"/>
+                        <TextBlock Text="{Binding RuntimeSummary}" Classes="meta" FontSize="11"/>
+                    </StackPanel>
                 </StackPanel>
             </Border>
 
-            <Border Classes="card rise3" Padding="22,18">
+            <Border Classes="card rise4" Padding="22,18">
                 <StackPanel Spacing="6">
                     <TextBlock Text="About" Classes="h2" Margin="0,0,0,6"/>
                     <TextBlock Classes="meta" Text="FFXIV Combat Tracker · host shell"/>
-                    <TextBlock Classes="meta" Text="Two runtimes, two processes — net48 satellite + net10 host, bridged over a named pipe."/>
+                    <TextBlock Classes="meta"
+                               Text="Runs today's ACT plugin ecosystem unmodified on current .NET, with an opt-in path to a typed modern API."/>
                 </StackPanel>
             </Border>
         </StackPanel>

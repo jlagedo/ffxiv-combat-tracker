@@ -5,6 +5,7 @@ using System.IO;
 using System.IO.Pipes;
 using System.Threading;
 using System.Threading.Tasks;
+using Fct.App.Hosting;
 using Fct.Logging;
 using Microsoft.Extensions.Logging;
 
@@ -41,16 +42,19 @@ public sealed class SatelliteHost
     private readonly ILoggerFactory _loggerFactory;
     private readonly ILogger<SatelliteHost> _log;
     private readonly ILogger _satelliteLog;   // category for records forwarded from the satellite
+    private readonly INotificationHub? _notifications;
 
     private NamedPipeServerStream? _server;     // satellite -> host: handshake + forwarded logs
     private EventWaitHandle? _shutdownEvent;    // host -> satellite: graceful-shutdown signal
+    private volatile bool _shuttingDown;        // suppress the "exited" notice during a requested drain
     public Process? Process { get; private set; }
 
-    public SatelliteHost(ILoggerFactory loggerFactory)
+    public SatelliteHost(ILoggerFactory loggerFactory, INotificationHub? notifications = null)
     {
         _loggerFactory = loggerFactory;
         _log = loggerFactory.CreateLogger<SatelliteHost>();
         _satelliteLog = loggerFactory.CreateLogger(LogCategories.Satellite);
+        _notifications = notifications;
     }
 
     public async Task<SatelliteStartResult> StartAsync(CancellationToken ct = default)
@@ -83,8 +87,13 @@ public sealed class SatelliteHost
         {
             Process.EnableRaisingEvents = true;
             Process.Exited += (_, _) =>
+            {
                 _log.LogWarning(LogEvents.SatelliteExited, "Satellite process {Pid} exited with code {ExitCode}",
                     SafePid(Process), SafeExitCode(Process));
+                if (!_shuttingDown)
+                    _notifications?.Publish(NotificationSeverity.Warning, "Satellite",
+                        "The satellite stopped", "Legacy plugins are no longer running. Restart it from the Plugins page.");
+            };
 
             // Tie the satellite to the host's lifetime before it spawns its own children (CEF), so
             // the whole tree dies with the host instead of orphaning.
@@ -191,6 +200,7 @@ public sealed class SatelliteHost
     // the host is not blocked. Idempotent and safe if the satellite never started.
     public async Task ShutdownAsync(TimeSpan timeout)
     {
+        _shuttingDown = true;
         var process = Process;
         if (process is null || _shutdownEvent is null) return;
         try { if (process.HasExited) return; } catch { return; }
@@ -236,6 +246,39 @@ public sealed class SatelliteHost
             ? rec.Message
             : rec.Message + Environment.NewLine + rec.Exception;
         logger.Log(rec.Level, new EventId(rec.EventId, rec.EventName), "{SatelliteMessage}", message);
+        MaybeNotify(rec, message);
+    }
+
+    // Surface the satellite records a user should see: ACT's NotificationAdd (the legacy "toast"),
+    // legacy exceptions, and plugin load failures — plus any genuine warning/error. Info/debug
+    // chatter is left to the logs so the notification feed stays signal.
+    private void MaybeNotify(BridgeLogRecord rec, string message)
+    {
+        if (_notifications is null) return;
+        switch (rec.EventId)
+        {
+            case 2403: // ActNotification — ACT NotificationAdd
+                _notifications.Publish(NotificationSeverity.Info, "Legacy plugin", StripNotifyPrefix(rec.Message));
+                return;
+            case 2402: // ActException
+                _notifications.Publish(NotificationSeverity.Error, "Legacy plugin", "A legacy plugin reported an error", message);
+                return;
+            case 2103: // PluginLoadFailed
+            case 2104: // PluginNotFound
+                _notifications.Publish(NotificationSeverity.Warning, "Satellite", "A legacy plugin failed to load", message);
+                return;
+        }
+
+        if (rec.Level >= LogLevel.Error)
+            _notifications.Publish(NotificationSeverity.Error, "Satellite", "Satellite error", message);
+        else if (rec.Level == LogLevel.Warning)
+            _notifications.Publish(NotificationSeverity.Warning, "Satellite", "Satellite warning", message);
+    }
+
+    private static string StripNotifyPrefix(string message)
+    {
+        var m = message?.Trim() ?? string.Empty;
+        return m.StartsWith("[Notify]", StringComparison.OrdinalIgnoreCase) ? m["[Notify]".Length..].Trim() : m;
     }
 
     private static int SafePid(Process? p) { try { return p?.Id ?? -1; } catch { return -1; } }

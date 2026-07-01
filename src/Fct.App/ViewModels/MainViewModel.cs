@@ -4,108 +4,103 @@ using System.Collections.ObjectModel;
 using System.Linq;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
+using Fct.Abstractions;
+using Fct.App.Hosting;
 
 namespace Fct.App.ViewModels;
 
 public enum HostState { Starting, Online, Offline }
 
-// The shell coordinator: owns the shared plugin roster + satellite state, and the top-level
-// navigation (CurrentPage). Page-specific behaviour lives in the per-page view models, which
-// read shared state back through this instance.
+// The shell coordinator: owns the two plugin rosters (legacy · satellite, modern · host), the
+// satellite/host connection state, the notification centre, and top-level navigation. Page view
+// models read shared state back through this instance.
 public sealed partial class MainViewModel : ObservableObject
 {
-    public ObservableCollection<PluginViewModel> Plugins { get; } = new();
+    // Legacy plugins are reconciled from the satellite's reported windows; modern plugins come from
+    // the net10 plugin registry. Kept apart because they are two different runtimes.
+    public ObservableCollection<PluginViewModel> LegacyPlugins { get; } = new();
+    public ObservableCollection<PluginViewModel> ModernPlugins { get; } = new();
 
-    public DashboardViewModel DashboardPage { get; }
+    public NotificationCenterViewModel Notifications { get; }
+
+    public OverviewViewModel OverviewPage { get; }
     public PluginsViewModel PluginsPage { get; }
-    public OverlaysViewModel OverlaysPage { get; }
+    public EncountersViewModel EncountersPage { get; }
     public SettingsViewModel SettingsPage { get; }
 
     private readonly Dictionary<Section, PageViewModel> _pages;
+    private readonly INotificationHub? _hub;
 
+    // Raised when the user asks to (re)launch or add a plugin; the window owns those OS interactions.
+    public event Action? SatelliteRestartRequested;
+    public event Action? AddPluginRequested;
+
+    // ---- design-time ctor: seed a representative roster for the previewer ----
     public MainViewModel()
     {
-        Plugins.Add(new PluginViewModel
+        Notifications = new NotificationCenterViewModel();
+        LegacyPlugins.Add(DemoLegacy("ffxiv", PluginStatus.Live));
+        LegacyPlugins.Add(DemoLegacy("overlay", PluginStatus.Running));
+        LegacyPlugins.Add(DemoLegacy("triggernometry", PluginStatus.Running));
+        ModernPlugins.Add(new PluginViewModel
         {
-            Name = "FFXIV_ACT_Plugin",
-            Role = "Network parser · data source",
-            Version = "2.7.5.0",
-            Kind = PluginKind.Legacy,
-            Key = "ffxiv",
-            Description =
-                "Reads the game's network stream and turns it into combat actions. " +
-                "Every other plugin builds on the data it produces.",
-        });
-        Plugins.Add(new PluginViewModel
-        {
-            Name = "OverlayPlugin",
-            Role = "Overlays · cactbot bridge",
-            Version = "0.16.5",
-            Kind = PluginKind.Legacy,
-            Key = "overlay",
-            Description =
-                "Serves overlays over WebSocket and bridges cactbot — DPS meters, " +
-                "timelines, and raid tools rendered in the browser layer.",
-        });
-        Plugins.Add(new PluginViewModel
-        {
-            Name = "Triggernometry",
-            Role = "Triggers · timelines · TTS",
-            Version = "1.9.5.0",
-            Kind = PluginKind.Legacy,
-            Key = "triggernometry",
-            Description =
-                "Matches log lines to fire alerts, timers, and text-to-speech callouts " +
-                "from your own trigger packs.",
-        });
-        Plugins.Add(new PluginViewModel
-        {
-            Name = "Discord Triggers",
-            Role = "Encounter → Discord",
-            Version = "2.0.0",
-            Kind = PluginKind.Legacy,
-            Key = "discord",
-            Description =
-                "Posts encounter results and trigger events to a Discord webhook when a " +
-                "fight ends.",
-        });
-        Plugins.Add(new PluginViewModel
-        {
-            Name = "Native Parser",
-            Role = "Native pipeline · preview",
-            Version = "0.1-preview",
-            Kind = PluginKind.Native,
-            Key = "native",
-            IsActive = false,
-            BaseStatus = PluginStatus.Preview,
-            Description =
-                "Clean-room packet parser built for the .NET 10 host. Opt-in and " +
-                "hot-swappable — no host restart on patch day. Arriving in a later slice.",
+            Name = "Fct.SamplePlugin", Role = "Native plugin", Version = "0.1.0", Kind = PluginKind.Native,
+            ContractVersion = "1.0", Description = "Reference native plugin for the .NET 10 host.",
+            Status = PluginStatus.Loaded,
         });
 
-        _selectedPlugin = Plugins[0];
-        _selectedPlugin.IsSelected = true;
-
-        DashboardPage = new DashboardViewModel(this);
+        OverviewPage = new OverviewViewModel(this);
         PluginsPage = new PluginsViewModel(this);
-        OverlaysPage = new OverlaysViewModel(this);
-        SettingsPage = new SettingsViewModel(this);
-        _pages = new Dictionary<Section, PageViewModel>
-        {
-            [Section.Dashboard] = DashboardPage,
-            [Section.Plugins] = PluginsPage,
-            [Section.Overlays] = OverlaysPage,
-            [Section.Settings] = SettingsPage,
-        };
-        _currentPage = PluginsPage;
+        EncountersPage = new EncountersViewModel(this, encounters: null);
+        SettingsPage = new SettingsViewModel(this, store: null);
+        _pages = BuildPages();
+        _currentPage = OverviewPage;
+
+        _selectedPlugin = LegacyPlugins[0];
+        _selectedPlugin.IsSelected = true;
+        Host = HostState.Online;
+        SatelliteState = "Online";
+        SatelliteSummary = "pid 8123 · CLR 4.0.30319 · x64";
+    }
+
+    // ---- runtime ctor: bind the real host services ----
+    public MainViewModel(IPluginRegistry registry, IEncounterService encounters,
+        INotificationHub notifications, UiSettingsStore settings)
+    {
+        _hub = notifications;
+        Notifications = new NotificationCenterViewModel(notifications);
+
+        foreach (var info in registry.LoadedPlugins)
+            ModernPlugins.Add(new PluginViewModel
+            {
+                Name = info.Id,
+                Role = "Native plugin",
+                Version = info.Version,
+                Kind = PluginKind.Native,
+                ContractVersion = info.ContractVersion,
+                Description = "Runs in the .NET 10 host in its own load context.",
+                Status = PluginStatus.Loaded,
+            });
+
+        OverviewPage = new OverviewViewModel(this);
+        PluginsPage = new PluginsViewModel(this);
+        EncountersPage = new EncountersViewModel(this, encounters);
+        SettingsPage = new SettingsViewModel(this, settings);
+        _pages = BuildPages();
+        _currentPage = OverviewPage;
 
         SetStarting();
     }
 
+    private Dictionary<Section, PageViewModel> BuildPages() => new()
+    {
+        [Section.Overview] = OverviewPage,
+        [Section.Plugins] = PluginsPage,
+        [Section.Encounters] = EncountersPage,
+        [Section.Settings] = SettingsPage,
+    };
+
     // ---- navigation ----
-    // Accepts a Section (typed) or its name (from a XAML CommandParameter string); the enum
-    // is the source of truth — the string is parsed once here, at the boundary. The generated
-    // command is SelectPageCommand (matches the XAML binding).
     [RelayCommand]
     private void SelectPage(object? param)
     {
@@ -126,20 +121,27 @@ public sealed partial class MainViewModel : ObservableObject
         private set => SetProperty(ref _currentPage, value);
     }
 
+    // ---- shell actions (owned by the window) ----
+    [RelayCommand] private void RestartSatellite() => SatelliteRestartRequested?.Invoke();
+    [RelayCommand] private void AddPlugin() => AddPluginRequested?.Invoke();
+
     // ---- shared selection ----
     [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(HasSelection))]
     private PluginViewModel? _selectedPlugin;
 
-    // Keep exactly one plugin flagged selected as the selection moves.
+    public bool HasSelection => SelectedPlugin is not null;
+
     partial void OnSelectedPluginChanged(PluginViewModel? oldValue, PluginViewModel? newValue)
     {
         if (oldValue is not null) oldValue.IsSelected = false;
         if (newValue is not null) newValue.IsSelected = true;
     }
 
-    // ---- satellite / host state ----
+    // ---- satellite / host / game connection state ----
     [ObservableProperty]
-    [NotifyPropertyChangedFor(nameof(IsOnline), nameof(IsOffline))]
+    [NotifyPropertyChangedFor(nameof(IsOnline), nameof(IsOffline), nameof(GameLive),
+        nameof(GameStateLabel))]
     private HostState _host = HostState.Starting;
 
     public bool IsOnline => Host == HostState.Online;
@@ -160,10 +162,28 @@ public sealed partial class MainViewModel : ObservableObject
 
     public bool HasError => !string.IsNullOrEmpty(ErrorMessage);
 
-    public int LoadedCount =>
-        Plugins.Count(p => p.Status is PluginStatus.Live or PluginStatus.Running or PluginStatus.Loaded);
+    // The net10 host is running whenever this view model exists.
+    public string HostStateLabel => "Online";
 
-    public string LoadedSummary => $"{LoadedCount} of {Plugins.Count(p => p.Kind == PluginKind.Legacy)} legacy plugins";
+    // "Game data" = the satellite is up AND the parser is streaming (its plugin reads Live).
+    public bool GameLive => IsOnline && LegacyPlugins.Any(p => p.Key == "ffxiv" && p.IsLive);
+    public string GameStateLabel =>
+        !IsOnline ? "Offline"
+        : GameLive ? "Streaming"
+        : "Waiting";
+
+    // ---- roster-derived figures ----
+    public int LegacyLoadedCount =>
+        LegacyPlugins.Count(p => p.Status is PluginStatus.Live or PluginStatus.Running or PluginStatus.Loaded);
+    public int ModernLoadedCount => ModernPlugins.Count;
+    public int TotalLoadedCount => LegacyLoadedCount + ModernLoadedCount;
+    public int FaultCount => LegacyPlugins.Count(p => p.Status is PluginStatus.Error or PluginStatus.NotLoaded);
+
+    public string LoadedSummary =>
+        $"{TotalLoadedCount} loaded · {LegacyLoadedCount} legacy · {ModernLoadedCount} modern";
+
+    public bool HasModernPlugins => ModernPlugins.Count > 0;
+    public bool HasLegacyPlugins => LegacyPlugins.Count > 0;
 
     public void SetStarting()
     {
@@ -172,14 +192,11 @@ public sealed partial class MainViewModel : ObservableObject
         SatelliteSummary = "Launching .NET Framework 4.8 satellite…";
         ConfigReady = false;
         ErrorMessage = null;
-        foreach (var p in Plugins)
-            if (p.BaseStatus != PluginStatus.Preview) p.BaseStatus = PluginStatus.Loading;
         RaiseRosterChanged();
     }
 
-    // Reconcile the roster with what the satellite actually loaded: each reported plugin gets
-    // its embed window + a live status; the data source (ffxiv) reads as Live, the rest Running.
-    // Legacy plugins this build doesn't host yet fall back to "Not loaded".
+    // Rebuild the legacy roster from what the satellite actually loaded; the data source (ffxiv)
+    // reads Live, other reported windows Running, and anything without a window Not loaded.
     internal void SetOnline(string handshake, int pid, IReadOnlyList<SatellitePlugin> plugins)
     {
         Host = HostState.Online;
@@ -187,27 +204,34 @@ public sealed partial class MainViewModel : ObservableObject
         SatelliteState = "Online";
         SatelliteSummary = $"pid {pid} · {Clr(handshake)} · x64";
 
-        var byKey = plugins.ToDictionary(p => p.Key, StringComparer.OrdinalIgnoreCase);
-        foreach (var vm in Plugins)
+        LegacyPlugins.Clear();
+        foreach (var p in plugins)
         {
-            if (vm.BaseStatus == PluginStatus.Preview) continue;
-
-            if (byKey.TryGetValue(vm.Key, out var reported) && reported.Hwnd != IntPtr.Zero)
+            var meta = LegacyPluginCatalog.For(p.Key, p.Title);
+            var hosted = p.Hwnd != IntPtr.Zero;
+            LegacyPlugins.Add(new PluginViewModel
             {
-                vm.Hwnd = reported.Hwnd;
-                vm.HasNativeConfig = true;
-                vm.BaseStatus = vm.Key == "ffxiv" ? PluginStatus.Live : PluginStatus.Running;
-            }
-            else
-            {
-                vm.Hwnd = IntPtr.Zero;
-                vm.HasNativeConfig = false;
-                vm.BaseStatus = PluginStatus.NotLoaded;
-            }
+                Name = meta.Name,
+                Role = meta.Role,
+                Description = meta.Description,
+                Version = "—",
+                Kind = PluginKind.Legacy,
+                Key = p.Key,
+                Hwnd = p.Hwnd,
+                SatelliteStatusText = p.Status,
+                HasNativeConfig = hosted,
+                Status = hosted ? (p.Key == "ffxiv" ? PluginStatus.Live : PluginStatus.Running)
+                                : PluginStatus.NotLoaded,
+            });
         }
 
         ConfigReady = plugins.Any(p => p.Hwnd != IntPtr.Zero);
+        if (SelectedPlugin is null || !LegacyPlugins.Contains(SelectedPlugin))
+            SelectedPlugin = LegacyPlugins.FirstOrDefault() ?? ModernPlugins.FirstOrDefault();
         RaiseRosterChanged();
+
+        _hub?.Publish(NotificationSeverity.Success, "Satellite", "Satellite online",
+            $"{plugins.Count} legacy plugin window(s) hosted.");
     }
 
     public void SetOffline(string error)
@@ -217,24 +241,52 @@ public sealed partial class MainViewModel : ObservableObject
         SatelliteState = "Offline";
         SatelliteSummary = "Satellite not running";
         ErrorMessage = error;
-        foreach (var p in Plugins)
-            if (p.BaseStatus != PluginStatus.Preview)
-            {
-                p.BaseStatus = PluginStatus.Unavailable;
-                p.HasNativeConfig = false;
-                p.Hwnd = IntPtr.Zero;
-            }
+        foreach (var p in LegacyPlugins)
+        {
+            p.Status = PluginStatus.Unavailable;
+            p.HasNativeConfig = false;
+            p.Hwnd = IntPtr.Zero;
+        }
+        RaiseRosterChanged();
+
+        _hub?.Publish(NotificationSeverity.Error, "Satellite", "Couldn't start the satellite", error);
+    }
+
+    // The satellite is intentionally not running (auto-launch disabled). A neutral state — no error.
+    public void SetIdle()
+    {
+        Host = HostState.Offline;
+        ConfigReady = false;
+        SatelliteState = "Idle";
+        SatelliteSummary = "Satellite not started — start it from the Plugins page.";
+        ErrorMessage = null;
+        LegacyPlugins.Clear();
         RaiseRosterChanged();
     }
 
-    // Re-raise the roster-derived figures after the collection or a plugin's status changes.
     internal void RaiseRosterChanged()
     {
-        OnPropertyChanged(nameof(LoadedCount));
+        OnPropertyChanged(nameof(LegacyLoadedCount));
+        OnPropertyChanged(nameof(ModernLoadedCount));
+        OnPropertyChanged(nameof(TotalLoadedCount));
+        OnPropertyChanged(nameof(FaultCount));
         OnPropertyChanged(nameof(LoadedSummary));
+        OnPropertyChanged(nameof(HasLegacyPlugins));
+        OnPropertyChanged(nameof(HasModernPlugins));
+        OnPropertyChanged(nameof(GameLive));
+        OnPropertyChanged(nameof(GameStateLabel));
     }
 
-    // Pull the CLR version out of "READY pid=.. x64=True clr=.." for the status chip.
+    private static PluginViewModel DemoLegacy(string key, PluginStatus status)
+    {
+        var meta = LegacyPluginCatalog.For(key, key);
+        return new PluginViewModel
+        {
+            Name = meta.Name, Role = meta.Role, Description = meta.Description, Version = "—",
+            Kind = PluginKind.Legacy, Key = key, HasNativeConfig = true, Status = status,
+        };
+    }
+
     private static string Clr(string handshake)
     {
         const string key = "clr=";

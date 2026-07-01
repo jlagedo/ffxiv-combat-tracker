@@ -27,6 +27,7 @@ internal sealed class PluginManager
     private readonly IClock _clock;
     private readonly ILoggerFactory _loggerFactory;
     private readonly ILogger<PluginManager> _log;
+    private readonly INotificationHub? _notifications;
     private readonly List<LoadedPlugin> _loaded = new();
 
     public PluginManager(
@@ -36,7 +37,8 @@ internal sealed class PluginManager
         RegistryService registry,
         GameEventBus bus,
         IClock clock,
-        ILoggerFactory loggerFactory)
+        ILoggerFactory loggerFactory,
+        INotificationHub? notifications = null)
     {
         _game = game;
         _encounters = encounters;
@@ -45,6 +47,7 @@ internal sealed class PluginManager
         _sink = bus;
         _clock = clock;
         _loggerFactory = loggerFactory;
+        _notifications = notifications;
         _log = loggerFactory.CreateLogger<PluginManager>();
     }
 
@@ -129,10 +132,14 @@ internal sealed class PluginManager
 
             _loaded.Add(new LoadedPlugin(manifest, alc, instance));
             _log.LogInformation(LogEvents.NativePluginInitialized, "Initialized plugin {Id}", manifest.Id);
+            _notifications?.Publish(NotificationSeverity.Success, manifest.Id,
+                $"{manifest.Id} loaded", $"Native plugin v{manifest.Version} is running.");
         }
         catch (Exception ex)
         {
             _log.LogError(LogEvents.NativePluginFaulted, ex, "Plugin {Id} faulted during load/init — quarantined", manifest.Id);
+            _notifications?.Publish(NotificationSeverity.Error, manifest.Id,
+                $"{manifest.Id} was quarantined", ex.Message);
             if (instance is not null)
             {
                 try { await instance.DisposeAsync().ConfigureAwait(false); } catch { /* best-effort */ }

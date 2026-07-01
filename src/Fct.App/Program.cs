@@ -65,6 +65,13 @@ class Program
         builder.Logging.ClearProviders();
         builder.Services.AddSerilog(Log.Logger, dispose: false);
 
+        // User-facing notifications: one hub the whole app publishes to and the shell subscribes to.
+        builder.Services.AddSingleton<NotificationService>();
+        builder.Services.AddSingleton<INotificationHub>(sp => sp.GetRequiredService<NotificationService>());
+
+        // Shell preferences (persisted JSON).
+        builder.Services.AddSingleton<UiSettingsStore>();
+
         builder.Services.AddSingleton<SatelliteHost>();
         builder.Services.AddSingleton<MainViewModel>();
         builder.Services.AddSingleton<MainWindow>();
