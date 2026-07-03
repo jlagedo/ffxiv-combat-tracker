@@ -9,8 +9,9 @@ It is the counterpart to the *backward* surface: [`ACT-INTERFACE-MAP.md`](ACT-IN
 to run the five plugins **unmodified**. This document is the **net10 contract** they migrate *to*.
 
 > **Status.** The contract (`Fct.Abstractions` + `.UI`), the flow-test harness, the net10 host +
-> ALC loader, the net48→net10 bridge forwarder, and most of the compat shim are built and load real
-> plugins end-to-end (**18 flow tests + `Fct.Compat.Shim.Tests`, all green**). What remains is a small,
+> ALC loader, the net48→net10 bridge forwarder, the plugin install/classification + lifecycle pipeline,
+> and most of the compat shim are built and load real plugins end-to-end (**21 flow tests +
+> `Fct.Compat.Shim.Tests`, all green**). What remains is a small,
 > **named set of missing pipes and faces** — read [The model](#the-model--one-set-of-pipes-three-faces),
 > the [Pipe inventory](#pipe-inventory--every-pipe-three-faces), and
 > [What we must do](#what-we-must-do--the-work-list) first. Per-piece build state is in
@@ -358,8 +359,9 @@ separate call the coordinator drives directly.
 - **Fault containment.** A throwing `RegisterUi` is caught per-plugin (peers still register) and
   surfaced as an inline error settings page attributed to the plugin id; a throwing `CreateView` is
   caught by `PluginSurfaceView` into an inline placeholder. Neither takes down the shell.
-- **Honest limit:** surfaces are session-scoped — a plugin unload doesn't retract its settings page or
-  corner controls today (hot-unload isn't built; see work item 11). The **only contribution surfaces
+- **Unload retracts UI.** On hot-unload/uninstall the coordinator's `RemovePlugin` clears the plugin's
+  settings page and any corner controls (`SettingsPageRemoved`/`CornerControlRemoved`), so a removed
+  plugin leaves no orphaned surface. The **only contribution surfaces
   are the ACT-grounded ones** — a settings page (the `TabPage` replacement, rendered in the Plugins
   config bay next to the legacy embeds) plus Triggernometry's `RevealPage` and
   `AddCornerControl`/`RemoveCornerControl`; no nav-page / dashboard-widget / status-item surfaces.
@@ -508,7 +510,7 @@ separately by `Fct.Compat.Shim.Tests`; see [The net10 compat shim](#the-net10-co
 
 ### What can and cannot be tested now
 
-- **Implemented and green, headless (18 tests, 0 skipped):** the full A1–A5 / B1–B5 set — including
+- **Implemented and green, headless (21 tests, 0 skipped):** the full A1–A5 / B1–B5 set — including
   A2 fan-out **and** the A2 terminal-sink variant (G3), B4's synthetic-line emit (G4), and the
   G2/G5/G6/G7/G8/G9/G10 round-trip checks — plus bus filter/isolation checks and the G1
   default/round-trip check. They validate every contract gap end-to-end with only the harness as new
@@ -731,13 +733,17 @@ faces. Pieces not yet built are numbered items in [What we must do](#what-we-mus
 
 ### Package format — a loose plugin folder
 
-A plugin is a **folder** under the host's `plugins/` root (`<host-exe-dir>/plugins/<name>/`) holding
-`plugin.json` (read **without loading any assembly**), the entry assembly + its private dependency
-closure, and the `*.deps.json` / `*.runtimeconfig.json` the ALC's `AssemblyDependencyResolver` consumes.
-**No archive and no signing in v1** — install is a folder copy; isolation and type identity are the
-ALC's job, not a signature's. Shared assemblies (contract, Avalonia, shim/facades) may physically sit in the folder but
-are always resolved from the default ALC for one type identity (see
-[Isolation](#isolation--assembly-loading)).
+A plugin is a **folder** holding the entry assembly + its private dependency closure, the `*.deps.json` /
+`*.runtimeconfig.json` the ALC's `AssemblyDependencyResolver` consumes, and an **optional** `plugin.json`
+(read **without loading any assembly**). Two roots hold plugin folders: build-staged dev samples sit in
+`<host-exe-dir>/plugins/`, and **user-installed plugins land in `%LOCALAPPDATA%\FFXIVCombatTracker\installed-plugins\<id>\`**
+(one `<id>` folder per plugin). `PluginInstaller` accepts either a folder **or a `.zip`** (extracted to a
+staging dir, then descended to the payload root) as the install source. **No signing in v1** — install is
+a folder copy; isolation and type identity are the ALC's job, not a signature's. When `plugin.json` is
+absent, `PluginClassifier` inspects the entry assembly's references with a `MetadataLoadContext` (no
+execution) to derive kind + identity; a present manifest is authoritative. Shared assemblies (contract,
+Avalonia, shim/facades) may physically sit in the folder but are always resolved from the default ALC for
+one type identity (see [Isolation](#isolation--assembly-loading)).
 
 ### Manifest
 
@@ -754,17 +760,33 @@ are always resolved from the default ALC for one type identity (see
 The `contract` string is the single host gate (`HostContract.Accepts`, **major-version equality**); with
 NuGet SDK distribution it equals the SDK package major the plugin built against.
 
-### Install, discover, update, remove — full lifecycle
+### Install, discover, update, remove — full lifecycle (built)
 
-The **collectible ALC** already exists for exactly this; the lifecycle uses it end-to-end:
+`PluginInstaller` owns the runtime lifecycle end-to-end over the collectible ALC (net10 faces) and the
+satellite channel (real-legacy face). `PluginRegistryStore` persists the installed set to
+`%LOCALAPPDATA%\FFXIVCombatTracker\installed-plugins.json` so it survives restarts.
 
-- **Install** — the shell's *Add plugin* copies a plugin folder into `plugins/`.
-- **Discover + load** — `PluginManager` scans each `plugins/<name>/plugin.json`, gates `contract`, loads
-  the entry into a fresh collectible ALC, time-boxes init, quarantines on fault.
-- **Hot-load / unload / reload at runtime** — installing loads immediately; removing disposes the
-  instance and unloads its ALC; updating = unload → swap folder → load. (Today load is start-time only
-  and there is no remove — this is the lifecycle work item.)
-- **Uninstall** — a Plugins-roster *Remove* unloads the ALC, then deletes the folder.
+- **Classify** — `PluginClassifier` routes each install to a `LoadKind`: `Native` (references
+  `Fct.Abstractions`, implements `IPlugin`), `RecompiledShim` (references the unsigned `Advanced Combat
+  Tracker` facade / declares `legacyEntry`), or `RealLegacy` (references `Advanced Combat Tracker` under
+  the real ACT strong-name token `a946b61e93d97868`). Manifest-first; else metadata-only reflection with
+  a `MetadataLoadContext` (no execution).
+- **Install** — the shell's *Add plugin* (`MainViewModel.AddPlugin`) hands a folder or `.zip` to
+  `PluginInstaller.InstallAsync`, which classifies, copies into `installed-plugins\<id>\`, loads it live,
+  and records it.
+- **Route load** — net10 kinds load in-process (`PluginManager.LoadDirectoryAsync` → fresh collectible
+  ALC, `contract` gate, time-boxed fault-guarded init, quarantine on fault). Real-legacy kinds are sent
+  to the net48 satellite as a `LOADPLUGIN` command frame (`ISatellitePluginChannel` /
+  `SatelliteProtocol`) and hosted out-of-process there.
+- **Startup** — `PluginLifetime` clears pending deletes, loads every persisted net10 plugin
+  (`LoadPersistedAsync`), then scans the build-staged `plugins/` sample folder (`LoadAllAsync`);
+  persisted real-legacy plugins are replayed to the satellite (`ReplayLegacyToSatellite`) once it is
+  online.
+- **Uninstall** — a Plugins-roster *Remove* calls `UninstallAsync`: it retracts the plugin's UI, unloads
+  the live instance (`PluginManager.UnloadAsync` — dispose → force-close its `ScopedPluginRegistry`
+  registrations so no delegate pins the ALC → `UnloadAndWait` + GC pump; or a satellite `UNLOADPLUGIN`
+  round-trip for real-legacy), deletes the install folder, and drops the record. Folders still locked
+  (collectible ALC / CEF) are marked `PendingDelete` and removed on the next launch.
 
 Honest limit unchanged from [Locked decisions](#locked-decisions): a hard native crash still takes the
 host; hot-unload is cooperative (quarantine + collectible ALC), not a fault boundary.
@@ -829,8 +851,9 @@ rule 1 requires it.
    declares, so the host has zero name-knowledge of the shim and stays a generic router/loader (rule 2).
 
 **Host & authoring readiness** — not data pipes, but the machinery to *build, install, and surface*
-plugins across the three faces (goal 2). Without these the host cannot yet accommodate an external
-modern plugin end-to-end:
+plugins across the three faces (goal 2). Install/load/unload, the UI contribution surface, and manifest
+metadata are built (items 9, 11, 13); what remains here is the stable theme seam and the published SDK
+feed:
 
 9. **Modern UI contribution surface.** ✅ **Built.** `Fct.App` implements `IUiHost` (`PluginUiCoordinator`
    + `AvaloniaUiDispatcher`), discovers `IUiContributor` on loaded plugins gated by the manifest `"ui"`
@@ -841,9 +864,14 @@ modern plugin end-to-end:
 10. **Semantic theme token contract.** Add the stable token keys + style classes to
     `Fct.Abstractions.UI`, map them onto the shell's internal palette, and document them, so plugins
     theme against a stable seam and the shell can restyle (incl. a light variant) without breaking them.
-11. **Plugin lifecycle — uninstall + hot-reload.** Runtime load/unload/reload and an in-app *Remove*
-    (unload ALC → delete folder), using the collectible ALC that already exists. Load is start-time-only
-    today and there is no remove path.
+11. **Plugin lifecycle — install / uninstall / hot-reload.** ✅ **Built.** `PluginInstaller` is the single
+    add/remove entry point: it accepts a folder **or a `.zip`**, classifies the payload across the three
+    faces (`PluginClassifier` → `LoadKind` native / recompiled-shim / real-legacy), copies it into the
+    per-plugin install root, routes the load (in-process collectible ALC for net10, or a satellite
+    `LOADPLUGIN` frame for real-legacy), and records it in a persisted registry that re-loads on the next
+    launch. Uninstall is the symmetric teardown (unload live → delete folder → drop the record), with a
+    deferred-delete list for folders still locked by a collectible ALC / CEF. Details:
+    [Install, discover, update, remove](#install-discover-update-remove--full-lifecycle-built).
 12. **SDK NuGet packaging.** **Partial — local pack only.** `dotnet run --project build` packs
     `Fct.Abstractions` + `Fct.Abstractions.UI` (major = contract version, `1.0.0` today) into
     `dist\<mode>\packages\*.nupkg` alongside the host/satellite publish (`build/Build.cs`); `dist/` is
@@ -869,10 +897,11 @@ modern plugin end-to-end:
   statuses/enmity/target/focus/hover/in-combat onto the bus. A dedicated native memory-reader plugin may
   replace it later; because the data lands in the same `Actor`/snapshot fields, that swap is a
   producer change with **no contract change**.
-- **Packaging & lifecycle — loose folder + full lifecycle.** A plugin stays a loose folder under
-  `plugins/`; no archive/signing in v1. The host adds runtime hot-load/unload/reload and in-app
-  uninstall over the existing collectible ALC. (Rejected: an archive/signing format — loose folder is
-  the v1 format; start-time-only loading — wastes the collectible ALC already built.)
+- **Packaging & lifecycle — loose folder + full lifecycle.** The installed form of a plugin is a loose
+  folder (a `.zip` is accepted only as an install source, extracted on the way in); no signing in v1. The
+  host provides runtime install / hot-load / unload / reload and in-app uninstall over the collectible
+  ALC (net10) and the satellite channel (real-legacy). (Rejected: a stored archive/signing format — loose
+  folder is the v1 format; start-time-only loading — wastes the collectible ALC already built.)
 - **SDK distribution — modern contract on GitHub NuGet; facades never published.** Only
   `Fct.Abstractions` / `Fct.Abstractions.UI` ship (GitHub Packages), package major = gated contract
   version. The ACT-impersonating facades are **never** published or built against as our SDK — they only
