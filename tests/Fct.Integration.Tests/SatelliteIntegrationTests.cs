@@ -1,5 +1,5 @@
 using System.Text.RegularExpressions;
-using Fct.App;
+using Fct.Bridge;
 using Xunit;
 using Xunit.Abstractions;
 

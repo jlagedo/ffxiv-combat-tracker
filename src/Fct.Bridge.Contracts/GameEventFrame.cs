@@ -8,8 +8,8 @@ using Fct.Abstractions;
 namespace Fct.Bridge
 {
     // A typed game event forwarded from the net48 satellite to the net10 host over the bridge pipe,
-    // feeding the host's IGameEventSink. Shared source: the satellite serializes with ToWire(); the
-    // host parses with TryParse() — same code, same shape, compiled on both sides (net48 + net10).
+    // feeding the host's IGameEventSink. The satellite serializes with ToWire(); the host parses
+    // with TryParse() — same code, same shape, on both sides of the bridge (net48 + net10).
     //
     // Wire form is a single line, tab-delimited, with free text escaped so a record never spans lines
     // or collides with the delimiter (no JSON dependency on either side), mirroring BridgeLogRecord:
@@ -25,7 +25,7 @@ namespace Fct.Bridge
     // so events that exist only as parsed log-line fields (StatusApplied/Removed, Cast*, DeathOccurred,
     // HpUpdated) are not synthesized here — consumers reach them through the RawLogLine firehose. ToWire
     // returns null for any unsupported record.
-    internal static class GameEventFrame
+    public static class GameEventFrame
     {
         public const string Prefix = "EVT ";
 

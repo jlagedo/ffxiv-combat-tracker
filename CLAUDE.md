@@ -58,7 +58,9 @@ Design docs — **read before proposing changes:**
 | `Fct.Abstractions` | net48;net10 | plugin SDK: contracts + domain records. No opcodes. |
 | `Fct.Abstractions.UI` | net10 | Avalonia UI contribution surfaces (`IUiContributor`/`IUiHost`); referenced by UI-contributing net10 plugins and by `Fct.App` itself (the shell's `IUiHost` implementation). |
 | `Fct.Abstractions.Testing` | net10 | in-memory fakes of every plugin-contract interface + the `ShimStub` seam; backs the headless flow tests. |
-| `Fct.App` | net10 | the **.NET 10 host**: Avalonia control panel + shell (MVVM); owns the IPC bridge client (`SatelliteHost`/`SatelliteProtocol`/`SatelliteLifetime`) and the net10 plugin host (`Hosting/` services, `Plugins/` ALC loader). |
+| `Fct.Logging.Contracts` | net48;net10 | shared logging contract: the `LogEvents`/`LogCategories` EventId taxonomy, `LogPaths`, and the `BridgeLogRecord` log wire record — one identity on both ends of the bridge. |
+| `Fct.Bridge.Contracts` | net48;net10 | shared bridge contract: the `SatelliteProtocol` handshake/command line protocol and the `GameEventFrame` typed-event wire codec — formatted/parsed by one implementation on both ends. |
+| `Fct.App` | net10 | the **.NET 10 host**: Avalonia control panel + shell (MVVM); owns the IPC bridge client (`SatelliteHost`/`SatelliteLifetime`) and the net10 plugin host (`Hosting/` services, `Plugins/` ALC loader). |
 | `Fct.LegacyHost` | net48 | from-scratch ACT engine host; hosts the five real plugins; the net48 end of the bridge. |
 | `Fct.Parser.Legacy` | net48 | wraps the real FFXIV_ACT_Plugin. `WrappedFfxivPlugin` forwards `DataRepository`/`_iocContainer`/lifecycle to the real instance; `RingBufferDataSubscription` (`IDataSubscription` + `IRawPacketSource`) replaces the plugin's per-subscriber `BeginInvoke` fan-out with one bounded ring + single dispatch thread (~250× faster dispatch). |
 | `Fct.Compat.Act` | net48 | **the ACT engine** (facade surface, hosted in LegacyHost): `EncounterData`/`CombatantData`/`AttackType` aggregation + `ExportVariables`. Parity: see load-bearing facts + `docs/TESTING.md`. |
@@ -67,7 +69,9 @@ Design docs — **read before proposing changes:**
 | `Fct.Compat.Shim.SdkFacade` | net10 | assembly `FFXIV_ACT_Plugin.Common`: re-declares the SDK surface (`IDataSubscription`/`IDataRepository` + `Combatant`/`Player`/`NetworkBuff`/`PartyType`) a recompiled plugin binds to. No behavior — the `Fct.Compat.Shim` adapters map it onto the host. |
 | `Fct.StreamProbe` | net48 | diagnostic plugin in the satellite; taps the `MasterSwing`/raw-packet stream. |
 
-The net10↔net48 **IPC bridge is not its own project** — host end in `Fct.App`, satellite end in `Fct.LegacyHost`.
+The net10↔net48 **IPC bridge is not its own project** — host end in `Fct.App`, satellite end in
+`Fct.LegacyHost`. Its **wire contracts** are the multi-targeted `Fct.Bridge.Contracts` +
+`Fct.Logging.Contracts` libraries, referenced by both ends (never linked source).
 
 ## UI frameworks
 
@@ -136,10 +140,10 @@ backend — one API and one `EventId` taxonomy across the bridge.
 - **Legacy seam:** the ACT facade / plugin wrapper emit via `Action<string>` (`[Info]`/`[Debug]`/…
   prefixes); `SatelliteLogging.WriteLegacy` maps prefix → level + `EventId`. `Fct.Compat.Act` /
   `Fct.Parser.Legacy` take **no** logging dependency.
-- **Taxonomy:** `shared/Logging/` (linked into both processes) holds the `EventId` registry
-  (`LogEvents`: 1xxx host, 2xxx satellite, 3xxx parser), the wire format (`BridgeLogRecord`), and the
-  shared path (`LogPaths`). Level: default Information (Debug in `DEBUG`); `FCT_LOG_LEVEL` overrides.
-  Packages pinned in `Directory.Packages.props`.
+- **Taxonomy:** `Fct.Logging.Contracts` (net48;net10, referenced by both processes) holds the
+  `EventId` registry (`LogEvents`: 1xxx host, 2xxx satellite, 3xxx parser), the wire format
+  (`BridgeLogRecord`), and the shared path (`LogPaths`). Level: default Information (Debug in
+  `DEBUG`); `FCT_LOG_LEVEL` overrides. Packages pinned in `Directory.Packages.props`.
 
 ## Build & test
 

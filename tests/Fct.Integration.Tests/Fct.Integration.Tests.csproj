@@ -5,7 +5,7 @@
     Fct.LegacyHost.exe, complete the bridge handshake, and inspect its verification log.
     Skips when the satellite isn't staged or the real FFXIV plugin isn't installed, so it's
     safe on a clean checkout but exercises the real binaries where present.
-    SatelliteProtocol.cs is linked to reuse the exact handshake parsing the host uses.
+    Fct.Bridge.Contracts is referenced to reuse the exact handshake parsing the host uses.
   -->
   <PropertyGroup>
     <TargetFramework>net10.0</TargetFramework>
@@ -17,7 +17,7 @@
   </ItemGroup>
 
   <ItemGroup>
-    <Compile Include="..\..\src\Fct.App\SatelliteProtocol.cs" Link="SatelliteProtocol.cs" />
+    <ProjectReference Include="..\..\src\Fct.Bridge.Contracts\Fct.Bridge.Contracts.csproj" />
   </ItemGroup>
 
 </Project>

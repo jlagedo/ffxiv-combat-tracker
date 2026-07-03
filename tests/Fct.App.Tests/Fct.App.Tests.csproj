@@ -1,9 +1,10 @@
 <Project Sdk="Microsoft.NET.Sdk">
 
   <!--
-    Unit tests for the net10 host's pure logic. Host source (SatelliteProtocol, and the plugin
-    subsystem under Hosting/ + Plugins/) is *linked* rather than referenced so the tests stay fast and
-    headless — referencing the Avalonia WinExe would drag in the satellite build chain.
+    Unit tests for the net10 host's pure logic. Host source (the plugin subsystem under Hosting/ +
+    Plugins/) is *linked* rather than referenced so the tests stay fast and headless — referencing the
+    Avalonia WinExe would drag in the satellite build chain. The satellite protocol / logging / bridge
+    contracts are referenced as libraries (Fct.Bridge.Contracts, Fct.Logging.Contracts).
   -->
   <PropertyGroup>
     <TargetFramework>net10.0</TargetFramework>
@@ -19,11 +20,14 @@
     <!-- IUiContributor/IUiHost/UiSurface for the linked PluginUiCoordinator below. Pulls Avalonia in as
          a compile-time type source only; tests never build a Control or touch the UI thread. -->
     <ProjectReference Include="..\..\src\Fct.Abstractions.UI\Fct.Abstractions.UI.csproj" />
+    <!-- Shared logging + bridge contracts (satellite protocol, log record, EventId taxonomy, wire
+         codec): referenced, not linked, so the tests bind the same identity the host does. -->
+    <ProjectReference Include="..\..\src\Fct.Logging.Contracts\Fct.Logging.Contracts.csproj" />
+    <ProjectReference Include="..\..\src\Fct.Bridge.Contracts\Fct.Bridge.Contracts.csproj" />
   </ItemGroup>
 
   <!-- Existing linked host logic. -->
   <ItemGroup>
-    <Compile Include="..\..\src\Fct.App\SatelliteProtocol.cs" Link="SatelliteProtocol.cs" />
     <Compile Include="..\..\src\Fct.App\ProcessJob.cs" Link="ProcessJob.cs" />
   </ItemGroup>
 
@@ -42,9 +46,6 @@
     <Compile Include="..\..\src\Fct.App\Plugins\PluginInstaller.cs" Link="Plugins\PluginInstaller.cs" />
     <Compile Include="..\..\src\Fct.App\Plugins\Ui\PluginUiCoordinator.cs" Link="Plugins\Ui\PluginUiCoordinator.cs" />
     <Compile Include="..\..\src\Fct.App\Plugins\Ui\PluginUiHost.cs" Link="Plugins\Ui\PluginUiHost.cs" />
-    <Compile Include="..\..\shared\Logging\LogEvents.cs" Link="Logging\LogEvents.cs" />
-    <Compile Include="..\..\shared\Logging\LogPaths.cs" Link="Logging\LogPaths.cs" />
-    <Compile Include="..\..\shared\Bridge\GameEventFrame.cs" Link="Bridge\GameEventFrame.cs" />
   </ItemGroup>
 
   <!-- Build the sample plugin and stage it under plugins\ so the loader tests can load it from disk.

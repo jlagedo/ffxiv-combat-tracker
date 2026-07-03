@@ -31,7 +31,7 @@ Status legend: ☐ not started · ◐ in progress · ☑ done · ⊘ blocked
 | # | Phase | Addresses (review finding) | Risk | Status |
 |---|-------|----------------------------|------|--------|
 | 0 | Baseline & docs truth-up | Stale map, #7, #8 | minimal | ☑ |
-| 1 | Shared contracts → libraries | #6 | low | ☐ |
+| 1 | Shared contracts → libraries | #6 | low | ☑ |
 | 2 | Extract `Fct.Host` (god-project split) | #1 (CRITICAL) | med | ☐ |
 | 3 | Extract `Fct.Aggregation` engine | #2 | med (parity) | ☐ |
 | 4 | Thin ACT facade + parser direction | #4, #5 | low–med | ☐ |
@@ -94,20 +94,25 @@ establish the `net48;net10` library pattern. Kills the drift risk between the tw
 | `Fct.Logging.Contracts` | net48;net10 | `shared/Logging/{LogEvents,LogPaths,BridgeLogRecord}.cs` |
 | `Fct.Bridge.Contracts` | net48;net10 | `shared/Bridge/GameEventFrame.cs` + `Fct.App/SatelliteProtocol.cs` |
 
-- [ ] Create `Fct.Logging.Contracts` (net48;net10, `Microsoft.Bcl.AsyncInterfaces` on net48 if the
-      records need it). Move `shared/Logging/*.cs` in.
-- [ ] Create `Fct.Bridge.Contracts` (net48;net10). Move `shared/Bridge/GameEventFrame.cs` and
-      `Fct.App/SatelliteProtocol.cs` in (the protocol becomes shared instead of net10-only).
-- [ ] Reference both libs from `Fct.App` and `Fct.LegacyHost`; delete the `<Compile Include>`
+- [x] Create `Fct.Logging.Contracts` (net48;net10). Moved `shared/Logging/*.cs` in; types made
+      `public`. No `Microsoft.Bcl.AsyncInterfaces` needed (no records/async in these types).
+- [x] Create `Fct.Bridge.Contracts` (net48;net10, references `Fct.Abstractions`). Moved
+      `shared/Bridge/GameEventFrame.cs` and `Fct.App/SatelliteProtocol.cs` in (namespace `Fct.App` →
+      `Fct.Bridge`, types made `public`); the protocol is now shared instead of net10-only.
+- [x] Reference both libs from `Fct.App` and `Fct.LegacyHost`; deleted the `<Compile Include>`
       `shared/Logging` + `shared/Bridge` links from both.
-- [ ] Point the **satellite** handshake at the shared `SatelliteProtocol` (retire any net48-side
-      duplicate handshake code so both ends share one implementation).
-- [ ] Update `Fct.App.Tests` + `Fct.Integration.Tests` to reference the libs; delete their
-      `SatelliteProtocol.cs` / `LogEvents.cs` / `GameEventFrame.cs` links.
-- [ ] Delete the emptied `shared/Logging` + `shared/Bridge` folders; add both projects to `.slnx`.
+- [x] Pointed the **satellite** handshake at the shared `SatelliteProtocol` — added `FormatReady`/
+      `FormatHwnd`/`FormatPlugin` and switched `Program.cs` (READY/HWND/PLUGIN/PLUGINS-END emit,
+      LOADPLUGIN/UNLOADPLUGIN parse, UNLOADED emit) onto it; retired the hand-rolled format strings.
+- [x] Updated `Fct.App.Tests` + `Fct.Integration.Tests` to reference the libs; deleted their
+      `SatelliteProtocol.cs` / `LogEvents.cs` / `LogPaths.cs` / `GameEventFrame.cs` links and fixed the
+      `using Fct.App;` → `using Fct.Bridge;` in the moved-type consumers.
+- [x] Deleted the emptied `shared/Logging` + `shared/Bridge` folders; added both projects to `.slnx`.
 
-**Exit gate:** build + tests green; **host↔satellite handshake verified** (integration test or manual
-launch); no linked logging/bridge source remains anywhere.
+**Exit gate:** ☑ build + tests green (114 App, 61 Compat.Act, 21 Flow, 55 Shim, 6 Parser, 7 Integration
++ 1 data-dependent skip); **host↔satellite handshake verified** — the integration suite launched the
+real staged satellite and completed the READY/HWND handshake through the shared `SatelliteProtocol`
+codec; no linked logging/bridge source remains anywhere.
 **Risk / rollback:** low–med (records on net48; confirm `Fct.LegacyHost` binding redirects unaffected).
 Pure move + re-wire — revert restores links.
 

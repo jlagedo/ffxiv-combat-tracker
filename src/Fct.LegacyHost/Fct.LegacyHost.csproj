@@ -60,12 +60,11 @@
     <PackageReference Include="Serilog.Sinks.File" />
   </ItemGroup>
 
-  <!-- Shared logging contract: same EventId taxonomy + bridge wire format compiled on both sides. -->
+  <!-- Shared logging + bridge contracts: one identity for the EventId taxonomy, log record, bridge
+       wire codec, and satellite protocol across both ends of the bridge (net48;net10 libraries). -->
   <ItemGroup>
-    <Compile Include="..\..\shared\Logging\LogEvents.cs" Link="Logging\LogEvents.cs" />
-    <Compile Include="..\..\shared\Logging\LogPaths.cs" Link="Logging\LogPaths.cs" />
-    <Compile Include="..\..\shared\Logging\BridgeLogRecord.cs" Link="Logging\BridgeLogRecord.cs" />
-    <Compile Include="..\..\shared\Bridge\GameEventFrame.cs" Link="Bridge\GameEventFrame.cs" />
+    <ProjectReference Include="..\Fct.Logging.Contracts\Fct.Logging.Contracts.csproj" />
+    <ProjectReference Include="..\Fct.Bridge.Contracts\Fct.Bridge.Contracts.csproj" />
   </ItemGroup>
 
 </Project>

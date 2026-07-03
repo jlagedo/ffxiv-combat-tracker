@@ -1,0 +1,21 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!--
+    Shared bridge contract: the satellite<->host line protocol (SatelliteProtocol handshake +
+    load/unload frames) and the typed game-event wire codec (GameEventFrame). Multi-targets
+    net48;net10 so both ends of the bridge serialize/parse with one identical implementation.
+    References Fct.Abstractions for the GameEvent domain records GameEventFrame carries.
+  -->
+  <PropertyGroup>
+    <TargetFrameworks>net48;net10.0</TargetFrameworks>
+    <ImplicitUsings>disable</ImplicitUsings>
+    <RootNamespace>Fct.Bridge</RootNamespace>
+    <Version>1.0.0</Version>
+    <Description>FFXIV Combat Tracker bridge contract — the satellite handshake/command protocol and the typed GameEvent wire codec shared by the net10 host and the net48 satellite.</Description>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\Fct.Abstractions\Fct.Abstractions.csproj" />
+  </ItemGroup>
+
+</Project>

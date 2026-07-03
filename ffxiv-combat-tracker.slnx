@@ -4,6 +4,8 @@
     <Project Path="src/Fct.Abstractions.Testing/Fct.Abstractions.Testing.csproj" />
     <Project Path="src/Fct.Abstractions.UI/Fct.Abstractions.UI.csproj" />
     <Project Path="src/Fct.App/Fct.App.csproj" />
+    <Project Path="src/Fct.Bridge.Contracts/Fct.Bridge.Contracts.csproj" />
+    <Project Path="src/Fct.Logging.Contracts/Fct.Logging.Contracts.csproj" />
     <Project Path="src/Fct.LegacyHost/Fct.LegacyHost.csproj" />
     <Project Path="src/Fct.Compat.Act/Fct.Compat.Act.csproj" />
     <Project Path="src/Fct.Compat.Shim/Fct.Compat.Shim.csproj" />

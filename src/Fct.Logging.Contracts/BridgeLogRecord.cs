@@ -7,13 +7,13 @@ using Microsoft.Extensions.Logging;
 namespace Fct.Logging
 {
     // One log record forwarded from the net48 satellite to the net10 host over the bridge pipe, so
-    // every satellite log line lands in the host's unified Serilog pipeline. Shared source: the
-    // satellite serializes with ToWire(); the host parses with TryParse() — same code, same shape.
+    // every satellite log line lands in the host's unified Serilog pipeline. The satellite
+    // serializes with ToWire(); the host parses with TryParse() — same code, same shape.
     //
     // Wire form is a single line, tab-delimited, with the free-text message/exception escaped so a
     // record never spans lines or collides with the delimiter (no JSON dependency on either side):
     //   LOG <iso8601>\t<level>\t<eventId>\t<eventName>\t<category>\t<message>\t<exception>
-    internal sealed class BridgeLogRecord
+    public sealed class BridgeLogRecord
     {
         public const string Prefix = "LOG ";
 

@@ -5,6 +5,7 @@ using System.IO.Pipes;
 using System.Linq;
 using System.Windows.Forms;
 using Advanced_Combat_Tracker;
+using Fct.Bridge;
 using Fct.LegacyHost.Logging;
 using Fct.Logging;
 using Microsoft.Extensions.Logging;
@@ -141,7 +142,7 @@ namespace Fct.LegacyHost
                 "Loading FFXIV_ACT_Plugin (wrapped) from {Path}", FacadeHost.FfxivPluginPath);
             _ffxiv = FacadeHost.LoadWrappedFfxivPlugin(FacadeHost.FfxivPluginPath);
             _plugins[_ffxiv.Key] = _ffxiv;
-            SendLine($"HWND {_ffxiv.Hwnd.ToInt64():X}");   // primary window (bridge-handshake compat)
+            SendLine(SatelliteProtocol.FormatHwnd(_ffxiv.Hwnd));   // primary window (bridge-handshake compat)
             SendPlugin(_ffxiv);
 
             _log.LogInformation(LogEvents.PluginLoading,
@@ -156,7 +157,7 @@ namespace Fct.LegacyHost
                 "Loading Fct.StreamProbe from {Path}", FacadeHost.StreamProbePath);
             _probe = FacadeHost.LoadProbe(FacadeHost.StreamProbePath);
 
-            SendLine("PLUGINS-END");
+            SendLine(SatelliteProtocol.PluginsEnd);
             _log.LogInformation(LogEvents.PluginsReady,
                 "Loaded 2 plugin window(s): {Ffxiv}=0x{FfxivHwnd:X}, {Overlay}=0x{OverlayHwnd:X}",
                 _ffxiv.Title, _ffxiv.Hwnd.ToInt64(), _overlay.Title, _overlay.Hwnd.ToInt64());
@@ -392,8 +393,9 @@ namespace Fct.LegacyHost
                 _bridge = new NamedPipeClientStream(".", pipeName, PipeDirection.Out);
                 _bridge.Connect(5000);
                 _writer = new StreamWriter(_bridge) { AutoFlush = true };
-                SendLine($"READY pid={System.Diagnostics.Process.GetCurrentProcess().Id} " +
-                         $"x64={Environment.Is64BitProcess} clr={Environment.Version}");
+                SendLine(SatelliteProtocol.FormatReady(
+                    System.Diagnostics.Process.GetCurrentProcess().Id,
+                    Environment.Is64BitProcess, Environment.Version.ToString()));
                 // The pipe is up: start forwarding log records to the host's pipeline.
                 BridgeLogSink.Sender = SendLine;
                 // Wait on the host's cross-process graceful-shutdown signal (best effort).
@@ -437,52 +439,46 @@ namespace Fct.LegacyHost
 
         private static void HandleCommand(string line)
         {
-            if (line.StartsWith("LOADPLUGIN ", StringComparison.Ordinal))
+            if (SatelliteProtocol.TryParseLoadPlugin(line, out var loadKey, out var dll, out var title))
             {
-                var parts = line.Substring("LOADPLUGIN ".Length).Split(new[] { '|' }, 3);
-                if (parts.Length < 3) return;
-                var key = parts[0].Trim();
-                var dll = parts[1];
-                var title = parts[2];
                 InvokeOnUi(() =>
                 {
                     try
                     {
-                        var loaded = FacadeHost.LoadPlugin(key, title, dll, null);
-                        _plugins[key] = loaded;
+                        var loaded = FacadeHost.LoadPlugin(loadKey, title, dll, null);
+                        _plugins[loadKey] = loaded;
                         SendPlugin(loaded);
-                        _log.LogInformation(LogEvents.PluginInitialized, "Loaded plugin {Key} '{Title}' on command from {Dll}", key, title, dll);
+                        _log.LogInformation(LogEvents.PluginInitialized, "Loaded plugin {Key} '{Title}' on command from {Dll}", loadKey, title, dll);
                     }
                     catch (Exception ex)
                     {
-                        _log.LogError(LogEvents.PluginLoadFailed, ex, "LOADPLUGIN {Key} failed", key);
+                        _log.LogError(LogEvents.PluginLoadFailed, ex, "LOADPLUGIN {Key} failed", loadKey);
                     }
                 });
             }
-            else if (line.StartsWith("UNLOADPLUGIN ", StringComparison.Ordinal))
+            else if (SatelliteProtocol.TryParseUnloadPlugin(line, out var unloadKey))
             {
-                var key = line.Substring("UNLOADPLUGIN ".Length).Trim();
                 InvokeOnUi(() =>
                 {
                     bool ok = false;
                     try
                     {
-                        if (_plugins.TryGetValue(key, out var p))
+                        if (_plugins.TryGetValue(unloadKey, out var p))
                         {
                             FacadeHost.UnloadPlugin(p);
-                            _plugins.Remove(key);
+                            _plugins.Remove(unloadKey);
                             ok = true;
                         }
                         else
                         {
-                            _log.LogWarning(LogEvents.PluginDeInit, "UNLOADPLUGIN {Key}: no such loaded plugin", key);
+                            _log.LogWarning(LogEvents.PluginDeInit, "UNLOADPLUGIN {Key}: no such loaded plugin", unloadKey);
                         }
                     }
                     catch (Exception ex)
                     {
-                        _log.LogError(LogEvents.PluginDeInit, ex, "UNLOADPLUGIN {Key} failed", key);
+                        _log.LogError(LogEvents.PluginDeInit, ex, "UNLOADPLUGIN {Key} failed", unloadKey);
                     }
-                    SendLine($"UNLOADED {key}|{(ok ? "1" : "0")}");
+                    SendLine(SatelliteProtocol.FormatUnloaded(unloadKey, ok));
                 });
             }
         }
@@ -586,9 +582,7 @@ namespace Fct.LegacyHost
         private static void SendPlugin(LoadedPlugin p)
         {
             if (p == null) return;
-            var status = (p.Status ?? "").Replace('|', '/');
-            var title = (p.Title ?? "").Replace('|', '/');
-            SendLine($"PLUGIN {p.Key}|{p.Hwnd.ToInt64():X}|{status}|{title}");
+            SendLine(SatelliteProtocol.FormatPlugin(p.Key, p.Hwnd, p.Status, p.Title));
         }
     }
 }

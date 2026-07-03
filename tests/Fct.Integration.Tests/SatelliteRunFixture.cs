@@ -1,6 +1,6 @@
 using System.Diagnostics;
 using System.IO.Pipes;
-using Fct.App;
+using Fct.Bridge;
 using Xunit;
 
 namespace Fct.Integration.Tests

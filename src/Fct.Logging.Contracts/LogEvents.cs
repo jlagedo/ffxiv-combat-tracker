@@ -3,14 +3,15 @@ using Microsoft.Extensions.Logging;
 namespace Fct.Logging
 {
     // Stable EventId taxonomy for the whole stack. Ranges group the important junctions by
-    // subsystem so logs filter and correlate across the two-process bridge. This file is shared
-    // source: it is compiled into both the net10 host (Fct.App) and the net48 satellite
-    // (Fct.LegacyHost), so a given junction carries the same numeric id on both sides of the pipe.
+    // subsystem so logs filter and correlate across the two-process bridge. This assembly
+    // multi-targets net48;net10 so the net10 host (Fct.App) and the net48 satellite
+    // (Fct.LegacyHost) share one identity, so a junction carries the same numeric id on both
+    // sides of the pipe.
     //
     //   1xxx  host process            (launch, lifetime, bridge, embedding)
     //   2xxx  satellite process       (boot, plugin load, dispatch, diagnostics)
     //   3xxx  native parser
-    internal static class LogEvents
+    public static class LogEvents
     {
         // -- 10xx host lifecycle --
         public static readonly EventId HostStarting = new EventId(1000, nameof(HostStarting));
@@ -105,7 +106,7 @@ namespace Fct.Logging
     // Stable category names (the ILogger<T> category is the type's full name by default; these are
     // for the hand-built loggers where a type isn't the natural category — e.g. forwarded satellite
     // records re-emitted on the host).
-    internal static class LogCategories
+    public static class LogCategories
     {
         public const string Satellite = "Fct.Satellite";
         public const string Bridge = "Fct.Bridge";

@@ -1,3 +1,4 @@
+using Fct.Bridge;
 using Xunit;
 
 namespace Fct.App.Tests.Plugins;

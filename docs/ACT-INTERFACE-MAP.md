@@ -465,7 +465,8 @@ stack costs essentially nothing beyond G‑1.
 
 - **The net48↔net10 IPC bridge**: not an ACT surface — how the satellite (legacy plugins + facade)
   and the net10 host exchange typed domain events. Plugins never see it. Not its own project — the
-  host end lives in `Fct.App` (`SatelliteHost`/`SatelliteProtocol`/`SatelliteLifetime`), the
-  satellite end in `Fct.LegacyHost`.
+  host end lives in `Fct.App` (`SatelliteHost`/`SatelliteLifetime`), the satellite end in
+  `Fct.LegacyHost`; the wire contracts (`SatelliteProtocol`, `GameEventFrame`, `BridgeLogRecord`)
+  are the shared `Fct.Bridge.Contracts` + `Fct.Logging.Contracts` libraries.
 - **`IRawPacketSource`** (`Fct.Abstractions`): the one opt-in escape hatch exposing raw packets to
   net10 consumers / legacy `RegisterNetworkParser`, fed by `RingBufferDataSubscription`.

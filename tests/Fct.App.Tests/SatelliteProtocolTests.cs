@@ -1,5 +1,5 @@
 using System;
-using Fct.App;
+using Fct.Bridge;
 using Xunit;
 
 namespace Fct.App.Tests

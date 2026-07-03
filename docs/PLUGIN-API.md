@@ -597,7 +597,7 @@ Live game data reaches the net10 bus over the existing satellite→host pipe (pi
   tap, but it **projects each callback into a typed `GameEvent`** and ships it to the host instead of
   logging it. A bounded ring + one writer thread (drop-oldest + a dropped counter, mirroring
   `RingBufferDataSubscription`) keeps pipe I/O off the SDK dispatch/UI threads on the high-rate firehose.
-- **Wire (`shared/Bridge/GameEventFrame.cs`, linked into both processes)** — a new `EVT` frame kind
+- **Wire (`GameEventFrame` in `Fct.Bridge.Contracts`, referenced by both processes)** — a new `EVT` frame kind
   alongside `LOG`: one tab-delimited, backslash-escaped line per event, **no JSON** (the
   `BridgeLogRecord` convention). `Sequence` is not on the wire — the host re-stamps each decoded event
   from its own `IGameEventSink.NextSequence()` so the bus keeps one coherent per-session ordering.

@@ -1,10 +1,10 @@
 using System;
 using System.Globalization;
 
-namespace Fct.App;
+namespace Fct.Bridge;
 
 // One plugin the satellite loaded into its own embeddable window.
-internal readonly struct PluginLine
+public readonly struct PluginLine
 {
     public PluginLine(string key, IntPtr hwnd, string status, string title)
     { Key = key; Hwnd = hwnd; Status = status; Title = title; }
@@ -20,8 +20,9 @@ internal readonly struct PluginLine
 //   HWND <hex>                              (primary window; handshake compat)
 //   PLUGIN <key>|<hwndHex>|<status>|<title> (one per loaded plugin window)
 //   PLUGINS-END                             (no more plugin lines)
-// Pure parsing, separated from the I/O in SatelliteHost so it can be unit-tested.
-internal static class SatelliteProtocol
+// Pure parsing/formatting, separated from the I/O (SatelliteHost on the host, Program on the
+// satellite) so both ends share one implementation and it can be unit-tested.
+public static class SatelliteProtocol
 {
     public const string ReadyPrefix = "READY";
     public const string HwndPrefix = "HWND ";
@@ -32,6 +33,20 @@ internal static class SatelliteProtocol
     public const string LoadPluginPrefix = "LOADPLUGIN ";
     public const string UnloadPluginPrefix = "UNLOADPLUGIN ";
     public const string UnloadedPrefix = "UNLOADED ";
+
+    // ---- satellite -> host handshake frames (formatted on the satellite, parsed on the host) ----
+
+    /// <summary>Format "READY pid=&lt;n&gt; x64=&lt;bool&gt; clr=&lt;version&gt;".</summary>
+    public static string FormatReady(int pid, bool x64, string clr)
+        => ReadyPrefix + $" pid={pid} x64={x64} clr={clr}";
+
+    /// <summary>Format "HWND &lt;hex&gt;" for an embeddable window handle.</summary>
+    public static string FormatHwnd(IntPtr handle)
+        => HwndPrefix + handle.ToInt64().ToString("X", CultureInfo.InvariantCulture);
+
+    /// <summary>Format "PLUGIN &lt;key&gt;|&lt;hwndHex&gt;|&lt;status&gt;|&lt;title&gt;". '|' in status/title is sanitized to '/'.</summary>
+    public static string FormatPlugin(string key, IntPtr handle, string? status, string? title)
+        => PluginPrefix + $"{key}|{handle.ToInt64().ToString("X", CultureInfo.InvariantCulture)}|{San(status)}|{San(title)}";
 
     public static bool IsReady(string? line) =>
         line != null && line.StartsWith(ReadyPrefix, StringComparison.Ordinal);
