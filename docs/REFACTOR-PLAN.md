@@ -34,7 +34,7 @@ Status legend: ☐ not started · ◐ in progress · ☑ done · ⊘ blocked
 | 1 | Shared contracts → libraries | #6 | low | ☑ |
 | 2 | Extract `Fct.Host` (god-project split) | #1 (CRITICAL) | med | ☑ |
 | 3 | Extract `Fct.Aggregation` engine | #2 | med (parity) | ☑ |
-| 4 | Thin ACT facade + parser direction | #4, #5 | low–med | ☐ |
+| 4 | Thin ACT facade + parser direction | #4, #5 | low–med | ☑ |
 | 5 | Shim-as-plugin (drop hard ref) | #3 | high | ☐ |
 
 ## Sequence rationale
@@ -214,17 +214,34 @@ data-dependent skip); real-plugin replay reaches `Started` and reproduces the `Y
 **Goal:** with the engine extracted, reduce `Fct.Compat.Act` to impersonation-identity + WinForms host
 shims, and settle the odd `Fct.Parser.Legacy → Fct.Compat.Act` direction.
 
-- [ ] Confirm `Fct.Compat.Act` now holds only: `FormActMain`/`EncounterData`/`CombatantData` WinForms
-      shims, `ActGlobals`, and the fake-identity/signing config (engine is referenced, not compiled in).
-- [ ] Audit what `Fct.Parser.Legacy` actually consumes from `Fct.Compat.Act`. If it's only
-      host-surface types (`ActGlobals`/`Advanced_Combat_Tracker`), decide: narrow the reference to a
-      thinner surface, or accept the direction and record the rationale in `docs/ARCHITECTURE.md`.
-- [ ] (Optional) if a clean "ACT host-surface" separates naturally, split it; otherwise document the
-      accepted dependency with its reason.
+- [x] Confirmed `Fct.Compat.Act` now holds **only** host-surface: `FormActMain` (+ combat pipeline
+      delegation into the engine), `ActGlobals` (statics + the `AggregationGlobals` accessor wiring),
+      the `IActPluginV1`/`IActPluginAlias`/`ActPluginData` contract + ACT event args/delegates
+      (`Primitives.cs`), WinForms shims (`SettingsSerializer`, `FormSpellTimers`, `FormImportProgress`,
+      `TraySlider`), the fake-identity/signing config, and `TypeForwards.cs`. **No engine code compiled
+      in** — the aggregation types are `TypeForwardedTo(Fct.Aggregation)`, which is referenced (P3).
+- [x] Audited `Fct.Parser.Legacy`'s consumption of `Fct.Compat.Act`: a single file
+      (`WrappedFfxivPlugin.cs`) touches the `Advanced_Combat_Tracker` namespace, and it consumes
+      **only two host-surface contract types** — `IActPluginV1` and `IActPluginAlias`. No engine,
+      aggregation, `ActGlobals`, or `FormActMain` types are consumed by the parser.
+- [x] **Decision: accept the direction, document the rationale** (narrowing is impossible, not merely
+      unattractive). `WrappedFfxivPlugin` is placed in `ActPluginData.pluginObj`, so it must **be** an
+      `IActPluginV1`, and it composes over a real plugin's `IActPluginV1` — which resolves to the
+      facade's `Advanced_Combat_Tracker.IActPluginV1, Advanced Combat Tracker`. That contract must carry
+      the impersonation identity by requirement, so it cannot be relocated to a thinner shared surface
+      without breaking the identity the real precompiled plugins bind to. Recorded in
+      `docs/ARCHITECTURE.md` (§4, after the project table). No clean "ACT host-surface" separates —
+      no split performed.
+- [x] Doc truth-up alongside: refreshed the `Fct.Compat.Act` / `Fct.Parser.Legacy` project-table
+      entries in `docs/ARCHITECTURE.md`, and fixed a stale §8 reference that still called
+      `Fct.Compat.Act` "the ACT engine" (the engine is `Fct.Aggregation` since P3).
 
-**Exit gate:** facade responsibilities minimized + documented; parser dependency justified or narrowed;
-build + tests green.
-**Risk / rollback:** low–med; mostly investigation + small moves.
+**Exit gate:** ☑ facade confirmed minimal (host surface only; engine referenced, not compiled);
+parser→facade dependency justified + documented as a necessary host-surface reference; no code moves
+were needed (investigation confirmed the split is already clean). Build + full suite green (61
+Compat.Act, 114 App, 6 Parser, 21 Flow, 55 Shim, 7 Integration + 1 data-dependent skip); the
+Integration suite launched the real staged satellite through the READY/HWND handshake.
+**Risk / rollback:** low–med; investigation + docs only — no source moved, nothing to roll back.
 
 ---
 
@@ -281,6 +298,9 @@ Fct.Compat.Shim.ActFacade (net10, "Advanced Combat Tracker") ──> Fct.Aggrega
 
 ## Open items to revisit
 
-- Phase 4: final call on the `Fct.Parser.Legacy → Fct.Compat.Act` direction (narrow vs. document).
+- ~~Phase 4: final call on the `Fct.Parser.Legacy → Fct.Compat.Act` direction (narrow vs. document).~~
+  **Resolved: documented.** The direction is a necessary host-surface reference — `WrappedFfxivPlugin`
+  implements the facade's `IActPluginV1`, which must carry the `Advanced Combat Tracker` impersonation
+  identity, so it cannot be narrowed to a thinner surface. Rationale in `docs/ARCHITECTURE.md` §4.
 - Phase 5: confirm shared-ALC identity unification for the impersonation facades holds without the
   `deps.json` bake-in; fall back to hard reference if not.

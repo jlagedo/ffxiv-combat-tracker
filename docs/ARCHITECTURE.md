@@ -144,8 +144,15 @@ Fct.LegacyHost     net48        from-scratch ACT engine + IActPluginV1 loader; h
 
 Fct.Parser.Legacy  net48        wraps the real FFXIV_ACT_Plugin (DataRepository +
                                 RingBufferDataSubscription / IRawPacketSource). The parser, permanently.
+                                Its WrappedFfxivPlugin implements the facade's IActPluginV1 /
+                                IActPluginAlias, so it references Fct.Compat.Act (see note below).
 
-Fct.Compat.Act     net48        the ACT facade surface (lives in LegacyHost).
+Fct.Compat.Act     net48        the ACT facade: impersonation identity ("Advanced Combat
+                                Tracker") + WinForms host shims (FormActMain, ActGlobals,
+                                SettingsSerializer, FormSpellTimers, TraySlider,
+                                FormImportProgress, IActPluginV1). Type-forwards the aggregation
+                                engine types to Fct.Aggregation — no engine code compiled in.
+                                Lives in LegacyHost.
 
 Fct.StreamProbe    net48        diagnostic plugin in the satellite; taps the parser's
                                 swing/raw-packet stream for inspection.
@@ -155,6 +162,17 @@ The net48↔net10 IPC bridge (named pipe + wire protocol) is **not its own proje
 host end lives in `Fct.Host` (loaded by the `Fct.App` process), the satellite end in
 `Fct.LegacyHost`. Its wire contracts are the shared `Fct.Bridge.Contracts` +
 `Fct.Logging.Contracts` libraries, referenced by both ends.
+
+**`Fct.Parser.Legacy` → `Fct.Compat.Act` is deliberate, not backwards.** The parser wrapper is
+placed in `ActPluginData.pluginObj` in the facade's plugin list, so `WrappedFfxivPlugin` **is** an
+`IActPluginV1` and must carry the facade's ACT host contract. That contract — `IActPluginV1` and the
+`IActPluginAlias` seam `PluginGetSelfData` resolves through — lives in the `Advanced Combat Tracker`
+identity **by requirement**: the real precompiled plugins implement
+`Advanced_Combat_Tracker.IActPluginV1, Advanced Combat Tracker`, and the wrapper composes over a real
+plugin's `IActPluginV1`, which resolves to exactly that facade type. The contract therefore **cannot**
+be relocated to a thinner shared surface without breaking the impersonation identity, so the reference
+is accepted as-is. It is a host-surface reference only — the parser consumes no engine or aggregation
+types from the facade (those live in `Fct.Aggregation`).
 
 ### 4a. UI framework
 
@@ -264,8 +282,8 @@ post-parse data reaches the net10 bus as typed `GameEvent`s over the bridge forw
 
 **Reimplementing the FFXIV parser natively is an explicit non-goal.** Opcode/packet/memory decode
 stays the plugin's job, permanently; we never read, mirror, or port its logic. We build only the
-**consume/aggregate** side — the ACT engine (`Fct.Compat.Act`) — held to the real ACT binary
-corpus-wide (see `docs/TESTING.md`).
+**consume/aggregate** side — the ACT aggregation engine (`Fct.Aggregation`, fed through the
+`Fct.Compat.Act` facade) — held to the real ACT binary corpus-wide (see `docs/TESTING.md`).
 
 ---
 
