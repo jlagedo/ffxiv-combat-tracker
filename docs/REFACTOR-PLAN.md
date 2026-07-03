@@ -35,7 +35,7 @@ Status legend: ☐ not started · ◐ in progress · ☑ done · ⊘ blocked
 | 2 | Extract `Fct.Host` (god-project split) | #1 (CRITICAL) | med | ☑ |
 | 3 | Extract `Fct.Aggregation` engine | #2 | med (parity) | ☑ |
 | 4 | Thin ACT facade + parser direction | #4, #5 | low–med | ☑ |
-| 5 | Shim-as-plugin (drop hard ref) | #3 | high | ☐ |
+| 5 | Shim-as-plugin (drop hard ref) | #3 | high | ☑ |
 
 ## Sequence rationale
 
@@ -251,22 +251,44 @@ Integration suite launched the real staged satellite through the READY/HWND hand
 impersonation facades as a **staged plugin package** into the shared/default ALC, so the modern host's
 static graph no longer bakes in ACT-impersonation identities. Highest runtime risk → last.
 
-- [ ] Verify the loader (now in `Fct.Host`) can place an assembly set into the shared/default ALC via
-      `PluginLoadContext.IsShared` — the same mechanism that shares Avalonia/`Fct.Abstractions` today.
-- [ ] Change `Fct.App`'s `<ProjectReference Include="Fct.Compat.Shim">` to
-      `ReferenceOutputAssembly="false"` + a staging target (mirror `StageSamplePlugin`), staging
-      `Fct.Compat.Shim` + `ActFacade` (`Advanced Combat Tracker`) + `SdkFacade`
-      (`FFXIV_ACT_Plugin.Common`) into the legacy-runtime folder.
-- [ ] Ensure the two impersonation facades resolve into the **shared** ALC so a shimmed plugin and the
-      shim agree on type identity (the original reason for the hard ref) — via the loader's
-      shared-assembly path, **not** a `deps.json` bake-in.
-- [ ] End-to-end: load `Fct.SampleLegacyPlugin` through the shim; confirm `InitPlugin(TabPage, Label)`
-      + `ActGlobals` wiring still work.
+- [x] Confirmed the shared-assembly mechanism: `PluginLoadContext.IsShared` already routes the three
+      shim/facade names to the default context (returns `null` in `Load`). What was missing once the hard
+      ref is dropped is the default context's *ability to find* them (they leave TPA/`deps.json`) —
+      supplied by new `Fct.Host/Plugins/CompatRuntime.Enable`, a one-shot `AssemblyLoadContext.Default.
+      Resolving` hook that probes the staged `compat\` folder by simple name.
+- [x] Flipped `Fct.App`'s `Fct.Compat.Shim` `ProjectReference` to `ReferenceOutputAssembly="false"
+      Private="false"` and added `StageCompatShim` (shim + `ActFacade` (`Advanced Combat Tracker`) +
+      `SdkFacade` (`FFXIV_ACT_Plugin.Common`) + `Fct.Aggregation` → `compat\`) and `StageSampleLegacyPlugin`
+      (dev sample → `plugins\`) targets. `Program.cs`'s `LegacyPluginHostFactory` is now **reflective**
+      (`AssemblyLoadContext.Default.LoadFromAssemblyName("Fct.Compat.Shim")` → `Activator.CreateInstance`),
+      dropping the last compile-time shim dependency; `BuildHost` calls `CompatRuntime.Enable(…/compat)`
+      before `host.Start()`.
+- [x] Facades resolve into the shared/default ALC via the `compat\` hook, **not** a `deps.json` bake-in —
+      verified: `Fct.App.deps.json` contains none of `Advanced Combat Tracker` / `FFXIV_ACT_Plugin.Common`
+      / `Fct.Compat.Shim` / `Fct.Aggregation`, and the app root carries no impersonation DLL (they live
+      only under `compat\`). `StaticGraphTests` guards this.
+- [x] End-to-end confirmed twice: the new shim-free `Fct.Compat.Shim.E2E.Tests` (net10-windows) stages
+      `compat\` + the legacy sample, enables `CompatRuntime`, loads via the **real** reflective factory +
+      `PluginManager`, and asserts `InitPlugin` ran (`InitCount==1`, status label set through the shared
+      `ActGlobals` hub) + `DeInitPlugin` on unload. The real `Fct.App.exe` smoke run logs `Compat runtime
+      enabled`, `Resolving Fct.Compat.Shim / Advanced Combat Tracker / FFXIV_ACT_Plugin.Common /
+      Fct.Aggregation from compat runtime`, `Loaded legacy plugin com.fct.sample-legacy … via compat
+      shim`, and the plugin's `SampleLegacyPlugin initialized`.
 
-**Exit gate:** `Fct.App`'s static graph contains **no** ACT-impersonation identities;
-`Fct.SampleLegacyPlugin` loads + runs via the shim through the loader; build + tests green.
-**Risk / rollback:** HIGH (runtime ALC identity + legacy load path). Keep the ability to revert to the
-hard reference if shared-ALC identity unification proves fragile.
+**Fast-follow (enabled by, not part of, this phase):** `Fct.Aggregation` is intentionally **not** in
+`IsShared` — the identity topology is unchanged by P5 (one default copy + one private per plugin ALC) and
+the sample never exchanges engine types across the boundary. A real recompiled plugin that reads
+`EncounterData`/`CombatantData` through `ActGlobals` would need the engine shared; the fix (add
+`Fct.Aggregation` to `IsShared` + drop the plugin-private copy) is now possible because P5 makes the
+engine resolvable in the default ALC via `compat\`.
+
+**Exit gate:** ☑ `Fct.App`'s static graph contains **no** ACT-impersonation identities (deps.json guard
++ 4 new `StaticGraphTests` cases); `Fct.SampleLegacyPlugin` loads + runs via the shim through the loader
+(new e2e + real-exe smoke); build + full suite green (61 Compat.Act, 118 App, 6 Parser, 21 Flow, 55 Shim,
+1 Shim.E2E, 7 Integration + 1 data-dependent skip). The Integration suite launched the real staged
+satellite through the READY/HWND handshake.
+**Risk / rollback:** HIGH (runtime ALC identity + legacy load path). Revert restores the hard reference —
+the reflective factory + `CompatRuntime` + staging targets are the only moving parts.
 
 ---
 
@@ -286,7 +308,8 @@ Fct.Host (net10) ── host services + plugin loader + bridge-client   ← new 
 
 Fct.App (net10, WinExe) ── shell only: Views/ViewModels + composition root
   ├─> Fct.Host, Fct.Abstractions(.UI)
-  ├─> Fct.LegacyHost, Fct.SamplePlugin, Fct.Compat.Shim   (all staged, ReferenceOutputAssembly=false)  ← P5
+  ├─> Fct.LegacyHost (→satellite\), Fct.SamplePlugin + Fct.SampleLegacyPlugin (→plugins\),
+  │     Fct.Compat.Shim + facades (→compat\)   (all staged, ReferenceOutputAssembly=false)  ← P5
   └─> Fct.Bridge.Contracts, Fct.Logging.Contracts
 
 Fct.LegacyHost (net48, WinExe)
@@ -302,5 +325,13 @@ Fct.Compat.Shim.ActFacade (net10, "Advanced Combat Tracker") ──> Fct.Aggrega
   **Resolved: documented.** The direction is a necessary host-surface reference — `WrappedFfxivPlugin`
   implements the facade's `IActPluginV1`, which must carry the `Advanced Combat Tracker` impersonation
   identity, so it cannot be narrowed to a thinner surface. Rationale in `docs/ARCHITECTURE.md` §4.
-- Phase 5: confirm shared-ALC identity unification for the impersonation facades holds without the
-  `deps.json` bake-in; fall back to hard reference if not.
+- ~~Phase 5: confirm shared-ALC identity unification for the impersonation facades holds without the
+  `deps.json` bake-in; fall back to hard reference if not.~~ **Resolved: holds.** The two facades resolve
+  into the default ALC from the staged `compat\` package via `CompatRuntime`'s `Default.Resolving` hook
+  (no `deps.json` bake-in); a shimmed plugin and the shim share one `Advanced Combat Tracker` /
+  `FFXIV_ACT_Plugin.Common` identity through `PluginLoadContext.IsShared`. Proven by the e2e + real-exe
+  smoke. No fallback needed.
+- **New fast-follow (surfaced by Phase 5):** add `Fct.Aggregation` to `PluginLoadContext.IsShared` (and
+  drop the plugin-private engine copy) so recompiled plugins that exchange `EncounterData`/`CombatantData`
+  with the shim share the default-ALC engine identity. Not needed by the current sample; see the Phase 5
+  fast-follow note.

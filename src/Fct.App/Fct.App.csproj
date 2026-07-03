@@ -54,10 +54,24 @@
   </ItemGroup>
 
   <!-- The net10 compat shim + its two legacy-impersonating facades (Advanced Combat Tracker /
-       FFXIV_ACT_Plugin.Common). Referenced so they land in the host output + deps.json and the
-       default ALC resolves them for shimmed plugins (PluginLoadContext.IsShared shares them). -->
+       FFXIV_ACT_Plugin.Common). Built as a dependency but DO NOT reference its assemblies: they must
+       NOT land in this exe's deps.json (no ACT-impersonation identity in the modern host's static
+       graph). Instead StageCompatShim copies them under compat\ and CompatRuntime.Enable teaches the
+       default ALC to resolve them there at runtime — opt-in, not a flag day. -->
   <ItemGroup>
-    <ProjectReference Include="..\Fct.Compat.Shim\Fct.Compat.Shim.csproj" />
+    <ProjectReference Include="..\Fct.Compat.Shim\Fct.Compat.Shim.csproj"
+                      ReferenceOutputAssembly="false"
+                      Private="false" />
+  </ItemGroup>
+
+  <!-- Build the recompiled-legacy sample as a dependency (no assembly reference: it loads only through
+       its own ALC via the shim). Staged under plugins\ so the shipped exe exercises the shim path,
+       exactly as StageSamplePlugin does for the native sample. Its legacyEntry manifest routes it to
+       the reflective LegacyPluginHostFactory. -->
+  <ItemGroup>
+    <ProjectReference Include="..\..\samples\Fct.SampleLegacyPlugin\Fct.SampleLegacyPlugin.csproj"
+                      ReferenceOutputAssembly="false"
+                      Private="false" />
   </ItemGroup>
 
   <!-- Build the net48 satellite as a dependency (no assembly reference: different runtime)
@@ -92,6 +106,27 @@
     </ItemGroup>
     <Copy SourceFiles="@(SamplePluginFiles)"
           DestinationFiles="@(SamplePluginFiles->'$(OutDir)plugins\Fct.SamplePlugin\%(RecursiveDir)%(Filename)%(Extension)')"
+          SkipUnchangedFiles="true" />
+  </Target>
+
+  <!-- The opt-in legacy compat runtime: the shim + its two impersonation facades + the aggregation
+       engine, staged under compat\ (NOT under plugins\ — that folder is scanned for plugin.json and the
+       shim set would be mis-classified). CompatRuntime.Enable resolves these into the default ALC. -->
+  <Target Name="StageCompatShim" AfterTargets="Build">
+    <ItemGroup>
+      <CompatShimFiles Include="$(MSBuildThisFileDirectory)..\Fct.Compat.Shim\bin\$(Configuration)\net10.0-windows\**\*" />
+    </ItemGroup>
+    <Copy SourceFiles="@(CompatShimFiles)"
+          DestinationFiles="@(CompatShimFiles->'$(OutDir)compat\%(RecursiveDir)%(Filename)%(Extension)')"
+          SkipUnchangedFiles="true" />
+  </Target>
+
+  <Target Name="StageSampleLegacyPlugin" AfterTargets="Build">
+    <ItemGroup>
+      <SampleLegacyFiles Include="$(MSBuildThisFileDirectory)..\..\samples\Fct.SampleLegacyPlugin\bin\$(Configuration)\net10.0-windows\**\*" />
+    </ItemGroup>
+    <Copy SourceFiles="@(SampleLegacyFiles)"
+          DestinationFiles="@(SampleLegacyFiles->'$(OutDir)plugins\Fct.SampleLegacyPlugin\%(RecursiveDir)%(Filename)%(Extension)')"
           SkipUnchangedFiles="true" />
   </Target>
 </Project>

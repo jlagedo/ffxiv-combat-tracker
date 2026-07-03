@@ -23,6 +23,7 @@
   <Folder Name="/tests/">
     <Project Path="tests/Fct.Compat.Act.Tests/Fct.Compat.Act.Tests.csproj" />
     <Project Path="tests/Fct.Compat.Shim.Tests/Fct.Compat.Shim.Tests.csproj" />
+    <Project Path="tests/Fct.Compat.Shim.E2E.Tests/Fct.Compat.Shim.E2E.Tests.csproj" />
     <Project Path="tests/Fct.App.Tests/Fct.App.Tests.csproj" />
     <Project Path="tests/Fct.FlowTests/Fct.FlowTests.csproj" />
     <Project Path="tests/Fct.Integration.Tests/Fct.Integration.Tests.csproj" />

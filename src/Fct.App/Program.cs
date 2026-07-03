@@ -1,4 +1,7 @@
 using System;
+using System.IO;
+using System.Reflection;
+using System.Runtime.Loader;
 using System.Threading.Tasks;
 using Avalonia;
 using Fct.Abstractions;
@@ -82,16 +85,33 @@ class Program
         builder.Services.AddSingleton<ISatelliteNotificationText, SatelliteNotificationText>();
 
         // The compat shim's legacy-plugin host factory (injected into PluginManager for `legacyEntry`
-        // manifests). Kept behind a delegate so the loader takes no compile-time shim dependency.
-        builder.Services.AddSingleton<LegacyPluginHostFactory>(
-            _ => (assembly, legacyEntry) => new Fct.Compat.Shim.LegacyPluginHost(assembly, legacyEntry));
+        // manifests). The shim + its two impersonation facades are a staged compat\ package resolved
+        // into the default ALC by CompatRuntime — NOT a static reference of this exe — so the shim's
+        // LegacyPluginHost is materialized reflectively here (no compile-time shim dependency, no
+        // impersonation identity in Fct.App's deps.json). The (IPlugin) cast is safe because
+        // Fct.Abstractions is single-identity (shared up to the default context).
+        builder.Services.AddSingleton<LegacyPluginHostFactory>(_ => (assembly, legacyEntry) =>
+        {
+            var shim = AssemblyLoadContext.Default.LoadFromAssemblyName(new AssemblyName("Fct.Compat.Shim"));
+            var hostType = shim.GetType("Fct.Compat.Shim.LegacyPluginHost", throwOnError: true)!;
+            return (IPlugin)Activator.CreateInstance(hostType, assembly, legacyEntry)!;
+        });
 
         // The plugin UI dispatcher: Avalonia's UI thread, owned by the shell (kept out of Fct.Host so
         // the runtime takes no Avalonia.Threading dependency). The PluginUiCoordinator that consumes it
         // is registered by AddFctHostServices.
         builder.Services.AddSingleton<Fct.Abstractions.UI.IUiDispatcher, Fct.App.Plugins.Ui.AvaloniaUiDispatcher>();
 
-        return builder.Build();
+        var host = builder.Build();
+
+        // Opt in to the staged legacy compat runtime: teach the default ALC to resolve the shim + its
+        // two impersonation facades from compat\ (they are staged there, not baked into this exe's
+        // deps.json). Subscribed here — before host.Start() — so it is live before any plugin loads.
+        CompatRuntime.Enable(
+            Path.Combine(AppContext.BaseDirectory, "compat"),
+            host.Services.GetRequiredService<ILoggerFactory>());
+
+        return host;
     }
 
     // Nothing should reach these, but if it does we want it in the log rather than a silent crash.

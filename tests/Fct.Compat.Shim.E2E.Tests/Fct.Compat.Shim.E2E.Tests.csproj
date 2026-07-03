@@ -1,0 +1,50 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!--
+    Phase 5 end-to-end proof: the net10 host loads a recompiled-legacy plugin through the compat shim
+    with the shim + its two impersonation facades resolved SOLELY from a staged compat\ package — NO
+    compile-time reference to the shim (mirroring Fct.App's decoupled static graph). net10.0-windows
+    because loading the shim/facades pulls WinForms; a plain net10.0 host has no WindowsDesktop runtime.
+    The shim and the sample are built as dependencies and staged, never assembly-referenced.
+  -->
+  <PropertyGroup>
+    <TargetFramework>net10.0-windows</TargetFramework>
+    <UseWindowsForms>true</UseWindowsForms>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <!-- The host runtime under test (PluginManager + CompatRuntime); internals exposed via
+         InternalsVisibleTo("Fct.Compat.Shim.E2E.Tests") on Fct.Host. -->
+    <ProjectReference Include="..\..\src\Fct.Host\Fct.Host.csproj" />
+  </ItemGroup>
+
+  <!-- Built + staged, NOT assembly-referenced: the shim resolves only through the compat\ hook, and the
+       legacy sample loads only through its own ALC. This keeps the test's own graph shim-free. -->
+  <ItemGroup>
+    <ProjectReference Include="..\..\src\Fct.Compat.Shim\Fct.Compat.Shim.csproj"
+                      ReferenceOutputAssembly="false"
+                      Private="false" />
+    <ProjectReference Include="..\..\samples\Fct.SampleLegacyPlugin\Fct.SampleLegacyPlugin.csproj"
+                      ReferenceOutputAssembly="false"
+                      Private="false" />
+  </ItemGroup>
+
+  <Target Name="StageCompatRuntimeForTests" AfterTargets="Build">
+    <ItemGroup>
+      <CompatShimFiles Include="$(MSBuildThisFileDirectory)..\..\src\Fct.Compat.Shim\bin\$(Configuration)\net10.0-windows\**\*" />
+    </ItemGroup>
+    <Copy SourceFiles="@(CompatShimFiles)"
+          DestinationFiles="@(CompatShimFiles->'$(OutDir)compat\%(RecursiveDir)%(Filename)%(Extension)')"
+          SkipUnchangedFiles="true" />
+  </Target>
+
+  <Target Name="StageSampleLegacyPluginForTests" AfterTargets="Build">
+    <ItemGroup>
+      <SampleLegacyFiles Include="$(MSBuildThisFileDirectory)..\..\samples\Fct.SampleLegacyPlugin\bin\$(Configuration)\net10.0-windows\**\*" />
+    </ItemGroup>
+    <Copy SourceFiles="@(SampleLegacyFiles)"
+          DestinationFiles="@(SampleLegacyFiles->'$(OutDir)plugins\Fct.SampleLegacyPlugin\%(RecursiveDir)%(Filename)%(Extension)')"
+          SkipUnchangedFiles="true" />
+  </Target>
+
+</Project>

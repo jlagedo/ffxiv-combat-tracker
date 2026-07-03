@@ -128,16 +128,21 @@ Fct.Logging.Contracts net48;net10 shared logging contract: LogEvents/LogCategori
 Fct.Host           net10        the net10 host runtime (headless class library): the
                                 IPluginHost services + typed bus (Channels), the
                                 ALC-per-plugin loader + manifest/contract-version gate,
-                                and the IPC bridge client (SatelliteHost/SatelliteLifetime/
-                                ProcessJob; wire contracts in Fct.Bridge.Contracts/
-                                Fct.Logging.Contracts). Registered via AddFctHostServices;
-                                InternalsVisibleTo Fct.App + Fct.App.Tests. See §4a.
+                                CompatRuntime (the default-ALC resolver for the staged
+                                compat\ legacy package), and the IPC bridge client
+                                (SatelliteHost/SatelliteLifetime/ProcessJob; wire contracts
+                                in Fct.Bridge.Contracts/Fct.Logging.Contracts). Registered
+                                via AddFctHostServices; InternalsVisibleTo Fct.App +
+                                Fct.App.Tests + Fct.Compat.Shim.E2E.Tests. See §4a.
 
 Fct.App            net10        the Avalonia shell + composition root (one exe): control
                                 panel + shell (MVVM), localization, Serilog bootstrap, and
                                 the Generic Host wiring that binds Fct.Host to the UI (the
-                                IUiDispatcher, LegacyPluginHostFactory, and localized
-                                ISatelliteNotificationText it supplies). See §4a.
+                                IUiDispatcher, the reflective LegacyPluginHostFactory, and
+                                localized ISatelliteNotificationText it supplies). Enables
+                                CompatRuntime and stages the legacy compat package under
+                                compat\ (no static Fct.Compat.Shim reference — no ACT-
+                                impersonation identity in its deps.json). See §4a.
 
 Fct.LegacyHost     net48        from-scratch ACT engine + IActPluginV1 loader; hosts
                                 the five real plugins; satellite end of the bridge.

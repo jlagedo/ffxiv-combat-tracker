@@ -34,4 +34,20 @@
           SkipUnchangedFiles="true" />
   </Target>
 
+  <!-- Build Fct.App first (no assembly reference: it is net10.0-windows and pulls WinForms/Avalonia we
+       don't want in the test graph) so its deps.json exists, then copy it in. StaticGraphTests asserts
+       the shipped exe carries no ACT-impersonation identity (Phase 5 goal). -->
+  <ItemGroup>
+    <ProjectReference Include="..\..\src\Fct.App\Fct.App.csproj"
+                      ReferenceOutputAssembly="false"
+                      SkipGetTargetFrameworkProperties="true"
+                      Private="false" />
+  </ItemGroup>
+
+  <Target Name="StageAppDepsForTests" AfterTargets="Build">
+    <Copy SourceFiles="$(MSBuildThisFileDirectory)..\..\src\Fct.App\bin\$(Configuration)\net10.0-windows\Fct.App.deps.json"
+          DestinationFiles="$(OutDir)Fct.App.deps.json"
+          SkipUnchangedFiles="true" />
+  </Target>
+
 </Project>
