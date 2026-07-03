@@ -155,7 +155,7 @@ Three findings drove the shapes:
 |---|---|---|
 | `Fct.Abstractions` | net48;net10 | core contract: lifecycle, events, snapshot, encounter, audio, registry, raw hatch. **No UI, no opcodes.** |
 | `Fct.Abstractions.UI` | net10 | Avalonia UI contribution surfaces. Referenced only by UI-contributing plugins. |
-| `Fct.Abstractions.Testing` | net48;net10 | in-memory fakes of every contract interface + the `ShimStub` seam, for the headless flow tests. |
+| `Fct.Abstractions.Testing` | net10 | in-memory fakes of every contract interface + the `ShimStub` seam, for the headless flow tests. |
 | `Fct.Compat.Shim` | net10-windows | the recompile-shim adapter runtime over the modern contract (`LegacyPluginHost`, the SDK mappers/projectors). Distinct from the existing net48 `Fct.Compat.Act` (the satellite's ACT engine). |
 | `Fct.Compat.Shim.ActFacade` | net10-windows | assembly `Advanced Combat Tracker`: the POCO `ActGlobals`/`FormActMain` surface a recompiled plugin binds to, forwarding onto `IPluginHost`. |
 | `Fct.Compat.Shim.SdkFacade` | net10 | assembly `FFXIV_ACT_Plugin.Common`: re-declares the SDK surface (`IDataSubscription`, `IDataRepository`, `Combatant`/`Player`/`NetworkBuff`/`PartyType`) a recompiled plugin binds to. |
@@ -470,7 +470,7 @@ separately by `Fct.Compat.Shim.Tests`; see [The net10 compat shim](#the-net10-co
 
 ### The harness
 
-`Fct.Abstractions.Testing` (net48;net10) + `Fct.FlowTests` (net10 xUnit) provide:
+`Fct.Abstractions.Testing` (net10) + `Fct.FlowTests` (net10 xUnit) provide:
 
 1. **`FakePluginHost : IPluginHost`** — wires the fakes below; `Self` = a canned `PluginInfo`.
 2. **`InMemoryEventBus : IGameEventStream`** — a bounded per-subscriber ring (hand-rolled, mirroring

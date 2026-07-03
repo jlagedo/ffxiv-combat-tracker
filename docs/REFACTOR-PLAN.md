@@ -30,7 +30,7 @@ Status legend: ☐ not started · ◐ in progress · ☑ done · ⊘ blocked
 
 | # | Phase | Addresses (review finding) | Risk | Status |
 |---|-------|----------------------------|------|--------|
-| 0 | Baseline & docs truth-up | Stale map, #7, #8 | minimal | ☐ |
+| 0 | Baseline & docs truth-up | Stale map, #7, #8 | minimal | ☑ |
 | 1 | Shared contracts → libraries | #6 | low | ☐ |
 | 2 | Extract `Fct.Host` (god-project split) | #1 (CRITICAL) | med | ☐ |
 | 3 | Extract `Fct.Aggregation` engine | #2 | med (parity) | ☐ |
@@ -66,14 +66,16 @@ Status legend: ☐ not started · ◐ in progress · ☑ done · ⊘ blocked
 
 **Goal:** lock a green baseline and clear zero-risk doc/config defects so later diffs read clean.
 
-- [ ] Record baseline: full build + `.\test.ps1` green; note which data-dependent tests skip.
-- [ ] Refresh the `CLAUDE.md` project map to include `Fct.Compat.Shim`,
+- [x] Record baseline: full build + `.\test.ps1` green; note which data-dependent tests skip.
+      (All suites pass; one skip: `Fct.Integration.Tests.SatelliteIntegrationTests
+      .Self_test_aggregation_matches_known_vector`, data-dependent on `FFXIV_ACT_Plugin.dll`.)
+- [x] Refresh the `CLAUDE.md` project map to include `Fct.Compat.Shim`,
       `Fct.Compat.Shim.ActFacade`, `Fct.Compat.Shim.SdkFacade`, and `Fct.Abstractions.Testing`.
-- [ ] Document the two **intentional** assembly-name collisions (`Advanced Combat Tracker` ×2,
+- [x] Document the two **intentional** assembly-name collisions (`Advanced Combat Tracker` ×2,
       `FFXIV_ACT_Plugin.Common` ×2) in the map so nobody "fixes" them (finding #8).
-- [ ] Drop the speculative `net48` TFM from `Fct.Abstractions.Testing` → `net10` only (all three
+- [x] Drop the speculative `net48` TFM from `Fct.Abstractions.Testing` → `net10` only (all three
       consumers are net10; re-add when a net48 shim consumer is real) (finding #7).
-- [ ] Commit this plan.
+- [x] Commit this plan.
 
 **Exit gate:** build + tests green; `CLAUDE.md` map matches the `.slnx`.
 **Risk / rollback:** minimal; each item is independently revertible.

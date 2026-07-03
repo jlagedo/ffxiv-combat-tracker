@@ -57,11 +57,14 @@ Design docs — **read before proposing changes:**
 |---|---|---|
 | `Fct.Abstractions` | net48;net10 | plugin SDK: contracts + domain records. No opcodes. |
 | `Fct.Abstractions.UI` | net10 | Avalonia UI contribution surfaces (`IUiContributor`/`IUiHost`); referenced by UI-contributing net10 plugins and by `Fct.App` itself (the shell's `IUiHost` implementation). |
-| `Fct.Abstractions.Testing` | net48;net10 | in-memory fakes of every plugin-contract interface + the `ShimStub` seam; backs the headless flow tests. |
+| `Fct.Abstractions.Testing` | net10 | in-memory fakes of every plugin-contract interface + the `ShimStub` seam; backs the headless flow tests. |
 | `Fct.App` | net10 | the **.NET 10 host**: Avalonia control panel + shell (MVVM); owns the IPC bridge client (`SatelliteHost`/`SatelliteProtocol`/`SatelliteLifetime`) and the net10 plugin host (`Hosting/` services, `Plugins/` ALC loader). |
 | `Fct.LegacyHost` | net48 | from-scratch ACT engine host; hosts the five real plugins; the net48 end of the bridge. |
 | `Fct.Parser.Legacy` | net48 | wraps the real FFXIV_ACT_Plugin. `WrappedFfxivPlugin` forwards `DataRepository`/`_iocContainer`/lifecycle to the real instance; `RingBufferDataSubscription` (`IDataSubscription` + `IRawPacketSource`) replaces the plugin's per-subscriber `BeginInvoke` fan-out with one bounded ring + single dispatch thread (~250× faster dispatch). |
 | `Fct.Compat.Act` | net48 | **the ACT engine** (facade surface, hosted in LegacyHost): `EncounterData`/`CombatantData`/`AttackType` aggregation + `ExportVariables`. Parity: see load-bearing facts + `docs/TESTING.md`. |
+| `Fct.Compat.Shim` | net10-windows | recompile-shim adapter runtime re-projecting the legacy ACT/SDK programming model onto `IPluginHost`; hosts a recompiled legacy plugin (`LegacyPluginHost : IPlugin`), wires `ActGlobals.oFormActMain`, maps the SDK `IDataSubscription`/`IDataRepository`/`Combatant` surface. The in-process net10 legacy path — distinct from the net48 `Fct.Compat.Act`. Design: [`docs/PLUGIN-API.md`](docs/PLUGIN-API.md). |
+| `Fct.Compat.Shim.ActFacade` | net10-windows | assembly `Advanced Combat Tracker`: the POCO `ActGlobals`/`FormActMain` host surface a recompiled plugin binds to (net10 counterpart of `Fct.Compat.Act`), forwarding onto `IPluginHost`. |
+| `Fct.Compat.Shim.SdkFacade` | net10 | assembly `FFXIV_ACT_Plugin.Common`: re-declares the SDK surface (`IDataSubscription`/`IDataRepository` + `Combatant`/`Player`/`NetworkBuff`/`PartyType`) a recompiled plugin binds to. No behavior — the `Fct.Compat.Shim` adapters map it onto the host. |
 | `Fct.StreamProbe` | net48 | diagnostic plugin in the satellite; taps the `MasterSwing`/raw-packet stream. |
 
 The net10↔net48 **IPC bridge is not its own project** — host end in `Fct.App`, satellite end in `Fct.LegacyHost`.
@@ -97,6 +100,10 @@ are mapped in [`docs/ACT-INTERFACE-MAP.md`](docs/ACT-INTERFACE-MAP.md).
 
 - **Naming:** assemblies are prefixed `Fct.`. Facade assemblies that must impersonate legacy DLLs
   keep the **legacy** identity (e.g. `Advanced Combat Tracker`, `FFXIV_ACT_Plugin.Common`) — intentional.
+  Two assembly-name collisions are deliberate — **do not "fix" them:** `Advanced Combat Tracker` is the
+  assembly name of both `Fct.Compat.Act` (net48) and `Fct.Compat.Shim.ActFacade` (net10), one facade
+  per runtime side; `FFXIV_ACT_Plugin.Common` (`Fct.Compat.Shim.SdkFacade`, net10) impersonates the
+  identity of the real embedded SDK DLL used on the net48 side (no net48 Fct project carries that name).
 - **Modern .NET on the net10 side:** Generic Host + MEDI, `System.Threading.Channels` for the bus,
   `System.Text.Json` source-gen, `ILogger` source-gen, CommunityToolkit.Mvvm source-gen for view
   models, records + spans. No Newtonsoft, no hand-rolled DI, no ReactiveUI.
