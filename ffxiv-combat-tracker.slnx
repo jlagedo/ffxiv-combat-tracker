@@ -3,6 +3,7 @@
     <Project Path="src/Fct.Abstractions/Fct.Abstractions.csproj" />
     <Project Path="src/Fct.Abstractions.Testing/Fct.Abstractions.Testing.csproj" />
     <Project Path="src/Fct.Abstractions.UI/Fct.Abstractions.UI.csproj" />
+    <Project Path="src/Fct.Aggregation/Fct.Aggregation.csproj" />
     <Project Path="src/Fct.App/Fct.App.csproj" />
     <Project Path="src/Fct.Bridge.Contracts/Fct.Bridge.Contracts.csproj" />
     <Project Path="src/Fct.Logging.Contracts/Fct.Logging.Contracts.csproj" />

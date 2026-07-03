@@ -1,0 +1,30 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!--
+    The ACT aggregation engine: the clean-room reimplementation of ACT's MasterSwing collection +
+    encounter/DPS aggregation + ExportVariables (namespace Advanced_Combat_Tracker). One identity,
+    multi-targeted net48;net10, so the net48 facade (Fct.Compat.Act) and the net10 facade
+    (Fct.Compat.Shim.ActFacade) consume the same engine binary instead of recompiling the source
+    twice. Compile settings are pinned to match both former compile contexts exactly, so nothing
+    about the produced IL depends on which facade referenced it.
+  -->
+  <PropertyGroup>
+    <TargetFrameworks>net48;net10.0</TargetFrameworks>
+    <Nullable>disable</Nullable>
+    <ImplicitUsings>disable</ImplicitUsings>
+    <LangVersion>latest</LangVersion>
+    <RootNamespace>Advanced_Combat_Tracker</RootNamespace>
+    <!-- Fully strong-named with a real key pair (valid signature). Required because the public-signed
+         Fct.Compat.Act facade may only reference strong-named assemblies (CS8002); a valid signature
+         also loads cleanly in the VSTest testhost, unlike the facade's public-signed (invalid) one. -->
+    <SignAssembly>true</SignAssembly>
+    <AssemblyOriginatorKeyFile>Fct.Aggregation.snk</AssemblyOriginatorKeyFile>
+  </PropertyGroup>
+
+  <!-- System.Drawing.Color (delegate/callback signatures). Framework assembly on net48; on net10 it
+       lives in the shared framework's System.Drawing.Primitives, so no reference is needed there. -->
+  <ItemGroup Condition="'$(TargetFramework)' == 'net48'">
+    <Reference Include="System.Drawing" />
+  </ItemGroup>
+
+</Project>

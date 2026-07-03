@@ -7,7 +7,7 @@ namespace Advanced_Combat_Tracker
     // CombatantData.ExportVariables dictionary, so the full ACT-default key set is registered here,
     // each format mirroring ACT's FormActMain.CombatantFormatSwitch exactly. (The FFXIV plugin and
     // OverlayPlugin add a few extras — Job, ParryPct… — on top during their own init.)
-    internal static class CombatTables
+    public static class CombatTables
     {
         private static bool _done;
 

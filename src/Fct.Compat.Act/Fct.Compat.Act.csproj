@@ -25,10 +25,10 @@
     <AssemblyOriginatorKeyFile>act.publickey</AssemblyOriginatorKeyFile>
   </PropertyGroup>
 
-  <!-- The ACT aggregation engine is shared source, linked identically into the net10 ActFacade
-       (Fct.Compat.Shim.ActFacade) so one implementation serves both runtimes. -->
+  <!-- The ACT aggregation engine: one multi-targeted identity (Fct.Aggregation), consumed here on
+       net48 and by the net10 ActFacade (Fct.Compat.Shim.ActFacade) — same binary, not recompiled source. -->
   <ItemGroup>
-    <Compile Include="..\..\shared\Aggregation\*.cs" Link="Aggregation\%(Filename)%(Extension)" />
+    <ProjectReference Include="..\Fct.Aggregation\Fct.Aggregation.csproj" />
   </ItemGroup>
 
 </Project>

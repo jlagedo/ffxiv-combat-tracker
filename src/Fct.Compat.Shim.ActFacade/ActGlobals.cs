@@ -19,10 +19,21 @@ namespace Advanced_Combat_Tracker
 
         public static string charName = "YOU";
 
-        // Aggregation flags (ACT-core). Defaults match ACT. Read by the shared aggregation engine (D5).
+        // Aggregation flags (ACT-core). Defaults match ACT. Kept as real static fields to mirror the
+        // net48 facade (a recompiled plugin binds ActGlobals.charName the same way real ACT exposes it).
         public static bool blockIsHit = true;
         public static bool mainTableShowCommas = false;
         public static bool restrictToAll = false;
         public static bool longDuration = false;
+
+        // Wire the Fct.Aggregation engine's read accessors to these fields, so it reads one live source
+        // of truth without referencing this facade (which would be a cycle). Runs on first ActGlobals
+        // access — which precedes any encounter aggregation.
+        static ActGlobals()
+        {
+            AggregationGlobals.CharNameAccessor = () => charName;
+            AggregationGlobals.BlockIsHitAccessor = () => blockIsHit;
+            AggregationGlobals.RestrictToAllAccessor = () => restrictToAll;
+        }
     }
 }

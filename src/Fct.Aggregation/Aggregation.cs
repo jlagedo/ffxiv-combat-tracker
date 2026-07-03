@@ -45,8 +45,8 @@ namespace Advanced_Combat_Tracker
         public void AddCombatAction(MasterSwing action) => Items.Add(action);
 
         public long Damage => Items.Where(s => (long)s.Damage > 0).Sum(s => (long)s.Damage);
-        public int Hits => Items.Count(s => ActGlobals.blockIsHit ? (long)s.Damage >= 0 : (long)s.Damage > 0);
-        public int CritHits => Items.Count(s => s.Critical && (ActGlobals.blockIsHit ? (long)s.Damage >= 0 : (long)s.Damage > 0));
+        public int Hits => Items.Count(s => AggregationGlobals.blockIsHit ? (long)s.Damage >= 0 : (long)s.Damage > 0);
+        public int CritHits => Items.Count(s => s.Critical && (AggregationGlobals.blockIsHit ? (long)s.Damage >= 0 : (long)s.Damage > 0));
         // Unguarded like ACT (AttackType.CritPerc): 0 crits / 0 hits → NaN, which ACT surfaces as
         // "NaN" for an attack-type that recorded only misses. The DamageTypeData level still guards the
         // no-swing case (no "All" attack-type → 0), so only an all-miss bucket yields NaN.
@@ -229,10 +229,10 @@ namespace Advanced_Combat_Tracker
                 {
                     ModAlly(victim, OutgoingDamageTypeDataObjects.TryGetValue(key, out var def) ? def.AllyValue : 0);
                     dtd.AddCombatAction(action, "All");
-                    if (!ActGlobals.restrictToAll) dtd.AddCombatAction(action, action.AttackType);
+                    if (!AggregationGlobals.restrictToAll) dtd.AddCombatAction(action, action.AttackType);
                 }
             outAll.AddCombatAction(action, "All");
-            if (!ActGlobals.restrictToAll) outAll.AddCombatAction(action, action.AttackType);
+            if (!AggregationGlobals.restrictToAll) outAll.AddCombatAction(action, action.AttackType);
         }
 
         public void AddReverseCombatAction(MasterSwing action)
@@ -244,10 +244,10 @@ namespace Advanced_Combat_Tracker
                 {
                     ModAlly(attacker, IncomingDamageTypeDataObjects.TryGetValue(key, out var def) ? def.AllyValue : 0);
                     dtd.AddCombatAction(action, "All");
-                    if (!ActGlobals.restrictToAll) dtd.AddCombatAction(action, action.AttackType);
+                    if (!AggregationGlobals.restrictToAll) dtd.AddCombatAction(action, action.AttackType);
                 }
             incAll.AddCombatAction(action, "All");
-            if (!ActGlobals.restrictToAll) incAll.AddCombatAction(action, action.AttackType);
+            if (!AggregationGlobals.restrictToAll) incAll.AddCombatAction(action, action.AttackType);
         }
 
         public void ModAlly(string combatant, int mod)
@@ -392,7 +392,7 @@ namespace Advanced_Combat_Tracker
         public string ZoneName { get; set; } = "";
         public EncounterData ActiveEncounter { get; set; }
         public List<EncounterData> Items { get; set; } = new List<EncounterData>();
-        public ZoneData() { ActiveEncounter = new EncounterData(ActGlobals.charName, "", this); }
+        public ZoneData() { ActiveEncounter = new EncounterData(AggregationGlobals.charName, "", this); }
     }
 
     public class EncounterData

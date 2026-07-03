@@ -33,7 +33,7 @@ Status legend: ☐ not started · ◐ in progress · ☑ done · ⊘ blocked
 | 0 | Baseline & docs truth-up | Stale map, #7, #8 | minimal | ☑ |
 | 1 | Shared contracts → libraries | #6 | low | ☑ |
 | 2 | Extract `Fct.Host` (god-project split) | #1 (CRITICAL) | med | ☑ |
-| 3 | Extract `Fct.Aggregation` engine | #2 | med (parity) | ☐ |
+| 3 | Extract `Fct.Aggregation` engine | #2 | med (parity) | ☑ |
 | 4 | Thin ACT facade + parser direction | #4, #5 | low–med | ☐ |
 | 5 | Shim-as-plugin (drop hard ref) | #3 | high | ☐ |
 
@@ -171,20 +171,41 @@ binaries.
 `ImplicitUsings=disable`, `LangVersion=latest` to match **both** current compile contexts exactly
 (prevents behavior drift from a different compile setting).
 
-- [ ] Create `Fct.Aggregation` (net48;net10); move `shared/Aggregation/*.cs`; pin the compile settings
-      above.
-- [ ] Reference it from `Fct.Compat.Act` (net48) and `Fct.Compat.Shim.ActFacade` (net10); delete the
+- [x] Create `Fct.Aggregation` (net48;net10); move `shared/Aggregation/*.cs`; pin the compile settings
+      above (`Nullable=disable`, `ImplicitUsings=disable`, `LangVersion=latest`).
+- [x] Reference it from `Fct.Compat.Act` (net48) and `Fct.Compat.Shim.ActFacade` (net10); deleted the
       `shared/Aggregation` `<Compile Include>` links from both.
-- [ ] Update `Fct.Compat.Act.Tests` to **reference** `Fct.Aggregation` (now a normal unsigned DLL that
-      loads in testhost) instead of recompiling `shared/Aggregation`; keep recompiling only the thin
-      facade sources (the signed-identity load barrier applies to the facade, not the engine).
-- [ ] Run the differential `AggregateCompatTests` against the ACT oracle — **must stay bit-for-bit
-      identical**. This is the gate.
-- [ ] Delete the emptied `shared/Aggregation`; add the project to `.slnx`.
+- [x] Update `Fct.Compat.Act.Tests` to **reference** `Fct.Aggregation` instead of recompiling
+      `shared/Aggregation`; still recompiles only the thin facade sources.
+- [x] Ran the differential `AggregateCompatTests` against the ACT oracle — **bit-for-bit identical**
+      (61 pass). Full suite green; replay through the real plugin restores the `YOU` combatant
+      (2,692,084 damage, 2 idle-split encounters) — proving the plugin↔facade↔engine path is intact.
+- [x] Deleted the emptied `shared/Aggregation` (+ empty `shared/`); added the project to `.slnx`.
 
-**Exit gate:** aggregation oracle diff **bit-identical**; both facades build; engine has one identity.
-**Risk / rollback:** med — parity. The oracle diff is the hard gate; the only real risk is compile-context
-drift, controlled by pinning. Revert restores linked source.
+**Three constraints the plan didn't foresee (all resolved, all parity-load-bearing):**
+
+1. **Engine↔facade coupling.** The engine reads `ActGlobals.{charName,blockIsHit,restrictToAll}`, which
+   live on each facade — a cycle if referenced directly. Resolved by an accessor seam: the engine's
+   `AggregationGlobals` exposes `Func<>` accessors (ACT-default fallbacks) that each facade's
+   `ActGlobals` static ctor wires to its own fields. The engine reads one live source without
+   referencing the facade.
+2. **`ActGlobals` fields must stay fields.** Precompiled plugins bind those statics as `ldsfld` (e.g.
+   `FFXIV_ACT_Plugin.Common`'s `ACTWrapper.CharName => ActGlobals.charName`). An earlier attempt to make
+   them forwarding *properties* broke the real plugin's primary-player→`YOU` substitution (its 2.7M
+   damage vanished, only 1 encounter). Kept as real fields; the accessor seam above bridges to the engine.
+3. **Assembly-qualified type identity.** Real plugins reference the ACT types by
+   `"<type>, Advanced Combat Tracker"`. Moving them out triggered
+   `TypeLoadException: Could not load type 'DamageTypeDef' from 'Advanced Combat Tracker'`. Resolved with
+   `[assembly: TypeForwardedTo]` for every top-level engine type in the net48 facade (`TypeForwards.cs`);
+   nested types ride their declaring type's forward. The net10 side recompiles, so its transitive
+   project reference suffices — no forwarders there. Signing: `Fct.Compat.Act` is public-signed, so it may
+   only reference strong-named assemblies (CS8002) → `Fct.Aggregation` is **fully** strong-named
+   (`Fct.Aggregation.snk`, a real key pair, valid signature that also loads in the VSTest testhost).
+
+**Exit gate:** ☑ aggregation oracle diff **bit-identical** (61 pass); both facades build; engine has one
+identity; full suite green (61 Compat.Act, 55 Shim, 21 Flow, 6 Parser, App, 7 Integration + 1
+data-dependent skip); real-plugin replay reaches `Started` and reproduces the `YOU` aggregate.
+**Risk / rollback:** med — parity. Revert restores linked source.
 
 ---
 

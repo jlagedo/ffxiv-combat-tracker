@@ -222,7 +222,12 @@ Reproduce faithfully (signatures verified against `E:\dev\ACT-decompiled`):
 - **State:** `CurrentZone`, `InCombat`, `LastEstimatedTime`/`LastKnownTime`,
   `CustomTriggers`.
 - **Identity:** facade assemblies named/strong-named as `Advanced Combat Tracker` /
-  `FFXIV_ACT_Plugin.Common` so the unmodified DLLs bind.
+  `FFXIV_ACT_Plugin.Common` so the unmodified DLLs bind. The aggregation engine itself is one
+  strong-named assembly (`Fct.Aggregation`, net48;net10) shared by both facades; the net48
+  `Advanced Combat Tracker` facade **type-forwards** the engine's `Advanced_Combat_Tracker.*` types so
+  precompiled plugins' assembly-qualified references still resolve to that identity. ACT-core flags a
+  plugin reads via `ldsfld` (`ActGlobals.charName`, …) stay real static fields on the facade; the
+  engine reads them through accessors the facade wires at init.
 
 ---
 

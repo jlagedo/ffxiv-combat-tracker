@@ -19,11 +19,16 @@
     strong-name bypass tolerates in the satellite, but VSTest's testhost rejects on load).
     Linking the sources tests the same engine logic without the signed-binary load barrier.
     The signed artifact's identity/binding is covered by the satellite integration test.
+    The aggregation engine is unsigned, so it is referenced (not recompiled) — the same binary
+    the facade ships against.
   -->
   <ItemGroup>
     <Compile Include="..\..\src\Fct.Compat.Act\*.cs" />
-    <Compile Include="..\..\shared\Aggregation\*.cs" />
     <Compile Include="..\Shared\ActEngineHarness.cs" Link="Shared\ActEngineHarness.cs" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\..\src\Fct.Aggregation\Fct.Aggregation.csproj" />
   </ItemGroup>
 
   <!-- The captured real-plugin swing stream + the real-ACT aggregation baseline (see

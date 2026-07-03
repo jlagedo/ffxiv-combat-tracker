@@ -5,7 +5,7 @@ namespace Advanced_Combat_Tracker
     // or below the smallest threshold. NaN/Infinity sentinels surface verbatim. Stateless, so the
     // aggregation engine (and both facades' FormActMain) call it directly instead of reaching through
     // ActGlobals.oFormActMain.
-    internal static class DamageString
+    public static class DamageString
     {
         public static string Create(long damage, bool useSuffix, bool useDecimals)
         {

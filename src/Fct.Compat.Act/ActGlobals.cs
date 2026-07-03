@@ -13,10 +13,21 @@ namespace Advanced_Combat_Tracker
         public static FormSpellTimers oFormSpellTimers = new FormSpellTimers();
         public static string charName = "YOU";
 
-        // Aggregation flags (ACT-core). Defaults match ACT.
+        // Aggregation flags (ACT-core). Defaults match ACT. These stay real static fields: precompiled
+        // plugins bind them as `ldsfld` (e.g. FFXIV_ACT_Plugin.Common reads ActGlobals.charName).
         public static bool blockIsHit = true;
         public static bool mainTableShowCommas = false;
         public static bool restrictToAll = false;
         public static bool longDuration = false;
+
+        // Wire the Fct.Aggregation engine's read accessors to these fields, so it reads one live source
+        // of truth without referencing this facade (which would be a cycle). Runs on first ActGlobals
+        // access — which precedes any encounter aggregation.
+        static ActGlobals()
+        {
+            AggregationGlobals.CharNameAccessor = () => charName;
+            AggregationGlobals.BlockIsHitAccessor = () => blockIsHit;
+            AggregationGlobals.RestrictToAllAccessor = () => restrictToAll;
+        }
     }
 }

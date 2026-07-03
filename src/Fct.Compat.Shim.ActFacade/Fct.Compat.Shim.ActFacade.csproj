@@ -7,7 +7,7 @@
     instead; this is the net10-host counterpart). Unlike the net48 facade, FormActMain is a POCO
     (NOT a System.Windows.Forms.Form) that forwards to the modern IPluginHost. WinForms is still
     referenced because IActPluginV1.InitPlugin(TabPage, Label) and ActPluginData require the control
-    types. Behavior is added slice-by-slice; the aggregation engine (shared/Aggregation) lands in D5.
+    types. The aggregation engine is referenced from Fct.Aggregation.
   -->
   <PropertyGroup>
     <TargetFramework>net10.0-windows</TargetFramework>
@@ -28,10 +28,11 @@
     <ProjectReference Include="..\Fct.Compat.Shim.SdkFacade\Fct.Compat.Shim.SdkFacade.csproj" />
   </ItemGroup>
 
-  <!-- The ACT aggregation engine: the same shared source linked into the net48 Fct.Compat.Act, so
-       the net10 ActiveZone/EncounterData/ExportVariables path is provably identical to the satellite's. -->
+  <!-- The ACT aggregation engine: one multi-targeted identity (Fct.Aggregation), consumed here on
+       net10 and by the net48 Fct.Compat.Act — the same binary, so the net10 ActiveZone/EncounterData/
+       ExportVariables path is provably identical to the satellite's. -->
   <ItemGroup>
-    <Compile Include="..\..\shared\Aggregation\*.cs" Link="Aggregation\%(Filename)%(Extension)" />
+    <ProjectReference Include="..\Fct.Aggregation\Fct.Aggregation.csproj" />
   </ItemGroup>
 
 </Project>
