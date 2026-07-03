@@ -2,8 +2,8 @@ using System;
 using System.IO;
 using System.Threading;
 using System.Threading.Tasks;
-using Fct.App.Hosting;
-using Fct.App.Plugins;
+using Fct.Host.Hosting;
+using Fct.Host.Plugins;
 using Microsoft.Extensions.Logging.Abstractions;
 using Xunit;
 

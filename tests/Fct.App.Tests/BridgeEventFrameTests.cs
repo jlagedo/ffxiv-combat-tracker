@@ -1,7 +1,7 @@
 using System;
 using System.Collections.Generic;
 using Fct.Abstractions;
-using Fct.App.Hosting;
+using Fct.Host.Hosting;
 using Fct.Bridge;
 using Xunit;
 

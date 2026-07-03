@@ -6,9 +6,10 @@ using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using Fct.Abstractions;
 using Fct.Abstractions.UI;
-using Fct.App.Hosting;
 using Fct.App.Lang;
-using Fct.App.Plugins.Ui;
+using Fct.Host;
+using Fct.Host.Hosting;
+using Fct.Host.Plugins.Ui;
 
 namespace Fct.App.ViewModels;
 

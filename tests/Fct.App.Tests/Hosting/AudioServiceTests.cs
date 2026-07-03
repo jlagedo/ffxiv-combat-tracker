@@ -1,6 +1,6 @@
 using Fct.Abstractions;
 using Fct.Abstractions.Testing;
-using Fct.App.Hosting;
+using Fct.Host.Hosting;
 using Microsoft.Extensions.Logging.Abstractions;
 using Xunit;
 

@@ -4,9 +4,10 @@ using System.Linq;
 using System.Threading.Tasks;
 using Avalonia.Controls;
 using Avalonia.Platform.Storage;
-using Fct.App.Hosting;
-using Fct.App.Plugins;
-using Fct.App.Plugins.Ui;
+using Fct.Host;
+using Fct.Host.Hosting;
+using Fct.Host.Plugins;
+using Fct.Host.Plugins.Ui;
 using Fct.App.ViewModels;
 // Aliased: MainWindow inherits Window.Resources (IResourceDictionary), which shadows the
 // Fct.App.Lang.Resources type name inside this class; "Lang" would itself collide with the

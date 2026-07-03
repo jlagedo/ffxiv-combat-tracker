@@ -1,5 +1,5 @@
 using System;
-using Fct.App.Hosting;
+using Fct.Host.Hosting;
 
 namespace Fct.App.ViewModels;
 

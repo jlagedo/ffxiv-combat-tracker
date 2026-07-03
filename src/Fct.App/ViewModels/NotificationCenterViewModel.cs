@@ -4,7 +4,7 @@ using System.Collections.ObjectModel;
 using Avalonia.Threading;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
-using Fct.App.Hosting;
+using Fct.Host.Hosting;
 
 namespace Fct.App.ViewModels;
 

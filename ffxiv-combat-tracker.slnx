@@ -11,6 +11,7 @@
     <Project Path="src/Fct.Compat.Shim/Fct.Compat.Shim.csproj" />
     <Project Path="src/Fct.Compat.Shim.ActFacade/Fct.Compat.Shim.ActFacade.csproj" />
     <Project Path="src/Fct.Compat.Shim.SdkFacade/Fct.Compat.Shim.SdkFacade.csproj" />
+    <Project Path="src/Fct.Host/Fct.Host.csproj" />
     <Project Path="src/Fct.Parser.Legacy/Fct.Parser.Legacy.csproj" />
     <Project Path="src/Fct.StreamProbe/Fct.StreamProbe.csproj" />
   </Folder>

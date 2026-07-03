@@ -1,6 +1,6 @@
 using System.IO;
-using Fct.App.Hosting;
-using Fct.App.Plugins;
+using Fct.Host.Hosting;
+using Fct.Host.Plugins;
 using Xunit;
 
 namespace Fct.App.Tests.Plugins;

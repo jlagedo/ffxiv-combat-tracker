@@ -1,6 +1,6 @@
 using System;
 using System.Diagnostics;
-using Fct.App;
+using Fct.Host;
 using Xunit;
 
 namespace Fct.App.Tests

@@ -5,9 +5,9 @@ using System.Threading;
 using System.Threading.Tasks;
 using Fct.Abstractions;
 using Fct.Abstractions.UI;
-using Fct.App.Hosting;
-using Fct.App.Plugins;
-using Fct.App.Plugins.Ui;
+using Fct.Host.Hosting;
+using Fct.Host.Plugins;
+using Fct.Host.Plugins.Ui;
 using Microsoft.Extensions.Logging.Abstractions;
 using Xunit;
 

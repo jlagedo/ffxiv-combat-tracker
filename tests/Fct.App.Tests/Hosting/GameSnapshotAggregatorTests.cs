@@ -3,7 +3,7 @@ using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
 using Fct.Abstractions;
-using Fct.App.Hosting;
+using Fct.Host.Hosting;
 using Microsoft.Extensions.Logging.Abstractions;
 using Xunit;
 

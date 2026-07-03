@@ -1,0 +1,39 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!--
+    The .NET 10 headless runtime: the IPluginHost services (Hosting/), the ALC-per-plugin loader
+    (Plugins/), and the net48 bridge-client orchestration (SatelliteHost/SatelliteLifetime/ProcessJob).
+    Plain net10.0 (no WindowsDesktop / WinForms) so the runtime is testable and reusable in isolation;
+    the Avalonia shell, composition root, and localization stay in Fct.App. The UI plugin face
+    (PluginUiCoordinator) compiles against the cross-platform Avalonia surface via Fct.Abstractions.UI.
+  -->
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <ImplicitUsings>disable</ImplicitUsings>
+    <RootNamespace>Fct.Host</RootNamespace>
+    <Version>1.0.0</Version>
+    <Description>FFXIV Combat Tracker .NET 10 host runtime: IPluginHost services, the ALC plugin loader, and the satellite bridge client.</Description>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Microsoft.Extensions.Hosting.Abstractions" />
+    <PackageReference Include="System.Reflection.MetadataLoadContext" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\Fct.Abstractions\Fct.Abstractions.csproj" />
+    <ProjectReference Include="..\Fct.Abstractions.UI\Fct.Abstractions.UI.csproj" />
+    <ProjectReference Include="..\Fct.Bridge.Contracts\Fct.Bridge.Contracts.csproj" />
+    <ProjectReference Include="..\Fct.Logging.Contracts\Fct.Logging.Contracts.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <AssemblyAttribute Include="System.Runtime.CompilerServices.InternalsVisibleTo">
+      <_Parameter1>Fct.App</_Parameter1>
+    </AssemblyAttribute>
+    <AssemblyAttribute Include="System.Runtime.CompilerServices.InternalsVisibleTo">
+      <_Parameter1>Fct.App.Tests</_Parameter1>
+    </AssemblyAttribute>
+  </ItemGroup>
+
+</Project>

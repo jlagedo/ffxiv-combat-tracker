@@ -47,6 +47,12 @@
     <ProjectReference Include="..\Fct.Abstractions.UI\Fct.Abstractions.UI.csproj" />
   </ItemGroup>
 
+  <!-- The .NET 10 host runtime (IPluginHost services + ALC plugin loader + satellite bridge client).
+       The shell registers it via AddFctHostServices and supplies the Avalonia-bound pieces. -->
+  <ItemGroup>
+    <ProjectReference Include="..\Fct.Host\Fct.Host.csproj" />
+  </ItemGroup>
+
   <!-- The net10 compat shim + its two legacy-impersonating facades (Advanced Combat Tracker /
        FFXIV_ACT_Plugin.Common). Referenced so they land in the host output + deps.json and the
        default ALC resolves them for shimmed plugins (PluginLoadContext.IsShared shares them). -->

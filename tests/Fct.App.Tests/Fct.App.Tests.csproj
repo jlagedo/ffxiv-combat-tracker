@@ -1,51 +1,20 @@
 <Project Sdk="Microsoft.NET.Sdk">
 
   <!--
-    Unit tests for the net10 host's pure logic. Host source (the plugin subsystem under Hosting/ +
-    Plugins/) is *linked* rather than referenced so the tests stay fast and headless — referencing the
-    Avalonia WinExe would drag in the satellite build chain. The satellite protocol / logging / bridge
-    contracts are referenced as libraries (Fct.Bridge.Contracts, Fct.Logging.Contracts).
+    Unit tests for the net10 host runtime. The host services + ALC loader + bridge client live in
+    Fct.Host (a plain net10 class library), referenced here directly; InternalsVisibleTo("Fct.App.Tests")
+    on Fct.Host exposes its internal types so the tests construct them (new GameEventBus(), new
+    PluginManager(...), …). Abstractions/Abstractions.UI/logging/bridge contracts arrive transitively.
   -->
   <PropertyGroup>
     <TargetFramework>net10.0</TargetFramework>
   </PropertyGroup>
 
   <ItemGroup>
-    <ProjectReference Include="..\..\src\Fct.Abstractions\Fct.Abstractions.csproj" />
+    <!-- The host runtime under test. -->
+    <ProjectReference Include="..\..\src\Fct.Host\Fct.Host.csproj" />
+    <!-- In-memory plugin-contract fakes (not referenced by Fct.Host, so kept explicit). -->
     <ProjectReference Include="..\..\src\Fct.Abstractions.Testing\Fct.Abstractions.Testing.csproj" />
-    <!-- IHostedService for the linked GameSnapshotAggregator (abstractions only — no Avalonia/host chain). -->
-    <PackageReference Include="Microsoft.Extensions.Hosting.Abstractions" />
-    <!-- Metadata-only assembly inspection for the linked PluginClassifier. -->
-    <PackageReference Include="System.Reflection.MetadataLoadContext" />
-    <!-- IUiContributor/IUiHost/UiSurface for the linked PluginUiCoordinator below. Pulls Avalonia in as
-         a compile-time type source only; tests never build a Control or touch the UI thread. -->
-    <ProjectReference Include="..\..\src\Fct.Abstractions.UI\Fct.Abstractions.UI.csproj" />
-    <!-- Shared logging + bridge contracts (satellite protocol, log record, EventId taxonomy, wire
-         codec): referenced, not linked, so the tests bind the same identity the host does. -->
-    <ProjectReference Include="..\..\src\Fct.Logging.Contracts\Fct.Logging.Contracts.csproj" />
-    <ProjectReference Include="..\..\src\Fct.Bridge.Contracts\Fct.Bridge.Contracts.csproj" />
-  </ItemGroup>
-
-  <!-- Existing linked host logic. -->
-  <ItemGroup>
-    <Compile Include="..\..\src\Fct.App\ProcessJob.cs" Link="ProcessJob.cs" />
-  </ItemGroup>
-
-  <!-- Host subsystem under test (headless, no Avalonia): the host services + ALC loader. The
-       GameSnapshotAggregator is an IHostedService but headless, so it links (its abstractions package
-       is referenced above); PluginLifetime (Avalonia-coupled) stays out via the explicit Plugins list. -->
-  <ItemGroup>
-    <Compile Include="..\..\src\Fct.App\Hosting\*.cs" Link="Hosting\%(Filename)%(Extension)" />
-    <Compile Include="..\..\src\Fct.App\Plugins\HostContract.cs" Link="Plugins\HostContract.cs" />
-    <Compile Include="..\..\src\Fct.App\Plugins\PluginManifest.cs" Link="Plugins\PluginManifest.cs" />
-    <Compile Include="..\..\src\Fct.App\Plugins\PluginLoadContext.cs" Link="Plugins\PluginLoadContext.cs" />
-    <Compile Include="..\..\src\Fct.App\Plugins\PluginManager.cs" Link="Plugins\PluginManager.cs" />
-    <Compile Include="..\..\src\Fct.App\Plugins\LoadKind.cs" Link="Plugins\LoadKind.cs" />
-    <Compile Include="..\..\src\Fct.App\Plugins\PluginClassifier.cs" Link="Plugins\PluginClassifier.cs" />
-    <Compile Include="..\..\src\Fct.App\Plugins\ISatellitePluginChannel.cs" Link="Plugins\ISatellitePluginChannel.cs" />
-    <Compile Include="..\..\src\Fct.App\Plugins\PluginInstaller.cs" Link="Plugins\PluginInstaller.cs" />
-    <Compile Include="..\..\src\Fct.App\Plugins\Ui\PluginUiCoordinator.cs" Link="Plugins\Ui\PluginUiCoordinator.cs" />
-    <Compile Include="..\..\src\Fct.App\Plugins\Ui\PluginUiHost.cs" Link="Plugins\Ui\PluginUiHost.cs" />
   </ItemGroup>
 
   <!-- Build the sample plugin and stage it under plugins\ so the loader tests can load it from disk.

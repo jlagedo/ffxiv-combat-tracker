@@ -125,14 +125,19 @@ Fct.Bridge.Contracts net48;net10 shared bridge wire contract: SatelliteProtocol
 Fct.Logging.Contracts net48;net10 shared logging contract: LogEvents/LogCategories
                                 EventId taxonomy, LogPaths, BridgeLogRecord wire record.
 
-Fct.App            net10        the net10 host AND user-facing UI (one project):
-                                Avalonia control panel + shell (MVVM), plus the host
-                                runtime — Generic Host, config, logging, lifecycle, the
-                                typed bus (Channels), and the IPC bridge client
-                                (SatelliteHost/SatelliteLifetime; wire contracts in
-                                Fct.Bridge.Contracts/Fct.Logging.Contracts).
-                                Target: ALC-per-plugin loader + manifest/contract-version
-                                gate for new plugins. See §4a.
+Fct.Host           net10        the net10 host runtime (headless class library): the
+                                IPluginHost services + typed bus (Channels), the
+                                ALC-per-plugin loader + manifest/contract-version gate,
+                                and the IPC bridge client (SatelliteHost/SatelliteLifetime/
+                                ProcessJob; wire contracts in Fct.Bridge.Contracts/
+                                Fct.Logging.Contracts). Registered via AddFctHostServices;
+                                InternalsVisibleTo Fct.App + Fct.App.Tests. See §4a.
+
+Fct.App            net10        the Avalonia shell + composition root (one exe): control
+                                panel + shell (MVVM), localization, Serilog bootstrap, and
+                                the Generic Host wiring that binds Fct.Host to the UI (the
+                                IUiDispatcher, LegacyPluginHostFactory, and localized
+                                ISatelliteNotificationText it supplies). See §4a.
 
 Fct.LegacyHost     net48        from-scratch ACT engine + IActPluginV1 loader; hosts
                                 the five real plugins; satellite end of the bridge.
@@ -147,8 +152,9 @@ Fct.StreamProbe    net48        diagnostic plugin in the satellite; taps the par
 ```
 
 The net48↔net10 IPC bridge (named pipe + wire protocol) is **not its own project**: the
-host end lives in `Fct.App`, the satellite end in `Fct.LegacyHost`. Its wire contracts are the
-shared `Fct.Bridge.Contracts` + `Fct.Logging.Contracts` libraries, referenced by both ends.
+host end lives in `Fct.Host` (loaded by the `Fct.App` process), the satellite end in
+`Fct.LegacyHost`. Its wire contracts are the shared `Fct.Bridge.Contracts` +
+`Fct.Logging.Contracts` libraries, referenced by both ends.
 
 ### 4a. UI framework
 

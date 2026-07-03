@@ -36,12 +36,16 @@ Design docs — **read before proposing changes:**
   .NET Framework 4.8 satellite process (`Fct.LegacyHost`); the .NET 10 host (`Fct.App`) runs new
   plugins; they bridge over a named pipe. `AssemblyLoadContext` isolates net10 plugins from each
   other — it is **not** cross-runtime.
-- **The net10 plugin host lives in `Fct.App`** (not its own project). Native plugins load in-process,
-  one collectible `AssemblyLoadContext` each. `Fct.App/Plugins` discovers + loads (discover →
-  `PluginManifest` + `HostContract` major-version gate → fault-guarded init → quarantine/unload);
-  `Fct.App/Hosting` implements the `IPluginHost` services (bus, registry, audio, encounter, disk
-  storage). ALC is isolation, **not** a fault boundary — a hard native crash still takes the host.
-  `samples/Fct.SamplePlugin` is the reference native plugin. Design: [`docs/PLUGIN-API.md`](docs/PLUGIN-API.md).
+- **The net10 host runtime lives in `Fct.Host`** (a plain net10 class library); `Fct.App` is the
+  Avalonia shell + composition root that references it. Native plugins load in-process, one collectible
+  `AssemblyLoadContext` each. `Fct.Host/Plugins` discovers + loads (discover → `PluginManifest` +
+  `HostContract` major-version gate → fault-guarded init → quarantine/unload); `Fct.Host/Hosting`
+  implements the `IPluginHost` services (bus, registry, audio, encounter, disk storage); `Fct.Host`
+  also owns the IPC bridge client (`SatelliteHost`/`SatelliteLifetime`). `AddFctHostServices` registers
+  the whole runtime; the shell supplies the Avalonia-bound pieces (`IUiDispatcher`,
+  `LegacyPluginHostFactory`, localized `ISatelliteNotificationText`). ALC is isolation, **not** a fault
+  boundary — a hard native crash still takes the host. `samples/Fct.SamplePlugin` is the reference
+  native plugin. Design: [`docs/PLUGIN-API.md`](docs/PLUGIN-API.md).
 - **We build only the ACT engine** (`Fct.Compat.Act`) — the consumer that aggregates the plugin's
   `MasterSwing`s into encounters / DPS / `ExportVariables`. The real FFXIV_ACT_Plugin is the **sole
   parser**; we **never** decode log lines or port its parsing/swing/DoT-HoT-shield logic (see
@@ -60,7 +64,8 @@ Design docs — **read before proposing changes:**
 | `Fct.Abstractions.Testing` | net10 | in-memory fakes of every plugin-contract interface + the `ShimStub` seam; backs the headless flow tests. |
 | `Fct.Logging.Contracts` | net48;net10 | shared logging contract: the `LogEvents`/`LogCategories` EventId taxonomy, `LogPaths`, and the `BridgeLogRecord` log wire record — one identity on both ends of the bridge. |
 | `Fct.Bridge.Contracts` | net48;net10 | shared bridge contract: the `SatelliteProtocol` handshake/command line protocol and the `GameEventFrame` typed-event wire codec — formatted/parsed by one implementation on both ends. |
-| `Fct.App` | net10 | the **.NET 10 host**: Avalonia control panel + shell (MVVM); owns the IPC bridge client (`SatelliteHost`/`SatelliteLifetime`) and the net10 plugin host (`Hosting/` services, `Plugins/` ALC loader). |
+| `Fct.Host` | net10 | the **.NET 10 host runtime**: `Hosting/` `IPluginHost` services, `Plugins/` ALC loader, and the IPC bridge client (`SatelliteHost`/`SatelliteLifetime`/`ProcessJob`). Headless (no Avalonia shell/WinForms); registered via `AddFctHostServices`. `InternalsVisibleTo` `Fct.App` + `Fct.App.Tests`. |
+| `Fct.App` | net10 | the **Avalonia shell + composition root** (MVVM): control panel, `Views/ViewModels`, localization (`Lang/`), Serilog bootstrap, and the DI wiring that binds `Fct.Host` to the UI (`IUiDispatcher`, `LegacyPluginHostFactory`, `ISatelliteNotificationText`, `EmbeddedSatelliteView`). |
 | `Fct.LegacyHost` | net48 | from-scratch ACT engine host; hosts the five real plugins; the net48 end of the bridge. |
 | `Fct.Parser.Legacy` | net48 | wraps the real FFXIV_ACT_Plugin. `WrappedFfxivPlugin` forwards `DataRepository`/`_iocContainer`/lifecycle to the real instance; `RingBufferDataSubscription` (`IDataSubscription` + `IRawPacketSource`) replaces the plugin's per-subscriber `BeginInvoke` fan-out with one bounded ring + single dispatch thread (~250× faster dispatch). |
 | `Fct.Compat.Act` | net48 | **the ACT engine** (facade surface, hosted in LegacyHost): `EncounterData`/`CombatantData`/`AttackType` aggregation + `ExportVariables`. Parity: see load-bearing facts + `docs/TESTING.md`. |
@@ -69,9 +74,10 @@ Design docs — **read before proposing changes:**
 | `Fct.Compat.Shim.SdkFacade` | net10 | assembly `FFXIV_ACT_Plugin.Common`: re-declares the SDK surface (`IDataSubscription`/`IDataRepository` + `Combatant`/`Player`/`NetworkBuff`/`PartyType`) a recompiled plugin binds to. No behavior — the `Fct.Compat.Shim` adapters map it onto the host. |
 | `Fct.StreamProbe` | net48 | diagnostic plugin in the satellite; taps the `MasterSwing`/raw-packet stream. |
 
-The net10↔net48 **IPC bridge is not its own project** — host end in `Fct.App`, satellite end in
-`Fct.LegacyHost`. Its **wire contracts** are the multi-targeted `Fct.Bridge.Contracts` +
-`Fct.Logging.Contracts` libraries, referenced by both ends (never linked source).
+The net10↔net48 **IPC bridge is not its own project** — host end in `Fct.Host` (the client, loaded by
+the `Fct.App` process), satellite end in `Fct.LegacyHost`. Its **wire contracts** are the
+multi-targeted `Fct.Bridge.Contracts` + `Fct.Logging.Contracts` libraries, referenced by both ends
+(never linked source).
 
 ## UI frameworks
 

@@ -1,6 +1,6 @@
 using System;
 using Fct.Abstractions;
-using Fct.App.Hosting;
+using Fct.Host.Hosting;
 using Xunit;
 
 namespace Fct.App.Tests.Hosting;

@@ -1,5 +1,5 @@
 using CommunityToolkit.Mvvm.ComponentModel;
-using Fct.App.Hosting;
+using Fct.Host.Hosting;
 using Fct.App.Lang;
 using Fct.Logging;
 

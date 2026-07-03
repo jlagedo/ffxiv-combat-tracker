@@ -2,7 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Threading;
 using Fct.Abstractions;
-using Fct.App.Hosting;
+using Fct.Host.Hosting;
 using Xunit;
 
 namespace Fct.App.Tests.Hosting;

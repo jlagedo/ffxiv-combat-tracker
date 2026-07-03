@@ -1,6 +1,6 @@
 using System;
 using System.IO;
-using Fct.App.Plugins;
+using Fct.Host.Plugins;
 using Xunit;
 
 namespace Fct.App.Tests.Plugins;

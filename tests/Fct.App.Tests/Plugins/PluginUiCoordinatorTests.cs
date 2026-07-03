@@ -5,8 +5,8 @@ using System.Threading.Tasks;
 using Avalonia.Controls;
 using Fct.Abstractions;
 using Fct.Abstractions.UI;
-using Fct.App.Plugins;
-using Fct.App.Plugins.Ui;
+using Fct.Host.Plugins;
+using Fct.Host.Plugins.Ui;
 using Microsoft.Extensions.Logging.Abstractions;
 using Xunit;
 

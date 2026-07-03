@@ -32,7 +32,7 @@ Status legend: ☐ not started · ◐ in progress · ☑ done · ⊘ blocked
 |---|-------|----------------------------|------|--------|
 | 0 | Baseline & docs truth-up | Stale map, #7, #8 | minimal | ☑ |
 | 1 | Shared contracts → libraries | #6 | low | ☑ |
-| 2 | Extract `Fct.Host` (god-project split) | #1 (CRITICAL) | med | ☐ |
+| 2 | Extract `Fct.Host` (god-project split) | #1 (CRITICAL) | med | ☑ |
 | 3 | Extract `Fct.Aggregation` engine | #2 | med (parity) | ☐ |
 | 4 | Thin ACT facade + parser direction | #4, #5 | low–med | ☐ |
 | 5 | Shim-as-plugin (drop hard ref) | #3 | high | ☐ |
@@ -135,21 +135,28 @@ References: `Fct.Abstractions`, `Fct.Abstractions.UI`, `Fct.Bridge.Contracts`, `
 | Moves to `Fct.Host` | Stays in `Fct.App` (UI / composition root) |
 |---|---|
 | `Hosting/*` (bus, registry, audio, encounter, snapshot, storage, session, raw sources) | `App.axaml`, `MainWindow`, `Program` (composition root) |
-| `Plugins/*` **except** `PluginLifetime.cs` | `Plugins/PluginLifetime.cs` (Avalonia-coupled `IHostedService`) |
+| `Plugins/*` **incl.** `PluginLifetime.cs` (headless `IHostedService` — depends only on `PluginManager`/`PluginInstaller`) | — |
 | `Plugins/Ui/PluginUiCoordinator.cs`, `Plugins/Ui/PluginUiHost.cs` (compile-time Avalonia only) | `Plugins/Ui/AvaloniaUiDispatcher.cs` (runtime `Dispatcher.UIThread`) |
 | `SatelliteHost.cs`, `SatelliteLifetime.cs`, `ProcessJob.cs` | `EmbeddedSatelliteView.cs` (WinForms/Avalonia view), `Views/`, `ViewModels/`, `Styles/`, `Converters/`, `Lang/` |
 
-- [ ] Create `Fct.Host`; move the left-column files. Keep namespaces or update references in one pass.
-- [ ] `Fct.App` references `Fct.Host`; fix the composition root (`Program`/`App`) DI registrations to
-      the moved types.
-- [ ] Keep the staging targets (`StageSatellite`, `StageSamplePlugin`) in `Fct.App` — they're
-      deployment concerns of the shell.
-- [ ] Rewrite `Fct.App.Tests` to **reference `Fct.Host`**; delete **all** host-source
-      `<Compile Include>` links (`Hosting/*`, `Plugins/*`, `SatelliteProtocol`, `ProcessJob`).
+- [x] Create `Fct.Host` (net10.0 class library, `InternalsVisibleTo` `Fct.App` + `Fct.App.Tests`);
+      moved `Hosting/*`, `Plugins/*` (incl. `PluginLifetime` — headless, not Avalonia-coupled),
+      `Plugins/Ui/{PluginUiCoordinator,PluginUiHost}`, and `SatelliteHost`/`SatelliteLifetime`/
+      `ProcessJob`. Namespaces renamed `Fct.App.*` → `Fct.Host.*`. `AvaloniaUiDispatcher` stays in
+      `Fct.App` (runtime `Dispatcher.UIThread`).
+- [x] `Fct.App` references `Fct.Host`. Added an `AddFctHostServices()` registration extension in
+      `Fct.Host`; `Program.BuildHost` now calls it + registers the shell/Avalonia pieces only
+      (`MainWindow`/`MainViewModel`, `IUiDispatcher`→`AvaloniaUiDispatcher`, `LegacyPluginHostFactory`,
+      `ISatelliteNotificationText`). `SatelliteHost`'s `Lang.Resources` coupling is broken by the
+      `ISatelliteNotificationText` seam (impl `SatelliteNotificationText` in `Fct.App`); `Lang` stays put.
+- [x] Kept the staging targets (`StageSatellite`, `StageSamplePlugin`) in `Fct.App`.
+- [x] Rewrote `Fct.App.Tests` to **reference `Fct.Host`**; deleted **all** host-source
+      `<Compile Include>` links. Internal-type construction works via `InternalsVisibleTo`.
 
-**Exit gate:** build + tests green; `Fct.App.Tests` links **zero** host source (references only);
-manual smoke — host boots, satellite handshake completes, `Fct.SamplePlugin` + `Fct.SampleLegacyPlugin`
-load.
+**Exit gate:** ☑ build + tests green (114 App, 61 Compat.Act, 21 Flow, 55 Shim, 6 Parser, 7 Integration
++ 1 data-dependent skip); `Fct.App.Tests` links **zero** host source (references only); the Integration
+suite launched the real staged satellite and completed the READY/HWND handshake through the moved
+`SatelliteHost` — bridge-client verified from `Fct.Host`.
 **Risk / rollback:** med (largest move; namespace + DI churn). Pure move — revert restores the WinExe.
 
 ---

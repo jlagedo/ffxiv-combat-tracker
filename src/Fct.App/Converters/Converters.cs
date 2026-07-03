@@ -60,11 +60,11 @@ public sealed class SeverityToBrushConverter : IValueConverter
 
     public object Convert(object? value, Type targetType, object? parameter, CultureInfo culture)
     {
-        var key = (value as Fct.App.Hosting.NotificationSeverity?) switch
+        var key = (value as Fct.Host.Hosting.NotificationSeverity?) switch
         {
-            Fct.App.Hosting.NotificationSeverity.Success => "Frost",
-            Fct.App.Hosting.NotificationSeverity.Warning => "Ember",
-            Fct.App.Hosting.NotificationSeverity.Error => "Warn",
+            Fct.Host.Hosting.NotificationSeverity.Success => "Frost",
+            Fct.Host.Hosting.NotificationSeverity.Warning => "Ember",
+            Fct.Host.Hosting.NotificationSeverity.Error => "Warn",
             _ => "FrostDim",
         };
         return (parameter as string) == "glow" ? Glow(key) : Brush(key + "Brush");
