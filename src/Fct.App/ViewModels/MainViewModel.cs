@@ -230,10 +230,9 @@ public sealed partial class MainViewModel : ObservableObject
         if (newValue is not null) newValue.IsSelected = true;
     }
 
-    // ---- satellite / host / game connection state ----
+    // ---- satellite / host connection state ----
     [ObservableProperty]
-    [NotifyPropertyChangedFor(nameof(IsOnline), nameof(IsOffline), nameof(GameLive),
-        nameof(GameStateLabel), nameof(GameStatusKind))]
+    [NotifyPropertyChangedFor(nameof(IsOnline), nameof(IsOffline))]
     private HostState _host = HostState.Starting;
 
     public bool IsOnline => Host == HostState.Online;
@@ -263,14 +262,6 @@ public sealed partial class MainViewModel : ObservableObject
     // The app is running whenever this view model exists.
     public string HostStateLabel => Resources.Status_Running;
     public PluginStatus HostStatusKind => PluginStatus.Running;
-
-    // The game is "Live" when the classic engine is up AND the parser is streaming (reads Live).
-    public bool GameLive => IsOnline && LegacyPlugins.Any(p => p.Key == "ffxiv" && p.IsLive);
-    public string GameStateLabel =>
-        !IsOnline ? Resources.Status_NotConnected
-        : GameLive ? Resources.Status_Live
-        : Resources.Status_WaitingForCombat;
-    public PluginStatus GameStatusKind => GameLive ? PluginStatus.Live : PluginStatus.Loading;
 
     // ---- roster-derived figures ----
     public int LegacyLoadedCount =>
@@ -324,7 +315,7 @@ public sealed partial class MainViewModel : ObservableObject
                 Hwnd = p.Hwnd,
                 SatelliteStatusText = p.Status,
                 HasNativeConfig = hosted,
-                Status = hosted ? (p.Key == "ffxiv" ? PluginStatus.Live : PluginStatus.Running)
+                Status = hosted ? (LegacyPluginCatalog.IsParser(p.Key, p.Title) ? PluginStatus.Live : PluginStatus.Running)
                                 : PluginStatus.NotLoaded,
             });
         }
@@ -418,9 +409,6 @@ public sealed partial class MainViewModel : ObservableObject
         OnPropertyChanged(nameof(LoadedSummary));
         OnPropertyChanged(nameof(HasLegacyPlugins));
         OnPropertyChanged(nameof(HasModernPlugins));
-        OnPropertyChanged(nameof(GameLive));
-        OnPropertyChanged(nameof(GameStateLabel));
-        OnPropertyChanged(nameof(GameStatusKind));
     }
 
     private static PluginViewModel DemoLegacy(string key, PluginStatus status)

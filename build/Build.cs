@@ -40,7 +40,8 @@ await RunTargetsAndExitAsync(args);
 // Publish the host into dist/<mode>/ and the satellite into dist/<mode>/satellite/.
 void Publish(string configuration, bool singleFile, bool readyToRun, string mode)
 {
-    var outDir = Path.Combine(root, "dist", mode);
+    var distRoot = Path.Combine(root, "dist");
+    var outDir = Path.Combine(distRoot, mode);
     var satOut = Path.Combine(outDir, "satellite");
 
     Console.WriteLine($"==> FFXIV Combat Tracker build [{mode}]");
@@ -49,8 +50,10 @@ void Publish(string configuration, bool singleFile, bool readyToRun, string mode
     Console.WriteLine($"    ready-to-run  : {readyToRun}");
     Console.WriteLine($"    output        : {outDir}\n");
 
-    if (Directory.Exists(outDir))
-        Directory.Delete(outDir, recursive: true);
+    // Wipe the whole dist/ tree (every mode) so each build lands a clean version with no stale files
+    // from a prior debug/release drop.
+    if (Directory.Exists(distRoot))
+        Directory.Delete(distRoot, recursive: true);
 
     // 1. Host (net10) into the output root. Portable PDBs ship alongside so the drop is debuggable.
     var singleFileArgs = singleFile

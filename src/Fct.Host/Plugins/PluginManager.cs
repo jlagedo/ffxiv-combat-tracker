@@ -70,7 +70,11 @@ internal sealed class PluginManager
         _legacyFactory = legacyFactory;
     }
 
-    /// <summary>Directory scanned for plugin folders (each holds a <c>plugin.json</c>). Overridable for tests.</summary>
+    /// <summary>
+    /// Root of plugin folders (each holds a <c>plugin.json</c>) that <see cref="LoadAllAsync"/> scans as a
+    /// batch. Not part of the app's startup path — startup is registry-driven (see <c>PluginLifetime</c>);
+    /// this is the seam tests point at their own staged folder. Overridable for tests.
+    /// </summary>
     public string PluginsRoot { get; set; } = Path.Combine(AppContext.BaseDirectory, "plugins");
 
     /// <summary>Per-plugin init budget; the cancellation token cancels a slow <c>InitializeAsync</c>.</summary>

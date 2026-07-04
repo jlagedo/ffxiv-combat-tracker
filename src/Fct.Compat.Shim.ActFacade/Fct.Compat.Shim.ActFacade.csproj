@@ -26,6 +26,8 @@
     <!-- Names FFXIV_ACT_Plugin.Common.IDataSubscription for FormActMain's DataSubscription property.
          One-directional (SdkFacade references nothing), so no cycle. -->
     <ProjectReference Include="..\Fct.Compat.Shim.SdkFacade\Fct.Compat.Shim.SdkFacade.csproj" />
+    <!-- AppData.Root: sandboxes AppDataFolder into the ecosystem, off the real ACT folder. -->
+    <ProjectReference Include="..\Fct.Logging.Contracts\Fct.Logging.Contracts.csproj" />
   </ItemGroup>
 
   <!-- The ACT aggregation engine: one multi-targeted identity (Fct.Aggregation), consumed here on

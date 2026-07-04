@@ -7,10 +7,8 @@ namespace Fct.Logging
     // local fallback sit side by side. Referenced by both the host and the satellite.
     public static class LogPaths
     {
-        // %LOCALAPPDATA%\FFXIVCombatTracker\logs
-        public static string LogsDirectory => Path.Combine(
-            Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
-            "FFXIVCombatTracker", "logs");
+        // <AppData.Root>\logs
+        public static string LogsDirectory => Path.Combine(AppData.Root, "logs");
 
         public static string EnsureLogsDirectory()
         {

@@ -67,20 +67,20 @@ Design docs — **read before proposing changes:**
 | Project | TFM | Role |
 |---|---|---|
 | `Fct.Abstractions` | net48;net10 | plugin SDK: contracts + domain records. No opcodes. |
-| `Fct.Abstractions.UI` | net10 | Avalonia UI contribution surfaces (`IUiContributor`/`IUiHost`); referenced by UI-contributing net10 plugins and by `Fct.App` itself (the shell's `IUiHost` implementation). |
+| `Fct.Abstractions.UI` | net10 | Avalonia UI contribution surfaces (`IUiContributor`/`IUiHost`) + the semantic **UI token contract** (`FctTokens`/`FctStyleClasses`/`FctMetrics` — the stable `fct-*` styling seam the shell maps onto its palette; see [`docs/UI-TOKENS.md`](docs/UI-TOKENS.md)); referenced by UI-contributing net10 plugins and by `Fct.App` itself (the shell's `IUiHost` implementation). |
 | `Fct.Abstractions.Testing` | net10 | in-memory fakes of every plugin-contract interface + the `ShimStub` seam; backs the headless flow tests. |
 | `Fct.Logging.Contracts` | net48;net10 | shared logging contract: the `LogEvents`/`LogCategories` EventId taxonomy, `LogPaths`, and the `BridgeLogRecord` log wire record — one identity on both ends of the bridge. |
 | `Fct.Bridge.Contracts` | net48;net10 | shared bridge contract: the `SatelliteProtocol` handshake/command line protocol and the `GameEventFrame` typed-event wire codec — formatted/parsed by one implementation on both ends. |
 | `Fct.Aggregation` | net48;net10 | **the ACT aggregation engine** (namespace `Advanced_Combat_Tracker`): `EncounterData`/`CombatantData`/`AttackType`/`MasterSwing`/`Dnum` + `ExportVariables`/`ColumnDefs`. One strong-named identity referenced by both facades (`Fct.Compat.Act` net48, `Fct.Compat.Shim.ActFacade` net10) so the aggregation binary is provably identical on both runtimes. Reads its ACT-core flags (`charName`/`blockIsHit`/`restrictToAll`) through accessors each facade's `ActGlobals` wires — the facade keeps those as real fields (precompiled plugins bind them via `ldsfld`). |
 | `Fct.Host` | net10 | the **.NET 10 host runtime**: `Hosting/` `IPluginHost` services, `Plugins/` ALC loader (incl. `CompatRuntime`, the default-ALC resolver for the staged `compat\` legacy package), and the IPC bridge client (`SatelliteHost`/`SatelliteLifetime`/`ProcessJob`). Headless (no Avalonia shell/WinForms); registered via `AddFctHostServices`. `InternalsVisibleTo` `Fct.App` + `Fct.App.Tests` + `Fct.Compat.Shim.E2E.Tests`. |
-| `Fct.App` | net10 | the **Avalonia shell + composition root** (MVVM): control panel, `Views/ViewModels`, localization (`Lang/`), Serilog bootstrap, and the DI wiring that binds `Fct.Host` to the UI (`IUiDispatcher`, the reflective `LegacyPluginHostFactory`, `ISatelliteNotificationText`, `EmbeddedSatelliteView`). Enables the compat runtime (`CompatRuntime.Enable`) and stages the legacy compat package under `compat\` + the two dev samples under `plugins\` — it holds **no** static reference to `Fct.Compat.Shim`. |
+| `Fct.App` | net10 | the **Avalonia shell + composition root** (MVVM): control panel, `Views/ViewModels`, localization (`Lang/`), Serilog bootstrap, and the DI wiring that binds `Fct.Host` to the UI (`IUiDispatcher`, the reflective `LegacyPluginHostFactory`, `ISatelliteNotificationText`, `EmbeddedSatelliteView`). Enables the compat runtime (`CompatRuntime.Enable`) and stages the legacy compat package under `compat\` and the net48 satellite under `satellite\` — it bundles **no** plugins and holds **no** static reference to `Fct.Compat.Shim`. |
 | `Fct.LegacyHost` | net48 | from-scratch ACT engine host; hosts the five real plugins; the net48 end of the bridge. |
 | `Fct.Parser.Legacy` | net48 | wraps the real FFXIV_ACT_Plugin. `WrappedFfxivPlugin` forwards `DataRepository`/`_iocContainer`/lifecycle to the real instance; `RingBufferDataSubscription` (`IDataSubscription` + `IRawPacketSource`) replaces the plugin's per-subscriber `BeginInvoke` fan-out with one bounded ring + single dispatch thread (~250× faster dispatch). |
 | `Fct.Compat.Act` | net48 | **the ACT facade** (host surface, hosted in LegacyHost): `FormActMain`/`ActGlobals`/`SettingsSerializer`/`ActPluginData` WinForms shims + the fake-`Advanced Combat Tracker` identity. References `Fct.Aggregation` for the engine and **type-forwards** its aggregation types (`EncounterData`/`CombatantData`/…) into the `Advanced Combat Tracker` identity so the real precompiled plugins' assembly-qualified type references resolve. Parity: see load-bearing facts + `docs/TESTING.md`. |
 | `Fct.Compat.Shim` | net10-windows | recompile-shim adapter runtime re-projecting the legacy ACT/SDK programming model onto `IPluginHost`; hosts a recompiled legacy plugin (`LegacyPluginHost : IPlugin`), wires `ActGlobals.oFormActMain`, maps the SDK `IDataSubscription`/`IDataRepository`/`Combatant` surface. The in-process net10 legacy path — distinct from the net48 `Fct.Compat.Act`. Not statically referenced by `Fct.App`: staged under `compat\` and resolved into the default ALC by `CompatRuntime`. Design: [`docs/PLUGIN-API.md`](docs/PLUGIN-API.md). |
 | `Fct.Compat.Shim.ActFacade` | net10-windows | assembly `Advanced Combat Tracker`: the POCO `ActGlobals`/`FormActMain` host surface a recompiled plugin binds to (net10 counterpart of `Fct.Compat.Act`), forwarding onto `IPluginHost`. References `Fct.Aggregation` for the engine (recompiled plugins bind the engine types via the transitive reference, so no type-forwarders are needed on this side). |
 | `Fct.Compat.Shim.SdkFacade` | net10 | assembly `FFXIV_ACT_Plugin.Common`: re-declares the SDK surface (`IDataSubscription`/`IDataRepository` + `Combatant`/`Player`/`NetworkBuff`/`PartyType`) a recompiled plugin binds to. No behavior — the `Fct.Compat.Shim` adapters map it onto the host. |
-| `Fct.StreamProbe` | net48 | diagnostic plugin in the satellite; taps the `MasterSwing`/raw-packet stream. |
+| `Fct.StreamProbe` | net48 | **dev-only** diagnostic plugin that taps the `MasterSwing`/raw-packet stream; **not bundled or loaded** by the shipped app (`FacadeHost.LoadProbe` is a dev seam). |
 
 The net10↔net48 **IPC bridge is not its own project** — host end in `Fct.Host` (the client, loaded by
 the `Fct.App` process), satellite end in `Fct.LegacyHost`. Its **wire contracts** are the
@@ -131,8 +131,10 @@ are mapped in [`docs/ACT-INTERFACE-MAP.md`](docs/ACT-INTERFACE-MAP.md).
 ## Real binaries & the ACT facade
 
 - **Real binaries:** FFXIV_ACT_Plugin.dll loads from `%APPDATA%\Advanced Combat Tracker\Plugins\`;
-  the ACT install + OverlayPlugin 0.16.5 live at `E:\dev\Advanced Combat Tracker\`. The satellite
-  loads the real plugins from there — they are never bundled.
+  the ACT install + OverlayPlugin 0.16.5 live at `E:\dev\Advanced Combat Tracker\`. Nothing is bundled
+  and nothing is boot-loaded: the satellite starts empty and loads a real plugin **in place** only when
+  the user installs it through the catalog (host `LOADPLUGIN` command). A dev standalone run
+  (`Fct.LegacyHost.exe` with no `--bridge`) auto-loads FFXIV_ACT_Plugin + OverlayPlugin for convenience.
 - **ACT is strong-named** (`PublicKeyToken=a946b61e93d97868`); plugins reference it by strong name.
   The `Advanced Combat Tracker` facade is supplied via `AppDomain.AssemblyResolve` (token/version not
   re-checked on that path); the real ACT.exe stays out of the satellite probe path.

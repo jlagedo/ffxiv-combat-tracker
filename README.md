@@ -63,7 +63,7 @@ This is a prototype; the table below reflects what exists in the tree, not a fin
 | `Fct.Parser.Legacy` | net48 | wraps the real FFXIV_ACT_Plugin (the sole parser); ring-buffered single-dispatch `IDataSubscription`/`IRawPacketSource`. |
 | `Fct.Abstractions` | net48;net10 | the forward, typed plugin SDK — contracts + domain records shared across the bridge. No opcodes. |
 | `Fct.Abstractions.UI` | net10 | Avalonia UI contribution surfaces for net10 plugins. |
-| `Fct.StreamProbe` | net48 | diagnostic plugin in the satellite; taps the parser's swing/raw-packet stream. |
+| `Fct.StreamProbe` | net48 | dev-only diagnostic plugin; taps the parser's swing/raw-packet stream. Not bundled or loaded by the shipped app. |
 
 Plus `tools/mass-compare/` — a corpus-scale differential harness holding our ACT engine to the real
 ACT binary, both fed the same plugin-produced swings, on recorded logs.

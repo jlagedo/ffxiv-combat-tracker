@@ -379,11 +379,20 @@ to the default ALC, so a plugin's `Control` **is** the shell's `Control` type, a
 styles/resources (the shell's `FluentTheme` + palette) flow into any attached subtree. But the shell's
 actual resource keys (its internal "Evercold" palette, fonts, style classes) are **implementation, not
 contract** — so plugins do not bind them directly. Instead `Fct.Abstractions.UI` exposes a **stable
-semantic token contract**: a documented set of resource keys (surface / accent / text / danger brushes,
-typography, spacing) and a few style classes, which the shell maps onto its internal palette. Plugins
-bind the stable tokens; the shell can restyle, re-accent, or add a light variant (it is Dark-pinned
-today) without breaking any plugin. This is the theming equivalent of the typed data contract — a
-documented seam, never the internal implementation.
+semantic token contract**, and the shell maps it onto its internal palette. This is the theming
+equivalent of the typed data contract — a documented seam, never the internal implementation.
+
+**Built — full catalog in [`UI-TOKENS.md`](UI-TOKENS.md).** `Fct.Abstractions.UI` ships three constant
+classes: `FctTokens` (semantic brush + font resource keys — `FctSurface`/`FctAccent`/`FctText`/
+`FctDanger`/…), `FctStyleClasses` (blessed `fct-*` style classes — `fct-h1`/`fct-card`/`fct-ghost`/…),
+and `FctMetrics` (compile-time spacing / type-ramp / radius doubles). The shell supplies the values:
+the token brushes/fonts are aliased onto the Evercold palette in `App.axaml`; the `fct-*` classes are
+defined over those tokens (via `DynamicResource`) in `Styles/PluginTokens.axaml`, kept separate from
+the shell's private `Controls.axaml` classes. Plugins bind tokens **dynamically** (`{DynamicResource}`
+/ `GetResourceObservable`), so the shell can restyle, re-accent, or add a light variant (Dark-pinned
+today, via `ThemeDictionaries` later) without breaking any plugin. `samples/Fct.SamplePlugin` is the
+reference consumer; a `TokenContractTests` drift guard asserts every advertised key/class exists in the
+shell XAML.
 
 ## The compat shim (adapter)
 
@@ -735,9 +744,9 @@ faces. Pieces not yet built are numbered items in [What we must do](#what-we-mus
 
 A plugin is a **folder** holding the entry assembly + its private dependency closure, the `*.deps.json` /
 `*.runtimeconfig.json` the ALC's `AssemblyDependencyResolver` consumes, and an **optional** `plugin.json`
-(read **without loading any assembly**). Two roots hold plugin folders: build-staged dev samples sit in
-`<host-exe-dir>/plugins/`, and **user-installed plugins land in `%LOCALAPPDATA%\FFXIVCombatTracker\installed-plugins\<id>\`**
-(one `<id>` folder per plugin). `PluginInstaller` accepts either a folder **or a `.zip`** (extracted to a
+(read **without loading any assembly**). One root holds plugin folders: **user-installed plugins land in
+`%LOCALAPPDATA%\FFXIVCombatTracker\installed-plugins\<id>\`** (one `<id>` folder per plugin) — the host
+bundles no plugins and auto-discovers none from disk. `PluginInstaller` accepts either a folder **or a `.zip`** (extracted to a
 staging dir, then descended to the payload root) as the install source. **No signing in v1** — install is
 a folder copy; isolation and type identity are the ALC's job, not a signature's. When `plugin.json` is
 absent, `PluginClassifier` inspects the entry assembly's references with a `MetadataLoadContext` (no
@@ -778,9 +787,9 @@ satellite channel (real-legacy face). `PluginRegistryStore` persists the install
   ALC, `contract` gate, time-boxed fault-guarded init, quarantine on fault). Real-legacy kinds are sent
   to the net48 satellite as a `LOADPLUGIN` command frame (`ISatellitePluginChannel` /
   `SatelliteProtocol`) and hosted out-of-process there.
-- **Startup** — `PluginLifetime` clears pending deletes, loads every persisted net10 plugin
-  (`LoadPersistedAsync`), then scans the build-staged `plugins/` sample folder (`LoadAllAsync`);
-  persisted real-legacy plugins are replayed to the satellite (`ReplayLegacyToSatellite`) once it is
+- **Startup** — `PluginLifetime` clears pending deletes, then loads every persisted net10 plugin
+  (`LoadPersistedAsync`) — registry-driven only, nothing is auto-discovered from disk; persisted
+  real-legacy plugins are replayed to the satellite (`ReplayLegacyToSatellite`) once it is
   online.
 - **Uninstall** — a Plugins-roster *Remove* calls `UninstallAsync`: it retracts the plugin's UI, unloads
   the live instance (`PluginManager.UnloadAsync` — dispose → force-close its `ScopedPluginRegistry`
@@ -861,9 +870,12 @@ feed:
    A contributed settings page renders in the Plugins config bay (alongside the legacy embeds);
    `RevealPage` + `AddCornerControl`/`RemoveCornerControl` are wired end-to-end. Details:
    [Wiring & readiness](#wiring--readiness-modern-ui--built).
-10. **Semantic theme token contract.** Add the stable token keys + style classes to
-    `Fct.Abstractions.UI`, map them onto the shell's internal palette, and document them, so plugins
-    theme against a stable seam and the shell can restyle (incl. a light variant) without breaking them.
+10. **Semantic theme token contract.** ✅ **Built.** `Fct.Abstractions.UI` ships `FctTokens` (brush/font
+    resource keys), `FctStyleClasses` (blessed `fct-*` classes), and `FctMetrics` (layout doubles); the
+    shell aliases the tokens onto the Evercold palette in `App.axaml` and defines the `fct-*` classes over
+    them in `Styles/PluginTokens.axaml`. Plugins bind dynamically, so the shell can restyle (incl. a light
+    variant via `ThemeDictionaries`) without breaking them. Catalog: [`UI-TOKENS.md`](UI-TOKENS.md);
+    reference consumer `samples/Fct.SamplePlugin`; drift-guarded by `TokenContractTests`.
 11. **Plugin lifecycle — install / uninstall / hot-reload.** ✅ **Built.** `PluginInstaller` is the single
     add/remove entry point: it accepts a folder **or a `.zip`**, classifies the payload across the three
     faces (`PluginClassifier` → `LoadKind` native / recompiled-shim / real-legacy), copies it into the

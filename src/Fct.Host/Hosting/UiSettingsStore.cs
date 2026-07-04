@@ -1,6 +1,7 @@
 using System;
 using System.IO;
 using System.Text.Json;
+using Fct.Logging;
 
 namespace Fct.Host.Hosting;
 
@@ -12,16 +13,13 @@ public sealed class UiSettings
     public bool LaunchSatelliteOnStartup { get; set; } = true;
 }
 
-/// <summary>Loads and saves <see cref="UiSettings"/> to
-/// <c>%LOCALAPPDATA%\FFXIVCombatTracker\ui-settings.json</c>. Best-effort: a read/write failure
-/// falls back to defaults rather than blocking the UI.</summary>
+/// <summary>Loads and saves <see cref="UiSettings"/> to <c>&lt;AppData.Root&gt;\ui-settings.json</c>.
+/// Best-effort: a read/write failure falls back to defaults rather than blocking the UI.</summary>
 public sealed class UiSettingsStore
 {
     private static readonly JsonSerializerOptions Options = new() { WriteIndented = true };
 
-    private static string FilePath => Path.Combine(
-        Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
-        "FFXIVCombatTracker", "ui-settings.json");
+    private static string FilePath => Path.Combine(AppData.Root, "ui-settings.json");
 
     public UiSettings Current { get; private set; } = new();
 

@@ -19,11 +19,14 @@ internal sealed record InstallResult(bool Success, LoadKind Kind, string Id, str
 }
 
 /// <summary>
-/// The single entry point for adding and removing plugins. Accepts a <b>directory or a zip</b>,
-/// classifies the plugin (native / recompiled-shim / real-legacy), routes it to the right executor
-/// (in-process ALC, or the satellite), and records it in the persisted registry so it re-loads across
-/// restarts. <see cref="UninstallAsync"/> is the symmetric unload = uninstall: tear down live, delete
-/// the install folder, drop the registry entry — all without a restart.
+/// The single entry point for adding and removing plugins. Accepts a <b>directory, a single .dll, or a
+/// zip</b>, classifies the plugin (native / recompiled-shim / real-legacy), routes it to the right
+/// executor (in-process ALC, or the satellite), and records it in the persisted registry so it re-loads
+/// across restarts. Native/shim plugins are copied into the catalog; <b>real-legacy plugins install by
+/// reference</b> — loaded in place from where the user picked them (like ACT itself), never copied.
+/// <see cref="UninstallAsync"/> is the symmetric unload = uninstall: tear down live, drop the registry
+/// entry, and delete the install folder for catalog-owned plugins (legacy files are left untouched) —
+/// all without a restart.
 /// </summary>
 internal sealed class PluginInstaller
 {
@@ -66,20 +69,40 @@ internal sealed class PluginInstaller
         try
         {
             _paths.EnsureRoots();
-            var payloadDir = PreparePayload(sourcePath, ref staging);
+            var payloadDir = PreparePayload(sourcePath, ref staging, out var singleDll);
 
             PluginManifest? manifest = null;
             var manifestPath = Path.Combine(payloadDir, "plugin.json");
             if (File.Exists(manifestPath))
                 PluginManifest.TryLoad(manifestPath, out manifest, out _);
 
-            // Classify against the staged copy; the classifier disposes its MetadataLoadContext before
-            // we touch the files again, so nothing keeps them locked for the copy/load below.
-            var c = _classifier.Classify(payloadDir, manifest);
+            // Classify the payload; the classifier disposes its MetadataLoadContext before we touch the
+            // files again. A single picked DLL (e.g. FFXIV_ACT_Plugin.dll in the ACT install, whose folder
+            // holds other plugins) is classified alone, not by scanning the whole folder.
+            var c = singleDll is not null
+                ? _classifier.ClassifyFile(singleDll, manifest)
+                : _classifier.Classify(payloadDir, manifest);
 
-            var destDir = _paths.DirFor(c.Id);
-            if (Directory.Exists(destDir)) Directory.Delete(destDir, recursive: true);
-            CopyDirectory(payloadDir, destDir);
+            // Legacy plugins install by reference: load in place from where the user picked them (like ACT
+            // itself), so folder plugins keep their sibling deps (OverlayPlugin's libs/CEF/deucalion) and
+            // uninstall never deletes the user's files. Native/shim plugins are copied into our catalog.
+            // A zip is always copied (its extract dir is transient), even for legacy.
+            bool inPlace = c.Kind == LoadKind.RealLegacy && staging is null;
+            string destDir;
+            if (inPlace)
+            {
+                destDir = singleDll is not null ? Path.GetDirectoryName(singleDll)! : payloadDir;
+            }
+            else
+            {
+                destDir = _paths.DirFor(c.Id);
+                if (Directory.Exists(destDir)) Directory.Delete(destDir, recursive: true);
+                Directory.CreateDirectory(destDir);
+                if (singleDll is not null)
+                    File.Copy(singleDll, Path.Combine(destDir, Path.GetFileName(singleDll)), overwrite: true);
+                else
+                    CopyDirectory(payloadDir, destDir);
+            }
 
             var title = manifest?.Name ?? c.Id;
             var record = new InstalledPluginRecord(c.Id, c.Kind, destDir, c.EntryTypeName, c.Version)
@@ -131,13 +154,19 @@ internal sealed class PluginInstaller
                 freed = await _manager.UnloadAsync(id).ConfigureAwait(false);
             }
 
-            if (dir is not null) DeleteOrDefer(dir, freed);
+            // Legacy plugins are loaded in place (never copied into our catalog), so uninstall only
+            // unregisters + unloads them — it must never delete the user's own files. Native/shim
+            // plugins live in our install dir, so those are deleted (deferred if still locked).
+            bool ownsFiles = kind != LoadKind.RealLegacy;
+            if (ownsFiles && dir is not null) DeleteOrDefer(dir, freed);
             _registry.Remove(id);
 
+            var fileState = !ownsFiles ? "left in place" : freed ? "deleted" : "deferred";
             _log.LogInformation(LogEvents.NativePluginUnloaded, "Uninstalled plugin {Id} ({Kind}); files {State}",
-                id, kind, freed ? "deleted" : "deferred");
+                id, kind, fileState);
             _notifications?.Publish(NotificationSeverity.Success, "Plugins", $"{record?.Title ?? id} removed",
-                freed ? "The plugin was unloaded and deleted." : "The plugin was unloaded; its files will be removed on next launch.");
+                !ownsFiles ? "The plugin was unloaded (its files were left untouched)."
+                : freed ? "The plugin was unloaded and deleted." : "The plugin was unloaded; its files will be removed on next launch.");
             return true;
         }
         catch (Exception ex)
@@ -153,6 +182,7 @@ internal sealed class PluginInstaller
     /// (<see cref="ReplayLegacyToSatellite"/>).</summary>
     public async Task LoadPersistedAsync(CancellationToken ct)
     {
+        _registry.Load();   // read installed-plugins.json back into memory so installs survive restarts
         _registry.ProcessPendingDeletes();
         foreach (var record in _registry.All())
         {
@@ -203,11 +233,20 @@ internal sealed class PluginInstaller
         _registry.MarkPendingDelete(dir);
     }
 
-    // Zip -> extract into a fresh staging dir and descend to the real payload; directory -> as-is.
-    private string PreparePayload(string sourcePath, ref string? staging)
+    // Directory -> as-is; single .dll -> its folder as the payload dir + the dll itself (singleDll);
+    // zip -> extract into a fresh staging dir and descend to the real payload.
+    private string PreparePayload(string sourcePath, ref string? staging, out string? singleDll)
     {
+        singleDll = null;
+
         if (Directory.Exists(sourcePath))
             return sourcePath;
+
+        if (File.Exists(sourcePath) && string.Equals(Path.GetExtension(sourcePath), ".dll", StringComparison.OrdinalIgnoreCase))
+        {
+            singleDll = sourcePath;
+            return Path.GetDirectoryName(sourcePath) ?? ".";
+        }
 
         if (File.Exists(sourcePath) && string.Equals(Path.GetExtension(sourcePath), ".zip", StringComparison.OrdinalIgnoreCase))
         {
@@ -216,7 +255,7 @@ internal sealed class PluginInstaller
             return ResolvePayloadRoot(staging);
         }
 
-        throw new InvalidOperationException($"'{sourcePath}' is not a plugin directory or a .zip file.");
+        throw new InvalidOperationException($"'{sourcePath}' is not a plugin directory, .dll, or .zip file.");
     }
 
     // The plugin files may sit at the extract root or inside a single wrapper folder.

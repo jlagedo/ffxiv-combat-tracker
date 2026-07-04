@@ -64,30 +64,12 @@
                       Private="false" />
   </ItemGroup>
 
-  <!-- Build the recompiled-legacy sample as a dependency (no assembly reference: it loads only through
-       its own ALC via the shim). Staged under plugins\ so the shipped exe exercises the shim path,
-       exactly as StageSamplePlugin does for the native sample. Its legacyEntry manifest routes it to
-       the reflective LegacyPluginHostFactory. -->
-  <ItemGroup>
-    <ProjectReference Include="..\..\samples\Fct.SampleLegacyPlugin\Fct.SampleLegacyPlugin.csproj"
-                      ReferenceOutputAssembly="false"
-                      Private="false" />
-  </ItemGroup>
-
   <!-- Build the net48 satellite as a dependency (no assembly reference: different runtime)
        and stage its output under satellite\ next to the host. -->
   <ItemGroup>
     <ProjectReference Include="..\Fct.LegacyHost\Fct.LegacyHost.csproj"
                       ReferenceOutputAssembly="false"
                       SkipGetTargetFrameworkProperties="true"
-                      Private="false" />
-  </ItemGroup>
-
-  <!-- Build the sample plugin as a dependency but DO NOT reference its assembly: it must load only
-       through its own ALC, never into the host's default context. Staged under plugins\ next to the host. -->
-  <ItemGroup>
-    <ProjectReference Include="..\..\samples\Fct.SamplePlugin\Fct.SamplePlugin.csproj"
-                      ReferenceOutputAssembly="false"
                       Private="false" />
   </ItemGroup>
 
@@ -100,15 +82,6 @@
           SkipUnchangedFiles="true" />
   </Target>
 
-  <Target Name="StageSamplePlugin" AfterTargets="Build">
-    <ItemGroup>
-      <SamplePluginFiles Include="$(MSBuildThisFileDirectory)..\..\samples\Fct.SamplePlugin\bin\$(Configuration)\net10.0\**\*" />
-    </ItemGroup>
-    <Copy SourceFiles="@(SamplePluginFiles)"
-          DestinationFiles="@(SamplePluginFiles->'$(OutDir)plugins\Fct.SamplePlugin\%(RecursiveDir)%(Filename)%(Extension)')"
-          SkipUnchangedFiles="true" />
-  </Target>
-
   <!-- The opt-in legacy compat runtime: the shim + its two impersonation facades + the aggregation
        engine, staged under compat\ (NOT under plugins\ — that folder is scanned for plugin.json and the
        shim set would be mis-classified). CompatRuntime.Enable resolves these into the default ALC. -->
@@ -118,15 +91,6 @@
     </ItemGroup>
     <Copy SourceFiles="@(CompatShimFiles)"
           DestinationFiles="@(CompatShimFiles->'$(OutDir)compat\%(RecursiveDir)%(Filename)%(Extension)')"
-          SkipUnchangedFiles="true" />
-  </Target>
-
-  <Target Name="StageSampleLegacyPlugin" AfterTargets="Build">
-    <ItemGroup>
-      <SampleLegacyFiles Include="$(MSBuildThisFileDirectory)..\..\samples\Fct.SampleLegacyPlugin\bin\$(Configuration)\net10.0-windows\**\*" />
-    </ItemGroup>
-    <Copy SourceFiles="@(SampleLegacyFiles)"
-          DestinationFiles="@(SampleLegacyFiles->'$(OutDir)plugins\Fct.SampleLegacyPlugin\%(RecursiveDir)%(Filename)%(Extension)')"
           SkipUnchangedFiles="true" />
   </Target>
 </Project>

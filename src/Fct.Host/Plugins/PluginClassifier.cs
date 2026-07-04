@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Diagnostics.CodeAnalysis;
 using System.IO;
 using System.Linq;
 using System.Reflection;
@@ -35,12 +36,7 @@ internal sealed class PluginClassifier
     /// is non-null it is trusted; otherwise the directory's assemblies are inspected.</summary>
     public PluginClassification Classify(string pluginDir, PluginManifest? manifest)
     {
-        if (manifest is not null)
-        {
-            var kind = manifest.LegacyEntry is not null ? LoadKind.RecompiledShim : LoadKind.Native;
-            var entry = manifest.LegacyEntry ?? manifest.Entry;
-            return new PluginClassification(kind, manifest.Id, manifest.Version, entry, manifest.Assembly);
-        }
+        if (manifest is not null) return FromManifest(manifest);
 
         var dlls = Directory.GetFiles(pluginDir, "*.dll");
         if (dlls.Length == 0)
@@ -53,30 +49,69 @@ internal sealed class PluginClassifier
             Assembly asm;
             try { asm = mlc.LoadFromAssemblyPath(dll); }
             catch { continue; }
-
-            var refs = asm.GetReferencedAssemblies();
-            var actRef = refs.FirstOrDefault(r => r.Name == ActAssemblyName);
-            if (actRef is not null)
-            {
-                var token = TokenHex(actRef.GetPublicKeyToken());
-                bool isReal = string.Equals(token, RealActToken, StringComparison.OrdinalIgnoreCase);
-                var kind = isReal ? LoadKind.RealLegacy : LoadKind.RecompiledShim;
-                // Real-legacy: don't resolve its (net48, absent) type graph — the satellite finds the
-                // entry type at load. Shim: the facade is in the app dir, so the entry type resolves.
-                var entry = isReal ? null : FindEntryType(asm, ActPluginInterface);
-                return Synthesize(kind, asm, dll, entry);
-            }
-
-            if (refs.Any(r => r.Name == AbstractionsName))
-            {
-                var entry = FindEntryType(asm, PluginInterface);
-                if (entry is not null)
-                    return Synthesize(LoadKind.Native, asm, dll, entry);
-            }
+            if (TryInspect(asm, dll, out var c)) return c;
         }
 
         throw new InvalidOperationException(
             $"No plugin entry assembly found in '{pluginDir}' (no type implementing IPlugin or IActPluginV1).");
+    }
+
+    /// <summary>Classify a single DLL the user picked directly (e.g. <c>FFXIV_ACT_Plugin.dll</c> from the
+    /// ACT install, whose folder holds many unrelated plugins). Only that DLL is inspected; its siblings
+    /// are made resolvable so its metadata reads, but they are not themselves classified.</summary>
+    public PluginClassification ClassifyFile(string dllPath, PluginManifest? manifest)
+    {
+        if (manifest is not null) return FromManifest(manifest);
+
+        var siblings = Directory.GetFiles(Path.GetDirectoryName(dllPath) ?? ".", "*.dll");
+        using var mlc = new MetadataLoadContext(BuildResolver(siblings));
+        Assembly asm;
+        try { asm = mlc.LoadFromAssemblyPath(dllPath); }
+        catch (Exception ex) { throw new InvalidOperationException($"Could not read '{dllPath}' as a .NET assembly.", ex); }
+
+        if (TryInspect(asm, dllPath, out var c)) return c;
+        throw new InvalidOperationException(
+            $"'{dllPath}' is not a plugin (no type implementing IPlugin or IActPluginV1).");
+    }
+
+    private static PluginClassification FromManifest(PluginManifest manifest)
+    {
+        var kind = manifest.LegacyEntry is not null ? LoadKind.RecompiledShim : LoadKind.Native;
+        var entry = manifest.LegacyEntry ?? manifest.Entry;
+        return new PluginClassification(kind, manifest.Id, manifest.Version, entry, manifest.Assembly);
+    }
+
+    // Inspect one already-loaded (metadata-only) assembly: the referenced "Advanced Combat Tracker"
+    // identity (real strong-name vs shim facade) and the implemented plugin interface decide the kind.
+    private bool TryInspect(Assembly asm, string dll, [NotNullWhen(true)] out PluginClassification? result)
+    {
+        result = null;
+        var refs = asm.GetReferencedAssemblies();
+
+        var actRef = refs.FirstOrDefault(r => r.Name == ActAssemblyName);
+        if (actRef is not null)
+        {
+            var token = TokenHex(actRef.GetPublicKeyToken());
+            bool isReal = string.Equals(token, RealActToken, StringComparison.OrdinalIgnoreCase);
+            var kind = isReal ? LoadKind.RealLegacy : LoadKind.RecompiledShim;
+            // Real-legacy: don't resolve its (net48, absent) type graph — the satellite finds the
+            // entry type at load. Shim: the facade is in the app dir, so the entry type resolves.
+            var entry = isReal ? null : FindEntryType(asm, ActPluginInterface);
+            result = Synthesize(kind, asm, dll, entry);
+            return true;
+        }
+
+        if (refs.Any(r => r.Name == AbstractionsName))
+        {
+            var entry = FindEntryType(asm, PluginInterface);
+            if (entry is not null)
+            {
+                result = Synthesize(LoadKind.Native, asm, dll, entry);
+                return true;
+            }
+        }
+
+        return false;
     }
 
     private static PluginClassification Synthesize(LoadKind kind, Assembly asm, string dll, string? entry)

@@ -26,8 +26,8 @@ namespace Fct.LegacyHost
 
         private static LoadedPlugin _ffxiv;
         private static LoadedPlugin _overlay;
-        private static LoadedPlugin _probe;
         private static BridgeForwarder _forwarder;
+        private static bool _parserWired;
 
         private static NamedPipeClientStream _cmdPipe;   // host -> satellite: load/unload commands
         // Every plugin loaded into this satellite, keyed by the host-facing key, so a single one can
@@ -117,10 +117,8 @@ namespace Fct.LegacyHost
             _standalone = pipeName == null;
 
             // Load plugins once the message loop is running (some plugins poll via timers).
-            ScheduleOnce(250, LoadPlugins);
-            ScheduleOnce(3000, StartDispatcherDiagnostics);
+            ScheduleOnce(250, Boot);
             ScheduleOnce(12000, WriteSummary);
-            ScheduleOnce(12500, StartCaptureHeartbeat);
 
             try
             {
@@ -134,52 +132,43 @@ namespace Fct.LegacyHost
 
         private static bool _standalone;
 
-        private static void LoadPlugins()
+        // Boot the satellite with NO plugins loaded: a clean host ships nothing and boot-loads nothing.
+        // Every plugin (parser included) arrives on demand via the host's LOADPLUGIN command
+        // (HandleCommand). The one dev exception is a standalone run (no --bridge), which auto-loads the
+        // usual pair so the satellite is useful on its own for manual testing / the oracle tooling.
+        private static void Boot()
         {
-            // Each plugin loads into its own borderless window; the host embeds whichever the
-            // user selects, so a plugin's window shows only its own configuration tabs.
-            _log.LogInformation(LogEvents.PluginLoading,
-                "Loading FFXIV_ACT_Plugin (wrapped) from {Path}", FacadeHost.FfxivPluginPath);
-            _ffxiv = FacadeHost.LoadWrappedFfxivPlugin(FacadeHost.FfxivPluginPath);
-            _plugins[_ffxiv.Key] = _ffxiv;
-            SendLine(SatelliteProtocol.FormatHwnd(_ffxiv.Hwnd));   // primary window (bridge-handshake compat)
-            SendPlugin(_ffxiv);
-
-            _log.LogInformation(LogEvents.PluginLoading,
-                "Loading OverlayPlugin from {Path}", FacadeHost.OverlayPluginPath);
-            _overlay = FacadeHost.LoadPlugin("overlay", "OverlayPlugin", FacadeHost.OverlayPluginPath, null);
-            _plugins[_overlay.Key] = _overlay;
-            SendPlugin(_overlay);
-
-            // Headless diagnostic plugin: taps the full data path and logs to satellite\streamprobe.log.
-            // No embeddable window, so it is not announced to the host (no SendPlugin).
-            _log.LogInformation(LogEvents.PluginLoading,
-                "Loading Fct.StreamProbe from {Path}", FacadeHost.StreamProbePath);
-            _probe = FacadeHost.LoadProbe(FacadeHost.StreamProbePath);
-
-            SendLine(SatelliteProtocol.PluginsEnd);
-            _log.LogInformation(LogEvents.PluginsReady,
-                "Loaded 2 plugin window(s): {Ffxiv}=0x{FfxivHwnd:X}, {Overlay}=0x{OverlayHwnd:X}",
-                _ffxiv.Title, _ffxiv.Hwnd.ToInt64(), _overlay.Title, _overlay.Hwnd.ToInt64());
-
-            if (_standalone)
-                foreach (var p in new[] { _ffxiv, _overlay })
-                {
-                    p.Window.FormBorderStyle = FormBorderStyle.Sizable;
-                    p.Window.StartPosition = FormStartPosition.WindowsDefaultLocation;
-                    p.Window.Text = p.Title;
-                    p.Window.Show();
-                }
-
-            // Drive ACT's idle-end off the live log stream: the FFXIV plugin raises OnLogLineRead for
-            // every parsed line, so advancing the clock per line splits combat into per-pull
-            // encounters (matching ACT). OverlayPlugin reads ActiveZone.ActiveEncounter, so this is
-            // what gives a live, per-encounter DPS instead of one ever-growing all-time encounter.
+            // Drive ACT's idle-end off the live log stream: whichever parser loads raises OnLogLineRead
+            // for every parsed line, so advancing the clock per line splits combat into per-pull
+            // encounters (matching ACT). Wired unconditionally — harmless before any parser exists,
+            // and OverlayPlugin reads ActiveZone.ActiveEncounter to show live per-encounter DPS.
             ActGlobals.oFormActMain.OnLogLineRead += (isImport, args) =>
             {
                 if (args.detectedTime > DateTime.MinValue)
                     ActGlobals.oFormActMain.AdvanceClock(args.detectedTime);
             };
+
+            if (_standalone)
+            {
+                LoadStandalonePlugins();
+            }
+            else
+            {
+                // Bridged/production: no plugins at boot. Close the handshake immediately so the host's
+                // StartAsync loop returns at once (empty roster) instead of waiting the 60s timeout.
+                SendLine(SatelliteProtocol.PluginsEnd);
+                _log.LogInformation(LogEvents.PluginsReady, "Boot complete: 0 plugins (catalog-driven; awaiting LOADPLUGIN)");
+            }
+        }
+
+        // Parser-dependent wiring, run once the parser is up (from the standalone boot-load or the
+        // on-demand LOADPLUGIN path) rather than at a fixed boot time — with catalog-driven loading the
+        // parser can arrive at any point. Starts the bridge forwarder (bridged only) and the ring/capture
+        // diagnostics. Idempotent: a later parser reload is a no-op here.
+        private static void OnParserLoaded()
+        {
+            if (_parserWired) return;
+            _parserWired = true;
 
             // Forward the live SDK/ACT stream to the net10 host as typed GameEvent frames (piece C).
             // Only when bridged: standalone runs have no host to receive them.
@@ -189,7 +178,44 @@ namespace Fct.LegacyHost
                 _forwarder.Start();
             }
 
+            // Deterministic aggregation check — runs now that the parser has populated ACT's routing
+            // tables / ExportVariables (it produces zeros without them); also sets the capture baseline.
             SelfTestAggregation();
+            StartDispatcherDiagnostics();
+            StartCaptureHeartbeat();
+        }
+
+        // Dev convenience for a standalone (no --bridge) run: auto-load the usual FFXIV_ACT_Plugin +
+        // OverlayPlugin pair from the real ACT install so the satellite is exercisable on its own. This
+        // path never runs in production (which is always bridged and catalog-driven).
+        private static void LoadStandalonePlugins()
+        {
+            _log.LogInformation(LogEvents.PluginLoading,
+                "Loading FFXIV_ACT_Plugin (wrapped) from {Path}", FacadeHost.FfxivPluginPath);
+            _ffxiv = FacadeHost.LoadWrappedFfxivPlugin(FacadeHost.FfxivPluginPath);
+            _plugins[_ffxiv.Key] = _ffxiv;
+            SendLine(SatelliteProtocol.FormatHwnd(_ffxiv.Hwnd));   // primary window (bridge-handshake compat)
+            SendPlugin(_ffxiv);
+            OnParserLoaded();
+
+            _log.LogInformation(LogEvents.PluginLoading,
+                "Loading OverlayPlugin from {Path}", FacadeHost.OverlayPluginPath);
+            _overlay = FacadeHost.LoadPlugin("overlay", "OverlayPlugin", FacadeHost.OverlayPluginPath, null);
+            _plugins[_overlay.Key] = _overlay;
+            SendPlugin(_overlay);
+
+            SendLine(SatelliteProtocol.PluginsEnd);
+            _log.LogInformation(LogEvents.PluginsReady,
+                "Loaded 2 plugin window(s): {Ffxiv}=0x{FfxivHwnd:X}, {Overlay}=0x{OverlayHwnd:X}",
+                _ffxiv.Title, _ffxiv.Hwnd.ToInt64(), _overlay.Title, _overlay.Hwnd.ToInt64());
+
+            foreach (var p in new[] { _ffxiv, _overlay })
+            {
+                p.Window.FormBorderStyle = FormBorderStyle.Sizable;
+                p.Window.StartPosition = FormStartPosition.WindowsDefaultLocation;
+                p.Window.Text = p.Title;
+                p.Window.Show();
+            }
         }
 
         // Deterministic S5 check: drive synthetic combat through the facade and read back
@@ -350,7 +376,8 @@ namespace Fct.LegacyHost
         private static void WriteSummary()
         {
             var act = ActGlobals.oFormActMain;
-            var logFolder = Path.Combine(FacadeHost.AppData, "FFXIVLogs");
+            // The FFXIV plugin writes Network_*.log under the (sandboxed) ACT AppDataFolder.
+            var logFolder = Path.Combine(act.AppDataFolder.FullName, "FFXIVLogs");
             string[] networkLogs = Array.Empty<string>();
             try { networkLogs = Directory.GetFiles(logFolder, "Network_*.log"); } catch { }
             var today = networkLogs.Length > 0
@@ -412,7 +439,10 @@ namespace Fct.LegacyHost
 
         // Connect the host->satellite command pipe and read LOADPLUGIN/UNLOADPLUGIN frames on a
         // background thread, marshaling each onto the WinForms UI thread (plugin Init/DeInit build and
-        // destroy WinForms controls). Mirrors StartShutdownWaiter's thread + Invoke pattern.
+        // destroy WinForms controls). The host creates the server before launching us, so the connect
+        // succeeds immediately. Connect BEFORE the first log call: log records are forwarded
+        // synchronously over the event pipe (SendLine), so a host that isn't draining that pipe must
+        // never be able to keep this thread from reaching the command pipe.
         private static void StartCommandReader(string pipeName)
         {
             var t = new System.Threading.Thread(() =>
@@ -420,7 +450,8 @@ namespace Fct.LegacyHost
                 try
                 {
                     _cmdPipe = new NamedPipeClientStream(".", pipeName + "-cmd", PipeDirection.In);
-                    _cmdPipe.Connect(5000);
+                    _cmdPipe.Connect(30000);
+                    _log.LogDebug(LogEvents.SatelliteBridgeConnected, "Command pipe connected");
                     using (var reader = new StreamReader(_cmdPipe))
                     {
                         string line;
@@ -430,7 +461,8 @@ namespace Fct.LegacyHost
                 }
                 catch (Exception ex)
                 {
-                    _log.LogWarning(LogEvents.SatelliteBridgeConnectFailed, ex, "Command pipe reader stopped");
+                    _log.LogWarning(LogEvents.SatelliteBridgeConnectFailed, ex,
+                        "Command pipe unavailable; live load/unload disabled");
                 }
             })
             { IsBackground = true, Name = "cmd-reader" };
@@ -445,8 +477,14 @@ namespace Fct.LegacyHost
                 {
                     try
                     {
-                        var loaded = FacadeHost.LoadPlugin(loadKey, title, dll, null);
+                        // The parser needs the ring-buffer wrapper OverlayPlugin binds to; every other
+                        // legacy plugin takes the generic path. Detect it by its (fixed) DLL name.
+                        bool isParser = string.Equals(Path.GetFileName(dll), "FFXIV_ACT_Plugin.dll", StringComparison.OrdinalIgnoreCase);
+                        var loaded = isParser
+                            ? FacadeHost.LoadWrappedFfxivPlugin(dll, loadKey)
+                            : FacadeHost.LoadPlugin(loadKey, title, dll, null);
                         _plugins[loadKey] = loaded;
+                        if (isParser) { _ffxiv = loaded; OnParserLoaded(); }
                         SendPlugin(loaded);
                         _log.LogInformation(LogEvents.PluginInitialized, "Loaded plugin {Key} '{Title}' on command from {Dll}", loadKey, title, dll);
                     }

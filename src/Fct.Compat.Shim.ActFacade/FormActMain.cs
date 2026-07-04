@@ -64,11 +64,12 @@ namespace Advanced_Combat_Tracker
         public Version GetVersion() => new Version(3, 8, 5, 288);
 
         /// <summary>ACT's config folder (a single global folder, as in real ACT — a plugin's own folder
-        /// comes from <see cref="PluginGetSelfData"/>.<c>pluginFile.DirectoryName</c>).</summary>
+        /// comes from <see cref="PluginGetSelfData"/>.<c>pluginFile.DirectoryName</c>). Sandboxed into
+        /// the ecosystem (<c>&lt;AppData.Root&gt;\legacy\Advanced Combat Tracker</c>) instead of the real
+        /// ACT folder, so in-process legacy plugins don't read or write the old ACT data location.</summary>
         public DirectoryInfo AppDataFolder =>
             new DirectoryInfo(Path.Combine(
-                Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData),
-                "Advanced Combat Tracker"));
+                Fct.Logging.AppData.Root, "legacy", "Advanced Combat Tracker"));
 
         public bool InitActDone { get; set; } = true;
         public bool IsActClosing { get; set; }

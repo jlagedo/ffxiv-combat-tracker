@@ -19,7 +19,6 @@ public static class Resources
 
     // ---- General labels ----
     public static string Label_App => Get(nameof(Label_App));
-    public static string Label_Game => Get(nameof(Label_Game));
     public static string Label_ClassicEngine => Get(nameof(Label_ClassicEngine));
     public static string Label_ClassicChip => Get(nameof(Label_ClassicChip));
     public static string Label_ModernChip => Get(nameof(Label_ModernChip));
@@ -71,7 +70,6 @@ public static class Resources
 
     // ---- Status bar / connection state ----
     public static string Status_AppRunning => Get(nameof(Status_AppRunning));
-    public static string Status_GameFormat => Get(nameof(Status_GameFormat));
     public static string Status_Live => Get(nameof(Status_Live));
     public static string Status_LastFight => Get(nameof(Status_LastFight));
     public static string Status_Starting => Get(nameof(Status_Starting));
@@ -80,8 +78,6 @@ public static class Resources
     public static string Status_NotLoaded => Get(nameof(Status_NotLoaded));
     public static string Status_Unavailable => Get(nameof(Status_Unavailable));
     public static string Status_Error => Get(nameof(Status_Error));
-    public static string Status_NotConnected => Get(nameof(Status_NotConnected));
-    public static string Status_WaitingForCombat => Get(nameof(Status_WaitingForCombat));
     public static string Status_Stopped => Get(nameof(Status_Stopped));
     public static string Status_NotStarted => Get(nameof(Status_NotStarted));
     public static string Status_EngineStoppedSummary => Get(nameof(Status_EngineStoppedSummary));

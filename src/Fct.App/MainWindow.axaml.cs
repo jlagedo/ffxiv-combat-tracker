@@ -78,15 +78,19 @@ public partial class MainWindow : Window
         coordinator.FlushRegisterUi(manager.Loaded.Select(p => (p.Manifest, p.Instance)));
     }
 
-    // Add a plugin from a .zip package or a folder. The single installer classifies it (native /
-    // recompiled-shim / real-legacy), routes it to the right executor, loads it live, and persists it.
+    // Add a plugin from a .zip package, a single .dll, or a folder. The single installer classifies it
+    // (native / recompiled-shim / real-legacy), routes it to the right executor, loads it live, and
+    // persists it. A single .dll covers loose legacy plugins like FFXIV_ACT_Plugin.dll / Triggernometry.dll.
     private async Task PickPluginAsync()
     {
         var files = await StorageProvider.OpenFilePickerAsync(new FilePickerOpenOptions
         {
             Title = Strings.Dialog_AddPluginFolderTitle,
             AllowMultiple = false,
-            FileTypeFilter = new[] { new FilePickerFileType("Plugin package") { Patterns = new[] { "*.zip" } } },
+            FileTypeFilter = new[]
+            {
+                new FilePickerFileType("Plugin (package or assembly)") { Patterns = new[] { "*.zip", "*.dll" } },
+            },
         });
         if (files.FirstOrDefault() is { } file)
         {
@@ -94,7 +98,7 @@ public partial class MainWindow : Window
             return;
         }
 
-        // No zip chosen — offer a plugin folder instead (dev builds ship as a folder, not a zip).
+        // No file chosen — offer a plugin folder instead (e.g. OverlayPlugin\, or a dev build folder).
         var folders = await StorageProvider.OpenFolderPickerAsync(new FolderPickerOpenOptions
         {
             Title = Strings.Dialog_AddPluginFolderTitle,

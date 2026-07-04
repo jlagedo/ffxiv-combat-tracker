@@ -1,0 +1,98 @@
+<Styles xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
+
+    <!-- ============================================================================
+         The blessed, plugin-facing style classes (Fct.Abstractions.UI FctStyleClasses;
+         docs/UI-TOKENS.md). A plugin's contributed Control gets these by adding the
+         `fct-*` class; they are defined entirely over the FctTokens design tokens (via
+         {DynamicResource}) so a shell restyle reaches attached plugin controls at runtime.
+         Distinct from the shell's private, unprefixed classes in Controls.axaml. -->
+
+    <!-- ============================ Typography ============================ -->
+    <Style Selector="TextBlock.fct-eyebrow">
+        <Setter Property="FontFamily" Value="{DynamicResource FctFontMono}"/>
+        <Setter Property="FontSize" Value="11"/>
+        <Setter Property="LetterSpacing" Value="2.5"/>
+        <Setter Property="Foreground" Value="{DynamicResource FctTextDim}"/>
+    </Style>
+    <Style Selector="TextBlock.fct-h1">
+        <Setter Property="FontFamily" Value="{DynamicResource FctFontDisplay}"/>
+        <Setter Property="FontSize" Value="30"/>
+        <Setter Property="LetterSpacing" Value="0.5"/>
+        <Setter Property="Foreground" Value="{DynamicResource FctText}"/>
+    </Style>
+    <Style Selector="TextBlock.fct-h2">
+        <Setter Property="FontFamily" Value="{DynamicResource FctFontDisplay}"/>
+        <Setter Property="FontSize" Value="19"/>
+        <Setter Property="Foreground" Value="{DynamicResource FctText}"/>
+    </Style>
+    <Style Selector="TextBlock.fct-subtitle">
+        <Setter Property="FontSize" Value="13"/>
+        <Setter Property="Foreground" Value="{DynamicResource FctTextDim}"/>
+        <Setter Property="LineHeight" Value="19"/>
+        <Setter Property="TextWrapping" Value="Wrap"/>
+    </Style>
+    <Style Selector="TextBlock.fct-meta">
+        <Setter Property="FontFamily" Value="{DynamicResource FctFontMono}"/>
+        <Setter Property="FontSize" Value="12"/>
+        <Setter Property="Foreground" Value="{DynamicResource FctTextDim}"/>
+    </Style>
+    <Style Selector="TextBlock.fct-body">
+        <Setter Property="FontSize" Value="13"/>
+        <Setter Property="Foreground" Value="{DynamicResource FctText}"/>
+        <Setter Property="LineHeight" Value="20"/>
+        <Setter Property="TextWrapping" Value="Wrap"/>
+    </Style>
+
+    <!-- ============================ Surfaces ============================ -->
+    <Style Selector="Border.fct-card">
+        <Setter Property="Background" Value="{DynamicResource FctSurface}"/>
+        <Setter Property="BorderBrush" Value="{DynamicResource FctHairline}"/>
+        <Setter Property="BorderThickness" Value="1"/>
+        <Setter Property="CornerRadius" Value="14"/>
+        <Setter Property="Padding" Value="14"/>
+    </Style>
+    <Style Selector="Border.fct-rule">
+        <Setter Property="Height" Value="1"/>
+        <Setter Property="Background" Value="{DynamicResource FctHairline}"/>
+    </Style>
+
+    <!-- ============================ Ghost button ============================ -->
+    <Style Selector="Button.fct-ghost">
+        <Setter Property="Background" Value="Transparent"/>
+        <Setter Property="BorderBrush" Value="{DynamicResource FctAccentDim}"/>
+        <Setter Property="BorderThickness" Value="1"/>
+        <Setter Property="Foreground" Value="{DynamicResource FctAccent}"/>
+        <Setter Property="CornerRadius" Value="8"/>
+        <Setter Property="Padding" Value="16,9"/>
+        <Setter Property="FontSize" Value="13"/>
+        <Setter Property="RenderTransform" Value="translateY(0px)"/>
+        <Setter Property="Transitions">
+            <Transitions>
+                <TransformOperationsTransition Property="RenderTransform" Duration="0:0:0.16" Easing="CubicEaseOut"/>
+            </Transitions>
+        </Setter>
+    </Style>
+    <Style Selector="Button.fct-ghost /template/ ContentPresenter">
+        <Setter Property="Transitions">
+            <Transitions>
+                <BrushTransition Property="Background" Duration="0:0:0.16"/>
+                <BrushTransition Property="BorderBrush" Duration="0:0:0.16"/>
+            </Transitions>
+        </Setter>
+    </Style>
+    <Style Selector="Button.fct-ghost:pointerover">
+        <Setter Property="RenderTransform" Value="translateY(-2px)"/>
+    </Style>
+    <Style Selector="Button.fct-ghost:pointerover /template/ ContentPresenter">
+        <Setter Property="Background" Value="{DynamicResource FctSurfaceAlt}"/>
+        <Setter Property="BorderBrush" Value="{DynamicResource FctAccent}"/>
+    </Style>
+    <Style Selector="Button.fct-ghost:pressed">
+        <Setter Property="RenderTransform" Value="scale(0.97)"/>
+    </Style>
+    <Style Selector="Button.fct-ghost:focus-visible /template/ ContentPresenter">
+        <Setter Property="BorderBrush" Value="{DynamicResource FctAccent}"/>
+    </Style>
+
+</Styles>

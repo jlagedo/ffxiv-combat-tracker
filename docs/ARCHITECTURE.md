@@ -159,8 +159,8 @@ Fct.Compat.Act     net48        the ACT facade: impersonation identity ("Advance
                                 engine types to Fct.Aggregation — no engine code compiled in.
                                 Lives in LegacyHost.
 
-Fct.StreamProbe    net48        diagnostic plugin in the satellite; taps the parser's
-                                swing/raw-packet stream for inspection.
+Fct.StreamProbe    net48        dev-only diagnostic plugin; taps the parser's swing/raw-packet
+                                stream for inspection. Not bundled or loaded by the shipped app.
 ```
 
 The net48↔net10 IPC bridge (named pipe + wire protocol) is **not its own project**: the

@@ -38,6 +38,9 @@ namespace Fct.Integration.Tests
         public void Satellite_publishes_a_valid_window_handle_to_embed()
         {
             RequireSatellite();
+            // The satellite boots with no plugins; the embeddable window appears only after the parser is
+            // loaded on demand (the catalog path the fixture drives), which needs the real plugin installed.
+            Skip.IfNot(_fx.PluginPresent, $"FFXIV_ACT_Plugin not installed at {SatelliteRunFixture.FfxivPluginPath}.");
             _out.WriteLine("hwnd: 0x" + _fx.WindowHandle.ToString("X"));
             Assert.NotEqual(IntPtr.Zero, _fx.WindowHandle);
         }

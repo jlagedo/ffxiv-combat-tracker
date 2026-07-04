@@ -49,6 +49,27 @@
             <FontFamily x:Key="BodyFont">avares://Avalonia.Fonts.Inter/Assets#Inter</FontFamily>
             <FontFamily x:Key="MonoFont">Cascadia Mono, Cascadia Code, Consolas, monospace</FontFamily>
 
+            <!-- ============================================================================
+                 Plugin design-token contract (Fct.Abstractions.UI FctTokens; docs/UI-TOKENS.md).
+                 The stable, semantic seam plugins bind via {DynamicResource}. Maps onto the
+                 Evercold palette above; the shell may re-map these (light variant, re-accent)
+                 without touching the plugin contract. Keep in sync with FctTokens/FctStyleClasses. -->
+            <SolidColorBrush x:Key="FctBackground" Color="{StaticResource AbyssColor}"/>
+            <SolidColorBrush x:Key="FctSurface" Color="{StaticResource GlacierColor}"/>
+            <SolidColorBrush x:Key="FctSurfaceAlt" Color="{StaticResource RimeColor}"/>
+            <SolidColorBrush x:Key="FctSurfaceHi" Color="{StaticResource RimeHiColor}"/>
+            <SolidColorBrush x:Key="FctAccent" Color="{StaticResource FrostColor}"/>
+            <SolidColorBrush x:Key="FctAccentDim" Color="{StaticResource FrostDimColor}"/>
+            <SolidColorBrush x:Key="FctText" Color="{StaticResource GlintColor}"/>
+            <SolidColorBrush x:Key="FctTextDim" Color="{StaticResource HoarfrostColor}"/>
+            <SolidColorBrush x:Key="FctEmphasis" Color="{StaticResource EmberColor}"/>
+            <SolidColorBrush x:Key="FctDanger" Color="{StaticResource WarnColor}"/>
+            <SolidColorBrush x:Key="FctHairline" Color="{StaticResource HairlineColor}"/>
+
+            <FontFamily x:Key="FctFontDisplay">Bahnschrift SemiBold, Bahnschrift, Segoe UI Semibold, Inter, sans-serif</FontFamily>
+            <FontFamily x:Key="FctFontBody">avares://Avalonia.Fonts.Inter/Assets#Inter</FontFamily>
+            <FontFamily x:Key="FctFontMono">Cascadia Mono, Cascadia Code, Consolas, monospace</FontFamily>
+
             <!-- Tint the Fluent ToggleSwitch "on" state frost. -->
             <SolidColorBrush x:Key="ToggleSwitchFillOn" Color="{StaticResource FrostColor}"/>
             <SolidColorBrush x:Key="ToggleSwitchFillOnPointerOver" Color="{StaticResource FrostColor}"/>
@@ -67,5 +88,7 @@
     <Application.Styles>
         <FluentTheme />
         <StyleInclude Source="avares://Fct.App/Styles/Controls.axaml"/>
+        <!-- Blessed plugin-facing style classes (fct-*), applied after the shell's own. -->
+        <StyleInclude Source="avares://Fct.App/Styles/PluginTokens.axaml"/>
     </Application.Styles>
 </Application>

@@ -100,12 +100,27 @@ public sealed class SatelliteHost : Fct.Host.Plugins.ISatellitePluginChannel
         _shutdownEvent = new EventWaitHandle(false, EventResetMode.ManualReset, pipeName + "-shutdown");
 
         _log.LogInformation(LogEvents.SatelliteLaunching, "Launching satellite {Exe} on bridge {Pipe}", exe, pipeName);
-        Process = Process.Start(new ProcessStartInfo
+        var startInfo = new ProcessStartInfo
         {
             FileName = exe,
             Arguments = "--bridge " + pipeName,
             UseShellExecute = false,
-        });
+        };
+        // Hand the satellite the host's resolved data root so both processes agree on one location
+        // (the satellite sits in a satellite\ subfolder, so its own AppData.Root would differ in DEBUG).
+        startInfo.Environment[AppData.RootEnvVar] = AppData.Root;
+
+        // Sandbox the legacy plugins off the real ACT data location: point the satellite's %APPDATA%
+        // at <root>\legacy so any plugin/library that reads the APPDATA env var (or expands %APPDATA%)
+        // writes into the ecosystem. Note: .NET's GetFolderPath(ApplicationData) reads the shell API,
+        // not this env var, so plugins that use it for their own vendor folders are only redirected
+        // where they go through the ACT facade's AppDataFolder (which we point at
+        // <root>\legacy\Advanced Combat Tracker). Real plugin binaries load via GetFolderPath and are
+        // deliberately unaffected — they still come from the real ACT install.
+        var legacyRoot = Path.Combine(AppData.Root, "legacy");
+        try { Directory.CreateDirectory(legacyRoot); } catch { /* best-effort */ }
+        startInfo.Environment["APPDATA"] = legacyRoot;
+        Process = Process.Start(startInfo);
 
         if (Process != null)
         {

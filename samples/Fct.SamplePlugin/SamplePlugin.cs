@@ -3,6 +3,7 @@ using System.Threading;
 using System.Threading.Tasks;
 using Avalonia;
 using Avalonia.Controls;
+using Avalonia.Layout;
 using Fct.Abstractions;
 using Fct.Abstractions.UI;
 using Microsoft.Extensions.Logging;
@@ -77,24 +78,48 @@ public sealed class SamplePlugin : IPlugin, IUiContributor
         host.Logger.LogInformation("SamplePlugin launch #{Count}", settings.Launches);
     }
 
+    // Styled entirely through the plugin token contract (Fct.Abstractions.UI): the blessed `fct-*`
+    // classes for typography/surface/button, plus one raw brush token bound via DynamicResource in
+    // code — the reference for plugin authors (see docs/UI-TOKENS.md). No hardcoded colors/fonts, so
+    // this page tracks any shell restyle at runtime.
     private Control BuildSettingsView()
     {
+        var eyebrow = new TextBlock { Text = "SAMPLE PLUGIN" };
+        eyebrow.Classes.Add(FctStyleClasses.Eyebrow);
+
+        var title = new TextBlock { Text = "Settings" };
+        title.Classes.Add(FctStyleClasses.H1);
+
+        // Raw-token idiom: bind a brush token via DynamicResource in code, so a later shell restyle
+        // (e.g. a light variant) reaches this control at runtime. XAML authors instead write
+        // Background="{DynamicResource FctAccent}".
+        var accentRule = new Border { Height = 2, Width = 44, CornerRadius = new CornerRadius(1), HorizontalAlignment = HorizontalAlignment.Left };
+        accentRule.Bind(Border.BackgroundProperty, accentRule.GetResourceObservable(FctTokens.Accent));
+
+        var body = new TextBlock { Text = $"Launched {_launches} time(s) this session." };
+        body.Classes.Add(FctStyleClasses.Body);
+
         var showCorner = new Button { Content = "Show corner control (5s)" };
+        showCorner.Classes.Add(FctStyleClasses.Ghost);
         showCorner.Click += (_, _) => ShowCornerControl();
 
         var reveal = new Button { Content = "Reveal this page" };
+        reveal.Classes.Add(FctStyleClasses.Ghost);
         reveal.Click += (_, _) => _ui?.RevealPage(SettingsPageId);
+
+        var card = new Border();
+        card.Classes.Add(FctStyleClasses.Card);
+        card.Child = new StackPanel
+        {
+            Spacing = FctMetrics.SpaceSm,
+            Children = { eyebrow, title, accentRule, body, showCorner, reveal },
+        };
 
         return new StackPanel
         {
-            Margin = new Thickness(16),
-            Spacing = 12,
-            Children =
-            {
-                new TextBlock { Text = $"Launched {_launches} time(s) this session." },
-                showCorner,
-                reveal,
-            },
+            Margin = new Thickness(FctMetrics.SpaceLg),
+            Spacing = FctMetrics.SpaceMd,
+            Children = { card },
         };
     }
 

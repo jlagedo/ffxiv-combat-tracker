@@ -5,6 +5,7 @@ using System.Linq;
 using System.Text.Json;
 using System.Text.Json.Serialization;
 using Fct.Host.Plugins;
+using Fct.Logging;
 
 namespace Fct.Host.Hosting;
 
@@ -35,10 +36,10 @@ internal sealed partial class PluginRegistryJsonContext : JsonSerializerContext
 }
 
 /// <summary>
-/// Persists the installed-plugin set to <c>%LOCALAPPDATA%\FFXIVCombatTracker\installed-plugins.json</c>,
+/// Persists the installed-plugin set to <c>&lt;AppData.Root&gt;\installed-plugins.json</c>,
 /// mirroring <see cref="UiSettingsStore"/> (best-effort load/save; a read failure falls back to empty).
-/// This is the source of truth for <b>user-installed</b> plugins across restarts — distinct from the
-/// build-staged sample folder scanned separately.
+/// This is the single source of truth for <b>installed</b> plugins across restarts; nothing is
+/// auto-discovered from disk.
 /// </summary>
 internal sealed class PluginRegistryStore
 {
@@ -47,9 +48,7 @@ internal sealed class PluginRegistryStore
 
     /// <param name="filePathOverride">Test seam: overrides the registry file location.</param>
     public PluginRegistryStore(string? filePathOverride = null)
-        => _filePath = filePathOverride ?? Path.Combine(
-            Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
-            "FFXIVCombatTracker", "installed-plugins.json");
+        => _filePath = filePathOverride ?? Path.Combine(AppData.Root, "installed-plugins.json");
 
     private string FilePath => _filePath;
 

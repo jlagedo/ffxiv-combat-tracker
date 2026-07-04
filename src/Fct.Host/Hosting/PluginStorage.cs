@@ -2,13 +2,14 @@ using System;
 using System.IO;
 using System.Threading.Tasks;
 using Fct.Abstractions;
+using Fct.Logging;
 
 namespace Fct.Host.Hosting;
 
 /// <summary>
 /// Real disk-backed <see cref="IPluginStorage"/> — the production form of the reference
 /// <c>FakeStorage</c>. Each plugin gets a private directory under
-/// <c>%LOCALAPPDATA%\FFXIVCombatTracker\plugins\&lt;id&gt;</c>; settings serialize to
+/// <c>&lt;AppData.Root&gt;\plugins\&lt;id&gt;</c>; settings serialize to
 /// <c>&lt;name&gt;.json</c> via <see cref="System.Text.Json"/>. Replaces
 /// <c>PluginGetSelfData</c>/<c>AppDataFolder</c>.
 /// </summary>
@@ -19,9 +20,7 @@ internal sealed class PluginStorage : IPluginStorage
     public PluginStorage(string pluginId)
     {
         if (string.IsNullOrWhiteSpace(pluginId)) throw new ArgumentException("Plugin id required", nameof(pluginId));
-        _root = Path.Combine(
-            Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
-            "FFXIVCombatTracker", "plugins", Sanitize(pluginId));
+        _root = Path.Combine(AppData.Root, "plugins", Sanitize(pluginId));
     }
 
     public string DataDirectory

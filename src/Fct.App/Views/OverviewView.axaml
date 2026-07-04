@@ -21,7 +21,7 @@
                         <TextBlock Text="{x:Static lang:Resources.Overview_ConnectionTitle}" Classes="h2"/>
                         <Border Classes="rule" Width="52" HorizontalAlignment="Left"/>
 
-                        <Grid ColumnDefinitions="Auto,*,Auto" RowDefinitions="Auto,Auto,Auto" RowSpacing="13">
+                        <Grid ColumnDefinitions="Auto,*,Auto" RowDefinitions="Auto,Auto" RowSpacing="13">
                             <Ellipse Grid.Row="0" Width="9" Height="9" VerticalAlignment="Center" Margin="0,0,11,0"
                                      Fill="{Binding Shell.HostStatusKind, Converter={StaticResource StatusToBrush}}"/>
                             <TextBlock Grid.Row="0" Grid.Column="1" Text="{x:Static lang:Resources.Label_App}" Classes="body" VerticalAlignment="Center"/>
@@ -36,12 +36,6 @@
                                        VerticalAlignment="Center"
                                        Foreground="{Binding Shell.SatelliteStatusKind, Converter={StaticResource StatusToBrush}}"/>
 
-                            <Ellipse Grid.Row="2" Width="9" Height="9" VerticalAlignment="Center" Margin="0,0,11,0"
-                                     Fill="{Binding Shell.GameStatusKind, Converter={StaticResource StatusToBrush}}"/>
-                            <TextBlock Grid.Row="2" Grid.Column="1" Text="{x:Static lang:Resources.Label_Game}" Classes="body" VerticalAlignment="Center"/>
-                            <TextBlock Grid.Row="2" Grid.Column="2" Text="{Binding Shell.GameStateLabel}" Classes="meta"
-                                       VerticalAlignment="Center"
-                                       Foreground="{Binding Shell.GameStatusKind, Converter={StaticResource StatusToBrush}}"/>
                         </Grid>
 
                         <Button Classes="ghost small" Content="{x:Static lang:Resources.Action_RestartClassicEngine}" HorizontalAlignment="Left"

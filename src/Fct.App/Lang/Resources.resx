@@ -15,7 +15,6 @@
 
   <!-- General labels -->
   <data name="Label_App" xml:space="preserve"><value>App</value></data>
-  <data name="Label_Game" xml:space="preserve"><value>Game</value></data>
   <data name="Label_ClassicEngine" xml:space="preserve"><value>Classic engine</value></data>
   <data name="Label_ClassicChip" xml:space="preserve"><value>classic</value></data>
   <data name="Label_ModernChip" xml:space="preserve"><value>modern</value></data>
@@ -67,7 +66,6 @@
 
   <!-- Status bar / connection state -->
   <data name="Status_AppRunning" xml:space="preserve"><value>App running</value></data>
-  <data name="Status_GameFormat" xml:space="preserve"><value>Game: {0}</value></data>
   <data name="Status_Live" xml:space="preserve"><value>Live</value></data>
   <data name="Status_LastFight" xml:space="preserve"><value>Last fight</value></data>
   <data name="Status_Starting" xml:space="preserve"><value>Starting…</value></data>
@@ -76,8 +74,6 @@
   <data name="Status_NotLoaded" xml:space="preserve"><value>Not loaded</value></data>
   <data name="Status_Unavailable" xml:space="preserve"><value>Unavailable</value></data>
   <data name="Status_Error" xml:space="preserve"><value>Error</value></data>
-  <data name="Status_NotConnected" xml:space="preserve"><value>Not connected</value></data>
-  <data name="Status_WaitingForCombat" xml:space="preserve"><value>Waiting for combat</value></data>
   <data name="Status_Stopped" xml:space="preserve"><value>Stopped</value></data>
   <data name="Status_NotStarted" xml:space="preserve"><value>Not started</value></data>
   <data name="Status_EngineStoppedSummary" xml:space="preserve"><value>Classic plugin engine stopped.</value></data>

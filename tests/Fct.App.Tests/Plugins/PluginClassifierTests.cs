@@ -35,6 +35,19 @@ public class PluginClassifierTests
         finally { try { Directory.Delete(dir, true); } catch { } }
     }
 
+    [Fact]
+    public void ClassifyFile_classifies_a_single_picked_dll()
+    {
+        // A user picking one DLL (e.g. FFXIV_ACT_Plugin.dll from the ACT install, whose folder holds
+        // other plugins) must classify that DLL alone — not scan the folder. Proven here with the sample
+        // DLL sitting among its own dependency DLLs in the staged folder.
+        Assert.True(File.Exists(SampleDll), $"sample plugin not staged at {SampleDll}");
+        var c = new PluginClassifier().ClassifyFile(SampleDll, manifest: null);
+        Assert.Equal(LoadKind.Native, c.Kind);
+        Assert.Equal("fct.sampleplugin", c.Id);
+        Assert.Equal("Fct.SamplePlugin.dll", c.AssemblyFile);
+    }
+
     // Copy the sample's assemblies (no plugin.json) so classification must fall back to metadata.
     private static string CopyDllsOnly()
     {

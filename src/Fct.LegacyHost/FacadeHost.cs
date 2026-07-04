@@ -19,14 +19,26 @@ namespace Fct.LegacyHost
         // the ILogger directly (SatelliteLogging.Log).
         public static Action<string> Log = _ => { };
 
-        public static string AppData => Path.Combine(
+        // The real ACT install — the source of the real (net48) plugin binaries only. Never the
+        // plugins' data root: their config/data is sandboxed under LegacyActDataDir (see CreateAct).
+        // Computed via GetFolderPath (the real roaming AppData), so it is unaffected by the sandboxed
+        // APPDATA env var the host sets on this process.
+        public static string ActInstallDir => Path.Combine(
             Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData),
             "Advanced Combat Tracker");
 
-        public static string FfxivPluginPath => Path.Combine(AppData, "Plugins", "FFXIV_ACT_Plugin.dll");
+        public static string FfxivPluginPath => Path.Combine(ActInstallDir, "Plugins", "FFXIV_ACT_Plugin.dll");
 
         public static string OverlayPluginPath =>
-            Path.Combine(AppData, "Plugins", "OverlayPlugin", "OverlayPlugin.dll");
+            Path.Combine(ActInstallDir, "Plugins", "OverlayPlugin", "OverlayPlugin.dll");
+
+        // The sandboxed home for legacy plugins' data, inside the new ecosystem instead of the real
+        // ACT folder. LegacyDataRoot is also what the host sets as this process's APPDATA. The ACT
+        // facade's AppDataFolder points at LegacyActDataDir, so every plugin that reads
+        // ActGlobals.oFormActMain.AppDataFolder (OverlayPlugin, Triggernometry, the FFXIV plugin's
+        // own settings/logs) writes here, not into the real ACT folder.
+        public static string LegacyDataRoot => Path.Combine(Fct.Logging.AppData.Root, "legacy");
+        public static string LegacyActDataDir => Path.Combine(LegacyDataRoot, "Advanced Combat Tracker");
 
         // The diagnostic stream-probe plugin, staged next to the satellite under plugins\.
         public static string StreamProbePath =>
@@ -58,7 +70,7 @@ namespace Fct.LegacyHost
         // unmodified OverlayPlugin binds to our ring-buffer IDataSubscription instead of the
         // plugin's per-subscriber BeginInvoke fan-out. DataRepository/_iocContainer/raw packets
         // still come from the real instance. Title stays "FFXIV_ACT_Plugin" for discovery.
-        public static LoadedPlugin LoadWrappedFfxivPlugin(string dllPath)
+        public static LoadedPlugin LoadWrappedFfxivPlugin(string dllPath, string key = "ffxiv")
         {
             const string title = "FFXIV_ACT_Plugin";
             var window = CreateHostWindow(out var tabs);
@@ -76,7 +88,7 @@ namespace Fct.LegacyHost
                 pPluginInfo = new Panel(),
             };
             ActGlobals.oFormActMain.ActPlugins.Add(data);
-            var result = new LoadedPlugin { Key = "ffxiv", Title = title, Data = data, Window = window };
+            var result = new LoadedPlugin { Key = key, Title = title, Data = data, Window = window };
 
             try
             {
@@ -167,6 +179,9 @@ namespace Fct.LegacyHost
             FormActMain.Log = Log;
             var act = new FormActMain();
             ActGlobals.oFormActMain = act;
+            // Sandbox the plugins' ACT data folder into the new ecosystem, off the real ACT folder.
+            Directory.CreateDirectory(LegacyActDataDir);
+            act.AppDataFolder = new DirectoryInfo(LegacyActDataDir);
             // Show (off-screen, transparent, non-activating) so Control.Visible is true: the plugin's
             // ScanMemory/LogOutput threads gate on IsMainFormVisible() before emitting combat data.
             act.Show();

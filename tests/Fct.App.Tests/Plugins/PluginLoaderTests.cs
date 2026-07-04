@@ -106,10 +106,9 @@ public class PluginLoaderTests
             PacketDirection.Received, new byte[] { 0xAB, 0xCD, 0xEF }));
         Assert.True(TestWait.Until(() => { lock (rawLines) return rawLines.Exists(r => r.Line == "258|packet-seen|3"); }));
 
-        // And persisted a setting to its private storage dir.
+        // And persisted a setting to its private storage dir (under the shared app-data root).
         var settings = Path.Combine(
-            Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
-            "FFXIVCombatTracker", "plugins", SampleId, "settings.json");
+            Fct.Logging.AppData.Root, "plugins", SampleId, "settings.json");
         Assert.True(File.Exists(settings));
 
         await manager.UnloadAllAsync();

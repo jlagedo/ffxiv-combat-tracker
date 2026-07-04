@@ -18,14 +18,6 @@
                 <TextBlock Text="{x:Static lang:Resources.Encounters_WaitingTitle}" Classes="h2" HorizontalAlignment="Center"/>
                 <TextBlock Classes="subtitle" HorizontalAlignment="Center" TextAlignment="Center"
                            Text="{x:Static lang:Resources.Encounters_WaitingBody}"/>
-                <Border Background="{StaticResource RimeBrush}" CornerRadius="8" Padding="12,8" HorizontalAlignment="Center">
-                    <StackPanel Orientation="Horizontal" Spacing="9">
-                        <Ellipse Width="8" Height="8" VerticalAlignment="Center"
-                                 Fill="{Binding Shell.GameStatusKind, Converter={StaticResource StatusToBrush}}"/>
-                        <TextBlock Text="{Binding Shell.GameStateLabel, StringFormat={x:Static lang:Resources.Status_GameFormat}}"
-                                   Classes="meta" FontSize="11.5" VerticalAlignment="Center"/>
-                    </StackPanel>
-                </Border>
             </StackPanel>
         </Border>
 

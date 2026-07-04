@@ -1,13 +1,14 @@
 using System;
 using System.IO;
+using Fct.Logging;
 
 namespace Fct.Host.Hosting;
 
 /// <summary>
-/// Locations for <b>user-installed</b> plugin binaries. Deliberately separate from
-/// <see cref="PluginStorage"/>'s per-plugin <c>plugins\&lt;id&gt;</c> <i>settings</i> directory and from
-/// the build-staged <c>plugins\</c> folder next to the host (which carries the dev samples). Follows
-/// the <c>%LOCALAPPDATA%\FFXIVCombatTracker</c> convention used by the logs and settings stores.
+/// Locations for <b>user-installed</b> plugin binaries — the sole on-disk home for plugins (the host
+/// bundles none). Deliberately separate from <see cref="PluginStorage"/>'s per-plugin
+/// <c>plugins\&lt;id&gt;</c> <i>settings</i> directory. Rooted at <see cref="AppData.Root"/>, shared with
+/// the logs and settings stores.
 /// </summary>
 internal sealed class PluginInstallPaths
 {
@@ -15,9 +16,7 @@ internal sealed class PluginInstallPaths
 
     /// <param name="baseOverride">Test seam: overrides the app data base directory.</param>
     public PluginInstallPaths(string? baseOverride = null)
-        => _base = baseOverride ?? Path.Combine(
-            Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
-            "FFXIVCombatTracker");
+        => _base = baseOverride ?? AppData.Root;
 
     private string Base => _base;
 
