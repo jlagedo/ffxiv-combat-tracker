@@ -162,9 +162,12 @@ namespace Advanced_Combat_Tracker
         public void NotificationAdd(string title, string text, EventHandler showCallback = null, object senderObject = null) =>
             Log($"[Notify] {title}: {text}");
 
-        // Host-window DPI scale. OP reads this to scale its config tab (in a try/catch → default 1);
-        // we render no ACT chrome, so a constant 1f is correct and removes OP's silent catch.
-        public float DpiScale => 1f;
+        // Host-window DPI scale. ACT derives this from a design-96px control auto-scaled by WinForms
+        // (pDpiSize.Width / 96); DeviceDpi/96 is the equivalent now that the satellite process is
+        // System-DPI-aware (app.manifest <dpiAware>true</dpiAware> + EnableWindowsFormsHighDpiAutoResizing).
+        // OverlayPlugin multiplies its config-tab layout by this; Hojoring/ACT-painted controls scale by
+        // it too. The facade form is Show()n off-screen (see FacadeHost.CreateAct), so DeviceDpi is live.
+        public float DpiScale => DeviceDpi / 96f;
 
         // ACT's corner-button tray. We host no chrome to place the control in, but Hojoring calls
         // these unguarded, so they must exist and survive add-then-remove. We track the controls in

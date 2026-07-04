@@ -14,6 +14,10 @@
     <Prefer32Bit>false</Prefer32Bit>
     <AssemblyName>Fct.LegacyHost</AssemblyName>
     <RootNamespace>Fct.LegacyHost</RootNamespace>
+    <!-- System-DPI-aware manifest matching real ACT; App.config carries the WinForms high-DPI
+         auto-resizing switch. Together they reproduce ACT's DPI environment so plugin WinForms tabs
+         scale to the system DPI instead of rendering at 96 px inside the reparented host window. -->
+    <ApplicationManifest>app.manifest</ApplicationManifest>
     <!-- Serilog's net48 dependencies (System.Memory etc.) need redirects in a process that also
          loads the legacy plugins. -->
     <AutoGenerateBindingRedirects>true</AutoGenerateBindingRedirects>
