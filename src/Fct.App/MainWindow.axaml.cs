@@ -47,6 +47,7 @@ public partial class MainWindow : Window
         _vm.SatelliteRestartRequested += () => _ = StartSatelliteAsync();
         _vm.AddPluginRequested += () => _ = PickPluginAsync();
         _vm.UnloadPluginRequested += row => _ = UnloadPluginAsync(row);
+        _vm.LocatePluginRequested += row => _ = LocatePluginAsync(row);
 
         // Legacy plugins loaded/unloaded live on the satellite after startup reconcile the roster.
         _satellite.PluginAnnounced += p => _vm.AddLegacyPlugin(p);
@@ -78,14 +79,16 @@ public partial class MainWindow : Window
         coordinator.FlushRegisterUi(manager.Loaded.Select(p => (p.Manifest, p.Instance)));
     }
 
-    // Add a plugin from a .zip package, a single .dll, or a folder. The single installer classifies it
-    // (native / recompiled-shim / real-legacy), routes it to the right executor, loads it live, and
-    // persists it. A single .dll covers loose legacy plugins like FFXIV_ACT_Plugin.dll / Triggernometry.dll.
+    // Add a plugin from a .zip package or a single .dll — the installer unpacks/classifies whatever
+    // is inside (native / recompiled-shim / real-legacy), routes it to the right executor, loads it
+    // live, and persists it. A single .dll covers loose legacy plugins like FFXIV_ACT_Plugin.dll, and
+    // picking a plugin's entry DLL inside its folder (e.g. OverlayPlugin.dll) installs it in place
+    // with its siblings.
     private async Task PickPluginAsync()
     {
         var files = await StorageProvider.OpenFilePickerAsync(new FilePickerOpenOptions
         {
-            Title = Strings.Dialog_AddPluginFolderTitle,
+            Title = Strings.Dialog_AddPluginTitle,
             AllowMultiple = false,
             FileTypeFilter = new[]
             {
@@ -93,19 +96,28 @@ public partial class MainWindow : Window
             },
         });
         if (files.FirstOrDefault() is { } file)
-        {
             await InstallAsync(file.Path.LocalPath);
-            return;
-        }
+    }
 
-        // No file chosen — offer a plugin folder instead (e.g. OverlayPlugin\, or a dev build folder).
-        var folders = await StorageProvider.OpenFolderPickerAsync(new FolderPickerOpenOptions
+    // Re-locate a missing install-by-reference legacy plugin: pick its DLL at the new home, then let
+    // the installer re-point the registry record and reload it on the satellite. On success the
+    // satellite announces the plugin, which replaces the "files missing" roster row.
+    private async Task LocatePluginAsync(PluginViewModel row)
+    {
+        var installer = App.Services?.GetService<PluginInstaller>();
+        if (installer is null) return;
+
+        var files = await StorageProvider.OpenFilePickerAsync(new FilePickerOpenOptions
         {
-            Title = Strings.Dialog_AddPluginFolderTitle,
+            Title = string.Format(Strings.Dialog_LocatePluginTitleFormat, row.Name),
             AllowMultiple = false,
+            FileTypeFilter = new[]
+            {
+                new FilePickerFileType("Plugin assembly") { Patterns = new[] { "*.dll" } },
+            },
         });
-        if (folders.FirstOrDefault() is { } folder)
-            await InstallAsync(folder.Path.LocalPath);
+        if (files.FirstOrDefault() is { } file)
+            installer.RelinkLegacy(row.Key, file.Path.LocalPath);   // installer surfaces its own notifications
     }
 
     private async Task InstallAsync(string source)
@@ -146,8 +158,11 @@ public partial class MainWindow : Window
             var pid = _satellite.Process?.Id ?? 0;
 
             _vm.SetOnline(result.Plugins);
-            // Re-load any persisted real-legacy plugins onto the now-online satellite.
-            App.Services?.GetService<PluginInstaller>()?.ReplayLegacyToSatellite();
+            // Re-load any persisted real-legacy plugins onto the now-online satellite; records whose
+            // files vanished (install-by-reference sources move) get a re-locatable roster row.
+            if (App.Services?.GetService<PluginInstaller>() is { } installer)
+                foreach (var missing in installer.ReplayLegacyToSatellite())
+                    _vm.AddMissingLegacyPlugin(missing.Id, missing.Title ?? missing.Id, missing.Dir);
             _log.LogInformation(LogEvents.SatelliteStarted,
                 "Satellite online: pid {Pid}, {PluginCount} plugin window(s) [{Handshake}]",
                 pid, result.Plugins.Count, result.Handshake);

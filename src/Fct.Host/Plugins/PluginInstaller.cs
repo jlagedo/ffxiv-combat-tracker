@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using System.IO;
 using System.IO.Compression;
 using System.Linq;
@@ -198,16 +199,71 @@ internal sealed class PluginInstaller
     }
 
     /// <summary>Once the satellite is online, (re)send a LOADPLUGIN for every persisted real-legacy
-    /// plugin so they come back after a restart.</summary>
-    public void ReplayLegacyToSatellite()
+    /// plugin so they come back after a restart. Returns the records whose entry DLL no longer exists
+    /// (install-by-reference sources can move or vanish) so the shell can offer to re-locate them.</summary>
+    public IReadOnlyList<InstalledPluginRecord> ReplayLegacyToSatellite()
     {
+        var missing = new List<InstalledPluginRecord>();
         foreach (var record in _registry.All().Where(r => r.Kind == LoadKind.RealLegacy))
         {
-            if (record.Entry is null && !Directory.Exists(record.Dir)) continue;
             var dll = ResolveEntryDll(record);
-            if (dll is null) { _log.LogWarning(LogEvents.NativePluginManifestRejected, "Legacy plugin {Id}: entry DLL missing", record.Id); continue; }
+            if (dll is null)
+            {
+                _log.LogWarning(LogEvents.NativePluginManifestRejected,
+                    "Legacy plugin {Id}: entry DLL missing under {Dir}", record.Id, record.Dir);
+                missing.Add(record);
+                continue;
+            }
             _satellite.RequestLoadPlugin(record.Id, dll, record.Title ?? record.Id);
         }
+        return missing;
+    }
+
+    /// <summary>Re-point a real-legacy record whose install-by-reference source moved: classify the
+    /// newly picked DLL, verify it is the same plugin, update the registry record, and ask the
+    /// satellite to load it from the new location.</summary>
+    public InstallResult RelinkLegacy(string id, string dllPath)
+    {
+        try
+        {
+            var record = _registry.Find(id);
+            if (record is null) return Reject(id, $"No installed plugin '{id}'.");
+
+            var c = _classifier.ClassifyFile(dllPath, manifest: null);
+            if (c.Kind != LoadKind.RealLegacy)
+                return Reject(record.Title ?? id, $"'{Path.GetFileName(dllPath)}' is not a classic ACT plugin.");
+            if (!string.Equals(c.Id, record.Id, StringComparison.OrdinalIgnoreCase))
+                return Reject(record.Title ?? id,
+                    $"'{Path.GetFileName(dllPath)}' is a different plugin — use Add plugin to install it.");
+
+            var title = record.Title ?? record.Id;
+            _registry.Add(record with
+            {
+                Dir = Path.GetDirectoryName(dllPath)!,
+                Version = c.Version,
+                AssemblyFile = c.AssemblyFile,
+            });
+            bool loaded = _satellite.RequestLoadPlugin(record.Id, dllPath, title);
+
+            _log.LogInformation(LogEvents.NativePluginLoaded, "Relinked legacy plugin {Id} -> {Dll}", id, dllPath);
+            _notifications?.Publish(NotificationSeverity.Success, "Plugins", $"{title} relinked",
+                loaded ? "The plugin is running from its new location."
+                       : "The plugin will load when the classic engine is running.");
+            return new InstallResult(true, LoadKind.RealLegacy, record.Id, null);
+        }
+        catch (Exception ex)
+        {
+            _log.LogWarning(LogEvents.NativePluginManifestRejected, ex, "Relink failed for {Id} from {Dll}", id, dllPath);
+            _notifications?.Publish(NotificationSeverity.Error, "Plugins", "Plugin relink failed", ex.Message);
+            return InstallResult.Fail(ex.Message);
+        }
+    }
+
+    private InstallResult Reject(string title, string reason)
+    {
+        _log.LogWarning(LogEvents.NativePluginManifestRejected, "Relink rejected for {Title}: {Reason}", title, reason);
+        _notifications?.Publish(NotificationSeverity.Error, "Plugins", "Plugin relink failed", reason);
+        return InstallResult.Fail(reason);
     }
 
     private async Task<bool> RouteLoadAsync(PluginClassification c, string destDir, string title, CancellationToken ct)

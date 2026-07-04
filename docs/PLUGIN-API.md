@@ -780,9 +780,12 @@ satellite channel (real-legacy face). `PluginRegistryStore` persists the install
   Tracker` facade / declares `legacyEntry`), or `RealLegacy` (references `Advanced Combat Tracker` under
   the real ACT strong-name token `a946b61e93d97868`). Manifest-first; else metadata-only reflection with
   a `MetadataLoadContext` (no execution).
-- **Install** — the shell's *Add plugin* (`MainViewModel.AddPlugin`) hands a folder or `.zip` to
-  `PluginInstaller.InstallAsync`, which classifies, copies into `installed-plugins\<id>\`, loads it live,
-  and records it.
+- **Install** — the shell's *Add plugin* (`MainViewModel.AddPlugin`) opens a single file picker for a
+  `.zip` package or a single `.dll` and hands the pick to `PluginInstaller.InstallAsync` (which also
+  accepts a directory for headless/dev callers). The installer classifies the payload and routes it:
+  native/shim plugins are copied into `installed-plugins\<id>\`; real-legacy plugins **install by
+  reference** — loaded in place from where the user picked them (zips are the exception: their extract
+  dir is transient, so they are always copied). Either way the plugin loads live and is recorded.
 - **Route load** — net10 kinds load in-process (`PluginManager.LoadDirectoryAsync` → fresh collectible
   ALC, `contract` gate, time-boxed fault-guarded init, quarantine on fault). Real-legacy kinds are sent
   to the net48 satellite as a `LOADPLUGIN` command frame (`ISatellitePluginChannel` /
@@ -791,6 +794,11 @@ satellite channel (real-legacy face). `PluginRegistryStore` persists the install
   (`LoadPersistedAsync`) — registry-driven only, nothing is auto-discovered from disk; persisted
   real-legacy plugins are replayed to the satellite (`ReplayLegacyToSatellite`) once it is
   online.
+- **Re-locate** — `ReplayLegacyToSatellite` returns the real-legacy records whose entry DLL no longer
+  exists (install-by-reference sources can move). The shell shows those as a *Files missing* roster row
+  with a *Locate…* action; picking the DLL at its new home calls `PluginInstaller.RelinkLegacy`, which
+  re-classifies the pick, verifies it is the same plugin, re-points the registry record, and reloads it
+  on the satellite.
 - **Uninstall** — a Plugins-roster *Remove* calls `UninstallAsync`: it retracts the plugin's UI, unloads
   the live instance (`PluginManager.UnloadAsync` — dispose → force-close its `ScopedPluginRegistry`
   registrations so no delegate pins the ALC → `UnloadAndWait` + GC pump; or a satellite `UNLOADPLUGIN`

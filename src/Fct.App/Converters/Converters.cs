@@ -22,6 +22,7 @@ public sealed class StatusToBrushConverter : IValueConverter
             PluginStatus.Loaded => "FrostDim",
             PluginStatus.Loading => "Hoarfrost",
             PluginStatus.NotLoaded => "Hoarfrost",
+            PluginStatus.Missing => "Warn",
             PluginStatus.Unavailable => "Warn",
             _ => "Warn",
         };

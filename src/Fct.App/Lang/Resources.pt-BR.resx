@@ -48,6 +48,7 @@
   <data name="Action_OpenNotifications" xml:space="preserve"><value>Abrir notificações</value></data>
   <data name="Action_AddPlugin" xml:space="preserve"><value>Adicionar plugin</value></data>
   <data name="Action_Remove" xml:space="preserve"><value>Remover</value></data>
+  <data name="Action_Locate" xml:space="preserve"><value>Localizar…</value></data>
   <data name="Action_ConfigurePlugins" xml:space="preserve"><value>Configurar plugins</value></data>
   <data name="Action_ViewEncounters" xml:space="preserve"><value>Ver combates</value></data>
   <data name="Action_Restart" xml:space="preserve"><value>Reiniciar</value></data>
@@ -72,6 +73,7 @@
   <data name="Status_Running" xml:space="preserve"><value>Em execução</value></data>
   <data name="Status_Loaded" xml:space="preserve"><value>Carregado</value></data>
   <data name="Status_NotLoaded" xml:space="preserve"><value>Não carregado</value></data>
+  <data name="Status_Missing" xml:space="preserve"><value>Arquivos ausentes</value></data>
   <data name="Status_Unavailable" xml:space="preserve"><value>Indisponível</value></data>
   <data name="Status_Error" xml:space="preserve"><value>Erro</value></data>
   <data name="Status_Stopped" xml:space="preserve"><value>Parado</value></data>
@@ -105,7 +107,8 @@
   <data name="Notify_PluginInstalledTitleFormat" xml:space="preserve"><value>{0} instalado</value></data>
   <data name="Notify_PluginInstalledBody" xml:space="preserve"><value>O plugin será carregado na próxima vez que você iniciar o app.</value></data>
   <data name="Notify_PluginInstallFailedTitle" xml:space="preserve"><value>Não foi possível instalar o plugin</value></data>
-  <data name="Dialog_AddPluginFolderTitle" xml:space="preserve"><value>Adicionar uma pasta de plugin nativo</value></data>
+  <data name="Dialog_AddPluginTitle" xml:space="preserve"><value>Adicionar um plugin (pacote .zip ou .dll)</value></data>
+  <data name="Dialog_LocatePluginTitleFormat" xml:space="preserve"><value>Localizar {0}</value></data>
 
   <!-- Overview page -->
   <data name="Overview_Subtitle" xml:space="preserve"><value>O estado do app em um relance — conexão, os plugins em execução e o que aconteceu recentemente.</value></data>
@@ -130,6 +133,8 @@
   <data name="Plugins_ModernNoEmbedBody" xml:space="preserve"><value>Plugins modernos rodam dentro do app e trazem suas próprias definições — não há nada para incorporar aqui.</value></data>
   <data name="Plugins_ClassicNoWindowBody" xml:space="preserve"><value>Este plugin clássico não forneceu uma janela de configuração.</value></data>
   <data name="Plugins_EngineDownBody" xml:space="preserve"><value>O motor clássico não está em execução, então a configuração deste plugin não pode ser exibida.</value></data>
+  <data name="Plugins_MissingTitle" xml:space="preserve"><value>Arquivos do plugin ausentes</value></data>
+  <data name="Plugins_MissingBody" xml:space="preserve"><value>Este plugin roda a partir da própria pasta, que não está mais onde estava. Se você a moveu, aponte o app para o novo local.</value></data>
   <data name="Plugins_ModernPluginRole" xml:space="preserve"><value>Plugin moderno</value></data>
   <data name="Plugins_ModernPluginDescription" xml:space="preserve"><value>Roda dentro do app em seu próprio sandbox.</value></data>
   <data name="Plugins_ModernUiErrorTitle" xml:space="preserve"><value>Não foi possível carregar as definições</value></data>

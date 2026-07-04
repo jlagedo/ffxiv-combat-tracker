@@ -52,6 +52,7 @@ public static class Resources
     public static string Action_OpenNotifications => Get(nameof(Action_OpenNotifications));
     public static string Action_AddPlugin => Get(nameof(Action_AddPlugin));
     public static string Action_Remove => Get(nameof(Action_Remove));
+    public static string Action_Locate => Get(nameof(Action_Locate));
     public static string Action_ConfigurePlugins => Get(nameof(Action_ConfigurePlugins));
     public static string Action_ViewEncounters => Get(nameof(Action_ViewEncounters));
     public static string Action_Restart => Get(nameof(Action_Restart));
@@ -76,6 +77,7 @@ public static class Resources
     public static string Status_Running => Get(nameof(Status_Running));
     public static string Status_Loaded => Get(nameof(Status_Loaded));
     public static string Status_NotLoaded => Get(nameof(Status_NotLoaded));
+    public static string Status_Missing => Get(nameof(Status_Missing));
     public static string Status_Unavailable => Get(nameof(Status_Unavailable));
     public static string Status_Error => Get(nameof(Status_Error));
     public static string Status_Stopped => Get(nameof(Status_Stopped));
@@ -109,7 +111,8 @@ public static class Resources
     public static string Notify_PluginInstalledTitleFormat => Get(nameof(Notify_PluginInstalledTitleFormat));
     public static string Notify_PluginInstalledBody => Get(nameof(Notify_PluginInstalledBody));
     public static string Notify_PluginInstallFailedTitle => Get(nameof(Notify_PluginInstallFailedTitle));
-    public static string Dialog_AddPluginFolderTitle => Get(nameof(Dialog_AddPluginFolderTitle));
+    public static string Dialog_AddPluginTitle => Get(nameof(Dialog_AddPluginTitle));
+    public static string Dialog_LocatePluginTitleFormat => Get(nameof(Dialog_LocatePluginTitleFormat));
 
     // ---- Overview page ----
     public static string Overview_Subtitle => Get(nameof(Overview_Subtitle));
@@ -134,6 +137,8 @@ public static class Resources
     public static string Plugins_ModernNoEmbedBody => Get(nameof(Plugins_ModernNoEmbedBody));
     public static string Plugins_ClassicNoWindowBody => Get(nameof(Plugins_ClassicNoWindowBody));
     public static string Plugins_EngineDownBody => Get(nameof(Plugins_EngineDownBody));
+    public static string Plugins_MissingTitle => Get(nameof(Plugins_MissingTitle));
+    public static string Plugins_MissingBody => Get(nameof(Plugins_MissingBody));
     public static string Plugins_ModernPluginRole => Get(nameof(Plugins_ModernPluginRole));
     public static string Plugins_ModernPluginDescription => Get(nameof(Plugins_ModernPluginDescription));
     public static string Plugins_ModernUiErrorTitle => Get(nameof(Plugins_ModernUiErrorTitle));

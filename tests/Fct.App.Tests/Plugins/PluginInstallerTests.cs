@@ -43,6 +43,88 @@ public class PluginInstallerTests
         Assert.Null(h.Registry.Find(SampleId));
     }
 
+    private static string FfxivPluginPath => Path.Combine(
+        Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData),
+        "Advanced Combat Tracker", "Plugins", "FFXIV_ACT_Plugin.dll");
+
+    [Fact]
+    public void Replay_loads_present_legacy_records_and_reports_the_missing_ones()
+    {
+        using var h = new Harness();
+
+        // A record whose DLL exists (replay only resolves the file; it never classifies) …
+        var present = Path.Combine(h.Base, "present");
+        Directory.CreateDirectory(present);
+        File.Copy(Path.Combine(SampleDir, "Fct.SamplePlugin.dll"), Path.Combine(present, "Some_Legacy.dll"));
+        h.Registry.Add(new InstalledPluginRecord("some_legacy", LoadKind.RealLegacy, present, null, "1.0")
+        { Title = "Some Legacy", AssemblyFile = "Some_Legacy.dll" });
+
+        // … and one whose install-by-reference source folder is gone.
+        h.Registry.Add(new InstalledPluginRecord("gone_legacy", LoadKind.RealLegacy,
+            Path.Combine(h.Base, "nowhere"), null, "1.0")
+        { Title = "Gone Legacy", AssemblyFile = "Gone_Legacy.dll" });
+
+        var missing = h.Installer.ReplayLegacyToSatellite();
+
+        Assert.Single(missing);
+        Assert.Equal("gone_legacy", missing[0].Id);
+        var request = Assert.Single(h.Satellite.LoadRequests);
+        Assert.Equal("some_legacy", request.Key);
+        Assert.Equal(Path.Combine(present, "Some_Legacy.dll"), request.DllPath);
+    }
+
+    [Fact]
+    public void Relink_rejects_a_dll_that_is_not_a_classic_plugin()
+    {
+        using var h = new Harness();
+        var dir = Path.Combine(h.Base, "old-home");
+        h.Registry.Add(new InstalledPluginRecord("fct.sampleplugin", LoadKind.RealLegacy, dir, null, "1.0")
+        { Title = "Sample", AssemblyFile = "Fct.SamplePlugin.dll" });
+
+        // The sample plugin classifies as Native, so relinking to it must be refused.
+        var result = h.Installer.RelinkLegacy("fct.sampleplugin", Path.Combine(SampleDir, "Fct.SamplePlugin.dll"));
+
+        Assert.False(result.Success);
+        Assert.Equal(dir, h.Registry.Find("fct.sampleplugin")!.Dir);   // record untouched
+        Assert.Empty(h.Satellite.LoadRequests);
+    }
+
+    [Fact]
+    public void Relink_rejects_an_unknown_plugin_id()
+    {
+        using var h = new Harness();
+        var result = h.Installer.RelinkLegacy("nope", Path.Combine(SampleDir, "Fct.SamplePlugin.dll"));
+        Assert.False(result.Success);
+    }
+
+    [SkippableFact]
+    public void Relink_repoints_the_record_and_requests_a_load()
+    {
+        Skip.IfNot(File.Exists(FfxivPluginPath), $"FFXIV_ACT_Plugin not installed at {FfxivPluginPath}.");
+        using var h = new Harness();
+
+        // The plugin was installed by reference from a folder that no longer exists; the user picks
+        // its DLL at the new home.
+        var newHome = Path.Combine(h.Base, "new-home");
+        Directory.CreateDirectory(newHome);
+        var dll = Path.Combine(newHome, "FFXIV_ACT_Plugin.dll");
+        File.Copy(FfxivPluginPath, dll);
+        h.Registry.Add(new InstalledPluginRecord("ffxiv_act_plugin", LoadKind.RealLegacy,
+            Path.Combine(h.Base, "old-home"), null, "0.0.0")
+        { Title = "FFXIV_ACT_Plugin", AssemblyFile = "FFXIV_ACT_Plugin.dll" });
+
+        var result = h.Installer.RelinkLegacy("ffxiv_act_plugin", dll);
+
+        Assert.True(result.Success, result.Error);
+        Assert.Equal(LoadKind.RealLegacy, result.Kind);
+        var record = h.Registry.Find("ffxiv_act_plugin")!;
+        Assert.Equal(newHome, record.Dir);
+        Assert.Equal("FFXIV_ACT_Plugin.dll", record.AssemblyFile);
+        var request = Assert.Single(h.Satellite.LoadRequests);
+        Assert.Equal("ffxiv_act_plugin", request.Key);
+        Assert.Equal(dll, request.DllPath);
+    }
+
     [Fact]
     public async Task Install_from_a_manifest_less_directory_detects_native_and_loads_it()
     {
@@ -71,6 +153,7 @@ public class PluginInstallerTests
         public readonly PluginRegistryStore Registry;
         public readonly PluginInstallPaths Paths;
         public readonly PluginInstaller Installer;
+        public readonly FakeSatelliteChannel Satellite;
 
         public Harness()
         {
@@ -82,11 +165,11 @@ public class PluginInstallerTests
                 new EncounterService(new SystemClock()),
                 new AudioService(NullLogger<AudioService>.Instance),
                 registry, bus, new SystemClock(), NullLoggerFactory.Instance);
-            var satellite = new FakeSatelliteChannel();
+            Satellite = new FakeSatelliteChannel();
             Paths = new PluginInstallPaths(Base);
             Registry = new PluginRegistryStore(Path.Combine(Base, "installed-plugins.json"));
             var ui = new PluginUiCoordinator(new InlineDispatcher(), NullLoggerFactory.Instance);
-            Installer = new PluginInstaller(Manager, satellite, new PluginClassifier(), Paths, Registry, ui, NullLoggerFactory.Instance);
+            Installer = new PluginInstaller(Manager, Satellite, new PluginClassifier(), Paths, Registry, ui, NullLoggerFactory.Instance);
         }
 
         public void Dispose()
@@ -104,9 +187,16 @@ public class PluginInstallerTests
         public Task<T> InvokeAsync<T>(Func<T> func) => Task.FromResult(func());
     }
 
-    private sealed class FakeSatelliteChannel : ISatellitePluginChannel
+    internal sealed class FakeSatelliteChannel : ISatellitePluginChannel
     {
-        public bool RequestLoadPlugin(string key, string dllPath, string title) => true;
+        public readonly System.Collections.Generic.List<(string Key, string DllPath, string Title)> LoadRequests = new();
+
+        public bool RequestLoadPlugin(string key, string dllPath, string title)
+        {
+            LoadRequests.Add((key, dllPath, title));
+            return true;
+        }
+
         public Task<bool> RequestUnloadPluginAsync(string key, TimeSpan timeout) => Task.FromResult(true);
     }
 }

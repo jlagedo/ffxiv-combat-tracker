@@ -12,6 +12,7 @@ public enum PluginStatus
     Running,      // loaded and active
     Loaded,       // present, idle (native plugins)
     NotLoaded,    // reported by the satellite but with no window / not hosted
+    Missing,      // installed by reference but its source files are gone — offer re-locate
     Unavailable,  // host/satellite down — cannot load
     Error
 }
@@ -41,6 +42,9 @@ public sealed partial class PluginViewModel : ObservableObject
     // The satellite window to embed when this legacy plugin is selected (zero until reported).
     public IntPtr Hwnd { get; set; }
 
+    // Legacy install-by-reference: the folder the plugin was last loaded from (shown on missing rows).
+    public string SourceDir { get; init; } = "";
+
     // The raw status text the satellite reported for a legacy plugin (e.g. "load failed").
     public string? SatelliteStatusText { get; set; }
 
@@ -52,8 +56,8 @@ public sealed partial class PluginViewModel : ObservableObject
     private bool _hasNativeConfig;
 
     [ObservableProperty]
-    [NotifyPropertyChangedFor(nameof(IsLive), nameof(StatusLabel),
-        nameof(ConfigPlaceholderTitle), nameof(ConfigPlaceholderBody))]
+    [NotifyPropertyChangedFor(nameof(IsLive), nameof(IsMissing), nameof(ShowLegacyPlaceholder),
+        nameof(StatusLabel), nameof(ConfigPlaceholderTitle), nameof(ConfigPlaceholderBody))]
     private PluginStatus _status = PluginStatus.Loading;
 
     // The Avalonia settings page this plugin contributed via IUiContributor.RegisterUi (work item 9),
@@ -65,12 +69,13 @@ public sealed partial class PluginViewModel : ObservableObject
     public bool IsLegacy => Kind == PluginKind.Legacy;
     public bool IsNative => Kind == PluginKind.Native;
     public bool IsLive => Status == PluginStatus.Live;
+    public bool IsMissing => Status == PluginStatus.Missing;
     public bool HasModernUi => SettingsSurface is not null;
 
     // Which panel the config bay shows for this plugin. A contributed settings page takes priority
-    // over the read-only manifest details card.
+    // over the read-only manifest details card; a missing row shows the re-locate panel instead.
     public bool ShowNativeDetails => IsNative && !HasModernUi;
-    public bool ShowLegacyPlaceholder => IsLegacy && !HasNativeConfig;
+    public bool ShowLegacyPlaceholder => IsLegacy && !HasNativeConfig && !IsMissing;
     public bool HasStatusText => !string.IsNullOrWhiteSpace(SatelliteStatusText);
 
     // Kind badge shown in the config bay header.
@@ -83,6 +88,7 @@ public sealed partial class PluginViewModel : ObservableObject
         PluginStatus.Running => Resources.Status_Running,
         PluginStatus.Loaded => Resources.Status_Loaded,
         PluginStatus.NotLoaded => Resources.Status_NotLoaded,
+        PluginStatus.Missing => Resources.Status_Missing,
         PluginStatus.Unavailable => Resources.Status_Unavailable,
         _ => Resources.Status_Error
     };

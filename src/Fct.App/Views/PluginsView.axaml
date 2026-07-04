@@ -216,6 +216,32 @@
                                 <views:PluginSurfaceView Surface="{Binding Shell.SelectedPlugin.SettingsSurface}"/>
                             </Border>
 
+                            <!-- Legacy plugin installed by reference whose source files are gone -->
+                            <Border IsVisible="{Binding Shell.SelectedPlugin.IsMissing}"
+                                    Background="#0B1016" BorderBrush="{StaticResource WarnBrush}"
+                                    BorderThickness="1" CornerRadius="10">
+                                <StackPanel VerticalAlignment="Center" HorizontalAlignment="Center" Spacing="10" MaxWidth="460">
+                                    <Path Width="38" Height="38" Stretch="Uniform" Opacity="0.55"
+                                          Fill="{StaticResource WarnBrush}" Data="M12 2 L20 9 L12 22 L4 9 Z"/>
+                                    <TextBlock Text="{x:Static lang:Resources.Plugins_MissingTitle}" Classes="h2"
+                                               HorizontalAlignment="Center"/>
+                                    <TextBlock HorizontalAlignment="Center" TextAlignment="Center" Classes="subtitle"
+                                               Text="{x:Static lang:Resources.Plugins_MissingBody}"/>
+                                    <Border Background="{StaticResource RimeBrush}" CornerRadius="6" Padding="10,6"
+                                            HorizontalAlignment="Center">
+                                        <TextBlock Text="{Binding Shell.SelectedPlugin.SourceDir}"
+                                                   FontFamily="{StaticResource MonoFont}" FontSize="11"
+                                                   Foreground="{StaticResource HoarfrostBrush}"
+                                                   TextWrapping="Wrap" MaxWidth="420"/>
+                                    </Border>
+                                    <Button Classes="ghost" HorizontalAlignment="Center"
+                                            Content="{x:Static lang:Resources.Action_Locate}"
+                                            AutomationProperties.AutomationId="plugin.locate"
+                                            Command="{Binding Shell.LocatePluginCommand}"
+                                            CommandParameter="{Binding Shell.SelectedPlugin}"/>
+                                </StackPanel>
+                            </Border>
+
                             <!-- Legacy plugin with no embeddable window -->
                             <Border IsVisible="{Binding Shell.SelectedPlugin.ShowLegacyPlaceholder}"
                                     Background="#0B1016" BorderBrush="{StaticResource HairlineBrush}"

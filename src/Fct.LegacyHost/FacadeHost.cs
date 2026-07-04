@@ -180,7 +180,10 @@ namespace Fct.LegacyHost
             var act = new FormActMain();
             ActGlobals.oFormActMain = act;
             // Sandbox the plugins' ACT data folder into the new ecosystem, off the real ACT folder.
-            Directory.CreateDirectory(LegacyActDataDir);
+            // Real ACT creates its Config\ subfolder at startup; reproduce that so plugins that write
+            // straight to AppDataFolder\Config (OverlayPlugin's RainbowMage.OverlayPlugin.config.json,
+            // saved on close) don't hit a missing directory.
+            Directory.CreateDirectory(Path.Combine(LegacyActDataDir, "Config"));
             act.AppDataFolder = new DirectoryInfo(LegacyActDataDir);
             // Show (off-screen, transparent, non-activating) so Control.Visible is true: the plugin's
             // ScanMemory/LogOutput threads gate on IsMainFormVisible() before emitting combat data.

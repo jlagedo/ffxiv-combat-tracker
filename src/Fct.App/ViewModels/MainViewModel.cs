@@ -47,6 +47,9 @@ public sealed partial class MainViewModel : ObservableObject
     // Raised when the user asks to unload/uninstall a plugin row; the window runs the teardown.
     public event Action<PluginViewModel>? UnloadPluginRequested;
 
+    // Raised when the user asks to re-locate a missing legacy plugin; the window owns the file picker.
+    public event Action<PluginViewModel>? LocatePluginRequested;
+
     // ---- design-time ctor: seed a representative roster for the previewer ----
     public MainViewModel()
     {
@@ -216,6 +219,10 @@ public sealed partial class MainViewModel : ObservableObject
     {
         if (row is not null) UnloadPluginRequested?.Invoke(row);
     }
+    [RelayCommand] private void LocatePlugin(PluginViewModel? row)
+    {
+        if (row is not null) LocatePluginRequested?.Invoke(row);
+    }
 
     // ---- shared selection ----
     [ObservableProperty]
@@ -268,7 +275,8 @@ public sealed partial class MainViewModel : ObservableObject
         LegacyPlugins.Count(p => p.Status is PluginStatus.Live or PluginStatus.Running or PluginStatus.Loaded);
     public int ModernLoadedCount => ModernPlugins.Count;
     public int TotalLoadedCount => LegacyLoadedCount + ModernLoadedCount;
-    public int FaultCount => LegacyPlugins.Count(p => p.Status is PluginStatus.Error or PluginStatus.NotLoaded);
+    public int FaultCount => LegacyPlugins.Count(p =>
+        p.Status is PluginStatus.Error or PluginStatus.NotLoaded or PluginStatus.Missing);
 
     public string LoadedSummary =>
         string.Format(Resources.Overview_LoadedSummaryFormat, TotalLoadedCount, LegacyLoadedCount, ModernLoadedCount);
@@ -287,40 +295,56 @@ public sealed partial class MainViewModel : ObservableObject
         RaiseRosterChanged();
     }
 
-    // Rebuild the classic roster from what the engine actually loaded; the data source (ffxiv)
-    // reads Live, other reported windows Running, and anything without a window Not loaded.
+    // One legacy roster row from a satellite-reported plugin. The data source (ffxiv) reads Live,
+    // other hosted windows Running, and anything without a window Not loaded. Shared by SetOnline and
+    // AddLegacyPlugin so the two paths can't drift (e.g. status kind, embeddable-window flag).
+    private static PluginViewModel BuildLegacyRow(SatellitePlugin p)
+    {
+        var meta = LegacyPluginCatalog.For(p.Key, p.Title);
+        var hosted = p.Hwnd != IntPtr.Zero;
+        return new PluginViewModel
+        {
+            Name = meta.Name,
+            Role = meta.Role,
+            Description = meta.Description,
+            Version = "—",
+            Kind = PluginKind.Legacy,
+            Key = p.Key,
+            Hwnd = p.Hwnd,
+            SatelliteStatusText = p.Status,
+            HasNativeConfig = hosted,
+            Status = hosted ? (LegacyPluginCatalog.IsParser(p.Key, p.Title) ? PluginStatus.Live : PluginStatus.Running)
+                            : PluginStatus.NotLoaded,
+        };
+    }
+
+    // Recompute the classic-engine state derived from the roster: whether any plugin exposes an
+    // embeddable window (gates the config bay via ConfigReady), and the running-plugin summary. Must
+    // run after every roster change while online — plugins announced after SetOnline (install / replay
+    // / relink) would otherwise leave ConfigReady false and the config bay stuck on its placeholder.
+    private void RefreshLegacyDerived()
+    {
+        ConfigReady = LegacyPlugins.Any(p => p.Hwnd != IntPtr.Zero);
+        if (Host != HostState.Online) return;
+        var count = LegacyLoadedCount;
+        SatelliteSummary = count == 1
+            ? Resources.Status_EngineRunningSummary_One
+            : string.Format(Resources.Status_EngineRunningSummary_Many, count);
+    }
+
+    // Rebuild the classic roster from what the engine actually loaded.
     internal void SetOnline(IReadOnlyList<SatellitePlugin> plugins)
     {
         Host = HostState.Online;
         ErrorMessage = null;
         SatelliteState = Resources.Status_Running;
         SatelliteStatusKind = PluginStatus.Running;
-        SatelliteSummary = plugins.Count == 1
-            ? Resources.Status_EngineRunningSummary_One
-            : string.Format(Resources.Status_EngineRunningSummary_Many, plugins.Count);
 
         LegacyPlugins.Clear();
         foreach (var p in plugins)
-        {
-            var meta = LegacyPluginCatalog.For(p.Key, p.Title);
-            var hosted = p.Hwnd != IntPtr.Zero;
-            LegacyPlugins.Add(new PluginViewModel
-            {
-                Name = meta.Name,
-                Role = meta.Role,
-                Description = meta.Description,
-                Version = "—",
-                Kind = PluginKind.Legacy,
-                Key = p.Key,
-                Hwnd = p.Hwnd,
-                SatelliteStatusText = p.Status,
-                HasNativeConfig = hosted,
-                Status = hosted ? (LegacyPluginCatalog.IsParser(p.Key, p.Title) ? PluginStatus.Live : PluginStatus.Running)
-                                : PluginStatus.NotLoaded,
-            });
-        }
+            LegacyPlugins.Add(BuildLegacyRow(p));
 
-        ConfigReady = plugins.Any(p => p.Hwnd != IntPtr.Zero);
+        RefreshLegacyDerived();
         if (SelectedPlugin is null || !LegacyPlugins.Contains(SelectedPlugin))
             SelectedPlugin = LegacyPlugins.FirstOrDefault() ?? ModernPlugins.FirstOrDefault();
         RaiseRosterChanged();
@@ -329,14 +353,40 @@ public sealed partial class MainViewModel : ObservableObject
             plugins.Count == 1 ? Resources.Notify_EngineReady_One : string.Format(Resources.Notify_EngineReady_Many, plugins.Count));
     }
 
-    // A legacy plugin was loaded live on the satellite after startup (install / restart replay).
+    // A legacy plugin was loaded live on the satellite after startup (install / restart replay /
+    // relink). A stale row under the same key (e.g. its "files missing" placeholder) is replaced.
     internal void AddLegacyPlugin(SatellitePlugin p)
     {
         PostToUi(() =>
         {
-            if (LegacyPlugins.Any(x => x.Key == p.Key)) return;
-            var meta = LegacyPluginCatalog.For(p.Key, p.Title);
-            var hosted = p.Hwnd != IntPtr.Zero;
+            var row = BuildLegacyRow(p);
+            var existing = LegacyPlugins.FirstOrDefault(x => x.Key == p.Key);
+            if (existing is not null)
+            {
+                LegacyPlugins[LegacyPlugins.IndexOf(existing)] = row;
+                if (ReferenceEquals(SelectedPlugin, existing)) SelectedPlugin = row;
+            }
+            else
+            {
+                LegacyPlugins.Add(row);
+            }
+            RefreshLegacyDerived();
+            // SetOnline may have run with an empty roster (the satellite starts bare, then plugins are
+            // replayed/installed and announced here); select the first one so the config bay isn't
+            // stranded empty until the user clicks.
+            if (SelectedPlugin is null) SelectedPlugin = row;
+            RaiseRosterChanged();
+        });
+    }
+
+    // A persisted install-by-reference plugin whose source files are gone: show a row the user can
+    // re-locate (satellite never announces it, so it would otherwise silently vanish from the roster).
+    internal void AddMissingLegacyPlugin(string key, string title, string sourceDir)
+    {
+        PostToUi(() =>
+        {
+            if (LegacyPlugins.Any(x => x.Key == key)) return;
+            var meta = LegacyPluginCatalog.For(key, title);
             LegacyPlugins.Add(new PluginViewModel
             {
                 Name = meta.Name,
@@ -344,11 +394,9 @@ public sealed partial class MainViewModel : ObservableObject
                 Description = meta.Description,
                 Version = "—",
                 Kind = PluginKind.Legacy,
-                Key = p.Key,
-                Hwnd = p.Hwnd,
-                SatelliteStatusText = p.Status,
-                HasNativeConfig = hosted,
-                Status = hosted ? PluginStatus.Running : PluginStatus.NotLoaded,
+                Key = key,
+                SourceDir = sourceDir,
+                Status = PluginStatus.Missing,
             });
             RaiseRosterChanged();
         });
@@ -364,6 +412,7 @@ public sealed partial class MainViewModel : ObservableObject
             LegacyPlugins.Remove(row);
             if (ReferenceEquals(SelectedPlugin, row))
                 SelectedPlugin = LegacyPlugins.FirstOrDefault() ?? (PluginViewModel?)ModernPlugins.FirstOrDefault();
+            RefreshLegacyDerived();
             RaiseRosterChanged();
         });
     }
