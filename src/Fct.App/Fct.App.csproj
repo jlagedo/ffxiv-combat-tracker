@@ -61,7 +61,8 @@
   <ItemGroup>
     <ProjectReference Include="..\Fct.Compat.Shim\Fct.Compat.Shim.csproj"
                       ReferenceOutputAssembly="false"
-                      Private="false" />
+                      Private="false"
+                      UndefineProperties="PublishSingleFile;PublishReadyToRun" />
   </ItemGroup>
 
   <!-- Build the net48 satellite as a dependency (no assembly reference: different runtime)

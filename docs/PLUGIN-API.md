@@ -333,11 +333,12 @@ public interface IUiHost
 
 ### Wiring & readiness (modern UI) — ✅ built
 
-`Fct.App` implements `IUiHost` via `PluginUiCoordinator` (`src/Fct.App/Plugins/Ui/`) — the single
-owner of every contributed surface — plus a per-plugin `PluginUiHost` handle (attributes calls back
-to the owning plugin id) and `AvaloniaUiDispatcher` (`IUiDispatcher` over `Avalonia.Threading.
-Dispatcher.UIThread`). `IPluginHost` itself gains no UI member — `IUiContributor.RegisterUi` is a
-separate call the coordinator drives directly.
+The host runtime (`Fct.Host`) owns the `IUiHost` surface via `PluginUiCoordinator`
+(`src/Fct.Host/Plugins/Ui/`) — the single owner of every contributed surface — handing each plugin a
+per-plugin `PluginUiHost` handle (attributes calls back to the owning plugin id); the shell (`Fct.App`)
+supplies `AvaloniaUiDispatcher` (`src/Fct.App/Plugins/Ui/`, the `IUiDispatcher` over
+`Avalonia.Threading.Dispatcher.UIThread`). `IPluginHost` itself gains no UI member —
+`IUiContributor.RegisterUi` is a separate call the coordinator drives directly.
 
 - **Discovery + gating.** `PluginUiCoordinator.FlushRegisterUi` iterates every plugin `PluginManager`
   loaded; a plugin is skipped unless its manifest declares `"ui"` (checked *before* the
@@ -563,16 +564,19 @@ manifest. New `GameEvent` records are additive (switch-and-ignore-unknown); ever
 
 ## The net10 host & ALC loader (built)
 
-The real host services + assembly loader exist in `Fct.App` (net10), promoting the in-memory fakes to
-production and loading a real native `IPlugin` from disk:
+The real host services + assembly loader exist in `Fct.Host` (a headless net10 class library the shell
+references), promoting the in-memory fakes to production and loading a real native `IPlugin` from disk:
 
-- **Host services** (`src/Fct.App/Hosting/`): `GameEventBus` (a real `IGameEventStream` — bounded
+- **Host services** (`src/Fct.Host/Hosting/`): `GameEventBus` (a real `IGameEventStream` — bounded
   per-subscription channel drained by a background pump, drop-oldest backpressure, fault-guarded
   handlers, generalizing `RingBufferDataSubscription`) with an in-process `IGameEventSink` producer
   seam; `RegistryService`, `AudioService` (priority fan-out + terminal-sink G3), `EncounterService`,
   disk-backed `PluginStorage`, `SystemClock`, the capability-gated `RawLogLineEmitter` (G4), and the
-  per-plugin `PluginHost : IPluginHost`. Registered in `Program.BuildHost`.
-- **Live snapshot aggregator** (`src/Fct.App/Hosting/GameSnapshotAggregator.cs`): a hosted service that
+  per-plugin `PluginHost : IPluginHost`. Registered by `AddFctHostServices`
+  (`src/Fct.Host/ServiceCollectionExtensions.cs`), which the shell's `Program.BuildHost` calls (it adds
+  only the shell-only pieces: `MainViewModel`, `ISatelliteNotificationText`, `LegacyPluginHostFactory`,
+  `AvaloniaUiDispatcher`).
+- **Live snapshot aggregator** (`src/Fct.Host/Hosting/GameSnapshotAggregator.cs`): a hosted service that
   subscribes to the state events on `GameEventBus` (raw log lines filtered out), folds
   `CombatantAdded`/`CombatantRemoved`/`HpUpdated`/`ZoneChanged`/`PartyChanged`/`PrimaryPlayerChanged`
   into an immutable `IGameSnapshot`, and publishes it through `GameSnapshotProvider` — so
@@ -580,7 +584,7 @@ production and loading a real native `IPlugin` from disk:
   off the forwarded stream. `Target`/`Focus`/`Hover`, the actor side-channel fields, and the resource
   catalog are not sourced yet — their producers are decided (satellite forward; resource-provider
   plugin) and tracked in [What we must do](#what-we-must-do--the-work-list).
-- **ALC loader** (`src/Fct.App/Plugins/`): `PluginManifest` (`plugin.json`, read without loading the
+- **ALC loader** (`src/Fct.Host/Plugins/`): `PluginManifest` (`plugin.json`, read without loading the
   assembly) + `HostContract` major-version gate; `PluginLoadContext` (collectible, `Fct.Abstractions`/
   `Fct.Abstractions.UI`/`Microsoft.Extensions.Logging.Abstractions`/`Avalonia.*` — plus the compat
   shim (`Fct.Compat.Shim`) and its two legacy-identity facades (`Advanced Combat Tracker`,
@@ -610,7 +614,7 @@ Live game data reaches the net10 bus over the existing satellite→host pipe (pi
   alongside `LOG`: one tab-delimited, backslash-escaped line per event, **no JSON** (the
   `BridgeLogRecord` convention). `Sequence` is not on the wire — the host re-stamps each decoded event
   from its own `IGameEventSink.NextSequence()` so the bus keeps one coherent per-session ordering.
-- **Host (`src/Fct.App/SatelliteHost.cs`)** — the bridge read loop decodes `EVT` frames and calls
+- **Host (`src/Fct.Host/SatelliteHost.cs`)** — the bridge read loop decodes `EVT` frames and calls
   `IGameEventSink.Emit`, so bridge events flow to every subscription exactly like any in-process source.
 
 **What the forwarder can carry is bounded by the sole-parser directive** — it may only project data the
@@ -641,11 +645,23 @@ assemblies plus a sample legacy plugin, loaded by the existing ALC loader:
   `ActGlobals.oFormActMain` over the host, and bridges the lifecycle (`InitPlugin`⇄`InitializeAsync`,
   `DeInitPlugin`⇄`DisposeAsync`).
 
+The shim + its two facades + `Fct.Aggregation` are an **opt-in staged package**, not a static
+reference: `Fct.App` carries **no** ACT-impersonation identity in its `deps.json`. The set is staged
+under `compat\` next to the host (`StageCompatShim`), and `CompatRuntime.Enable`
+(`src/Fct.Host/Plugins/CompatRuntime.cs`, called from `Program.BuildHost`) hooks
+`AssemblyLoadContext.Default.Resolving` to resolve those assemblies from `compat\` — they are not on
+the TPA list, so this resolver is what lets the default context *find* them. The staged folder is
+located via `AppData.InstallDirectory` (the launched-exe dir, so it resolves under the single-file
+self-extracting build).
+
 The host loads a shimmed plugin through the same path as a native one: `PluginManifest` gains an
 optional `legacyEntry` (mutually exclusive with `entry`); `PluginManager` routes it through an injected
-`LegacyPluginHostFactory` (so the loader takes no compile-time shim dependency); `PluginLoadContext`
-shares `Fct.Compat.Shim` + the two facades to the default ALC so the shim and the plugin agree on type
-identity. Hosting recompiled WinForms plugins in-process makes `Fct.App` a **net10-windows** app.
+`LegacyPluginHostFactory` that materializes the shim's `LegacyPluginHost` **reflectively** via
+`AssemblyLoadContext.Default.LoadFromAssemblyName` (so the loader takes no compile-time shim
+dependency); `PluginLoadContext.IsShared` routes `Fct.Compat.Shim` + the two facades to the default
+ALC so the shim and the plugin agree on type identity (this by-name sharing must move to
+manifest-declared, item 8). Hosting recompiled WinForms plugins in-process makes `Fct.App` a
+**net10-windows** app.
 `samples/Fct.SampleLegacyPlugin` is the reference recompiled plugin; `tests/Fct.Compat.Shim.Tests`
 covers identity, lifecycle, the audio/registry/raw-line seams, the encounter driver +
 cross-TFM `ExportVariables` parity, the `IDataSubscription` event map, the `IDataRepository` +
@@ -656,9 +672,10 @@ cross-TFM `ExportVariables` parity, the `IDataSubscription` event map, the `IDat
 named callbacks (`RegisterNamedCallback`/`InvokeNamedCallback` → `IPluginRegistry`, G5);
 `Before/OnLogLineRead` re-fired from the `RawLogLine` firehose; logging + chrome
 (`WriteExceptionLog`/`CornerControlAdd`/…); the encounter driver (`AddCombatAction`/`SetEncounter`/
-`EndCombat`, `ActiveZone.ActiveEncounter`) over the ACT aggregation engine — factored into
-`shared/Aggregation/` and linked identically into the net48 `Fct.Compat.Act` and the net10 ActFacade,
-so the `ExportVariables` bag cactbot reads is bit-identical across runtimes (`EncounterProjector` maps
+`EndCombat`, `ActiveZone.ActiveEncounter`) over the ACT aggregation engine — the shared,
+strong-named `Fct.Aggregation` project (net48;net10) referenced by both the net48 `Fct.Compat.Act`
+and the net10 ActFacade, so the aggregation binary (and the `ExportVariables` bag cactbot reads) is
+bit-identical across runtimes (`EncounterProjector` maps
 it plus the typed metrics onto `EncounterSnapshot`/`CombatantMetrics`, G1/G2; combat state mirrors onto
 `IEncounterService`). The `IDataSubscription` event map: `DataSubscriptionAdapter` projects the
 `IGameEventStream` onto the SDK delegates a recompiled plugin binds — `LogLine`←`RawLogLine`,

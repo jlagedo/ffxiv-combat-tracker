@@ -78,7 +78,7 @@ public sealed class SatelliteHost : Fct.Host.Plugins.ISatellitePluginChannel
     public async Task<SatelliteStartResult> StartAsync(CancellationToken ct = default)
     {
         var pipeName = "fct-bridge-" + Guid.NewGuid().ToString("N");
-        var exe = Path.Combine(AppContext.BaseDirectory, "satellite", "Fct.LegacyHost.exe");
+        var exe = Path.Combine(AppData.InstallDirectory, "satellite", "Fct.LegacyHost.exe");
         if (!File.Exists(exe))
         {
             _log.LogError(LogEvents.SatelliteNotStaged, "Satellite executable not staged at {Exe}", exe);

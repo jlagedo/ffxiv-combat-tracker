@@ -229,7 +229,7 @@ public interface IDataRepository {
 
 ---
 
-## 3. Leg 2 — ACT aggregates into encounters (we build: `Fct.Compat.Act`)
+## 3. Leg 2 — ACT aggregates into encounters (we build: the `Fct.Aggregation` engine, hosted by the `Fct.Compat.Act` facade)
 
 ACT loaded the plugin via `IActPluginV1.InitPlugin(TabPage, Label)` and recorded it in
 `ActGlobals.oFormActMain.ActPlugins`. When log lines arrive, `FormActMain` runs the
@@ -240,7 +240,13 @@ log line ──regex──► MasterSwing ──AddCombatAction──► Combata
                                                           └─ reverse action ─► victim CombatantData
 ```
 
-### 3.1 The aggregation engine (from-scratch, behavior reproduced from the decompile)
+### 3.1 The aggregation engine (`Fct.Aggregation`, from-scratch, behavior reproduced from the decompile)
+
+The engine types live in `Fct.Aggregation` (one strong-named identity, multi-targeted `net48;net10`).
+The net48 `Fct.Compat.Act` facade references it and **type-forwards** the engine types into the
+`Advanced Combat Tracker` identity so precompiled plugins resolve; the net10 `Fct.Compat.Shim.ActFacade`
+references the same engine. The engine reads its ACT-core flags (`charName`/`blockIsHit`/`restrictToAll`)
+through accessor delegates each facade's `ActGlobals` wires to its real static fields.
 
 - `MasterSwing` — one action/damage event (attacker, victim, attackType, damage `Dnum`,
   swingType, critical, special, time/timeSorter). Strings interned on add.
@@ -254,10 +260,12 @@ log line ──regex──► MasterSwing ──AddCombatAction──► Combata
 - `ZoneData` — holds `ActiveEncounter`; `ChangeZone` / `SetEncounter` / `EndCombat` drive the
   lifecycle. `InCombat` gates `AddCombatAction` (throws if false).
 
-> **Bit-for-bit requirement.** `Fct.Compat.Act`'s `EncounterData`/`CombatantData`/`MasterSwing`/
-> `AttackType` aggregation reproduces the real ACT binary on captured combat (differential
-> tests in `docs/TESTING.md`). The lazy `xxxCached` flag pattern, the `GetAllies` graph-walk,
-> the `Dnum` semantics, and the `ExportVariables`/`ColumnDefs` formatter tables all match.
+> **Bit-for-bit requirement.** The `Fct.Aggregation` engine's `EncounterData`/`CombatantData`/
+> `MasterSwing`/`AttackType` aggregation reproduces the real ACT binary on captured combat
+> (differential tests in `docs/TESTING.md`); `Fct.Compat.Act` carries the `Advanced Combat Tracker`
+> identity and type-forwards these engine types into it. The lazy `xxxCached` flag pattern, the
+> `GetAllies` graph-walk, the `Dnum` semantics, and the `ExportVariables`/`ColumnDefs` formatter
+> tables all match.
 
 ### 3.2 The MasterSwing boundary
 
@@ -445,7 +453,7 @@ lines 256+ (MapEffect 257, CEDirector 259, InCombat 260, …) are silent if this
 | Seam | Owner | Notes |
 |---|---|---|
 | packets/memory → log lines + `IDataSubscription`/`IDataRepository` | **inherit** | real `FFXIV_ACT_Plugin`, hosted unmodified in `Fct.LegacyHost` |
-| log line → regex → `MasterSwing` → `CombatantData` → `EncounterData` | **build** | `Fct.Compat.Act`, bit-for-bit vs ACT |
+| log line → regex → `MasterSwing` → `CombatantData` → `EncounterData` | **build** | the `Fct.Aggregation` engine (referenced by `Fct.Compat.Act`), bit-for-bit vs ACT |
 | `EncounterData.ExportVariables` / `CombatantData.ExportVariables` formatters | **build** | full key set; MiniParse reads these |
 | `ActGlobals.oFormActMain` hub (events, state, `ActPlugins`, `ActiveZone`) | **build** | the surface every plugin binds to |
 | `ActPluginData` shape (`pluginObj`, `lblPluginTitle.Text`, `cbEnabled.Checked`) | **build** | exact shape FFXIVRepository reflects against |
@@ -455,9 +463,10 @@ lines 256+ (MapEffect 257, CEDirector 259, InCombat 260, …) are silent if this
 | OverlayPlugin WS server + cactbot + Triggernometry + Discord | **inherit** | hosted unmodified; they self-host on the surfaces above |
 | assembly identity (`Advanced Combat Tracker` token a946…) | **build** | facade strong-name + `AssemblyResolve` |
 
-Everything in the "build" rows lives on the **net48** side (`Fct.LegacyHost` /
-`Fct.Compat.Act`), co-located with the real plugins. Only *data* crosses the bridge to the
-net10 host. See `docs/ARCHITECTURE.md` §3b–§4 for the runtime split rationale.
+Everything in the "build" rows runs on the **net48** side (`Fct.LegacyHost` / `Fct.Compat.Act`),
+co-located with the real plugins; the aggregation binary itself is `Fct.Aggregation`
+(multi-targeted, referenced there). Only *data* crosses the bridge to the net10 host. See
+`docs/ARCHITECTURE.md` §3b–§4 for the runtime split rationale.
 
 ---
 

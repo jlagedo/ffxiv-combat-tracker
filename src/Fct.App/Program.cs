@@ -108,7 +108,7 @@ class Program
         // two impersonation facades from compat\ (they are staged there, not baked into this exe's
         // deps.json). Subscribed here — before host.Start() — so it is live before any plugin loads.
         CompatRuntime.Enable(
-            Path.Combine(AppContext.BaseDirectory, "compat"),
+            Path.Combine(AppData.InstallDirectory, "compat"),
             host.Services.GetRequiredService<ILoggerFactory>());
 
         return host;

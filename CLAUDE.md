@@ -52,7 +52,11 @@ Design docs — **read before proposing changes:**
   next to the host, and `Fct.Host/Plugins/CompatRuntime.Enable` hooks `AssemblyLoadContext.Default`
   to resolve them from there. `LegacyPluginHostFactory` materializes the shim's `LegacyPluginHost`
   reflectively (no compile-time shim dependency). `PluginLoadContext.IsShared` still routes those names
-  to the default context for a single identity across the boundary.
+  to the default context for a single identity across the boundary. The host resolves its staged
+  siblings (`satellite\`, `compat\`, `plugins\`) via `AppData.InstallDirectory` — the launched-exe
+  directory (`Environment.ProcessPath`), **not** `AppContext.BaseDirectory` — because a single-file
+  self-extracting host runs its managed assemblies from a temp extraction dir while the staged siblings
+  stay next to the `.exe`. Both build modes are single-file (`IncludeAllContentForSelfExtract`).
 - **We build only the ACT engine** (`Fct.Compat.Act`) — the consumer that aggregates the plugin's
   `MasterSwing`s into encounters / DPS / `ExportVariables`. The real FFXIV_ACT_Plugin is the **sole
   parser**; we **never** decode log lines or port its parsing/swing/DoT-HoT-shield logic (see
@@ -170,8 +174,10 @@ net48 targeting pack, WindowsDesktop runtime, VS 2026 / MSBuild.
 a bare `dotnet build`.
 
 ```powershell
-dotnet build src\Fct.App\Fct.App.csproj   # net10 host; a StageSatellite target chains + stages the
-                                          #   net48 satellite into bin\<cfg>\net10.0-windows\satellite\.
+dotnet build src\Fct.App\Fct.App.csproj   # net10 host; StageSatellite + StageCompatShim targets stage
+                                          #   the net48 satellite into bin\<cfg>\net10.0-windows\satellite\
+                                          #   and the legacy compat runtime (shim + facades + engine) into
+                                          #   bin\<cfg>\net10.0-windows\compat\.
 .\src\Fct.App\bin\Debug\net10.0-windows\Fct.App.exe   # run e2e: host launches satellite\Fct.LegacyHost.exe
                                               #   --bridge <pipe>, loads the real plugins. Unified logs
                                               #   under %LOCALAPPDATA%\FFXIVCombatTracker\logs\.
@@ -185,14 +191,17 @@ tests skip without `FFXIV_ACT_Plugin.dll` installed. Details: [`docs/TESTING.md`
 
 ### Distributable builds — `build/` (C# / Bullseye)
 
-`build/` is a C# console project (Bullseye + SimpleExec) that publishes the two-process tree
-(host + `satellite\`) into `dist\<mode>\`, self-contained `win-x64` with portable PDBs, and packs the
-plugin SDK (`Fct.Abstractions` + `Fct.Abstractions.UI`) into `dist\<mode>\packages\*.nupkg` — a
-local-only feed (`dist/` is git-ignored; never published to GitHub Packages by this step). Legacy
+`build/` is a C# console project (Bullseye + SimpleExec) that publishes the runtime tree — the net10
+host, its `satellite\` (net48) and its `compat\` (the staged legacy compat runtime: shim + facades +
+`Fct.Aggregation`) — into `dist\<mode>\`, self-contained `win-x64`, single-file + compressed with
+`IncludeAllContentForSelfExtract` (the bundle self-extracts to disk on first run so the plugin
+classifier's `MetadataLoadContext` can open the on-disk runtime assemblies), portable PDBs alongside,
+and packs the plugin SDK (`Fct.Abstractions` + `Fct.Abstractions.UI`) into `dist\<mode>\packages\*.nupkg`
+— a local-only feed (`dist/` is git-ignored; never published to GitHub Packages by this step). Legacy
 plugins are not bundled. **Windows-only** (the net48 satellite can't publish off Windows). The
 project opts out of central package management and is not in the solution.
 
 ```powershell
-dotnet run --project build            # debug (default): Debug, loose DLLs, no R2R -> dist\debug.
+dotnet run --project build            # debug (default): Debug, single-file, compressed, no R2R -> dist\debug.
 dotnet run --project build -- release # Release, single-file, compressed, ReadyToRun -> dist\release.
 ```

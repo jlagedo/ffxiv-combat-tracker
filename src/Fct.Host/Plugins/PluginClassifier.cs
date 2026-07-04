@@ -146,13 +146,21 @@ internal sealed class PluginClassifier
 
     // Resolver over the plugin's own DLLs plus the runtime + app dirs (so IPlugin / the shim facade /
     // the core library resolve). Deduped by simple name — PathAssemblyResolver rejects duplicates.
+    // BaseDirectory/RuntimeDirectory supply the runtime + Fct.Abstractions (in a single-file build these
+    // are the self-extract directory); the install dir's compat\ supplies the shim facade + aggregation
+    // engine that a recompiled-shim plugin binds to.
     private static PathAssemblyResolver BuildResolver(IEnumerable<string> pluginDlls)
     {
         var byName = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
         // Plugin DLLs win over runtime/app copies of the same simple name.
         foreach (var dll in pluginDlls)
             byName[Path.GetFileNameWithoutExtension(dll)] = dll;
-        foreach (var dir in new[] { AppContext.BaseDirectory, RuntimeEnvironment.GetRuntimeDirectory() })
+        foreach (var dir in new[]
+        {
+            AppContext.BaseDirectory,
+            RuntimeEnvironment.GetRuntimeDirectory(),
+            Path.Combine(Fct.Logging.AppData.InstallDirectory, "compat"),
+        })
         {
             foreach (var dll in SafeEnumerateDlls(dir))
             {

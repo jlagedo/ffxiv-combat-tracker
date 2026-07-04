@@ -16,6 +16,27 @@ namespace Fct.Logging
         // Set by the host on the satellite's environment to hand it the host's resolved root.
         public const string RootEnvVar = "FCT_DATA_ROOT";
 
+        // The directory the application was launched from — where its staged sibling folders
+        // (satellite\, compat\, plugins\) and, in DEBUG, its data root live. Distinct from
+        // AppContext.BaseDirectory: a single-file self-extracting host runs its managed assemblies out
+        // of a temp extraction directory (which BaseDirectory points at), but the staged siblings stay
+        // next to the launched .exe. On net48 (never single-file) the two are identical.
+        public static string InstallDirectory
+        {
+            get
+            {
+#if NET
+                var exe = Environment.ProcessPath;
+                if (!string.IsNullOrEmpty(exe))
+                {
+                    var dir = Path.GetDirectoryName(exe);
+                    if (!string.IsNullOrEmpty(dir)) return dir;
+                }
+#endif
+                return AppContext.BaseDirectory;
+            }
+        }
+
         public static string Root
         {
             get
@@ -23,7 +44,7 @@ namespace Fct.Logging
                 var overrideRoot = Environment.GetEnvironmentVariable(RootEnvVar);
                 if (!string.IsNullOrWhiteSpace(overrideRoot)) return overrideRoot;
 #if DEBUG
-                return Path.Combine(AppContext.BaseDirectory, "FFXIVCombatTracker");
+                return Path.Combine(InstallDirectory, "FFXIVCombatTracker");
 #else
                 return Path.Combine(
                     Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),

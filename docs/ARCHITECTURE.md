@@ -90,13 +90,14 @@ only the consume/aggregate side (the ACT engine).
 
 ```
 ┌─────────────────────────────────┐        ┌──────────────────────────────────┐
-│  Fct.LegacyHost  (.NET Fx 4.8)   │  IPC   │  Fct.App  (.NET 10)               │
+│  Fct.LegacyHost  (.NET Fx 4.8)   │  IPC   │  Fct.App + Fct.Host  (.NET 10)    │
 │                                  │◄──────►│                                  │
-│  • from-scratch ACT engine         │ pipe / │  • typed bus (Fct.Abstractions)   │
-│  • real FFXIV_ACT_Plugin         │ shared │  • ALC-isolated NEW plugins       │
-│  • real OverlayPlugin + CEF      │ memory │  • typed game-data API            │
-│  • Triggernometry, Discord       │        │  • Avalonia shell + control panel │
-│  • ACT.Hojoring                  │        │                                   │
+│  • from-scratch ACT engine         │ pipe / │  • Fct.Host runtime: typed bus    │
+│  • real FFXIV_ACT_Plugin         │ shared │    (Channels) + ALC-per-plugin    │
+│  • real OverlayPlugin + CEF      │ memory │    loader + bridge client         │
+│  • Triggernometry, Discord       │        │  • ALC-isolated NEW plugins       │
+│  • ACT.Hojoring                  │        │  • typed game-data API            │
+│                                  │        │  • Fct.App: Avalonia shell        │
 │  ← all net48, runs natively      │        │  ← all net10, runs natively       │
 └─────────────────────────────────┘        └──────────────────────────────────┘
         the OS process boundary IS the runtime boundary; only DATA crosses
@@ -116,7 +117,13 @@ Fct.Abstractions   net48;net10  the SDK. IPlugin, IGameSession (IGameEventStream
                                 domain records. Semver'd, additive-only. NO opcodes/packets/Machina.
 
 Fct.Abstractions.UI net10       Avalonia UI contribution surfaces (IUiContributor /
-                                IUiHost); referenced only by UI-contributing plugins.
+                                IUiHost) + the semantic UI token contract
+                                (FctTokens/FctStyleClasses/FctMetrics); referenced by
+                                UI-contributing net10 plugins and by Fct.App itself
+                                (the shell implements IUiHost).
+
+Fct.Abstractions.Testing net10  in-memory fakes of every plugin-contract interface + the
+                                ShimStub seam; backs the headless flow tests.
 
 Fct.Bridge.Contracts net48;net10 shared bridge wire contract: SatelliteProtocol
                                 (handshake/command line protocol) + GameEventFrame
@@ -152,12 +159,32 @@ Fct.Parser.Legacy  net48        wraps the real FFXIV_ACT_Plugin (DataRepository 
                                 Its WrappedFfxivPlugin implements the facade's IActPluginV1 /
                                 IActPluginAlias, so it references Fct.Compat.Act (see note below).
 
+Fct.Aggregation    net48;net10  the ACT aggregation engine (namespace Advanced_Combat_Tracker):
+                                EncounterData/CombatantData/AttackType/MasterSwing/Dnum +
+                                ExportVariables/ColumnDefs. One strong-named identity referenced by
+                                both facades (Fct.Compat.Act net48, Fct.Compat.Shim.ActFacade net10)
+                                so the aggregation binary is identical on both runtimes.
+
 Fct.Compat.Act     net48        the ACT facade: impersonation identity ("Advanced Combat
                                 Tracker") + WinForms host shims (FormActMain, ActGlobals,
                                 SettingsSerializer, FormSpellTimers, TraySlider,
                                 FormImportProgress, IActPluginV1). Type-forwards the aggregation
                                 engine types to Fct.Aggregation — no engine code compiled in.
                                 Lives in LegacyHost.
+
+Fct.Compat.Shim    net10-win    the net10 in-process legacy path (distinct from the net48
+                                Fct.Compat.Act drop-in): the recompile-shim adapter runtime that
+                                hosts a recompiled legacy plugin as LegacyPluginHost : IPlugin and
+                                re-projects the ACT/SDK programming model onto IPluginHost. Staged
+                                under compat\, resolved into the default ALC by CompatRuntime.
+
+Fct.Compat.Shim.ActFacade net10-win  assembly "Advanced Combat Tracker": the net10 counterpart of
+                                Fct.Compat.Act (POCO ActGlobals/FormActMain), forwarding onto
+                                IPluginHost. References Fct.Aggregation for the engine.
+
+Fct.Compat.Shim.SdkFacade net10  assembly "FFXIV_ACT_Plugin.Common": re-declares the SDK surface
+                                (IDataSubscription/IDataRepository + Combatant/Player/...) a
+                                recompiled plugin binds to; the shim adapters map it onto the host.
 
 Fct.StreamProbe    net48        dev-only diagnostic plugin; taps the parser's swing/raw-packet
                                 stream for inspection. Not bundled or loaded by the shipped app.

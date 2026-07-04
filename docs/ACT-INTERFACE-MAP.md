@@ -31,7 +31,7 @@ decisions are locked and recorded under each section's **Strategy** (look for `D
 **Four-plugin target:**
 - [x] **G‑1** ✅ `TTS(string)` / `PlaySound(string)` **methods** → route to delegate fields — §6 — BREAK
 - [x] **G‑2** ✅ `ActGlobals.oFormSpellTimers` + `FormSpellTimers` (2 events) — §7 — BREAK *(built with M4‑2)*
-- [x] **G‑3** ✅ `FormActMain.DpiScale` property → `1f` — §10 — MINOR
+- [x] **G‑3** ✅ `FormActMain.DpiScale` property → `DeviceDpi / 96f` (System-DPI-aware satellite) — §10 — MINOR
 - [ ] **VERIFY** 🟡 `BeforeLogLineRead` reflectable multicast field; exact "…Started" status string set before Trig/OP/Hojoring init — §3 / §1
 - [ ] **G‑4** 🟡 `TraySlider` / `ButtonLayoutEnum` inert stubs — **deferred on-demand** (build only if a bind throws) — §11
 
@@ -146,10 +146,13 @@ model so the rollup exposes the FFXIV columns + the `ExportVariables` keys OP la
 | ✅ | `ValidateLists` / `ValidateTableSetup` | FFXIV | commit after mutating the model |
 | ✅ | `ActLocalization.LocalizationStrings["attackTypeTerm-all"]` | FFXIV | localized "All" bucket key |
 
-**Strategy.** Done — verified bit-for-bit on captured combat (`Aggregation.cs` + `CombatTables.cs`;
-TESTING.md "Differential ACT-engine compat"), and corpus-wide by `tools/mass-compare`
-(our engine vs real ACT, identical plugin swings). DoT/HoT/shield *values* are the plugin's synthesis,
-baked into the swings both engines receive — not an interface concern.
+**Strategy.** Done — verified bit-for-bit on captured combat (`Aggregation.cs` + `CombatTables.cs`,
+which live in the `Fct.Aggregation` engine project; TESTING.md "Differential ACT-engine compat"), and
+corpus-wide by `tools/mass-compare` (our engine vs real ACT, identical plugin swings). These
+model/engine types are defined in `Fct.Aggregation` and **type-forwarded** into the `Advanced Combat
+Tracker` facade identity (`Fct.Compat.Act` on net48), so the binding contract below is unchanged.
+DoT/HoT/shield *values* are the plugin's synthesis, baked into the swings both engines receive — not
+an interface concern.
 
 ## 3. Inbound log seam — ✅ DONE (🟡 1 VERIFY)
 
@@ -338,20 +341,22 @@ needs.
 
 | St | member | consumers | why |
 |:--:|---|---|---|
-| ✅ | `DpiScale` (float) | OP | config-tab DPI scaling (read in try/catch → default 1) — **G‑3** |
+| ✅ | `DpiScale` (float) | OP | config-tab DPI scaling (read in try/catch → default 1); returns `DeviceDpi / 96f` — **G‑3** |
 | 🟡 | `NotificationAdd(string,string)` | OP | version-too-old toast — STUB (logs only); 2-arg matches consumer |
 | ✅ | `CornerControlAdd` / `CornerControlRemove(Control)` | Trig, Hojo | corner button — Trig reflects null-guarded; Hojo calls directly → **M4‑3** (real, tracks a private list) |
 | 🟡 | private `tc1` (TabControl) | Trig | `LocateTab` selects Trig's tab — OMITTED (reflected, guarded) |
 | ✅ | `WindowState` (settable) / `CanFocus` / `IsHandleCreated` / `IsDisposed` (`Form`) | Hojo | UI marshal + lifecycle guards — **M4‑4** (inherited from `Form`) |
 
-**Strategy.** ✅ **G‑3:** `DpiScale` → `1f` (removes OP's silent catch). 🟡 `NotificationAdd`
+**Strategy.** ✅ **G‑3:** `DpiScale` → `DeviceDpi / 96f` — the satellite is System-DPI-aware
+(`app.manifest <dpiAware>true`), matching real ACT's `pDpiSize.Width / 96`; OP multiplies its
+config-tab layout by it. 🟡 `NotificationAdd`
 stub + Trig-reflected `tc1` stay omitted (guarded). ✅ **M4‑3:** real `CornerControlAdd/Remove`
 track the control in a private `List<Control>`. ✅ **M4‑4:** settable `WindowState` +
 `CanFocus`/`IsHandleCreated`/`IsDisposed` inherited from `Form` (handle force-realized at
 `FacadeHost.cs:105`).
 
 > **Decision:**
-> - **G‑3:** `public float DpiScale => 1f;` on `FormActMain`.
+> - **G‑3:** `public float DpiScale => DeviceDpi / 96f;` on `FormActMain` (System-DPI-aware satellite).
 > - **M4‑3:** `CornerControlAdd(Control)` / `CornerControlRemove(Control)` are real methods that
 >   add/remove into a private tracked `List<Control>` (no host chrome to host it in) — Hojoring calls
 >   them unguarded, so they must exist and not throw on add-then-remove.
@@ -465,7 +470,8 @@ stack costs essentially nothing beyond G‑1.
 
 - **The net48↔net10 IPC bridge**: not an ACT surface — how the satellite (legacy plugins + facade)
   and the net10 host exchange typed domain events. Plugins never see it. Not its own project — the
-  host end lives in `Fct.App` (`SatelliteHost`/`SatelliteLifetime`), the satellite end in
+  host end lives in `Fct.Host` (`SatelliteHost`/`SatelliteLifetime`, loaded by the `Fct.App`
+  process), the satellite end in
   `Fct.LegacyHost`; the wire contracts (`SatelliteProtocol`, `GameEventFrame`, `BridgeLogRecord`)
   are the shared `Fct.Bridge.Contracts` + `Fct.Logging.Contracts` libraries.
 - **`IRawPacketSource`** (`Fct.Abstractions`): the one opt-in escape hatch exposing raw packets to

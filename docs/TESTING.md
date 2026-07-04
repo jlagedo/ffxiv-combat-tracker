@@ -16,7 +16,11 @@ Or run a single project directly with `dotnet test tests/<project>`.
 | Project | TFM | Scope |
 |---|---|---|
 | `Fct.Compat.Act.Tests` | net48 | The from-scratch ACT aggregation engine: `Dnum`, `MasterSwing`, `AttackType`/`CombatantData`/`EncounterData` math, the `ExportVariables` contract OverlayPlugin/cactbot read, `SettingsSerializer` XML round-trip, and the **differential ACT-engine compat** (`AggregateCompatTests`, below). |
-| `Fct.App.Tests` | net10 | The bridge handshake parser (`SatelliteProtocol`): READY detection, x64 gating, HWND hex parsing. |
+| `Fct.Parser.Legacy.Tests` | net48 | The parser interposition: `RingBufferDataSubscription` (bounded ring, single dispatch thread, `IRawPacketSource`) against a fake data subscription. |
+| `Fct.App.Tests` | net10 | The headless `Fct.Host` runtime: the bus/registry/audio/snapshot services, the ALC plugin loader (manifest gate, classifier, installer, unload, static-graph guard), `RawPacketSource`, `ProcessJob`, the UI-token contract, and the bridge handshake/event-frame codecs (`SatelliteProtocol`, `BridgeEventFrame`). |
+| `Fct.FlowTests` | net10 | The headless legacy↔native contract suite on the `Fct.Abstractions.Testing` fakes (encounter/snapshot/raw-packet/audio flows); no satellite/CEF/live game. |
+| `Fct.Compat.Shim.Tests` | net10-windows | The net10 compat shim: identity, `LegacyPluginHost` lifecycle, the `IDataSubscription`/`IDataRepository`/`Combatant` projection, the encounter driver, and cross-TFM `ExportVariables` parity. |
+| `Fct.Compat.Shim.E2E.Tests` | net10-windows | The shim-free load path: `CompatRuntime` resolving the staged `compat\` package into the default ALC end-to-end. |
 | `Fct.Integration.Tests` | net10 | Black-box end-to-end: launches the staged net48 satellite, checks the handshake/HWND, verifies the in-process self-test aggregation, and runs the **full live route** on a recorded slice (`--replay`, below). |
 
 ## What runs vs. skips
