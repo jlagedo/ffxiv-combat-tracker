@@ -18,6 +18,10 @@
 
   <ItemGroup>
     <ProjectReference Include="..\..\src\Fct.Bridge.Contracts\Fct.Bridge.Contracts.csproj" />
+    <!-- The wire-path e2e (ReplayBridgeRouteTests) decodes the bridged GameEventFrames and folds them
+         through the real host engine, asserting parity with the satellite's own captured totals. -->
+    <ProjectReference Include="..\..\src\Fct.Engine\Fct.Engine.csproj" />
+    <ProjectReference Include="..\..\src\Fct.Abstractions.Testing\Fct.Abstractions.Testing.csproj" />
   </ItemGroup>
 
 </Project>

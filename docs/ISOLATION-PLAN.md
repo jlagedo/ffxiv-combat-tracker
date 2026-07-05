@@ -110,20 +110,31 @@ cleanly without it.
 The host engine exists, is DI-wired, and passes unit tests; this phase makes its authority
 *proven* rather than asserted.
 
-- [ ] Commit `Fct.Engine` + `EncounterLifecycle`/`EngineTables` + `BridgeForwarder` swing
+- [x] Commit `Fct.Engine` + `EncounterLifecycle`/`EngineTables` + `BridgeForwarder` swing
       forwarding (the current uncommitted work).
-- [ ] Retire the orphaned placeholder `Fct.Host/Hosting/EncounterService.cs`.
-- [ ] **Cross-runtime engine parity test:** feed the committed oracle fixtures
+- [x] Retire the orphaned placeholder `Fct.Host/Hosting/EncounterService.cs`.
+- [x] **Cross-runtime engine parity test:** feed the committed oracle fixtures
       (`combat-slice*.oracle.tsv`) through `ModernEncounterEngine` and assert every
       `ExportVariables` string equals the committed real-ACT baselines
       (`combat-slice*.exportvars.tsv`) — the net10 engine held to the same oracle as the
-      net48 engine, bit-for-bit.
-- [ ] **Wire-path e2e** (`Fct.Integration.Tests`): a satellite `--replay` run forwards swings
-      over the real pipe; assert the host engine's encounter totals equal the satellite
-      engine's captured totals. **[plugin-gated]**
+      net48 engine, bit-for-bit. (`Fct.Engine.Tests/OracleParityTests`. Surfaced + fixed a
+      cross-TFM bug: `CombatTables.Cds` rendered a NaN/Infinity DPS as `"0"` on net10 vs
+      real ACT's `"NaN"`, relying on net48-only `(long)NaN==long.MinValue` overflow.)
+- [x] **Wire-path e2e** (`Fct.Integration.Tests/ReplayBridgeRouteTests`): a satellite
+      `--replay … --bridge` run forwards the swing/lifecycle stream over the real pipe; the
+      host `ModernEncounterEngine` folds the decoded frames and its per-encounter YOU total
+      equals the satellite's captured baseline, bit-for-bit. **[plugin-gated]**
 
 **Exit:** the host engine is demonstrably interchangeable with the net48 engine on identical
-input; divergence fails CI.
+input; divergence fails CI. ✅
+
+> **Known pre-existing loose end (from the in-flight commit, resolve by P5/P7):** `Fct.App`'s
+> deps.json still lists `Fct.Aggregation` because `Fct.Engine`'s `ProjectReference` ships it
+> next-to-exe *and* it is staged under `compat\` — two identities, violating the one-identity
+> invariant (`Fct.App.Tests/StaticGraphTests` red for `Fct.Aggregation`). The host engine must
+> resolve the single `compat\` copy via `CompatRuntime`; the fix is a reliably non-transitive
+> compile-only reference plus verifying the `CompatRuntime.Enable`-before-engine-construction
+> ordering by launching the app. Deferred here to avoid destabilizing startup mid-P1.
 
 ### P2 — Frame-replay harness (the e2e foundation for every later phase)
 

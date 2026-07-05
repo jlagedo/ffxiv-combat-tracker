@@ -142,6 +142,34 @@ namespace Fct.LegacyHost
             Application.Run(pump);
         }
 
+        // Replay a recorded log through the real parser + ACT facade WITHOUT writing any output: each
+        // parsed swing and the encounter lifecycle the plugin drives are raised on the facade, so a
+        // BridgeForwarder the caller attaches (via <paramref name="attachForwarder"/>) ships the whole
+        // stream to the net10 host engine over the real pipe. Same load + clock/idle-split + final
+        // EndCombat semantics as ReplayImpl, so the forwarded stream aggregates to the identical
+        // encounters — the satellite half of the ISOLATION-PLAN P1 wire-path e2e. The forwarder is
+        // attached AFTER the parser has started but BEFORE the first line is fed, so no combat is missed.
+        public static void ReplayOverBridge(string logPath, int maxLines, Action attachForwarder, Action<string> Log)
+        {
+            var act = ActGlobals.oFormActMain;
+            LoadStartedPlugin(Log);   // load + start the real FFXIV_ACT_Plugin (registers ACT tables, subscribes)
+            attachForwarder();
+
+            int fed = 0;
+            foreach (var raw in File.ReadLines(logPath).Take(maxLines))
+            {
+                if (raw.Length == 0) continue;
+                fed++;
+                var ts = ParseTimestamp(raw);
+                if (ts > DateTime.MinValue) act.AdvanceClock(ts);   // quiet gap > idle limit ends combat
+                var args = new LogLineEventArgs(raw, 0, ts, act.CurrentZone ?? "", act.InCombat);
+                try { act.FireBeforeLogLineRead(true, args); }
+                catch (Exception ex) { Log($"line {fed} parse error: {ex.Message}"); }
+            }
+            if (act.InCombat) act.EndCombat(true);   // flush the final encounter (forwarded as EndCombatRequested)
+            Log($"replay-over-bridge done fed={fed}");
+        }
+
         // Load the plugin and pump until it reports "Started".
         private static ActPluginData LoadStartedPlugin(Action<string> Log)
         {

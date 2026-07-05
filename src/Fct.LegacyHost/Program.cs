@@ -48,13 +48,25 @@ namespace Fct.LegacyHost
             }
 
             // End-to-end live route on a recorded log: plugin parse -> our ACT facade (with
-            // idle-end encounter splitting) -> per-encounter ExportVariables.
-            //   --replay <logPath> <maxLines> <outPath>
+            // idle-end encounter splitting).
+            //   --replay <logPath> <maxLines> <outPath>      : dump per-encounter ExportVariables to a TSV
+            //   --replay <logPath> <maxLines> --bridge <pipe>: forward the swing/lifecycle stream to the
+            //     net10 host engine over the real pipe (the P1 wire-path e2e). The host aggregates and is
+            //     asserted bit-equal to this satellite's own captured totals.
             int rpi = Array.IndexOf(args, "--replay");
-            if (rpi >= 0 && args.Length >= rpi + 4)
+            if (rpi >= 0 && args.Length >= rpi + 3)
             {
-                ParseOracle.Replay(args[rpi + 1], int.Parse(args[rpi + 2]), args[rpi + 3]);
-                return;
+                var replayPipe = ParseBridgeArg(args);
+                if (replayPipe != null)
+                {
+                    RunReplayBridge(args[rpi + 1], int.Parse(args[rpi + 2]), replayPipe);
+                    return;
+                }
+                if (args.Length >= rpi + 4)
+                {
+                    ParseOracle.Replay(args[rpi + 1], int.Parse(args[rpi + 2]), args[rpi + 3]);
+                    return;
+                }
             }
 
             // Batch oracle over a whole log folder (months of logs), one plugin load:
@@ -131,6 +143,60 @@ namespace Fct.LegacyHost
         }
 
         private static bool _standalone;
+
+        // Replay-over-bridge (the ISOLATION-PLAN P1 wire-path e2e): connect the bridge, load the real
+        // parser, attach the forwarder, and drive a recorded log through the facade so every swing +
+        // encounter-lifecycle event forwards to the net10 host engine over the real pipe. No live game,
+        // no live host — a headless proof that the host engine aggregates the bridged stream to the same
+        // totals this satellite would compute itself. Runs under a message loop (plugin Init marshals to
+        // the UI thread), drives from a one-shot timer tick, then drains the forwarder and exits.
+        private static void RunReplayBridge(string logPath, int maxLines, string pipeName)
+        {
+            SatelliteLogging.Initialize();
+            _log = SatelliteLogging.Log;
+            FacadeHost.Log = SatelliteLogging.WriteLegacy;
+            _log.LogInformation(LogEvents.SatelliteBooting,
+                "Replay-over-bridge: log={Log} max={Max} pipe={Pipe}", logPath, maxLines, pipeName);
+
+            ConnectBridge(pipeName);   // opens the event pipe (out) + sends READY
+            FacadeHost.InstallAssemblyResolver();
+            Application.EnableVisualStyles();
+            Application.SetCompatibleTextRenderingDefault(false);
+            FacadeHost.CreateAct();
+            _standalone = false;
+
+            var pump = new Form { ShowInTaskbar = false, FormBorderStyle = FormBorderStyle.None,
+                                  WindowState = FormWindowState.Minimized, Visible = false };
+            _ = pump.Handle;
+            var timer = new Timer { Interval = 250 };
+            timer.Tick += (s, e) =>
+            {
+                timer.Stop();
+                try
+                {
+                    ParseOracle.ReplayOverBridge(logPath, maxLines, () =>
+                    {
+                        // Attach the forwarder once the parser is started, before any line is fed, then
+                        // close the handshake so the host's StartAsync loop returns and begins draining.
+                        _forwarder = new BridgeForwarder(SendLine, _log);
+                        _forwarder.Start();
+                        SendLine(SatelliteProtocol.PluginsEnd);
+                    }, m => _log.LogDebug(LogEvents.PluginLoading, "[Replay] {Msg}", m));
+                }
+                catch (Exception ex)
+                {
+                    _log.LogError(LogEvents.SatelliteBooting, ex, "replay-over-bridge failed");
+                }
+                finally
+                {
+                    try { _forwarder?.Dispose(); } catch { }   // deterministic final drain of the ring to the pipe
+                    SatelliteLogging.Shutdown();
+                    Environment.Exit(0);
+                }
+            };
+            timer.Start();
+            Application.Run(pump);
+        }
 
         // Boot the satellite with NO plugins loaded: a clean host ships nothing and boot-loads nothing.
         // Every plugin (parser included) arrives on demand via the host's LOADPLUGIN command
