@@ -90,6 +90,20 @@ namespace Fct.LegacyHost
                 }
             }
 
+            // Downstream sink: a plugin-free satellite that SUBSCRIBEs to a stream set and records every
+            // frame the host fans down to it — the P4 downstream-data-plane e2e subject.
+            //   --sink <recordPath> --subscribe <streams> --bridge <pipe>
+            int si = Array.IndexOf(args, "--sink");
+            if (si >= 0 && args.Length >= si + 2)
+            {
+                var sinkPipe = ParseBridgeArg(args);
+                if (sinkPipe != null)
+                {
+                    RunSink(args[si + 1], ParseArgValue(args, "--subscribe") ?? SatelliteProtocol.StreamSwings, sinkPipe);
+                    return;
+                }
+            }
+
             // Batch oracle over a whole log folder (months of logs), one plugin load:
             //   --mass-oracle <logFolder> <outFolder> [maxLinesPerFile]
             int mo = Array.IndexOf(args, "--mass-oracle");
@@ -253,6 +267,73 @@ namespace Fct.LegacyHost
             finally
             {
                 _log.LogInformation(LogEvents.SatelliteBooting, "Replay-frames done: {Sent} frames", sent);
+                SatelliteLogging.Shutdown();
+                Environment.Exit(0);
+            }
+        }
+
+        // Downstream sink (ISOLATION-PLAN P4): connect the bridge, complete the handshake, declare a
+        // stream set (SUBSCRIBE), and record every frame the host fans down the command pipe. No plugin,
+        // no facade, no message loop — a headless subscriber that proves the host→satellite fan-out over
+        // the real pipe. Exits when the host signals shutdown or closes the pipe.
+        private static void RunSink(string recordPath, string streams, string pipeName)
+        {
+            SatelliteLogging.Initialize(_satelliteId);
+            _log = SatelliteLogging.Log;
+            _log.LogInformation(LogEvents.SatelliteBooting,
+                "Sink: record={Record} streams={Streams} pipe={Pipe}", recordPath, streams, pipeName);
+
+            try
+            {
+                _bridge = new NamedPipeClientStream(".", pipeName, PipeDirection.Out);
+                _bridge.Connect(5000);
+                _writer = new StreamWriter(_bridge) { AutoFlush = true };
+                SendLine(SatelliteProtocol.FormatReady(
+                    System.Diagnostics.Process.GetCurrentProcess().Id,
+                    Environment.Is64BitProcess, Environment.Version.ToString(), _satelliteId, _package));
+                SendLine(SatelliteProtocol.PluginsEnd);
+                SendLine(SatelliteProtocol.FormatSubscribe(streams.Split(',')));
+            }
+            catch (Exception ex)
+            {
+                _log.LogError(LogEvents.SatelliteBridgeConnectFailed, ex, "Sink bridge connect failed");
+                Environment.Exit(1);
+                return;
+            }
+
+            // Graceful shutdown: exit the instant the host signals (no message loop to pump).
+            try
+            {
+                var shutdown = System.Threading.EventWaitHandle.OpenExisting(pipeName + "-shutdown");
+                new System.Threading.Thread(() => { shutdown.WaitOne(); Environment.Exit(0); })
+                    { IsBackground = true, Name = "sink-shutdown" }.Start();
+            }
+            catch { /* best-effort */ }
+
+            try
+            {
+                _cmdPipe = new NamedPipeClientStream(".", pipeName + "-cmd", PipeDirection.In);
+                _cmdPipe.Connect(30000);
+                using var reader = new StreamReader(_cmdPipe);
+                using var record = new StreamWriter(recordPath, append: false) { AutoFlush = true };
+                string line;
+                int recorded = 0;
+                while ((line = reader.ReadLine()) != null)
+                {
+                    if (line.StartsWith(GameEventFrame.Prefix, StringComparison.Ordinal))
+                    {
+                        record.WriteLine(line);
+                        recorded++;
+                    }
+                }
+                _log.LogInformation(LogEvents.SatelliteBooting, "Sink done: recorded {Count} downstream frames", recorded);
+            }
+            catch (Exception ex)
+            {
+                _log.LogError(LogEvents.SatelliteBridgeConnectFailed, ex, "Sink command-pipe read failed");
+            }
+            finally
+            {
                 SatelliteLogging.Shutdown();
                 Environment.Exit(0);
             }

@@ -48,6 +48,9 @@ public sealed class SatelliteHost : Fct.Host.Plugins.ISatellitePluginChannel
     private readonly INotificationHub? _notifications;
     private readonly ISatelliteNotificationText _text;   // localized notification strings (Fct.App-backed)
     private readonly string _satelliteId;      // host-assigned identity (P3): launch arg + log attribution
+    private readonly IGameSession? _session;    // downstream fan-out source (P4): bus + snapshot to prime
+    private readonly object _egressLock = new();
+    private SatelliteEgress? _egress;           // the host→satellite fan-out for this satellite's SUBSCRIBE
     private int _firstEventLogged;
 
     /// <summary>The host-assigned identity this satellite hosts (P3). "ffxiv" for the single-satellite path.</summary>
@@ -72,12 +75,16 @@ public sealed class SatelliteHost : Fct.Host.Plugins.ISatellitePluginChannel
     private readonly System.Collections.Concurrent.ConcurrentDictionary<string, TaskCompletionSource<bool>> _pendingUnloads
         = new(StringComparer.OrdinalIgnoreCase);
 
+    private readonly string _extraArgs;         // extra launch args (test seam: e.g. the --sink mode)
+
     internal SatelliteHost(ILoggerFactory loggerFactory, IGameEventSink sink,
         INotificationHub? notifications = null, ISatelliteNotificationText? texts = null,
-        string satelliteId = "ffxiv")
+        string satelliteId = "ffxiv", IGameSession? session = null, string extraArgs = "")
     {
         _loggerFactory = loggerFactory;
         _satelliteId = string.IsNullOrWhiteSpace(satelliteId) ? "ffxiv" : satelliteId;
+        _session = session;
+        _extraArgs = extraArgs ?? "";
         _log = loggerFactory.CreateLogger<SatelliteHost>();
         // Forwarded records land under a per-satellite category so N satellites are attributable in the
         // host log (Fct.Satellite.<id>); the single-satellite path keeps Fct.Satellite.ffxiv.
@@ -115,7 +122,8 @@ public sealed class SatelliteHost : Fct.Host.Plugins.ISatellitePluginChannel
         var startInfo = new ProcessStartInfo
         {
             FileName = exe,
-            Arguments = "--bridge " + pipeName + " --satellite-id " + _satelliteId,
+            Arguments = "--bridge " + pipeName + " --satellite-id " + _satelliteId
+                + (_extraArgs.Length == 0 ? "" : " " + _extraArgs),
             UseShellExecute = false,
         };
         // Hand the satellite the host's resolved data root so both processes agree on one location
@@ -221,6 +229,10 @@ public sealed class SatelliteHost : Fct.Host.Plugins.ISatellitePluginChannel
                 {
                     result.WindowHandle = hwnd;   // primary window (compat); plugins drive the UI
                 }
+                else if (line.StartsWith(SatelliteProtocol.SubscribePrefix, StringComparison.Ordinal))
+                {
+                    HandleSubscribe(line);
+                }
             }
         }
         catch (OperationCanceledException) when (timeout.IsCancellationRequested && !ct.IsCancellationRequested)
@@ -275,6 +287,76 @@ public sealed class SatelliteHost : Fct.Host.Plugins.ISatellitePluginChannel
         finally { _pendingUnloads.TryRemove(key, out _); }
     }
 
+    // A satellite declared the downstream stream set its facade needs (P4). Build the filter, prime it
+    // from the current snapshot (so a late joiner converges — the same answer ACT gives a plugin enabled
+    // mid-session), then stand up the per-satellite egress that fans exactly those streams down the
+    // command pipe with its own bounded ring. A re-SUBSCRIBE replaces the previous egress.
+    private void HandleSubscribe(string line)
+    {
+        if (_session is null)
+        {
+            _log.LogWarning(LogEvents.BridgeFrameMalformed, "SUBSCRIBE from '{Id}' ignored: no session wired", _satelliteId);
+            return;
+        }
+        if (!SatelliteProtocol.TryParseSubscribe(line, out var tokens)) return;
+        var filter = StreamCatalog.ToFilter(tokens);
+        if (filter is null)
+        {
+            _log.LogWarning(LogEvents.BridgeFrameMalformed,
+                "SUBSCRIBE from '{Id}' matched no known streams: [{Streams}]", _satelliteId, string.Join(",", tokens));
+            return;
+        }
+
+        lock (_egressLock)
+        {
+            _egress?.Dispose();
+            PrimeSnapshot(tokens);   // snapshot-on-subscribe, before the live fan-out starts
+            _egress = new SatelliteEgress(_satelliteId, _session.Events, filter, SendDownstream);
+        }
+        _log.LogInformation(LogEvents.BridgeHandshake,
+            "Satellite '{Id}' subscribed to downstream streams [{Streams}]", _satelliteId, string.Join(",", tokens));
+    }
+
+    // Prime a newly-subscribed satellite with current state as synthesized frames, so it converges
+    // without waiting for the next live change (IGameSnapshot → zone/party/player/combatant frames).
+    private void PrimeSnapshot(string[] tokens)
+    {
+        try
+        {
+            var snap = _session!.Snapshot();
+            var now = DateTimeOffset.UtcNow;
+            bool zoneParty = Array.IndexOf(tokens, SatelliteProtocol.StreamZoneParty) >= 0;
+            bool combatants = Array.IndexOf(tokens, SatelliteProtocol.StreamCombatants) >= 0;
+
+            if (zoneParty)
+            {
+                SendDownstream(GameEventFrame.ToWire(new ZoneChanged(0, now, snap.Zone.Id, snap.Zone.Name)));
+                if (snap.Player is { } me)
+                    SendDownstream(GameEventFrame.ToWire(new PrimaryPlayerChanged(0, now, me.Id, me.Name)));
+                var members = new List<uint>();
+                foreach (var m in snap.Party.Members) members.Add(m.Id);
+                SendDownstream(GameEventFrame.ToWire(new PartyChanged(0, now, members)));
+            }
+            if (combatants)
+                foreach (var a in snap.Actors)
+                    SendDownstream(GameEventFrame.ToWire(new CombatantAdded(0, now, a)));
+        }
+        catch (Exception ex)
+        {
+            _log.LogWarning(LogEvents.BridgeFrameMalformed, ex, "Snapshot priming for '{Id}' failed", _satelliteId);
+        }
+    }
+
+    // Write one downstream frame to the command pipe (quiet — the high-rate fan-out must not log per frame).
+    private void SendDownstream(string? wire)
+    {
+        if (wire is null) return;
+        lock (_cmdLock)
+        {
+            try { _cmdWriter?.WriteLine(wire); } catch { /* dead pipe: the egress ring absorbs + drops */ }
+        }
+    }
+
     private bool SendCommand(string frame)
     {
         lock (_cmdLock)
@@ -312,6 +394,8 @@ public sealed class SatelliteHost : Fct.Host.Plugins.ISatellitePluginChannel
                     if (_pendingUnloads.TryGetValue(key, out var tcs)) tcs.TrySetResult(ok);
                     PluginUnloaded?.Invoke(key);
                 }
+                else if (line.StartsWith(SatelliteProtocol.SubscribePrefix, StringComparison.Ordinal))
+                    HandleSubscribe(line);
                 else
                     _log.LogDebug(LogEvents.BridgeFrameMalformed, "Unrecognized bridge frame after handshake: {Frame}", line);
             }
@@ -336,6 +420,7 @@ public sealed class SatelliteHost : Fct.Host.Plugins.ISatellitePluginChannel
     public async Task ShutdownAsync(TimeSpan timeout)
     {
         _shuttingDown = true;
+        lock (_egressLock) { _egress?.Dispose(); _egress = null; }
         var process = Process;
         if (process is null || _shutdownEvent is null) return;
         try { if (process.HasExited) return; } catch { return; }

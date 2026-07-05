@@ -39,6 +39,18 @@ public static class SatelliteProtocol
     public const string UnloadPluginPrefix = "UNLOADPLUGIN ";
     public const string UnloadedPrefix = "UNLOADED ";
 
+    // Satellite -> host: the downstream stream set this satellite's facade needs (P4). The host fans
+    // only these streams down to it. Comma-separated canonical tokens (see the Stream* constants).
+    public const string SubscribePrefix = "SUBSCRIBE ";
+
+    // Canonical downstream stream tokens. The host maps them to concrete event types; unknown tokens
+    // are ignored. Kept as protocol constants so both ends name the streams identically.
+    public const string StreamSwings = "swings";          // CombatSwing + the encounter lifecycle
+    public const string StreamRawLog = "rawlog";          // the RawLogLine firehose
+    public const string StreamPackets = "packets";        // the RawPacketReceived firehose
+    public const string StreamCombatants = "combatants";  // CombatantAdded/Removed
+    public const string StreamZoneParty = "zoneparty";    // ZoneChanged/PartyChanged/PrimaryPlayerChanged
+
     // ---- satellite -> host handshake frames (formatted on the satellite, parsed on the host) ----
 
     /// <summary>
@@ -158,6 +170,24 @@ public static class SatelliteProtocol
         dllPath = parts[1];
         title = parts[2];
         return key.Length != 0 && dllPath.Length != 0;
+    }
+
+    /// <summary>Format "SUBSCRIBE &lt;token&gt;[,&lt;token&gt;...]" — the satellite's declared downstream stream set.</summary>
+    public static string FormatSubscribe(params string[] streams)
+    {
+        var tokens = new System.Collections.Generic.List<string>(streams.Length);
+        foreach (var s in streams)
+            if (!string.IsNullOrWhiteSpace(s)) tokens.Add(Token(s));
+        return SubscribePrefix + string.Join(",", tokens);
+    }
+
+    public static bool TryParseSubscribe(string? line, out string[] streams)
+    {
+        streams = Array.Empty<string>();
+        if (line == null || !line.StartsWith(SubscribePrefix, StringComparison.Ordinal)) return false;
+        var body = line.Substring(SubscribePrefix.Length).Trim();
+        streams = body.Length == 0 ? Array.Empty<string>() : body.Split(',');
+        return true;
     }
 
     public static bool TryParseUnloadPlugin(string? line, out string key)

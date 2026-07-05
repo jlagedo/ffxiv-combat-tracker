@@ -63,6 +63,7 @@ namespace Fct.Host
         private readonly ILoggerFactory _loggerFactory;
         private readonly ILogger _log;
         private readonly IGameEventSink _sink;
+        private readonly IGameSession? _session;   // downstream fan-out source (P4)
         private readonly INotificationHub? _notifications;
         private readonly ISatelliteNotificationText? _texts;
         private readonly RestartPolicy _policy;
@@ -80,11 +81,13 @@ namespace Fct.Host
             ISatelliteNotificationText? texts = null,
             RestartPolicy? policy = null,
             Func<DateTimeOffset>? now = null,
-            Func<TimeSpan, CancellationToken, Task>? delay = null)
+            Func<TimeSpan, CancellationToken, Task>? delay = null,
+            IGameSession? session = null)
         {
             _loggerFactory = loggerFactory ?? throw new ArgumentNullException(nameof(loggerFactory));
             _log = loggerFactory.CreateLogger("Fct.Satellite.Supervisor");
             _sink = sink ?? throw new ArgumentNullException(nameof(sink));
+            _session = session;
             _notifications = notifications;
             _texts = texts;
             _policy = policy ?? new RestartPolicy();
@@ -114,7 +117,7 @@ namespace Fct.Host
 
         private async Task StartOneAsync(SupervisedSatellite sat, bool isRestart, CancellationToken ct)
         {
-            var host = new SatelliteHost(_loggerFactory, _sink, _notifications, _texts, sat.Id);
+            var host = new SatelliteHost(_loggerFactory, _sink, _notifications, _texts, sat.Id, _session);
             host.ProcessExited += code => OnExited(sat, code);
             sat.Host = host;
             sat.Set(isRestart ? SatelliteState.Restarting : SatelliteState.Starting);

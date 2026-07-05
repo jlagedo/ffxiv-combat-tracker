@@ -186,20 +186,24 @@ the Fct.App per-package spawn + per-satellite UI land with P7.)
 
 ### P4 — Downstream data plane (host → satellite fan-out)
 
-- [ ] `GameEventFrame` flows host→satellite over the existing duplex pipe (same codec, one
-      implementation both directions).
-- [ ] `SUBSCRIBE` control command: a satellite declares the stream set its facade needs
-      (swings/lifecycle, raw log lines, raw packets, combatants, zone/party/player, …).
-- [ ] Per-satellite bounded egress queue + drop-oldest + dropped/sent counters (mirror of the
-      upstream ring) so one stalled satellite never blocks the host bus or its peers.
-- [ ] Snapshot-on-subscribe: the host primes a newly-subscribed satellite from `IGameSnapshot`
-      (current zone/party/player/combatants) so late joiners converge — the same answer ACT
-      gives a plugin enabled mid-session.
-- [ ] Gate (e2e): frame-replay drives the host; two subscribed test satellites receive
-      identical, identically-ordered streams; an unsubscribed stream is not delivered; an
-      artificially-stalled satellite drops alone while peers stay lossless.
+- [x] `GameEventFrame` flows host→satellite over the command pipe (the same codec both
+      directions); the satellite decodes downstream frames (`--sink` mode records them).
+- [x] `SUBSCRIBE` control command: a satellite declares its stream set
+      (`SatelliteProtocol.FormatSubscribe`/`TryParseSubscribe` + canonical `Stream*` tokens);
+      the host maps tokens→`GameEventFilter` via `StreamCatalog` (routes by stream name, never
+      plugin identity — invariant §4).
+- [x] Per-satellite bounded egress queue + drop-oldest + sent/dropped counters (`SatelliteEgress`,
+      the host-side mirror of the upstream `BridgeForwarder` ring) so one stalled satellite never
+      blocks the host bus or its peers.
+- [x] Snapshot-on-subscribe: `SatelliteHost.PrimeSnapshot` seeds a newly-subscribed satellite
+      from `IGameSnapshot` (zone/party/player + combatants) before the live fan-out starts.
+- [x] Gate: in-process router gate (`Fct.App.Tests/SatelliteEgressTests`) — two subscribers get
+      identical, identically-ordered streams; a non-subscriber gets nothing; a stalled satellite
+      drops alone while a fast peer stays lossless. Real downstream e2e over the pipe
+      (`Fct.Integration.Tests/DownstreamFanoutTests`): a `SatelliteHost`-launched sink satellite
+      subscribes and records the frames the host fans down.
 
-**Exit:** the host is a working N-way router with per-consumer isolation and backpressure.
+**Exit:** the host is a working N-way router with per-consumer isolation and backpressure. ✅
 
 ### P5 — Consumer projection (the facade serves reads from host-routed data)
 
