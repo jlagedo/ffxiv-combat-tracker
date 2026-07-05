@@ -16,6 +16,11 @@ namespace Fct.Logging
         // Set by the host on the satellite's environment to hand it the host's resolved root.
         public const string RootEnvVar = "FCT_DATA_ROOT";
 
+        // Overrides InstallDirectory (where the staged satellite\/compat\/plugins\ siblings live).
+        // Used by tests that drive the host runtime out-of-process from the staged app tree, and by any
+        // portable layout that separates the launcher from the staged runtime.
+        public const string InstallDirEnvVar = "FCT_INSTALL_DIR";
+
         // The directory the application was launched from — where its staged sibling folders
         // (satellite\, compat\, plugins\) and, in DEBUG, its data root live. Distinct from
         // AppContext.BaseDirectory: a single-file self-extracting host runs its managed assemblies out
@@ -25,6 +30,8 @@ namespace Fct.Logging
         {
             get
             {
+                var overrideDir = Environment.GetEnvironmentVariable(InstallDirEnvVar);
+                if (!string.IsNullOrWhiteSpace(overrideDir)) return overrideDir;
 #if NET
                 var exe = Environment.ProcessPath;
                 if (!string.IsNullOrEmpty(exe))

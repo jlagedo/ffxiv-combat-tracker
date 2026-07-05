@@ -47,7 +47,15 @@ public sealed class SatelliteHost : Fct.Host.Plugins.ISatellitePluginChannel
     private readonly IGameEventSink _sink;     // decoded EVT frames land on the net10 event bus
     private readonly INotificationHub? _notifications;
     private readonly ISatelliteNotificationText _text;   // localized notification strings (Fct.App-backed)
+    private readonly string _satelliteId;      // host-assigned identity (P3): launch arg + log attribution
     private int _firstEventLogged;
+
+    /// <summary>The host-assigned identity this satellite hosts (P3). "ffxiv" for the single-satellite path.</summary>
+    public string SatelliteId => _satelliteId;
+
+    /// <summary>Raised when the satellite process exits UNEXPECTEDLY (not during a requested shutdown),
+    /// carrying the exit code. The <see cref="SatelliteSupervisor"/> uses it to drive restart/quarantine.</summary>
+    public event Action<int>? ProcessExited;
 
     private NamedPipeServerStream? _server;     // satellite -> host: handshake + forwarded logs
     private NamedPipeServerStream? _cmdServer;  // host -> satellite: load/unload commands
@@ -65,11 +73,15 @@ public sealed class SatelliteHost : Fct.Host.Plugins.ISatellitePluginChannel
         = new(StringComparer.OrdinalIgnoreCase);
 
     internal SatelliteHost(ILoggerFactory loggerFactory, IGameEventSink sink,
-        INotificationHub? notifications = null, ISatelliteNotificationText? texts = null)
+        INotificationHub? notifications = null, ISatelliteNotificationText? texts = null,
+        string satelliteId = "ffxiv")
     {
         _loggerFactory = loggerFactory;
+        _satelliteId = string.IsNullOrWhiteSpace(satelliteId) ? "ffxiv" : satelliteId;
         _log = loggerFactory.CreateLogger<SatelliteHost>();
-        _satelliteLog = loggerFactory.CreateLogger(LogCategories.Satellite);
+        // Forwarded records land under a per-satellite category so N satellites are attributable in the
+        // host log (Fct.Satellite.<id>); the single-satellite path keeps Fct.Satellite.ffxiv.
+        _satelliteLog = loggerFactory.CreateLogger(LogCategories.Satellite + "." + _satelliteId);
         _sink = sink;
         _notifications = notifications;
         _text = texts ?? DefaultSatelliteNotificationText.Instance;
@@ -103,7 +115,7 @@ public sealed class SatelliteHost : Fct.Host.Plugins.ISatellitePluginChannel
         var startInfo = new ProcessStartInfo
         {
             FileName = exe,
-            Arguments = "--bridge " + pipeName,
+            Arguments = "--bridge " + pipeName + " --satellite-id " + _satelliteId,
             UseShellExecute = false,
         };
         // Hand the satellite the host's resolved data root so both processes agree on one location
@@ -127,11 +139,16 @@ public sealed class SatelliteHost : Fct.Host.Plugins.ISatellitePluginChannel
             Process.EnableRaisingEvents = true;
             Process.Exited += (_, _) =>
             {
-                _log.LogWarning(LogEvents.SatelliteExited, "Satellite process {Pid} exited with code {ExitCode}",
-                    SafePid(Process), SafeExitCode(Process));
+                var code = SafeExitCode(Process);
+                _log.LogWarning(LogEvents.SatelliteExited, "Satellite '{Id}' process {Pid} exited with code {ExitCode}",
+                    _satelliteId, SafePid(Process), code);
                 if (!_shuttingDown)
+                {
                     _notifications?.Publish(NotificationSeverity.Warning, _text.SourceClassicEngine,
                         _text.EngineStoppedTitle, _text.EngineStoppedBody);
+                    // Drive supervision (restart/backoff/quarantine) — only for an UNEXPECTED exit.
+                    ProcessExited?.Invoke(code);
+                }
             };
 
             // Tie the satellite to the host's lifetime before it spawns its own children (CEF), so
@@ -178,7 +195,13 @@ public sealed class SatelliteHost : Fct.Host.Plugins.ISatellitePluginChannel
                 else if (SatelliteProtocol.IsReady(line))
                 {
                     result.Handshake = line;
-                    _log.LogInformation(LogEvents.BridgeHandshake, "Satellite handshake: {Handshake}", line);
+                    // Verify the process we connected is the identity we launched (v2 handshake). A v1
+                    // satellite echoes no id ("") and is accepted as-is; a mismatch means crossed pipes.
+                    var echoedId = SatelliteProtocol.ReadySatelliteId(line);
+                    if (echoedId.Length != 0 && !string.Equals(echoedId, _satelliteId, StringComparison.Ordinal))
+                        _log.LogWarning(LogEvents.BridgeHandshake,
+                            "Satellite handshake id '{Echoed}' does not match expected '{Expected}'", echoedId, _satelliteId);
+                    _log.LogInformation(LogEvents.BridgeHandshake, "Satellite '{Id}' handshake: {Handshake}", _satelliteId, line);
                 }
                 else if (line == SatelliteProtocol.PluginsEnd)
                 {

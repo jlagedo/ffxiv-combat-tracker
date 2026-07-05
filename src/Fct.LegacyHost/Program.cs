@@ -38,6 +38,12 @@ namespace Fct.LegacyHost
         [STAThread]
         private static void Main(string[] args)
         {
+            // The host-assigned identity this process hosts (P3): included in the READY handshake and used
+            // for the per-satellite verification-log name. Defaults to "ffxiv" so a dev-standalone / parser
+            // run keeps its historical s2-ffxiv.log artifact.
+            _satelliteId = ParseArgValue(args, "--satellite-id") ?? "ffxiv";
+            _package = ParseArgValue(args, "--package") ?? "";
+
             // Oracle capture mode: replay a log through the real plugin and dump its parse.
             //   --parse-oracle <logPath> <maxLines> <outPath>
             int oi = Array.IndexOf(args, "--parse-oracle");
@@ -114,7 +120,7 @@ namespace Fct.LegacyHost
                 return;
             }
 
-            SatelliteLogging.Initialize();
+            SatelliteLogging.Initialize(_satelliteId);
             _log = SatelliteLogging.Log;
             _log.LogInformation(LogEvents.SatelliteBooting,
                 "Satellite starting (pid {Pid}, x64 {X64}, clr {Clr})",
@@ -167,7 +173,7 @@ namespace Fct.LegacyHost
         // the UI thread), drives from a one-shot timer tick, then drains the forwarder and exits.
         private static void RunReplayBridge(string logPath, int maxLines, string pipeName)
         {
-            SatelliteLogging.Initialize();
+            SatelliteLogging.Initialize(_satelliteId);
             _log = SatelliteLogging.Log;
             FacadeHost.Log = SatelliteLogging.WriteLegacy;
             _log.LogInformation(LogEvents.SatelliteBooting,
@@ -220,7 +226,7 @@ namespace Fct.LegacyHost
         // without a game or the FFXIV_ACT_Plugin.
         private static void RunReplayFrames(string fixturePath, string pipeName)
         {
-            SatelliteLogging.Initialize();
+            SatelliteLogging.Initialize(_satelliteId);
             _log = SatelliteLogging.Log;
             _log.LogInformation(LogEvents.SatelliteBooting,
                 "Replay-frames: fixture={Fixture} pipe={Pipe}", fixturePath, pipeName);
@@ -533,6 +539,19 @@ namespace Fct.LegacyHost
             return null;
         }
 
+        // The host-assigned satellite identity + hosted package (P3). Set once in Main from --satellite-id
+        // / --package; read by ConnectBridge (handshake) and the logging init (verification-log name).
+        private static string _satelliteId = "ffxiv";
+        private static string _package = "";
+
+        private static string ParseArgValue(string[] args, string name)
+        {
+            for (int i = 0; i < args.Length - 1; i++)
+                if (args[i] == name)
+                    return args[i + 1];
+            return null;
+        }
+
         private static void ConnectBridge(string pipeName)
         {
             try
@@ -542,7 +561,8 @@ namespace Fct.LegacyHost
                 _writer = new StreamWriter(_bridge) { AutoFlush = true };
                 SendLine(SatelliteProtocol.FormatReady(
                     System.Diagnostics.Process.GetCurrentProcess().Id,
-                    Environment.Is64BitProcess, Environment.Version.ToString()));
+                    Environment.Is64BitProcess, Environment.Version.ToString(),
+                    _satelliteId, _package));
                 // The pipe is up: start forwarding log records to the host's pipeline.
                 BridgeLogSink.Sender = SendLine;
                 // Wait on the host's cross-process graceful-shutdown signal (best effort).

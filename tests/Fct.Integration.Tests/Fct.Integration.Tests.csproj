@@ -22,6 +22,8 @@
          through the real host engine, asserting parity with the satellite's own captured totals. -->
     <ProjectReference Include="..\..\src\Fct.Engine\Fct.Engine.csproj" />
     <ProjectReference Include="..\..\src\Fct.Abstractions.Testing\Fct.Abstractions.Testing.csproj" />
+    <!-- The P3 multi-satellite gate drives the internal SatelliteSupervisor (InternalsVisibleTo). -->
+    <ProjectReference Include="..\..\src\Fct.Host\Fct.Host.csproj" />
   </ItemGroup>
 
 </Project>

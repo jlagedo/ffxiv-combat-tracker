@@ -24,6 +24,11 @@ public readonly struct PluginLine
 // satellite) so both ends share one implementation and it can be unit-tested.
 public static class SatelliteProtocol
 {
+    // Wire-protocol version (distinct from the CLR runtime version in the READY `clr` field). v2 adds
+    // the satellite identity + hosted package to the handshake so the host can attribute N concurrent
+    // satellites. Bumped whenever the frame grammar changes; both ends live in this one file.
+    public const int ProtocolVersion = 2;
+
     public const string ReadyPrefix = "READY";
     public const string HwndPrefix = "HWND ";
     public const string PluginPrefix = "PLUGIN ";
@@ -36,9 +41,18 @@ public static class SatelliteProtocol
 
     // ---- satellite -> host handshake frames (formatted on the satellite, parsed on the host) ----
 
-    /// <summary>Format "READY pid=&lt;n&gt; x64=&lt;bool&gt; clr=&lt;version&gt;".</summary>
+    /// <summary>
+    /// Format the v2 handshake "READY pid=&lt;n&gt; x64=&lt;bool&gt; clr=&lt;version&gt; proto=&lt;v&gt; id=&lt;satId&gt; pkg=&lt;package&gt;".
+    /// The v1 fields lead, so the substring checks (<see cref="IsReady"/>/<see cref="IsReady64"/>) and any
+    /// older reader still work; the id/package are host-assigned so the host verifies the satellite it
+    /// connected is the one it launched.
+    /// </summary>
+    public static string FormatReady(int pid, bool x64, string clr, string satelliteId, string package)
+        => ReadyPrefix + $" pid={pid} x64={x64} clr={clr} proto={ProtocolVersion} id={Token(satelliteId)} pkg={Token(package)}";
+
+    /// <summary>v1-shape overload (no assigned identity): the dev-standalone / parser default.</summary>
     public static string FormatReady(int pid, bool x64, string clr)
-        => ReadyPrefix + $" pid={pid} x64={x64} clr={clr}";
+        => FormatReady(pid, x64, clr, "", "");
 
     /// <summary>Format "HWND &lt;hex&gt;" for an embeddable window handle.</summary>
     public static string FormatHwnd(IntPtr handle)
@@ -55,6 +69,34 @@ public static class SatelliteProtocol
     // demands a 64-bit process).
     public static bool IsReady64(string? line) =>
         IsReady(line) && line!.IndexOf("x64=True", StringComparison.OrdinalIgnoreCase) >= 0;
+
+    // Read a "key=value" field from a READY line (v2 handshake). Returns false for a v1 line lacking it.
+    public static bool TryGetReadyField(string? line, string key, out string value)
+    {
+        value = "";
+        if (!IsReady(line)) return false;
+        foreach (var tok in line!.Split(' '))
+        {
+            if (tok.StartsWith(key + "=", StringComparison.Ordinal))
+            {
+                value = tok.Substring(key.Length + 1);
+                return true;
+            }
+        }
+        return false;
+    }
+
+    /// <summary>The host-assigned satellite id the READY line echoes ("" for a v1/identity-less satellite).</summary>
+    public static string ReadySatelliteId(string? line) =>
+        TryGetReadyField(line, "id", out var v) ? v : "";
+
+    /// <summary>The hosted-package name the READY line echoes ("" when none).</summary>
+    public static string ReadyPackage(string? line) =>
+        TryGetReadyField(line, "pkg", out var v) ? v : "";
+
+    /// <summary>The wire-protocol version the READY line reports (1 when absent — a pre-v2 satellite).</summary>
+    public static int ReadyProtocol(string? line) =>
+        TryGetReadyField(line, "proto", out var v) && int.TryParse(v, NumberStyles.Integer, CultureInfo.InvariantCulture, out var n) ? n : 1;
 
     // Parse "HWND <hex>" into a window handle. Returns false for any other line or a
     // malformed/zero handle.
@@ -137,4 +179,15 @@ public static class SatelliteProtocol
     }
 
     private static string San(string? value) => (value ?? "").Replace('|', '/');
+
+    // A space-delimited READY field must contain no whitespace or '|'. Satellite ids/packages are simple
+    // identifiers by convention; sanitize defensively so a stray character can't split the handshake.
+    private static string Token(string? value)
+    {
+        if (string.IsNullOrEmpty(value)) return "";
+        var chars = value!.ToCharArray();
+        for (int i = 0; i < chars.Length; i++)
+            if (char.IsWhiteSpace(chars[i]) || chars[i] == '|') chars[i] = '_';
+        return new string(chars);
+    }
 }

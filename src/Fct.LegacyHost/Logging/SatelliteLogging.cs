@@ -29,12 +29,15 @@ namespace Fct.LegacyHost.Logging
         public static ILogger CreateLogger(string category) =>
             _factory != null ? _factory.CreateLogger(category) : NullLogger.Instance;
 
-        public static void Initialize()
+        public static void Initialize(string satelliteId = "ffxiv")
         {
             var logsDir = LogPaths.EnsureLogsDirectory();
 
-            // Fresh verification artifact each run (the old s2-ffxiv.log reset behavior).
-            var verificationLog = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "s2-ffxiv.log");
+            // Per-satellite verification artifact next to the exe (P3): N satellites share the staged dir,
+            // so the flat log is keyed by identity. Defaults to s2-ffxiv.log (the historical name the
+            // integration tests read for the parser satellite). Fresh each run.
+            var id = string.IsNullOrWhiteSpace(satelliteId) ? "ffxiv" : satelliteId;
+            var verificationLog = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "s2-" + id + ".log");
             try { File.Delete(verificationLog); } catch { }
 
             var serilog = new LoggerConfiguration()

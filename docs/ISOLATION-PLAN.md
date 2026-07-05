@@ -159,20 +159,30 @@ input; divergence fails CI. ✅
 
 ### P3 — Multi-satellite process fabric
 
-- [ ] Handshake v2: satellite identity + hosted-package manifest in `SatelliteProtocol`
-      (protocol version bump; both ends in `Fct.Bridge.Contracts`).
-- [ ] Host: N concurrent `SatelliteHost` instances — per-satellite pipe names, log category
-      attribution, lifecycle supervision (exit detection, restart with backoff,
-      quarantine on crash-loop), per-satellite embedded UI view in the shell.
-- [ ] Satellite: single-package hosting (`--satellite-id`, one package per process);
-      `LOADPLUGIN` and all commands target one satellite.
-- [ ] `Fct.App`: spawns one satellite per installed legacy package (catalog-driven — an App
-      concern, not host routing).
-- [ ] Gate (e2e, no plugins): host launches three empty satellites with distinct identities;
-      killing one leaves the others' pipes live and the host healthy; the dead one restarts
-      and re-handshakes; logs are attributed per satellite.
+- [x] Handshake v2: satellite identity + hosted package in `SatelliteProtocol` (`proto`/`id`/
+      `pkg` appended to `READY`, `ProtocolVersion=2`, `ReadySatelliteId`/`ReadyPackage`/
+      `ReadyProtocol` parsers; both ends). The satellite takes `--satellite-id`/`--package`;
+      the host verifies the echoed id.
+- [x] Host: N concurrent `SatelliteHost` instances via `SatelliteSupervisor` — per-satellite
+      pipe names (already GUID-unique), per-id log category (`Fct.Satellite.<id>`), lifecycle
+      supervision: exit detection (`SatelliteHost.ProcessExited`), restart with exponential
+      backoff + crash-loop quarantine (`RestartPolicy`, unit-tested). *Per-satellite embedded
+      UI view deferred to the Fct.App migration (a UX concern that does not gate the data plane
+      — open question §5).*
+- [x] Satellite: single-package hosting (`--satellite-id`, one process per identity); the
+      per-satellite verification artifact is now identity-keyed (`s2-<id>.log`). *Rejecting a
+      second package on one process is enforced at P7 when the packages actually split.*
+- [ ] `Fct.App`: spawns one satellite per installed legacy package (catalog-driven). *Deferred
+      to P7 — the App still runs one satellite until the packages are split; the supervisor it
+      will drive is in place. `AppData` gained an `FCT_INSTALL_DIR` override so the host runtime
+      can be driven from a staged tree.*
+- [x] Gate (e2e, no plugins): `Fct.Integration.Tests/SatelliteSupervisorTests` launches three
+      empty satellites with distinct identities; killing one leaves the others' processes live
+      and the host healthy; the dead one restarts and re-handshakes with the same id + a new
+      pid; each writes its own `s2-<id>.log`.
 
-**Exit:** process-per-package fabric with crash isolation, supervised, observable.
+**Exit:** process-per-package fabric with crash isolation, supervised, observable. ✅ (data plane;
+the Fct.App per-package spawn + per-satellite UI land with P7.)
 
 ### P4 — Downstream data plane (host → satellite fan-out)
 
