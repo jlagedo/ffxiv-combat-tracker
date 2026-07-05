@@ -1,0 +1,18 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!--
+    Tests for the modern encounter engine: the full CombatSwing/lifecycle event path through
+    ModernEncounterEngine → EncounterLifecycle → projected IEncounterService snapshot, driven over the
+    in-memory event bus fake. Aggregation math itself is held bit-exact vs real ACT by
+    Fct.Compat.Shim.Tests/ExportVariablesTests; here we prove the event mapping + lifecycle + projection.
+  -->
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\..\src\Fct.Engine\Fct.Engine.csproj" />
+    <ProjectReference Include="..\..\src\Fct.Abstractions.Testing\Fct.Abstractions.Testing.csproj" />
+  </ItemGroup>
+
+</Project>

@@ -2,6 +2,15 @@
 
 Automated tests live under `tests/`. Run everything with:
 
+> **The parity model has two axes.** Axis 1 — **oracle parity**: our `Fct.Aggregation` engine equals
+> the real ACT binary fed identical plugin swings, bit-for-bit (mass-compare + differential compat,
+> below). Axis 2 — **replica parity**: every engine instance (the host's `Fct.Engine` authority, each
+> satellite's replica, the shim's) produces identical output from the identical routed stream — the
+> same `Fct.Aggregation` binary held to the same oracle fixtures on every runtime. The isolation
+> build-out adds a per-phase e2e gate on top (replay-driven, headless, real satellite processes fed
+> recorded streams — no live game in CI): the gates live in
+> [`ISOLATION-PLAN.md`](ISOLATION-PLAN.md) §4 and land in these suites as their phases land.
+
 ```powershell
 ./test.ps1                 # Debug; builds + stages the satellite, then runs all suites
 ./test.ps1 -Configuration Release
@@ -18,6 +27,7 @@ Or run a single project directly with `dotnet test tests/<project>`.
 | `Fct.Compat.Act.Tests` | net48 | The from-scratch ACT aggregation engine: `Dnum`, `MasterSwing`, `AttackType`/`CombatantData`/`EncounterData` math, the `ExportVariables` contract OverlayPlugin/cactbot read, `SettingsSerializer` XML round-trip, and the **differential ACT-engine compat** (`AggregateCompatTests`, below). |
 | `Fct.Parser.Legacy.Tests` | net48 | The parser interposition: `RingBufferDataSubscription` (bounded ring, single dispatch thread, `IRawPacketSource`) against a fake data subscription. |
 | `Fct.App.Tests` | net10 | The headless `Fct.Host` runtime: the bus/registry/audio/snapshot services, the ALC plugin loader (manifest gate, classifier, installer, unload, static-graph guard), `RawPacketSource`, `ProcessJob`, the UI-token contract, and the bridge handshake/event-frame codecs (`SatelliteProtocol`, `BridgeEventFrame`). |
+| `Fct.Engine.Tests` | net10 | The modern host-side engine (`Fct.Engine`): `ModernEncounterEngine` fed swings/lifecycle through an in-memory bus, projection snapshots, idle auto-end, explicit end-combat. |
 | `Fct.FlowTests` | net10 | The headless legacy↔native contract suite on the `Fct.Abstractions.Testing` fakes (encounter/snapshot/raw-packet/audio flows); no satellite/CEF/live game. |
 | `Fct.Compat.Shim.Tests` | net10-windows | The net10 compat shim: identity, `LegacyPluginHost` lifecycle, the `IDataSubscription`/`IDataRepository`/`Combatant` projection, the encounter driver, and cross-TFM `ExportVariables` parity. |
 | `Fct.Compat.Shim.E2E.Tests` | net10-windows | The shim-free load path: `CompatRuntime` resolving the staged `compat\` package into the default ALC end-to-end. |

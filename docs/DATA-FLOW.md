@@ -1,10 +1,15 @@
-# Stack Data Flow & Compat Contract — the goal
+# Stack Data Flow & Compat Contract — the legacy contract we reproduce
 
-**This is the target.** Everything in `Fct.LegacyHost` / `Fct.Compat.Act` exists to make the
-real legacy stack — `FFXIV_ACT_Plugin` + ACT + OverlayPlugin + cactbot + Triggernometry +
-Discord triggers — run **unmodified**. This document is the authoritative map of how data
-flows through the real upstream stack today, and the exact integration seams we must
-reproduce so the unmodified plugins "just work."
+**This documents the upstream legacy stack, not our target topology.** It is the
+authoritative map of how data flows through the real upstream stack today — one shared
+process, plugins reaching each other through `ActGlobals` — and the exact integration seams
+`Fct.LegacyHost` / `Fct.Compat.Act` must reproduce so the unmodified plugins "just work."
+**Our topology is different by design:** each plugin package runs in its own satellite, and
+every seam below is reproduced *inside that satellite's facade*, backed by host-routed
+streams — the seam's shape is legacy, its data always crosses through the host. Aggregation
+truth lives in the host's `Fct.Engine`; each satellite's engine is a parity-gated replica.
+Topology, invariants, and mapping: [`ARCHITECTURE.md`](ARCHITECTURE.md) §3c/§5 +
+[`ISOLATION-PLAN.md`](ISOLATION-PLAN.md); §8 below maps each seam onto its host pipe.
 
 It is reconstructed from the real sources (two separate decompiles — do not conflate):
 
@@ -31,9 +36,11 @@ ACT consumes the log lines and aggregates them into encounters/DPS. OverlayPlugi
 from **both** plugin channels *and* from ACT's aggregated output — it reflects *through* ACT
 to reach the plugin's SDK directly, and reads ACT's `EncounterData.ExportVariables` for DPS.
 
-Our job: **host the real `FFXIV_ACT_Plugin` unmodified (it owns the two channels for free),
-and build a from-scratch ACT (`Fct.Compat.Act`) whose shape matches exactly what OverlayPlugin
-and the other plugins reflect against.**
+That one-heap arrangement is the **upstream reality**, not ours. Our job: **host the real
+`FFXIV_ACT_Plugin` unmodified (it owns the two channels for free), and build a from-scratch
+ACT (`Fct.Compat.Act`) whose shape matches exactly what OverlayPlugin and the other plugins
+reflect against** — instantiated **once per satellite**, with the data behind every shape
+arriving over the host's routed streams instead of a shared heap (§8).
 
 ---
 
@@ -229,7 +236,7 @@ public interface IDataRepository {
 
 ---
 
-## 3. Leg 2 — ACT aggregates into encounters (we build: the `Fct.Aggregation` engine, hosted by the `Fct.Compat.Act` facade)
+## 3. Leg 2 — ACT aggregates into encounters (we build: the `Fct.Aggregation` engine — authority in the host's `Fct.Engine`, a parity-gated replica behind each satellite's `Fct.Compat.Act` facade)
 
 ACT loaded the plugin via `IActPluginV1.InitPlugin(TabPage, Label)` and recorded it in
 `ActGlobals.oFormActMain.ActPlugins`. When log lines arrive, `FormActMain` runs the
@@ -407,8 +414,9 @@ Emitted as the `CombatData` event:
   "isActive":   "true" }
 ```
 
-So the DPS overlay consumes **ACT's** `ExportVariables` output — i.e. *our* `Fct.Compat.Act`
-output — not the plugin directly. This is why the full ExportVariables key set must match.
+So the DPS overlay consumes **ACT's** `ExportVariables` output — i.e. *our* engine output
+(the replica in OverlayPlugin's own satellite, replaying the host-routed swing stream) — not
+the plugin directly. This is why the full ExportVariables key set must match.
 
 Before each push MiniParse checks `ActGlobals.oFormImportProgress?.Visible` (`:189`) to skip
 updates during a log import — the field must exist on our `ActGlobals` (nullable is fine).
@@ -463,10 +471,14 @@ lines 256+ (MapEffect 257, CEDirector 259, InCombat 260, …) are silent if this
 | OverlayPlugin WS server + cactbot + Triggernometry + Discord | **inherit** | hosted unmodified; they self-host on the surfaces above |
 | assembly identity (`Advanced Combat Tracker` token a946…) | **build** | facade strong-name + `AssemblyResolve` |
 
-Everything in the "build" rows runs on the **net48** side (`Fct.LegacyHost` / `Fct.Compat.Act`),
-co-located with the real plugins; the aggregation binary itself is `Fct.Aggregation`
-(multi-targeted, referenced there). Only *data* crosses the bridge to the net10 host. See
-`docs/ARCHITECTURE.md` §3b–§4 for the runtime split rationale.
+The "build" rows are the **facade surface**, instantiated inside each net48 satellite
+(`Fct.LegacyHost` / `Fct.Compat.Act`) next to the one plugin it hosts. The **calculation
+authority is the net10 host**: the parser satellite forwards the full pre-aggregation
+`MasterSwing` stream + encounter lifecycle over the bridge, `Fct.Engine` aggregates it as
+the single source of truth, and each consumer satellite's facade replays the same routed
+stream through its `Fct.Aggregation` replica (the identical multi-targeted binary,
+parity-gated) to serve the plugin's synchronous reads. See `docs/ARCHITECTURE.md` §3b–§4
+for the runtime split and `docs/ISOLATION-PLAN.md` for the invariants.
 
 ---
 
@@ -503,3 +515,25 @@ aggregation engine. Where IINACT reaches into plugin internals (e.g. reading
 **we cannot** — our unmodified-drop-in directive means we bind only against the documented
 SDK + the reflected ACT shape above. Full comparison context: this is the same stack, hosted
 two different ways.
+
+---
+
+## 8. Seam → host pipe (how each upstream coupling is routed in the isolated topology)
+
+Upstream, every seam above is a shared-heap shortcut. In our topology each one is a
+**host-routed pipe** projected back into legacy shape by the facade inside the consuming
+satellite (phases: [`ISOLATION-PLAN.md`](ISOLATION-PLAN.md)):
+
+| Upstream coupling (this doc) | Producer side | Host pipe | Consumer-satellite projection |
+|---|---|---|---|
+| log-line events (§2.3A, §4.2) | parser facade tap → `RawLogLine` frames | typed bus fan-out | `Before/OnLogLineRead` re-raised; stand-in `IDataSubscription.LogLine` |
+| `MasterSwing` → encounters → `ExportVariables` (§3) | parser facade tap → `CombatSwing` + lifecycle frames | `Fct.Engine` (the truth) + fanned swing stream | local `Fct.Aggregation` replica → synchronous `ActiveZone.ActiveEncounter` reads (§4.3) |
+| SDK discovery by reflection (§4.1) | — | — | synthetic parser stand-in in `ActPlugins` (exact title/status/property shape) |
+| `IDataRepository` polls (§2.3B) | parser satellite publishes fixed-rate repository snapshots + dictionaries + PID | snapshot stream (+ `IGameSnapshot` priming) | local mirror answers `Get*` synchronously |
+| raw packets / `RegisterNetworkParser` (§4.4) | parser facade tap → `RawPacketReceived` frames | raw-packet fan-out (opt-in) | stand-in `NetworkReceived`/`NetworkSent` |
+| custom lines 256+ via `_iocContainer`/`ILogOutput` (§4.4) | consumer facade routes `WriteLine` to the host | `IRawLogLineEmitter` write-back → fanned to all log-line subscribers (incl. origin) | stand-in `_iocContainer` seam |
+| TTS / `PlaySound`, `PlayTtsMethod` hijack (§3.3) | any facade → audio frames | `IAudioOutput` routing; delegate-slot assignment registers a terminal sink | facade slots invoke the hijacker's delegate in its own satellite |
+| named callbacks (Triggernometry) | facade register/invoke | `IPluginRegistry` over the control channel | facade re-exposes ACT's callback surface |
+
+The WebSocket seam (§4.5) needs no pipe: OverlayPlugin's Fleck server is already
+cross-process by nature — cactbot and other WS consumers connect to its satellite unchanged.

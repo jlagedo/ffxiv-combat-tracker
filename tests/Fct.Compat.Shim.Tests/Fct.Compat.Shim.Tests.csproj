@@ -13,6 +13,7 @@
   <ItemGroup>
     <ProjectReference Include="..\..\src\Fct.Abstractions\Fct.Abstractions.csproj" />
     <ProjectReference Include="..\..\src\Fct.Abstractions.Testing\Fct.Abstractions.Testing.csproj" />
+    <ProjectReference Include="..\..\src\Fct.Engine\Fct.Engine.csproj" />
     <ProjectReference Include="..\..\src\Fct.Compat.Shim\Fct.Compat.Shim.csproj" />
     <ProjectReference Include="..\..\src\Fct.Compat.Shim.ActFacade\Fct.Compat.Shim.ActFacade.csproj" />
     <ProjectReference Include="..\..\src\Fct.Compat.Shim.SdkFacade\Fct.Compat.Shim.SdkFacade.csproj" />

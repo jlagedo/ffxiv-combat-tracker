@@ -24,6 +24,7 @@
     <ProjectReference Include="..\Fct.Abstractions\Fct.Abstractions.csproj" />
     <ProjectReference Include="..\Fct.Abstractions.UI\Fct.Abstractions.UI.csproj" />
     <ProjectReference Include="..\Fct.Bridge.Contracts\Fct.Bridge.Contracts.csproj" />
+    <ProjectReference Include="..\Fct.Engine\Fct.Engine.csproj" />
     <ProjectReference Include="..\Fct.Logging.Contracts\Fct.Logging.Contracts.csproj" />
   </ItemGroup>
 

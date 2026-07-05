@@ -19,12 +19,14 @@ namespace Fct.Bridge
     // IGameEventSink.NextSequence() so the bus keeps one coherent per-session sequence space. TryParse
     // therefore yields records with Sequence == 0.
     //
-    // Only the events the satellite SDK/ACT hub structurally exposes are representable here (RawLogLine,
+    // The events the satellite SDK/ACT hub structurally exposes are representable here (RawLogLine,
     // ZoneChanged, PartyChanged, PrimaryPlayerChanged, CombatantAdded/Removed, ActionEffect, and the
-    // RawPacketReceived firehose — raw bytes, never decoded on this side). The plugin is the sole parser,
-    // so events that exist only as parsed log-line fields (StatusApplied/Removed, Cast*, DeathOccurred,
-    // HpUpdated) are not synthesized here — consumers reach them through the RawLogLine firehose. ToWire
-    // returns null for any unsupported record.
+    // RawPacketReceived firehose — raw bytes, never decoded on this side), plus the full-fidelity
+    // aggregation feed the modern engine consumes: CombatSwing (every MasterSwing field + Tags) and the
+    // encounter-lifecycle requests (SetEncounterRequested, ZoneChangeRequested, EndCombatRequested). The
+    // plugin is the sole parser, so events that exist only as parsed log-line fields (StatusApplied/
+    // Removed, Cast*, DeathOccurred, HpUpdated) are not synthesized here — consumers reach them through
+    // the RawLogLine firehose. ToWire returns null for any unsupported record.
     public static class GameEventFrame
     {
         public const string Prefix = "EVT ";
@@ -37,6 +39,10 @@ namespace Fct.Bridge
         private const string TagCombatantRemoved = "CBDEL";
         private const string TagAction = "ACT";
         private const string TagPacket = "PKT";
+        private const string TagSwing = "SWING";
+        private const string TagSetEnc = "SETENC";
+        private const string TagZoneChange = "ZCHG";
+        private const string TagEndCombat = "ENDC";
 
         private static readonly CultureInfo Inv = CultureInfo.InvariantCulture;
 
@@ -74,6 +80,20 @@ namespace Fct.Bridge
 
                 case ActionEffect e:
                     return Head(TagAction, e.Timestamp) + '\t' + EncodeAction(e);
+
+                case CombatSwing e:
+                    return Head(TagSwing, e.Timestamp) + '\t' + EncodeSwing(e);
+
+                case SetEncounterRequested e:
+                    return Head(TagSetEnc, e.Timestamp)
+                        + '\t' + Enc(e.Attacker)
+                        + '\t' + Enc(e.Victim);
+
+                case ZoneChangeRequested e:
+                    return Head(TagZoneChange, e.Timestamp) + '\t' + Enc(e.ZoneName);
+
+                case EndCombatRequested e:
+                    return Head(TagEndCombat, e.Timestamp) + '\t' + (e.Export ? '1' : '0');
 
                 case RawPacketReceived e:
                     // Bytes are base64 — the tab/backslash escaping (Enc) cannot carry arbitrary binary.
@@ -132,6 +152,24 @@ namespace Fct.Bridge
 
                 case TagAction:
                     return TryDecodeAction(ts, f, out evt);
+
+                case TagSwing:
+                    return TryDecodeSwing(ts, f, out evt);
+
+                case TagSetEnc:
+                    if (f.Length < 4) return false;
+                    evt = new SetEncounterRequested(0, ts, Dec(f[2]), Dec(f[3]));
+                    return true;
+
+                case TagZoneChange:
+                    if (f.Length < 3) return false;
+                    evt = new ZoneChangeRequested(0, ts, Dec(f[2]));
+                    return true;
+
+                case TagEndCombat:
+                    if (f.Length < 3) return false;
+                    evt = new EndCombatRequested(0, ts, f[2] == "1");
+                    return true;
 
                 case TagPacket:
                     return TryDecodePacket(ts, f, out evt);
@@ -266,6 +304,95 @@ namespace Fct.Bridge
             evt = new ActionEffect(0, ts, new ActorRef(srcId, srcName), actionId, actionName, targets);
             return true;
         }
+
+        // ---- CombatSwing (a full-fidelity MasterSwing) — 9 scalars + a type-tagged Tags dict. ----
+        // Tags encode as a count-prefixed run of (key, typechar, value) triples; typechar preserves the
+        // boxed CLR identity the producer set: 's' string, 'd' double, 'u' uint. An unknown typechar
+        // decodes as string (forward-compatible with tags a newer producer adds).
+
+        private static readonly IReadOnlyDictionary<string, object> EmptyTags = new Dictionary<string, object>();
+
+        private static string EncodeSwing(CombatSwing e)
+        {
+            var sb = new StringBuilder(160);
+            sb.Append(e.SwingType.ToString(Inv));
+            sb.Append('\t').Append(e.Critical ? '1' : '0');
+            sb.Append('\t').Append(Enc(e.Special));
+            sb.Append('\t').Append(e.Damage.ToString(Inv));
+            sb.Append('\t').Append(e.TimeSorter.ToString(Inv));
+            sb.Append('\t').Append(Enc(e.AttackType));
+            sb.Append('\t').Append(Enc(e.Attacker));
+            sb.Append('\t').Append(Enc(e.DamageType));
+            sb.Append('\t').Append(Enc(e.Victim));
+            sb.Append('\t').Append(e.Tags.Count.ToString(Inv));
+            foreach (var kv in e.Tags)
+            {
+                sb.Append('\t').Append(Enc(kv.Key));
+                sb.Append('\t').Append(TagType(kv.Value));
+                sb.Append('\t').Append(Enc(TagValue(kv.Value)));
+            }
+            return sb.ToString();
+        }
+
+        private static bool TryDecodeSwing(DateTimeOffset ts, string[] f, out GameEvent? evt)
+        {
+            evt = null;
+            // 2 header + 10 fixed (swingType, crit, special, damage, timeSorter, attackType, attacker,
+            // damageType, victim, tagCount).
+            if (f.Length < 12) return false;
+            int i = 2;
+            if (!TryI(f[i++], out var swingType)) return false;
+            var crit = f[i++] == "1";
+            var special = Dec(f[i++]);
+            if (!TryL(f[i++], out var damage)) return false;
+            if (!TryI(f[i++], out var timeSorter)) return false;
+            var attackType = Dec(f[i++]);
+            var attacker = Dec(f[i++]);
+            var damageType = Dec(f[i++]);
+            var victim = Dec(f[i++]);
+            if (!TryI(f[i++], out var tagCount) || tagCount < 0) return false;
+            if (f.Length < i + tagCount * 3) return false;
+
+            IReadOnlyDictionary<string, object> tags;
+            if (tagCount == 0) tags = EmptyTags;
+            else
+            {
+                var d = new Dictionary<string, object>(tagCount);
+                for (int t = 0; t < tagCount; t++)
+                {
+                    var key = Dec(f[i++]);
+                    var typ = f[i++];
+                    var raw = Dec(f[i++]);
+                    d[key] = DecodeTagValue(typ, raw);
+                }
+                tags = d;
+            }
+            evt = new CombatSwing(0, ts, swingType, crit, special, damage, timeSorter,
+                attackType, attacker, damageType, victim, tags);
+            return true;
+        }
+
+        private static char TagType(object? v) => v switch
+        {
+            double => 'd',
+            uint => 'u',
+            _ => 's',
+        };
+
+        private static string TagValue(object? v) => v switch
+        {
+            double d => d.ToString("G17", Inv),
+            uint u => u.ToString(Inv),
+            null => "",
+            _ => v.ToString() ?? "",
+        };
+
+        private static object DecodeTagValue(string typ, string raw) => typ switch
+        {
+            "d" => double.TryParse(raw, NumberStyles.Float, Inv, out var d) ? d : (object)raw,
+            "u" => uint.TryParse(raw, NumberStyles.Integer, Inv, out var u) ? u : (object)raw,
+            _ => raw,
+        };
 
         // ---- RawPacketReceived (the NetworkReceived/Sent firehose) — bytes carried as base64. ----
 

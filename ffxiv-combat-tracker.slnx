@@ -12,6 +12,7 @@
     <Project Path="src/Fct.Compat.Shim/Fct.Compat.Shim.csproj" />
     <Project Path="src/Fct.Compat.Shim.ActFacade/Fct.Compat.Shim.ActFacade.csproj" />
     <Project Path="src/Fct.Compat.Shim.SdkFacade/Fct.Compat.Shim.SdkFacade.csproj" />
+    <Project Path="src/Fct.Engine/Fct.Engine.csproj" />
     <Project Path="src/Fct.Host/Fct.Host.csproj" />
     <Project Path="src/Fct.Parser.Legacy/Fct.Parser.Legacy.csproj" />
     <Project Path="src/Fct.StreamProbe/Fct.StreamProbe.csproj" />
@@ -24,6 +25,7 @@
     <Project Path="tests/Fct.Compat.Act.Tests/Fct.Compat.Act.Tests.csproj" />
     <Project Path="tests/Fct.Compat.Shim.Tests/Fct.Compat.Shim.Tests.csproj" />
     <Project Path="tests/Fct.Compat.Shim.E2E.Tests/Fct.Compat.Shim.E2E.Tests.csproj" />
+    <Project Path="tests/Fct.Engine.Tests/Fct.Engine.Tests.csproj" />
     <Project Path="tests/Fct.App.Tests/Fct.App.Tests.csproj" />
     <Project Path="tests/Fct.FlowTests/Fct.FlowTests.csproj" />
     <Project Path="tests/Fct.Integration.Tests/Fct.Integration.Tests.csproj" />

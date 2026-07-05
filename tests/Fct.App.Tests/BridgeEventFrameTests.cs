@@ -152,6 +152,64 @@ namespace Fct.App.Tests
         }
 
         [Fact]
+        public void CombatSwing_roundtrips_all_scalars_and_typed_tags()
+        {
+            var tags = new Dictionary<string, object>
+            {
+                ["Job"] = "WAR",                 // string
+                ["potency"] = 1.2345678901234567, // boxed double — must keep full precision
+                ["dotbase"] = 4200u,             // boxed uint
+                ["Status\tEffects"] = "a\\b",    // escaped key + value
+            };
+            var src = new CombatSwing(1, Ts,
+                SwingType: 3, Critical: true, Special: "DamageShield", Damage: -10 /*Death sentinel*/,
+                TimeSorter: 987654, AttackType: "Attack\tName", Attacker: "Player One",
+                DamageType: "Magic (Fire)", Victim: "Striking\\Dummy", Tags: tags);
+
+            var e = Assert.IsType<CombatSwing>(RoundTrip(src));
+            Assert.Equal(3, e.SwingType);
+            Assert.True(e.Critical);
+            Assert.Equal("DamageShield", e.Special);
+            Assert.Equal(-10L, e.Damage);
+            Assert.Equal(987654, e.TimeSorter);
+            Assert.Equal("Attack\tName", e.AttackType);
+            Assert.Equal("Player One", e.Attacker);
+            Assert.Equal("Magic (Fire)", e.DamageType);
+            Assert.Equal("Striking\\Dummy", e.Victim);
+            Assert.Equal(4, e.Tags.Count);
+            Assert.Equal("WAR", Assert.IsType<string>(e.Tags["Job"]));
+            Assert.Equal(1.2345678901234567, Assert.IsType<double>(e.Tags["potency"]));
+            Assert.Equal(4200u, Assert.IsType<uint>(e.Tags["dotbase"]));
+            Assert.Equal("a\\b", e.Tags["Status\tEffects"]);
+        }
+
+        [Fact]
+        public void CombatSwing_roundtrips_empty_tags()
+        {
+            var src = new CombatSwing(1, Ts, 2, false, "none", 1234, 1, "Skill", "Me", "", "Dummy",
+                new Dictionary<string, object>());
+            var e = Assert.IsType<CombatSwing>(RoundTrip(src));
+            Assert.Empty(e.Tags);
+            Assert.Equal(1234L, e.Damage);
+            Assert.Equal("", e.DamageType);
+        }
+
+        [Fact]
+        public void EncounterLifecycle_requests_roundtrip()
+        {
+            var se = Assert.IsType<SetEncounterRequested>(RoundTrip(new SetEncounterRequested(1, Ts, "Me\tSelf", "Boss")));
+            Assert.Equal("Me\tSelf", se.Attacker);
+            Assert.Equal("Boss", se.Victim);
+
+            var zc = Assert.IsType<ZoneChangeRequested>(RoundTrip(new ZoneChangeRequested(1, Ts, "The Gold Saucer")));
+            Assert.Equal("The Gold Saucer", zc.ZoneName);
+
+            var ec = Assert.IsType<EndCombatRequested>(RoundTrip(new EndCombatRequested(1, Ts, Export: true)));
+            Assert.True(ec.Export);
+            Assert.False(Assert.IsType<EndCombatRequested>(RoundTrip(new EndCombatRequested(1, Ts, Export: false))).Export);
+        }
+
+        [Fact]
         public void RawPacketReceived_roundtrips_bytes_via_base64()
         {
             var bytes = new byte[] { 0x00, 0x01, 0x7F, 0x80, 0xFF, 0x0A, 0x09, 0x5C };  // incl. \n, \t, backslash

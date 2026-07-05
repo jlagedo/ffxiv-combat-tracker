@@ -67,7 +67,14 @@ namespace Fct.LegacyHost
         {
             var act = ActGlobals.oFormActMain;
             if (act != null)
-                act.AfterCombatAction += OnAfterCombatAction;
+            {
+                // Pre-aggregation tap: forward the FULL MasterSwing (every field + Tags) plus the
+                // encounter lifecycle the plugin drives, so the net10 engine aggregates identically.
+                act.BeforeCombatAction += OnBeforeCombatAction;
+                act.EncounterSetRaised += OnEncounterSet;
+                act.ZoneChangeRaised += OnZoneChange;
+                act.CombatEndRaised += OnCombatEnd;
+            }
 
             _discover = new Timer { Interval = 500 };
             _discover.Tick += (s, e) => TryBindFfxiv();
@@ -172,16 +179,36 @@ namespace Fct.LegacyHost
         private void OnNetworkSent(string connection, long epoch, byte[] message) =>
             Enqueue(new RawPacketReceived(0, DateTimeOffset.Now, connection ?? "", epoch, PacketDirection.Sent, message ?? Array.Empty<byte>()));
 
-        // ACT's post-aggregation swing. attacker/victim are names (the ACT model is name-based), so the
-        // ActorRef ids are 0; damage is the resolved amount, critical → EffectFlags.Critical.
-        private void OnAfterCombatAction(bool isImport, CombatActionEventArgs e)
+        // Shared empty Tags for swings the plugin tags with nothing (avoids a per-swing allocation).
+        private static readonly IReadOnlyDictionary<string, object> EmptyTags = new Dictionary<string, object>();
+
+        // The full-fidelity swing, tapped BEFORE aggregation: every MasterSwing field + Tags cross the
+        // wire so the net10 engine reproduces ACT's numbers exactly (heals, DoT/HoT, jobs, direct-hit).
+        // Damage is the raw Dnum value (keeps ACT's −1 Miss / −10 Death / 0 NoDamage sentinels).
+        private void OnBeforeCombatAction(bool isImport, CombatActionEventArgs e)
         {
-            if (e == null) return;
-            var flags = e.critical ? EffectFlags.Critical : EffectFlags.None;
-            var target = new EffectTarget(new ActorRef(0, e.victim ?? ""), (long)e.damage, flags);
-            var ts = e.time > DateTime.MinValue ? new DateTimeOffset(e.time) : DateTimeOffset.Now;
-            Enqueue(new ActionEffect(0, ts, new ActorRef(0, e.attacker ?? ""), 0, e.theAttackType, new[] { target }));
+            var s = e?.combatAction;
+            if (s == null) return;
+            var ts = s.Time > DateTime.MinValue ? new DateTimeOffset(s.Time) : DateTimeOffset.Now;
+            var tags = s.Tags != null && s.Tags.Count > 0 ? s.Tags : EmptyTags;
+            Enqueue(new CombatSwing(0, ts, s.SwingType, s.Critical, s.Special ?? "none",
+                (long)s.Damage, s.TimeSorter, s.AttackType ?? "", s.Attacker ?? "",
+                s.DamageType ?? "", s.Victim ?? "", tags));
         }
+
+        // The encounter lifecycle the plugin drives on the ACT facade (SetEncounter per hostile action,
+        // ChangeZone, EndCombat), forwarded so the modern engine opens/refreshes/closes the same encounter.
+        private void OnEncounterSet(DateTime time, string attacker, string victim)
+        {
+            var ts = time > DateTime.MinValue ? new DateTimeOffset(time) : DateTimeOffset.Now;
+            Enqueue(new SetEncounterRequested(0, ts, attacker ?? "", victim ?? ""));
+        }
+
+        private void OnZoneChange(string zoneName) =>
+            Enqueue(new ZoneChangeRequested(0, DateTimeOffset.Now, zoneName ?? ""));
+
+        private void OnCombatEnd(bool export) =>
+            Enqueue(new EndCombatRequested(0, DateTimeOffset.Now, export));
 
         private static Actor ToActor(SdkModels.Combatant c) => new Actor(
             Id: c.ID, OwnerId: c.OwnerID, Kind: MapKind(c.type, c.OwnerID),
@@ -284,7 +311,13 @@ namespace Fct.LegacyHost
 
             try { _discover?.Stop(); _discover?.Dispose(); } catch { }
             var act = ActGlobals.oFormActMain;
-            if (act != null) { try { act.AfterCombatAction -= OnAfterCombatAction; } catch { } }
+            if (act != null)
+            {
+                try { act.BeforeCombatAction -= OnBeforeCombatAction; } catch { }
+                try { act.EncounterSetRaised -= OnEncounterSet; } catch { }
+                try { act.ZoneChangeRaised -= OnZoneChange; } catch { }
+                try { act.CombatEndRaised -= OnCombatEnd; } catch { }
+            }
             if (_sub != null)
             {
                 try { _sub.LogLine -= OnLogLine; } catch { }

@@ -49,8 +49,18 @@ public static class ServiceCollectionExtensions
         services.AddSingleton<RegistryService>();
         services.AddSingleton<IPluginRegistry>(sp => sp.GetRequiredService<RegistryService>());
         services.AddSingleton<IAudioOutput, AudioService>();
-        services.AddSingleton<IEncounterService, EncounterService>();
         services.AddSingleton<IClock, SystemClock>();
+
+        // The modern encounter engine: the single source of truth for encounter calculations. It runs
+        // the shared Fct.Aggregation engine fed by the typed CombatSwing/lifecycle feed off the bus, and
+        // its EngineEncounterService projects the live encounter into the IEncounterService the UI reads.
+        services.AddSingleton<Fct.Engine.ModernEncounterEngine>();
+        services.AddHostedService(sp => sp.GetRequiredService<Fct.Engine.ModernEncounterEngine>());
+        services.AddSingleton<IEncounterService>(sp => new Fct.Engine.EngineEncounterService(
+            sp.GetRequiredService<Fct.Engine.ModernEncounterEngine>(), sp.GetRequiredService<IClock>()));
+        // Diagnostic: log the engine's live encounter so net10 aggregation is observable + comparable to
+        // the satellite's [Capture] line in the unified host log.
+        services.AddHostedService<EncounterHeartbeat>();
         services.AddSingleton<PluginManager>();
         services.AddHostedService<PluginLifetime>();
 

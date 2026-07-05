@@ -5,8 +5,9 @@ compat adapter that lets ACT-era plugins migrate onto it. This is the **forward 
 in [`ARCHITECTURE.md`](ARCHITECTURE.md) §7, specified in full.
 
 It is the counterpart to the *backward* surface: [`ACT-INTERFACE-MAP.md`](ACT-INTERFACE-MAP.md) and
-[`DATA-FLOW.md`](DATA-FLOW.md) document the legacy ACT host surface the net48 satellite impersonates
-to run the five plugins **unmodified**. This document is the **net10 contract** they migrate *to*.
+[`DATA-FLOW.md`](DATA-FLOW.md) document the legacy ACT host surface the net48 satellites impersonate
+(one satellite per plugin package — [`ISOLATION-PLAN.md`](ISOLATION-PLAN.md)) to run the five
+plugins **unmodified**. This document is the **net10 contract** they migrate *to*.
 
 > **Status.** The contract (`Fct.Abstractions` + `.UI`), the flow-test harness, the net10 host +
 > ALC loader, the net48→net10 bridge forwarder, the plugin install/classification + lifecycle pipeline,
@@ -58,14 +59,17 @@ Three non-negotiables gate every entry in this document:
 
 | Face | Runtime | Binds to | Home |
 |---|---|---|---|
-| **Satellite** | net48 | real ACT/SDK, unmodified | `Fct.LegacyHost`; data crosses to the net10 bus via the [bridge forwarder](#the-bridge-data-forwarder-built) |
+| **Satellite** | net48 | real ACT/SDK, unmodified | `Fct.LegacyHost` — **one satellite process per plugin package**, each with its private ACT facade; produced data crosses to the net10 bus via the [bridge forwarder](#the-bridge-data-forwarder-built), consumed data is fanned back and projected by the facade ([`ISOLATION-PLAN.md`](ISOLATION-PLAN.md)) |
 | **Compat-shim (native)** | net10 | legacy ACT/SDK identity re-projected (`Fct.Compat.Shim` + its two facades, distinct from the net48 `Fct.Compat.Act` ACT engine) | in-process, ALC-per-plugin; a recompiled legacy plugin migrating **without breaking its interface** |
 | **Modern (native)** | net10 | the typed `Fct.Abstractions` contract | in-process; new plugins and fully-migrated ones |
 
-The satellite is a **temporary workaround** — the destination is native. So the fact that a consumer
-runs in the satellite *today* never justifies leaving its native faces unbuilt; the migration path
+The satellites are **temporary workarounds** — the destination is native. So the fact that a consumer
+runs in a satellite *today* never justifies leaving its native faces unbuilt; the migration path
 requires every pipe to be reachable natively too. A shimmed plugin migrates compat→modern
-member-by-member, then drops the shim.
+member-by-member, then drops the shim. And because each package has its **own** satellite, the
+satellite face routes through the host exactly like the native faces do — there is no shared heap
+for two plugins to bypass the pipes with (rule enforced by process boundary; invariants in
+[`ISOLATION-PLAN.md`](ISOLATION-PLAN.md)).
 
 ## Pipe inventory — every pipe, three faces
 
@@ -78,7 +82,7 @@ is the spine of [What we must do](#what-we-must-do--the-work-list).
 | **Raw log line** | `RawLogLine` event | `Before/OnLogLineRead` + `IDataSubscription.LogLine` | ACT `OnLogLineRead` (bridged) | ✅ built; shim `ParsedLogLine` event ⏳ |
 | **Repository snapshot** (combatant/zone/party/player) | `IGameSnapshot` | `IDataRepository.Get*` + state `IDataSubscription` events | SDK `IDataRepository` (bridged) | ✅ built; name tables empty |
 | **Actor side-channel state** (statuses/enmity/target-of-target/focus/hover/reliable in-combat) | `Actor` superset fields + snapshot `Focus`/`Hover` | consumed via the snapshot | today Hojoring reads OverlayPlugin + Sharlayan directly | contract fields ✅; **source = satellite forwards (pending)** |
-| **Encounter / DPS** (+`ExportVariables`) | `IEncounterService` + `ExportVariables` bag | `ActiveZone.ActiveEncounter` + `EncounterProjector` | ACT `EncounterData`/`CombatantData` | ✅ built; per-tick `Active` refresh ⏳ |
+| **Encounter / DPS** (+`ExportVariables`) | `IEncounterService` backed by `Fct.Engine` (the aggregation authority, fed by the forwarded `CombatSwing`/lifecycle stream; live `Active` on a 500 ms projection tick) | `ActiveZone.ActiveEncounter` + `Fct.Engine.EncounterProjector` | ACT `EncounterData`/`CombatantData` off the satellite's engine replica | ✅ built (host engine live) |
 | **Action event** | `ActionEffect` (+ typed records) | via events | ACT `AfterCombatAction` (bridged) | ✅ `ActionEffect`; status/cast/death/hp → **RawLogLine only** (note below) |
 | **Audio** | `IAudioOutput` | `TTS`/`PlaySound` + `PlayTts`/`PlaySound` slots | ACT `PlayTts`/`PlaySound` | ✅ built |
 | **Registry / peer** | `IPluginRegistry` | `RegisterNamedCallback`/`InvokeNamedCallback` | ACT named callbacks | ✅ built |
@@ -325,7 +329,7 @@ public interface IUiHost
   to the offending plugin for quarantine. Honest limit: a hard render/layout crash is still a host
   risk (same boundary as the ALC model).
 - **Overlays stay OverlayPlugin's domain.** `IUiContributor` is for in-shell UI only; transparent
-  click-through game overlays remain unmodified OverlayPlugin in the net48 satellite
+  click-through game overlays remain unmodified OverlayPlugin in its own net48 satellite
   ([`ARCHITECTURE.md`](ARCHITECTURE.md) §4a). Escape hatch only: a plugin may open its own top-level
   Avalonia window; the host provides no overlay scaffolding.
 - Triggernometry's host-window mutations map onto `IUiHost.RevealPage` (`LocateTab`) and
@@ -438,12 +442,13 @@ incremental migration (swap one call at a time, then drop the shim).
   carries status/enmity/in-combat and the snapshot carries focus/hover. Its poll-and-diff
   (`XIVPluginHelper.cs:904-912`) maps onto `IGameSnapshot`, or it adopts typed events and stops
   diffing. TTSYukkuri is both an audio producer and a sink provider ([G3](#contract-gaps-tracked)/[G8](#contract-gaps-tracked), shipped).
-- **OverlayPlugin — stays in the satellite.** Its `IDataSubscription`/`ExportVariables` use recompiles
-  fine, but **CefSharp is net48-only** (pinned `95.7.141`, `HtmlRenderer.csproj:45-52`), so OP's
-  CEF/Fleck rendering stays in the net48 satellite (already embedded cross-process). It is also itself
-  a mini plugin-host (`IOverlayAddonV2.Init`, `PluginMain.cs:493-504`). The recompile path serves
-  managed consumers; OP is why the satellite persists longest — consistent with overlays = unmodified
-  OP, hosted. The managed-consumer surface for cactbot fidelity ([G1](#contract-gaps-tracked)/[G2](#contract-gaps-tracked)/[G4](#contract-gaps-tracked)) is shipped.
+- **OverlayPlugin — stays in its own satellite.** Its `IDataSubscription`/`ExportVariables` use
+  recompiles fine, but **CefSharp is net48-only** (pinned `95.7.141`, `HtmlRenderer.csproj:45-52`), so
+  OP's CEF/Fleck rendering stays in a net48 satellite — **its own**, fully isolated from the parser,
+  fed by the host-routed streams through the facade's synthetic parser stand-in
+  ([`ISOLATION-PLAN.md`](ISOLATION-PLAN.md) P8). It is also itself a mini plugin-host
+  (`IOverlayAddonV2.Init`, `PluginMain.cs:493-504`). The recompile path serves managed consumers; OP
+  is why a satellite persists longest — consistent with overlays = unmodified OP, hosted. The managed-consumer surface for cactbot fidelity ([G1](#contract-gaps-tracked)/[G2](#contract-gaps-tracked)/[G4](#contract-gaps-tracked)) is shipped.
 
 ## Contract gaps (tracked)
 
@@ -622,11 +627,20 @@ SDK/ACT hub exposes (post-parse aggregates, or the untouched raw firehose), neve
 Forwarded today: `RawLogLine` (the SDK `LogLine` firehose that Trig/cactbot regex over), `ZoneChanged`,
 `PartyChanged`, `PrimaryPlayerChanged`, `CombatantAdded`/`CombatantRemoved` (`Combatant`→`Actor`,
 lossless for DoL/DoH per [G10](#contract-gaps-tracked)), `ActionEffect` (from the ACT hub's
-post-aggregation `AfterCombatAction`), and `RawPacketReceived` (the SDK `NetworkReceived`/`NetworkSent`
-firehose — raw bytes carried base64 on the wire, never decoded). Events that exist only as parsed
+post-aggregation `AfterCombatAction`), `RawPacketReceived` (the SDK `NetworkReceived`/`NetworkSent`
+firehose — raw bytes carried base64 on the wire, never decoded), and the **pre-aggregation feed that
+makes the host the calculation authority**: `CombatSwing` (the full `MasterSwing` — every field +
+`Tags`, raw `Dnum` sentinels, tapped off the facade's `BeforeCombatAction`) plus the encounter
+lifecycle (`SetEncounterRequested`/`ZoneChangeRequested`/`EndCombatRequested`), which `Fct.Engine`
+folds into the host's `IEncounterService` truth. Events that exist only as parsed
 log-line fields — `StatusApplied`/`Removed`, `Cast*`, `DeathOccurred`, `HpUpdated` — are **not**
 synthesized; consumers reach them through the `RawLogLine` firehose, exactly as in ACT today. Codec
 round-trip + decode-onto-bus are covered by `tests/Fct.App.Tests/BridgeEventFrameTests.cs`.
+
+The same `GameEventFrame` codec runs **downstream** (host → satellite) in the isolated topology:
+each consumer satellite subscribes to the stream set its facade projects (engine-replica swings,
+log lines, packets, repository snapshots), with a bounded per-satellite egress queue mirroring the
+upstream ring. Build phases: [`ISOLATION-PLAN.md`](ISOLATION-PLAN.md) P4–P6.
 
 ## The net10 compat shim (in progress)
 
@@ -673,11 +687,11 @@ named callbacks (`RegisterNamedCallback`/`InvokeNamedCallback` → `IPluginRegis
 `Before/OnLogLineRead` re-fired from the `RawLogLine` firehose; logging + chrome
 (`WriteExceptionLog`/`CornerControlAdd`/…); the encounter driver (`AddCombatAction`/`SetEncounter`/
 `EndCombat`, `ActiveZone.ActiveEncounter`) over the ACT aggregation engine — the shared,
-strong-named `Fct.Aggregation` project (net48;net10) referenced by both the net48 `Fct.Compat.Act`
-and the net10 ActFacade, so the aggregation binary (and the `ExportVariables` bag cactbot reads) is
-bit-identical across runtimes (`EncounterProjector` maps
-it plus the typed metrics onto `EncounterSnapshot`/`CombatantMetrics`, G1/G2; combat state mirrors onto
-`IEncounterService`). The `IDataSubscription` event map: `DataSubscriptionAdapter` projects the
+strong-named `Fct.Aggregation` project (net48;net10) referenced by the host's `Fct.Engine` (the
+aggregation authority), the net48 `Fct.Compat.Act`, and the net10 ActFacade, so the aggregation
+binary (and the `ExportVariables` bag cactbot reads) is bit-identical across runtimes
+(`Fct.Engine.EncounterProjector` maps it plus the typed metrics onto
+`EncounterSnapshot`/`CombatantMetrics`, G1/G2; combat state mirrors onto `IEncounterService`). The `IDataSubscription` event map: `DataSubscriptionAdapter` projects the
 `IGameEventStream` onto the SDK delegates a recompiled plugin binds — `LogLine`←`RawLogLine`,
 `ZoneChanged`, `PartyListChanged`←`PartyChanged`, `PrimaryPlayerChanged`, and
 `CombatantAdded`/`CombatantRemoved` (via `CombatantProjector`) — plus `NetworkReceived`/`NetworkSent`
@@ -875,8 +889,11 @@ rule 1 requires it.
 5. **`ParsedLogLine` shim event.** Declare it on the shim `IDataSubscription` and fire it off the
    existing `RawLogLine` firehose so Triggernometry's `BridgeFFXIV` reflection binds. (Hojoring already
    works — it reconstructs the parsed form itself off `OnLogLineRead` + `detectedType`, both built.)
-6. **Per-tick encounter refresh** into `IEncounterService.Active` (a host update seam off the forwarded
-   stream), so native consumers see live DPS, not just encounter open/close.
+6. **Per-tick encounter refresh** into `IEncounterService.Active`. ✅ **Built** — `Fct.Engine`:
+   `ModernEncounterEngine` aggregates the forwarded `CombatSwing`/lifecycle stream through the shared
+   `Fct.Aggregation` graph and `EngineEncounterService` republishes `Active` on a 500 ms projection
+   tick with ACT's exact idle-end clock; native consumers see live DPS computed **at the host**, not
+   forwarded satellite aggregates.
 7. **D8 — WinForms `TabPage` embedding** (shim UI face). Fully specced in
    [§D8](#d8--winforms-tabpage-embedding-planned-next-slice); the last piece for a recompiled-but-still-
    WinForms plugin to show its settings tab.
@@ -929,11 +946,12 @@ feed:
   host owns no name tables, keeping rule 1 intact. (Rejected: host-owns-tables and proxy-only — the
   former makes the host own a patch-drifting game asset; the latter leaves the buff table empty and so
   fails to accommodate Hojoring, violating goal 2.)
-- **Actor side-channel state — satellite forwards for v1.** The satellite already hosts real
-  OverlayPlugin + the real FFXIV plugin with memory/network access, so it is the v1 producer of
-  statuses/enmity/target/focus/hover/in-combat onto the bus. A dedicated native memory-reader plugin may
-  replace it later; because the data lands in the same `Actor`/snapshot fields, that swap is a
-  producer change with **no contract change**.
+- **Actor side-channel state — satellites forward for v1.** The parser and OverlayPlugin satellites
+  host the real plugins with memory/network access, so their facade taps are the v1 producers of
+  statuses/enmity/target/focus/hover/in-combat onto the bus (each satellite forwards what **its**
+  plugin produces; the host fans out). A dedicated native memory-reader plugin may replace them
+  later; because the data lands in the same `Actor`/snapshot fields, that swap is a producer change
+  with **no contract change**.
 - **Packaging & lifecycle — loose folder + full lifecycle.** The installed form of a plugin is a loose
   folder (a `.zip` is accepted only as an install source, extracted on the way in); no signing in v1. The
   host provides runtime install / hot-load / unload / reload and in-app uninstall over the collectible

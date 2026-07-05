@@ -1,11 +1,8 @@
 using System;
-using System.Collections.Generic;
-using System.Drawing;
 using System.Globalization;
 using System.IO;
 using System.Linq;
 using Advanced_Combat_Tracker;
-using DamageTypeDef = Advanced_Combat_Tracker.CombatantData.DamageTypeDef;
 
 namespace Fct.LegacyHost
 {
@@ -133,9 +130,9 @@ namespace Fct.LegacyHost
             "kills", "deaths",
         };
 
-        // The FFXIV damage-type routing tables ACT runs with (installed live by the plugin's
-        // ACT_UIMods). Replay-only aggregation has no plugin to install them, so we set the same
-        // state here. Held to the real ACT binary by Fct.Compat.Act.Tests/ExportVarsCompatTests.
+        // Stand the engine up for replay: register ExportVariables + install the FFXIV damage-type
+        // routing tables (the plugin's ACT_UIMods do this live; replay has no plugin). Shared with the
+        // modern net10 engine via EngineTables.Install so the two runtimes aggregate identically.
         private static bool _installed;
         private static void InstallTables()
         {
@@ -145,82 +142,13 @@ namespace Fct.LegacyHost
             FormActMain.Log = _ => { };
             // Build the ACT form WITHOUT running the WinForms Form ctor (as tools/act-oracle does): a
             // fully-constructed Form in this long-running, message-loop-less batch process destabilises
-            // over many large files. The export formatters need only its stateless CreateDamageString.
-            // The bypassed ctor is what normally registers the ExportVariables, so invoke that
-            // registration (CombatTables.Setup) explicitly.
+            // over many large files. The export formatters render through the stateless
+            // DamageString.Create, so an uninitialized form suffices as the oFormActMain global.
             ActGlobals.oFormActMain = (FormActMain)System.Runtime.Serialization.FormatterServices
                 .GetUninitializedObject(typeof(FormActMain));
-            typeof(EncounterData).Assembly.GetType("Advanced_Combat_Tracker.CombatTables")
-                .GetMethod("Setup", System.Reflection.BindingFlags.Public | System.Reflection.BindingFlags.Static)
-                .Invoke(null, null);
             ActGlobals.charName = "YOU";
 
-            DamageTypeDef Out(string l, int ally) => new DamageTypeDef(l, ally, Color.Orange);
-
-            CombatantData.OutgoingDamageTypeDataObjects = new Dictionary<string, DamageTypeDef>
-            {
-                { "Auto-Attack (Out)", Out("Auto-Attack (Out)", -1) },
-                { "Skill/Ability (Out)", Out("Skill/Ability (Out)", -1) },
-                { "Simulated DoTs (Out)", Out("Simulated DoTs (Out)", -1) },
-                { "Outgoing Damage", Out("Outgoing Damage", 0) },
-                { "Damage Shields (Out)", Out("Damage Shields (Out)", 1) },
-                { "Simulated HoTs (Out)", Out("Simulated HoTs (Out)", 1) },
-                { "Healed (Out)", Out("Healed (Out)", 1) },
-                { "Other (Out)", Out("Other (Out)", 0) },
-                { "Status (Out)", Out("Status (Out)", 0) },
-                { "Power Drain (Out)", Out("Power Drain (Out)", -1) },
-                { "Power Replenish (Out)", Out("Power Replenish (Out)", 1) },
-                { "Cure/Dispel (Out)", Out("Cure/Dispel (Out)", 0) },
-                { "Threat (Out)", Out("Threat (Out)", -1) },
-                { "All Outgoing (Ref)", Out("All Outgoing (Ref)", 0) },
-            };
-            CombatantData.IncomingDamageTypeDataObjects = new Dictionary<string, DamageTypeDef>
-            {
-                { "Simulated DoTs (Inc)", Out("Simulated DoTs (Inc)", -1) },
-                { "Incoming Damage", Out("Incoming Damage", -1) },
-                { "Damage Shields (Inc)", Out("Damage Shields (Inc)", 1) },
-                { "Simulated HoTs (Inc)", Out("Simulated HoTs (Inc)", 1) },
-                { "Healed (Inc)", Out("Healed (Inc)", 1) },
-                { "Other (Inc)", Out("Other (Inc)", 0) },
-                { "Status (Inc)", Out("Status (Inc)", 0) },
-                { "Power Drain (Inc)", Out("Power Drain (Inc)", -1) },
-                { "Power Replenish (Inc)", Out("Power Replenish (Inc)", 1) },
-                { "Cure/Dispel (Inc)", Out("Cure/Dispel (Inc)", 0) },
-                { "Threat (Inc)", Out("Threat (Inc)", -1) },
-                { "All Incoming (Ref)", Out("All Incoming (Ref)", 0) },
-            };
-            CombatantData.SwingTypeToDamageTypeDataLinksOutgoing = new SortedDictionary<int, List<string>>
-            {
-                { 0, new List<string> { "Auto-Attack (Out)", "Outgoing Damage" } },
-                { 1, new List<string> { "Other (Out)" } },
-                { 2, new List<string> { "Skill/Ability (Out)", "Outgoing Damage" } },
-                { 3, new List<string> { "Simulated DoTs (Out)", "Outgoing Damage" } },
-                { 4, new List<string> { "Healed (Out)" } },
-                { 5, new List<string> { "Simulated HoTs (Out)", "Healed (Out)" } },
-                { 6, new List<string> { "Power Drain (Out)" } },
-                { 7, new List<string> { "Power Replenish (Out)" } },
-                { 8, new List<string> { "Status (Out)" } },
-                { 9, new List<string> { "Cure/Dispel (Out)" } },
-                { 10, new List<string> { "Threat (Out)" } },
-                { 11, new List<string> { "Damage Shields (Out)", "Healed (Out)" } },
-            };
-            CombatantData.SwingTypeToDamageTypeDataLinksIncoming = new SortedDictionary<int, List<string>>
-            {
-                { 0, new List<string> { "Incoming Damage" } },
-                { 1, new List<string> { "Other (Inc)" } },
-                { 2, new List<string> { "Incoming Damage" } },
-                { 3, new List<string> { "Simulated DoTs (Inc)", "Incoming Damage" } },
-                { 4, new List<string> { "Healed (Inc)" } },
-                { 5, new List<string> { "Simulated HoTs (Inc)", "Healed (Inc)" } },
-                { 6, new List<string> { "Power Drain (Inc)" } },
-                { 7, new List<string> { "Power Replenish (Inc)" } },
-                { 8, new List<string> { "Status (Inc)" } },
-                { 9, new List<string> { "Cure/Dispel (Inc)" } },
-                { 10, new List<string> { "Threat (Inc)" } },
-                { 11, new List<string> { "Damage Shields (Inc)", "Healed (Inc)" } },
-            };
-            CombatantData.DamageSwingTypes = new List<int> { 0, 2, 3 };
-            CombatantData.HealingSwingTypes = new List<int> { 4, 5, 8, 9, 1 };
+            EngineTables.Install();
         }
     }
 }

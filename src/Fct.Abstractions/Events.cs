@@ -41,6 +41,37 @@ namespace Fct.Abstractions
     public sealed record ActionEffect(long Sequence, DateTimeOffset Timestamp, ActorRef Source, uint ActionId, string? ActionName, IReadOnlyList<EffectTarget> Targets)
         : GameEvent(Sequence, Timestamp);
 
+    /// <summary>
+    /// A full-fidelity ACT <c>MasterSwing</c> — every field the aggregation engine needs to reproduce
+    /// ACT's numbers bit-for-bit, carried verbatim so the modern engine folds the same swings the net48
+    /// engine sees. <see cref="GameEvent.Timestamp"/> is the swing time; <see cref="Damage"/> is the raw
+    /// signed <c>Dnum</c> value, keeping ACT's sentinels (−1 Miss, −10 Death, 0 NoDamage). The engine's
+    /// math reads only the scalar fields; <see cref="Tags"/> are pass-through for downstream consumers
+    /// (the one engine-relevant key is <c>"Job"</c>). Values in <see cref="Tags"/> are scalars only
+    /// (string / boxed double / boxed uint).
+    /// </summary>
+    public sealed record CombatSwing(
+        long Sequence, DateTimeOffset Timestamp,
+        int SwingType, bool Critical, string Special, long Damage, int TimeSorter,
+        string AttackType, string Attacker, string DamageType, string Victim,
+        IReadOnlyDictionary<string, object> Tags)
+        : GameEvent(Sequence, Timestamp);
+
+    /// <summary>
+    /// A request to open (or continue) an encounter — ACT's <c>SetEncounter(time, attacker, victim)</c>,
+    /// which the parser issues per hostile action. The engine's lifecycle auto-starts on the first one.
+    /// </summary>
+    public sealed record SetEncounterRequested(long Sequence, DateTimeOffset Timestamp, string Attacker, string Victim)
+        : GameEvent(Sequence, Timestamp);
+
+    /// <summary>ACT's <c>ChangeZone(name)</c>. Distinct from the SDK <see cref="ZoneChanged"/> (id + name).</summary>
+    public sealed record ZoneChangeRequested(long Sequence, DateTimeOffset Timestamp, string ZoneName)
+        : GameEvent(Sequence, Timestamp);
+
+    /// <summary>ACT's <c>EndCombat(export)</c> — the parser issues it on zone change; idle-end is the engine's own.</summary>
+    public sealed record EndCombatRequested(long Sequence, DateTimeOffset Timestamp, bool Export)
+        : GameEvent(Sequence, Timestamp);
+
     /// <summary>An actor begins casting (StartsCasting).</summary>
     public sealed record CastStarted(long Sequence, DateTimeOffset Timestamp, ActorRef Source, uint ActionId, ActorRef Target, float DurationSeconds)
         : GameEvent(Sequence, Timestamp);

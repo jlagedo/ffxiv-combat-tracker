@@ -50,6 +50,11 @@ namespace Advanced_Combat_Tracker
         public int SetEncounterCount;
         public int ChangeZoneCount;
 
+        // The shared, runtime-neutral encounter state machine (auto-start + idle-end). This facade is
+        // the ACT event/WinForms surface over it; the modern net10 engine drives an identical copy so
+        // both runtimes start and end an encounter at the same instant.
+        private readonly EncounterLifecycle _lifecycle = new EncounterLifecycle();
+
         public FormActMain()
         {
             // Off-screen + fully transparent + non-activating: invisible to the user, but a genuinely
@@ -65,6 +70,10 @@ namespace Advanced_Combat_Tracker
             AppDataFolder = new DirectoryInfo(Path.Combine(
                 Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData),
                 "Advanced Combat Tracker"));
+            _lifecycle.CombatStarted = enc =>
+                OnCombatStart?.Invoke(false, new CombatToggleEventArgs(0, _lifecycle.ActiveZone.Items.Count - 1, enc));
+            _lifecycle.CombatEnded = enc =>
+                OnCombatEnd?.Invoke(false, new CombatToggleEventArgs(0, 0, enc));
             ZoneList.Add(ActiveZone);
             CombatTables.Setup();
         }
@@ -84,24 +93,24 @@ namespace Advanced_Combat_Tracker
         public string LogFilePath { get; set; } = "";
         public string LogFileFilter { get; set; } = "";
         public int GlobalTimeSorter { get; set; }
-        public bool InCombat { get; set; }
+        public bool InCombat { get => _lifecycle.InCombat; set => _lifecycle.InCombat = value; }
         public int TimeStampLen { get; set; } = 15;
         public bool LogPathHasCharName { get; set; }
         public Regex ZoneChangeRegex { get; set; } = new Regex(@"01:Changed Zone to (?<ZoneName>.*)\.");
         public bool ReadThreadLock { get; set; }
-        public DateTime LastKnownTime { get; set; } = DateTime.Now;
-        public DateTime LastEstimatedTime { get; set; } = DateTime.Now;
-        public DateTime LastHostileTime { get; set; }
+        public DateTime LastKnownTime { get => _lifecycle.LastKnownTime; set => _lifecycle.LastKnownTime = value; }
+        public DateTime LastEstimatedTime { get => _lifecycle.LastEstimatedTime; set => _lifecycle.LastEstimatedTime = value; }
+        public DateTime LastHostileTime { get => _lifecycle.LastHostileTime; set => _lifecycle.LastHostileTime = value; }
 
         // Idle-end of combat (ACT CheckIdleEndCombat). nudIdleLimit_Value defaults to 6 s.
-        public bool IdleEndEnabled { get; set; } = true;
-        public double IdleLimitSeconds { get; set; } = 6;
-        public string CurrentZone { get; set; } = "";
+        public bool IdleEndEnabled { get => _lifecycle.IdleEndEnabled; set => _lifecycle.IdleEndEnabled = value; }
+        public double IdleLimitSeconds { get => _lifecycle.IdleLimitSeconds; set => _lifecycle.IdleLimitSeconds = value; }
+        public string CurrentZone { get => _lifecycle.CurrentZone; set => _lifecycle.CurrentZone = value; }
         public AttackTypeGraphGenerator GenerateAttackTypeGraph { get; set; }
         public List<ActPluginData> ActPlugins { get; } = new List<ActPluginData>();
         public bool InitActDone { get; set; } = true;
         public bool IsActClosing { get; set; }
-        public ZoneData ActiveZone { get; set; } = new ZoneData();
+        public ZoneData ActiveZone { get => _lifecycle.ActiveZone; set => _lifecycle.ActiveZone = value; }
 
         // Zone/encounter history. We keep a single live zone, so ZoneList holds ActiveZone; this is the
         // surface Triggernometry walks for past-encounter export.
@@ -129,6 +138,13 @@ namespace Advanced_Combat_Tracker
         public event CombatToggleEventDelegate OnCombatEnd;
         public event CombatActionDelegate BeforeCombatAction;
         public event CombatActionDelegate AfterCombatAction;
+
+        // Bridge taps: the modern net10 engine mirrors the encounter lifecycle the plugin drives here,
+        // so it aggregates the same swings into the same encounters. Not part of ACT's surface —
+        // internal to the satellite; BridgeForwarder subscribes and forwards the typed requests.
+        public event Action<DateTime, string, string> EncounterSetRaised;
+        public event Action<string> ZoneChangeRaised;
+        public event Action<bool> CombatEndRaised;
 
         // No-op publishers: ACT raises these from UI/clipboard/XML-share/URL paths the headless
         // host doesn't have. Declared so an unmodified plugin's `+=` binds (a `+=` to a missing
@@ -317,76 +333,49 @@ namespace Advanced_Combat_Tracker
 
         public void ActCommands(string commandText) => Log($"[ActCommands] {commandText}");
 
-        // --- Combat pipeline: feed the from-scratch aggregation engine ---
+        // --- Combat pipeline: feed the shared aggregation engine through the lifecycle ---
+        // The state machine (auto-start, idle-end, zone/encounter transitions) lives in
+        // EncounterLifecycle; this facade keeps the ACT event surface (Before/AfterCombatAction,
+        // OnCombatStart/End, wired to the lifecycle's CombatStarted/CombatEnded hooks) and the
+        // verification counters around it.
         public void AddCombatAction(MasterSwing action)
         {
             AddCombatActionCount++;
-            LastKnownTime = action.Time;
-            LastEstimatedTime = action.Time;
+            _lifecycle.LastKnownTime = action.Time;
+            _lifecycle.LastEstimatedTime = action.Time;
             BeforeCombatAction?.Invoke(false, new CombatActionEventArgs(action));
-            ActiveZone.ActiveEncounter?.AddCombatAction(action);
+            _lifecycle.ActiveZone.ActiveEncounter?.AddCombatAction(action);
             AfterCombatAction?.Invoke(false, new CombatActionEventArgs(action));
         }
 
         public bool SetEncounter(DateTime time, string attacker, string victim)
         {
             SetEncounterCount++;
-            LastKnownTime = time;
-            if (!InCombat || ActiveZone.ActiveEncounter == null || !ActiveZone.ActiveEncounter.Active)
-            {
-                var enc = new EncounterData(ActGlobals.charName, CurrentZone, ActiveZone) { Active = true };
-                enc.StartTimes.Add(time);
-                ActiveZone.ActiveEncounter = enc;
-                ActiveZone.Items.Add(enc);
-                InCombat = true;
-                OnCombatStart?.Invoke(false, new CombatToggleEventArgs(0, ActiveZone.Items.Count - 1, enc));
-            }
-            // Every hostile action refreshes the idle clock (ACT SetEncounter tail).
-            LastHostileTime = time;
-            return true;
+            var result = _lifecycle.SetEncounter(time, attacker, victim);
+            EncounterSetRaised?.Invoke(time, attacker, victim);
+            return result;
         }
 
         // Advance the parse clock as log lines are read. Combat ends after an idle gap, matching
         // ACT's CheckIdleEndCombat (LastKnownTime - LastHostileTime > nudIdleLimit). The FFXIV
         // plugin reads InCombat back off this form to gate which heals it reports, so driving this
         // from the host's log pump is what makes in-/out-of-combat heal attribution match ACT.
-        public bool AdvanceClock(DateTime time)
-        {
-            if (time > LastKnownTime) LastKnownTime = time;
-            return CheckIdleEndCombat();
-        }
+        public bool AdvanceClock(DateTime time) => _lifecycle.AdvanceClock(time);
 
-        public bool CheckIdleEndCombat()
-        {
-            if (InCombat && IdleEndEnabled &&
-                LastKnownTime - LastHostileTime > TimeSpan.FromSeconds(IdleLimitSeconds))
-            {
-                EndCombat(true);
-                return true;
-            }
-            return false;
-        }
+        public bool CheckIdleEndCombat() => _lifecycle.CheckIdleEndCombat();
 
         public void ChangeZone(string zoneName)
         {
             ChangeZoneCount++;
-            CurrentZone = zoneName;
-            ActiveZone.ZoneName = zoneName;
+            _lifecycle.ChangeZone(zoneName);
+            ZoneChangeRaised?.Invoke(zoneName);
             Log($"[ChangeZone] {zoneName}");
         }
 
         public void EndCombat(bool actExport)
         {
-            if (InCombat)
-            {
-                InCombat = false;
-                var enc = ActiveZone.ActiveEncounter;
-                if (enc != null)
-                {
-                    enc.EndCombat(actExport);
-                    OnCombatEnd?.Invoke(false, new CombatToggleEventArgs(0, 0, enc));
-                }
-            }
+            _lifecycle.EndCombat(actExport);
+            CombatEndRaised?.Invoke(actExport);
         }
 
         // EncounterData.AddCombatAction tracks every combatant in this slice.

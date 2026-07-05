@@ -42,6 +42,12 @@ The reference decompiles for all of this live under `E:\dev` (see §13).
 2. **Built for the future, with a clear legacy → native migration path** that unlocks
    capabilities the legacy log-line format cannot express. Migration is opt-in and
    incremental — never a flag day.
+3. **The host owns the calculations and the routing; processes enforce it.** All ACT
+   calculations (encounter aggregation, DPS, `ExportVariables`) live in the .NET 10 host's
+   engine — the single source of truth. Each legacy plugin package runs in its **own**
+   satellite process, so no two plugins share a heap: every inter-plugin data path is
+   physically forced through the host, which routes by stream/capability name and never by
+   plugin identity. Invariants + phased path: [`ISOLATION-PLAN.md`](ISOLATION-PLAN.md).
 
 ---
 
@@ -66,11 +72,25 @@ The four target plugins **cannot** be loaded unmodified into a .NET 10 process:
 - `BinaryFormatter`, AppDomains, Remoting, CAS, the framework config system are
   removed/changed in .NET 10; ACT-era plugins depend on them.
 
-Therefore: **legacy plugins run in a real .NET Framework 4.8 process; only data
+Therefore: **legacy plugins run in real .NET Framework 4.8 processes; only data
 crosses to the .NET 10 host, over IPC.** `AssemblyLoadContext` isolates net10
 plugins from each other but is **not** cross-runtime — don't conflate the two.
 
-### 3c. Host only the ACT engine; let the rest self-host
+### 3c. One satellite process per plugin package — the boundary that enforces routing
+Under real ACT the plugins share one managed heap and reach each other through
+`ActGlobals.oFormActMain` — the parser is read by reflection, the DPS rollup is read
+in-process, audio delegates are hijacked globally. Reproducing that shared heap would make
+"everything routes through the host" unenforceable. So **each legacy plugin package gets its
+own satellite process** with its own private ACT facade: what its plugin produces, the facade
+taps and ships to the host; what its plugin consumes, the host fans out and the facade
+projects — including a local replica of the host's aggregation engine (same `Fct.Aggregation`
+binary, same routed swing stream, parity-gated) to serve the plugins' synchronous
+`ActiveEncounter`/`ExportVariables` reads, and a synthetic parser stand-in so
+discovery-by-reflection binds exactly as under real ACT. Granularity is the **package**:
+cactbot lives inside OverlayPlugin; the Hojoring suite shares one process. Bonus: a CEF crash
+kills one plugin, not the ecosystem. Topology + phases: [`ISOLATION-PLAN.md`](ISOLATION-PLAN.md).
+
+### 3d. Host only the ACT engine; let the rest self-host
 Directive 1 requires honoring **three** legacy contracts, but we only *build* one:
 
 | # | Contract | Provided in v1 by | Our build cost |
@@ -89,18 +109,26 @@ only the consume/aggregate side (the ACT engine).
 ## 4. Target architecture
 
 ```
-┌─────────────────────────────────┐        ┌──────────────────────────────────┐
-│  Fct.LegacyHost  (.NET Fx 4.8)   │  IPC   │  Fct.App + Fct.Host  (.NET 10)    │
-│                                  │◄──────►│                                  │
-│  • from-scratch ACT engine         │ pipe / │  • Fct.Host runtime: typed bus    │
-│  • real FFXIV_ACT_Plugin         │ shared │    (Channels) + ALC-per-plugin    │
-│  • real OverlayPlugin + CEF      │ memory │    loader + bridge client         │
-│  • Triggernometry, Discord       │        │  • ALC-isolated NEW plugins       │
-│  • ACT.Hojoring                  │        │  • typed game-data API            │
-│                                  │        │  • Fct.App: Avalonia shell        │
-│  ← all net48, runs natively      │        │  ← all net10, runs natively       │
-└─────────────────────────────────┘        └──────────────────────────────────┘
-        the OS process boundary IS the runtime boundary; only DATA crosses
+                     ┌───────────────────────────────────────────────┐
+                     │        Fct.App + Fct.Host  (.NET 10)          │
+                     │  • Fct.Engine — THE aggregation authority     │
+                     │  • typed bus (Channels) — THE router          │
+                     │  • ALC-isolated NEW plugins, typed API        │
+                     │  • Fct.App: Avalonia shell                    │
+                     └──┬─────────┬─────────┬─────────┬─────────┬────┘
+        one duplex pipe │         │         │         │         │  (control + events,
+        per satellite ▼ ▼         ▼         ▼         ▼         ▼   both directions)
+                 ┌────────┐ ┌─────────┐ ┌─────────┐ ┌────────┐ ┌────────┐
+                 │ parser │ │ Overlay │ │ Trigger-│ │Discord-│ │Hojoring│
+                 │ FFXIV_ │ │ Plugin  │ │ nometry │ │Triggers│ │ suite  │
+                 │ ACT_   │ │ + CEF   │ │         │ │        │ │        │
+                 │ Plugin │ │ + Fleck │ │         │ │        │ │        │
+                 └────────┘ └─────────┘ └─────────┘ └────────┘ └────────┘
+                  Fct.LegacyHost (.NET Fx 4.8) × N — one plugin package each,
+                  each with its private ACT facade + parity-gated engine replica
+
+     the OS process boundary IS both the runtime boundary and the isolation boundary;
+     only DATA crosses, and every inter-plugin path crosses THROUGH the host
 ```
 
 `Fct.Abstractions` **multi-targets `net48;net10`** — records + interfaces compile for
@@ -151,8 +179,18 @@ Fct.App            net10        the Avalonia shell + composition root (one exe):
                                 compat\ (no static Fct.Compat.Shim reference — no ACT-
                                 impersonation identity in its deps.json). See §4a.
 
-Fct.LegacyHost     net48        from-scratch ACT engine + IActPluginV1 loader; hosts
-                                the five real plugins; satellite end of the bridge.
+Fct.Engine         net10        the modern host-side ACT engine — the single source of truth
+                                for encounter calculations: ModernEncounterEngine folds the
+                                bridged CombatSwing/lifecycle feed through the shared
+                                Fct.Aggregation graph; EngineEncounterService projects it as
+                                IEncounterService (+ EncounterProjector → EncounterSnapshot).
+
+Fct.LegacyHost     net48        the satellite: ACT facade host + IActPluginV1 loader, one
+                                real plugin package per process (parser, OverlayPlugin,
+                                Triggernometry, Discord-Triggers, Hojoring → five processes);
+                                satellite end of the bridge — taps what its plugin produces,
+                                projects what the host fans in (incl. the engine replica +
+                                synthetic parser stand-in for consumer packages).
 
 Fct.Parser.Legacy  net48        wraps the real FFXIV_ACT_Plugin (DataRepository +
                                 RingBufferDataSubscription / IRawPacketSource). The parser, permanently.
@@ -161,9 +199,11 @@ Fct.Parser.Legacy  net48        wraps the real FFXIV_ACT_Plugin (DataRepository 
 
 Fct.Aggregation    net48;net10  the ACT aggregation engine (namespace Advanced_Combat_Tracker):
                                 EncounterData/CombatantData/AttackType/MasterSwing/Dnum +
-                                ExportVariables/ColumnDefs. One strong-named identity referenced by
-                                both facades (Fct.Compat.Act net48, Fct.Compat.Shim.ActFacade net10)
-                                so the aggregation binary is identical on both runtimes.
+                                ExportVariables/ColumnDefs + EncounterLifecycle (the runtime-
+                                neutral encounter state machine) + EngineTables. One strong-named
+                                identity referenced by the host engine (Fct.Engine) and both
+                                facades (Fct.Compat.Act net48, Fct.Compat.Shim.ActFacade net10),
+                                so the authority and every replica run the identical binary.
 
 Fct.Compat.Act     net48        the ACT facade: impersonation identity ("Advanced Combat
                                 Tracker") + WinForms host shims (FormActMain, ActGlobals,
@@ -212,7 +252,7 @@ types from the facade (those live in `Fct.Aggregation`).
   modern, themeable, no packaging/runtime friction. The user-facing face of `Fct.App`.
 - **Overlays → unmodified OverlayPlugin.** The host does **not** build a native overlay
   layer (no `Fct.Overlays`, no WebView2, no host-side WebSocket/Kestrel — now or later).
-  OverlayPlugin runs unmodified in the net48 satellite, bringing its own CEF + Fleck +
+  OverlayPlugin runs unmodified in its own net48 satellite, bringing its own CEF + Fleck +
   event sources, and renders overlays as its own transparent click-through windows.
   cactbot/ecosystem compatibility comes from hosting the real OverlayPlugin, not from
   reproducing its web stack.
@@ -226,30 +266,35 @@ shell's Plugins config bay. Overlays stay OverlayPlugin's domain. Full surface +
 
 ---
 
-## 5. v1 dataflow (everything is a real, unmodified plugin)
+## 5. Dataflow (everything is a real, unmodified plugin; every path crosses the host)
 
 ```
 ffxiv_dx11.exe
    ▼
-real FFXIV_ACT_Plugin            ← hosted as IActPluginV1, given our ActGlobals facade
-   │  ParseRawLogLine(...)        (pipe-delimited lines, as in real ACT)
-   │  IDataSubscription + RegisterNetworkParser (raw packets) + custom log lines
-   ▼
-from-scratch ACT engine (Fct.LegacyHost)
-   • ParseRawLogLine → MasterSwing → CombatantData → EncounterData
-   • raises Before/OnLogLineRead, OnCombatStart/End, Before/AfterCombatAction
-   • CustomTrigger eval → TTS(...) / PlaySound(...)
-   • ActGlobals.oFormActMain.ActPlugins holds loaded plugin instances
-        ↑ OverlayPlugin's FFXIVRepository reflects over THIS to find the parser
-   • ── parallel tap ──► IPC bridge ──► typed bus on Fct.App (forward surface)
+PARSER SATELLITE — real FFXIV_ACT_Plugin (hosted as IActPluginV1 on its private facade)
+   │  drives the facade: AddCombatAction / SetEncounter / ChangeZone / log lines
+   │  facade tap → typed GameEventFrames: CombatSwing + lifecycle, RawLogLine,
+   │  RawPacketReceived, combatants/zone/party/player, repository snapshots
+   ▼ (pipe, upstream)
+HOST (Fct.App + Fct.Host, net10)
+   • Fct.Engine folds the swing/lifecycle feed → THE encounter/DPS/ExportVariables truth
+   • typed bus fans every subscribed stream out — to native plugins in-process and to
+     each consumer satellite (pipe, downstream); audio/callback services route the same way
+   ▼ (pipe, downstream — one per consumer satellite)
+CONSUMER SATELLITE (one per package) — its private facade projects the host streams:
+   • engine replica replays swings → synchronous ActiveZone.ActiveEncounter reads
+   • Before/OnLogLineRead re-raised; CustomTrigger eval → TTS/PlaySound → host audio pipe
+   • synthetic parser stand-in in ActPlugins (DataSubscription/DataRepository off the
+     host streams) ← OverlayPlugin's FFXIVRepository reflects over THIS, as under real ACT
    ▼
 real OverlayPlugin ──► its WebSocket server ──► cactbot, addons
-Triggernometry     ──► CustomTriggers / encounter events / TTS
-Discord plugin     ──► trigger+encounter events ──► HTTP→Discord
+Triggernometry     ──► CustomTriggers / encounter events / TTS  ──► host audio pipe
+Discord plugin     ──► registers the terminal audio sink with the host ──► HTTP→Discord
 ```
 
-Nothing here is reimplemented FFXIV logic. We host the real parser and overlay stack;
-we supply the ACT engine they plug into.
+Nothing here is reimplemented FFXIV logic. We host the real parser and overlay stack; we
+supply the ACT engine (in the host) plus the per-satellite facade that routes their world
+through it.
 
 ---
 
@@ -305,7 +350,7 @@ contract is specified in [`PLUGIN-API.md`](PLUGIN-API.md).
 
 ## 8. The parser is the sole, hosted parser
 
-The **real FFXIV_ACT_Plugin is the only parser**, hosted unmodified in the net48 satellite.
+The **real FFXIV_ACT_Plugin is the only parser**, hosted unmodified in the net48 parser satellite.
 `Fct.Parser.Legacy` wraps it: `WrappedFfxivPlugin` forwards `DataRepository`/`_iocContainer`/
 lifecycle to the real instance, and `RingBufferDataSubscription` funnels its events through one
 bounded ring + single dispatch thread and exposes the `IRawPacketSource` hatch. A game patch ships
@@ -321,18 +366,27 @@ stays the plugin's job, permanently; we never read, mirror, or port its logic. W
 
 ## 9. IPC bridge
 
-- **Transport:** a duplex **named pipe** carries both control and the typed-event firehose. The
-  satellite keeps a bounded ring + single writer thread (drop-oldest) so high-rate events never
-  stall the SDK/UI threads.
+- **Transport:** one duplex **named pipe per satellite** carries control and the typed-event
+  streams, **both directions**. Each end keeps a bounded ring + single writer thread
+  (drop-oldest + counters): upstream so high-rate events never stall the SDK/UI threads,
+  downstream (per-satellite egress in the host) so one stalled satellite never blocks the bus
+  or its peers.
 - **Wire format:** one **tab-delimited, backslash-escaped line per event** (an `EVT` frame
-  alongside the `LOG` frame) — **no JSON**. The host re-stamps each decoded event's sequence from
-  its own `IGameEventSink` so the bus keeps one coherent ordering. See
+  alongside the `LOG` frame) — **no JSON**; the same `GameEventFrame` codec both directions.
+  The host re-stamps each decoded event's sequence from its own `IGameEventSink` so the bus
+  keeps one coherent ordering, and fan-out preserves that order per satellite. See
   [`PLUGIN-API.md`](PLUGIN-API.md) ("The bridge data forwarder").
-- **Fault isolation (free bonus):** a CEF crash or a misbehaving legacy plugin cannot
-  take down the net10 host, and vice versa.
-- **Latency rule:** keep producer + latency-sensitive consumer **co-located**. In v1,
-  FFXIV_ACT_Plugin and the trigger plugins are both in the net48 satellite → no
-  cross-process hop on the trigger path. The bridge only feeds net10 *observers*.
+- **Subscriptions:** a satellite declares the stream set its facade needs; the host fans out
+  only those streams and primes late subscribers from `IGameSnapshot`. Routing is keyed by
+  stream/capability name — the host never routes by plugin identity.
+- **Fault isolation (a design goal, not a bonus):** a CEF crash kills the OverlayPlugin
+  satellite only; the host supervises and restarts it. No plugin can take down the host or a
+  peer.
+- **Latency budget:** the trigger and overlay paths cross two pipe hops
+  (parser satellite → host → consumer satellite). The budget is ≤ 10 ms p99 added over the
+  in-process baseline — pinned empirically and enforced by the soak gate
+  ([`ISOLATION-PLAN.md`](ISOLATION-PLAN.md) P4/P9). Co-location is **not** the escape hatch;
+  the budget is met by the bounded-ring design, not by moving consumers next to the producer.
 
 ---
 
@@ -343,12 +397,14 @@ stays the plugin's job, permanently; we never read, mirror, or port its logic. W
 2. **Augment** — author adds a `Fct.Abstractions` integration for typed access, still
    shipping the ACT entrypoint.
 3. **Native** — drops the ACT entrypoint; ships as a first-class net10 plugin; hops from
-   the net48 satellite into the net10 host.
+   its net48 satellite into the net10 host.
 
-**Process sequencing:** v1 *is* the net48 satellite (the whole functional stack already
-lives there — zero cross-runtime risk). The .NET 10 host grows alongside it via the
-bridge. Center of gravity migrates across the bridge as plugins go native; when the
-satellite is empty, delete it.
+**Process sequencing:** the host is the center of gravity from day one — it owns the
+aggregation truth and routes every stream; the satellites are per-package compat shells
+around unmodified plugins. The build order (fabric → fan-out → projection → per-plugin
+cutover, each e2e-gated) is [`ISOLATION-PLAN.md`](ISOLATION-PLAN.md). As a plugin goes
+native its satellite disappears; when the last one is empty, the satellite runtime is
+deleted.
 
 **Feature unlocks that pull authors forward** (impossible via the pipe-delimited line):
 - Full position/heading/velocity at packet rate (log lines round/drop these).
@@ -377,19 +433,27 @@ exactly as before; the forward surface is additive.
 - **M4 — Forward surface:** the parallel typed bus + a demo native plugin reads typed
   events alongside the legacy four — the migration path proven, opt-in, nothing replaced.
 
+Each milestone must hold in the **isolated topology** — one satellite per package, every
+path host-routed. The build order and per-phase e2e gates that get there are
+[`ISOLATION-PLAN.md`](ISOLATION-PLAN.md).
+
 ---
 
 ## 12. Load-bearing compat seams
 
-The seams that make the unmodified drop-in work — each specified in the companion docs:
+The seams that make the unmodified drop-in work. Each is reproduced by the facade **inside
+every satellite that needs it**, backed by the host-routed streams — the seam's *shape* is
+legacy, its *data* always crosses through the host:
 
 1. **MasterSwing boundary.** The **plugin** builds the `MasterSwing`s (`Parse.dll`, via
-   `AddCombatAction`) and feeds ACT; ACT's `FormActMain` does the encounter aggregation. We host the
-   plugin and reproduce only ACT — never porting plugin logic ([`DATA-FLOW.md`](DATA-FLOW.md) §3.2).
+   `AddCombatAction`) and feeds the parser satellite's facade, which forwards them to the host
+   engine — the aggregation truth. Consumer satellites replay the same routed swings through
+   the replica for synchronous reads. We host the plugin and reproduce only ACT — never
+   porting plugin logic ([`DATA-FLOW.md`](DATA-FLOW.md) §3.2).
 2. **`FFXIVRepository` reflection shape.** OverlayPlugin discovers the parser by reflecting
    `ActGlobals.oFormActMain.ActPlugins` and the instance's `DataSubscription`/`DataRepository`
-   properties; the facade matches the reflected shape, not just the public API
-   ([`DATA-FLOW.md`](DATA-FLOW.md) §4.1).
+   properties. In its own satellite it binds the facade's **synthetic parser stand-in** —
+   same reflected shape, data served from the host streams ([`DATA-FLOW.md`](DATA-FLOW.md) §4.1).
 3. **Assembly identity.** The facades carry the legacy strong-name identities the five plugins
    compile against, supplied via `AppDomain.AssemblyResolve`
    ([`ACT-INTERFACE-MAP.md`](ACT-INTERFACE-MAP.md) §17).

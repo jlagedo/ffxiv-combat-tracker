@@ -4,6 +4,7 @@ using System.Threading;
 using Advanced_Combat_Tracker;
 using Fct.Abstractions.Testing;
 using Fct.Compat.ActEngine.TestSupport;
+using Fct.Engine;
 using Xunit;
 
 // The engine uses global static routing tables + ExportVariables registration; serialize the suite so

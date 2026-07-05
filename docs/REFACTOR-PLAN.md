@@ -1,6 +1,9 @@
 # Architecture Refactoring Plan
 
 Phase-by-phase tracker for the structural refactoring identified in the project-layout review.
+The satellite-isolation topology (one satellite per plugin package, host-routed everything) has
+its own tracker: [`ISOLATION-PLAN.md`](ISOLATION-PLAN.md) — its invariants supersede any framing
+here that reads as a single shared satellite.
 This is a **working/tracking document** (unlike the facts docs in `docs/`): it carries sequence,
 status, and rationale. Update the status table and tick the checkboxes as each phase lands.
 

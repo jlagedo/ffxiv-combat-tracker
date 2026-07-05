@@ -1,7 +1,9 @@
 # GO-LIVE — v1 Remediation Plan
 
 Working punch-list to take FFXIV Combat Tracker to a functional v1 that runs the five
-target legacy plugins drop-in and loads native plugins through a full lifecycle. This is a
+target legacy plugins drop-in and loads native plugins through a full lifecycle. v1 ships on
+the **isolated topology** — one satellite per plugin package, every inter-plugin path
+host-routed; the build-out phases and e2e gates live in [`ISOLATION-PLAN.md`](ISOLATION-PLAN.md). This is a
 **tracking document**, not a facts doc — it records outstanding work, owners, and acceptance
 bars, and is retired once v1 ships.
 

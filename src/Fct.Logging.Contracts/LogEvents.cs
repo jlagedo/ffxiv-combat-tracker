@@ -58,6 +58,9 @@ namespace Fct.Logging
         public static readonly EventId NativePluginUiFaulted = new EventId(1502, nameof(NativePluginUiFaulted));
         public static readonly EventId NativePluginUiDuplicateSurface = new EventId(1503, nameof(NativePluginUiDuplicateSurface));
 
+        // -- 16xx modern encounter engine (host side) --
+        public static readonly EventId EncounterHeartbeat = new EventId(1600, nameof(EncounterHeartbeat));
+
         // -- 20xx satellite lifecycle (satellite side) --
         public static readonly EventId SatelliteBooting = new EventId(2000, nameof(SatelliteBooting));
         public static readonly EventId SatelliteBridgeConnected = new EventId(2001, nameof(SatelliteBridgeConnected));

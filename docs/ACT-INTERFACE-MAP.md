@@ -8,8 +8,12 @@ used, status, and strategy. The non-ACT integration surfaces (FFXIV SDK seam, Ov
 layer, Discord audio bridge) are the last sections.
 
 This document is the authority for the **surface/binding axis** (making the unmodified plugins load
-and run). Companion docs:
-- [`DATA-FLOW.md`](DATA-FLOW.md) — the data-flow narrative through the upstream stack.
+and run). The surface is instantiated **once per satellite** — each plugin package gets its own
+process with its own facade, and the data behind every member below arrives over the host's routed
+streams, never a heap shared with another plugin ([`ISOLATION-PLAN.md`](ISOLATION-PLAN.md)).
+Companion docs:
+- [`DATA-FLOW.md`](DATA-FLOW.md) — the data-flow narrative through the upstream stack (§8 maps each
+  seam onto its host pipe).
 - [`TESTING.md`](TESTING.md) — the **output-value axis**: our ACT engine's `ExportVariables` held to
   the real ACT binary, both fed the same plugin-produced swings (`AggregateCompatTests`/
   `ExportVarsCompatTests` on fixtures; `tools/mass-compare` corpus-wide).

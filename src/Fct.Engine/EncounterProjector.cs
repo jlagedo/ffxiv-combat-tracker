@@ -4,14 +4,14 @@ using System.Linq;
 using Advanced_Combat_Tracker;
 using Fct.Abstractions;
 
-namespace Fct.Compat.Shim
+namespace Fct.Engine
 {
     /// <summary>
-    /// Projects the shim's aggregating ACT <see cref="EncounterData"/>/<see cref="CombatantData"/>
-    /// into the modern typed <see cref="EncounterSnapshot"/>/<see cref="CombatantMetrics"/>. Carries
-    /// the opaque cactbot <c>ExportVariables</c> bag (G1, evaluated from the shared engine's registered
-    /// formatters) so a native consumer can round-trip the payload OverlayPlugin forwards verbatim.
-    /// Pure — no host interaction; the caller decides when to project (e.g. on combat-state change).
+    /// Projects the aggregating ACT <see cref="EncounterData"/>/<see cref="CombatantData"/> into the
+    /// modern typed <see cref="EncounterSnapshot"/>/<see cref="CombatantMetrics"/>. Carries the opaque
+    /// cactbot <c>ExportVariables</c> bag (evaluated from the engine's registered formatters) so a
+    /// consumer can round-trip the payload OverlayPlugin forwards verbatim. Pure — no host interaction;
+    /// the caller decides when to project (e.g. on a tick / combat-state change).
     /// </summary>
     public static class EncounterProjector
     {
@@ -44,9 +44,8 @@ namespace Fct.Compat.Shim
                 c.Name, 0u, 0, c.EncDPS, c.Damage, damagePercent, c.Healed, c.CritDamPerc, 0.0, c.Deaths)
             {
                 ExportVariables = CombatantExportVars(c),
-                // G2: OverlayPlugin's overHeal/damageShield/absorbHeal come from per-swing tags the
-                // FFXIV plugin sets; the shim populates them once it receives tagged swings. Absent in
-                // this slice's swing stream → 0.
+                // OverlayPlugin's overHeal/damageShield/absorbHeal come from per-swing tags the FFXIV
+                // plugin sets; they are populated once the tagged-swing formatters land (Phase 2).
                 Overheal = 0,
                 ShieldedDamage = 0,
                 Absorbed = 0,
