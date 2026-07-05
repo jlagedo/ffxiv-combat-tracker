@@ -16,6 +16,8 @@
     <!-- The host runtime under test (PluginManager + CompatRuntime); internals exposed via
          InternalsVisibleTo("Fct.Compat.Shim.E2E.Tests") on Fct.Host. -->
     <ProjectReference Include="..\..\src\Fct.Host\Fct.Host.csproj" />
+    <!-- In-memory plugin-contract fakes (FakeEncounterService) for wiring PluginManager. -->
+    <ProjectReference Include="..\..\src\Fct.Abstractions.Testing\Fct.Abstractions.Testing.csproj" />
   </ItemGroup>
 
   <!-- Built + staged, NOT assembly-referenced: the shim resolves only through the compat\ hook, and the

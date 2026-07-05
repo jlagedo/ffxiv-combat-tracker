@@ -15,4 +15,16 @@
     <ProjectReference Include="..\..\src\Fct.Abstractions.Testing\Fct.Abstractions.Testing.csproj" />
   </ItemGroup>
 
+  <!--
+    The committed real-ACT oracle corpus (captured plugin swing stream + the ExportVariables strings
+    real ACT rendered from it), linked from the net48 suite so both runtimes are held to ONE baseline.
+    OracleParityTests feeds the swings through ModernEncounterEngine and asserts the net10 engine
+    reproduces every string bit-for-bit — the same oracle the net48 engine is held to.
+  -->
+  <ItemGroup>
+    <Content Include="..\Fct.Compat.Act.Tests\fixtures\combat-slice*.oracle.tsv" Link="fixtures\%(Filename)%(Extension)" CopyToOutputDirectory="PreserveNewest" />
+    <Content Include="..\Fct.Compat.Act.Tests\fixtures\combat-slice*.exportvars.tsv" Link="fixtures\%(Filename)%(Extension)" CopyToOutputDirectory="PreserveNewest" />
+    <Content Include="..\Fct.Compat.Act.Tests\fixtures\combat-slice*.aggregate.tsv" Link="fixtures\%(Filename)%(Extension)" CopyToOutputDirectory="PreserveNewest" />
+  </ItemGroup>
+
 </Project>

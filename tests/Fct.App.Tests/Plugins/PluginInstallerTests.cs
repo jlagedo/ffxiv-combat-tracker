@@ -4,6 +4,7 @@ using System.IO.Compression;
 using System.Threading;
 using System.Threading.Tasks;
 using Fct.Abstractions;
+using Fct.Abstractions.Testing;
 using Fct.Abstractions.UI;
 using Fct.Host.Hosting;
 using Fct.Host.Plugins;
@@ -162,7 +163,7 @@ public class PluginInstallerTests
             var registry = new RegistryService();
             Manager = new PluginManager(
                 new GameSession(bus, new GameSnapshotProvider()),
-                new EncounterService(new SystemClock()),
+                new FakeEncounterService(),
                 new AudioService(NullLogger<AudioService>.Instance),
                 registry, bus, new SystemClock(), NullLoggerFactory.Instance);
             Satellite = new FakeSatelliteChannel();

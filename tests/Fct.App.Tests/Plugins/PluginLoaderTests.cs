@@ -75,7 +75,7 @@ public class PluginLoaderTests
         var clock = new SystemClock();
         var registry = new RegistryService();
         var audio = new AudioService(NullLogger<AudioService>.Instance);
-        var encounters = new EncounterService(clock);
+        var encounters = new FakeEncounterService();
 
         // Observe the plugin's outputs: an audio sink and a bus subscriber for its synthetic 257 line.
         var sink = new RecordingAudioSink();
@@ -140,7 +140,7 @@ public class PluginLoaderTests
             var bus = new GameEventBus();
             var manager = new PluginManager(
                 new GameSession(bus, new GameSnapshotProvider()),
-                new EncounterService(new SystemClock()),
+                new FakeEncounterService(),
                 new AudioService(NullLogger<AudioService>.Instance),
                 new RegistryService(),
                 bus,
@@ -195,7 +195,7 @@ public class PluginLoaderTests
             var registry = new RegistryService();
             var manager = new PluginManager(
                 new GameSession(bus, new GameSnapshotProvider()),
-                new EncounterService(new SystemClock()),
+                new FakeEncounterService(),
                 new AudioService(NullLogger<AudioService>.Instance),
                 registry,
                 bus,

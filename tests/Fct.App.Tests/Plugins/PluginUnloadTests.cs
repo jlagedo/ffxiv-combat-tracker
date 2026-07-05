@@ -2,6 +2,7 @@ using System;
 using System.IO;
 using System.Threading;
 using System.Threading.Tasks;
+using Fct.Abstractions.Testing;
 using Fct.Host.Hosting;
 using Fct.Host.Plugins;
 using Microsoft.Extensions.Logging.Abstractions;
@@ -27,7 +28,7 @@ public class PluginUnloadTests
 
         var manager = new PluginManager(
             new GameSession(bus, new GameSnapshotProvider()),
-            new EncounterService(new SystemClock()),
+            new FakeEncounterService(),
             new AudioService(NullLogger<AudioService>.Instance),
             registry, bus, new SystemClock(), NullLoggerFactory.Instance);
 

@@ -11,9 +11,14 @@ namespace Advanced_Combat_Tracker
     {
         private static bool _done;
 
-        // ACT's suffixed number renderer (the "-*"/"-k|m|b" keys).
+        // ACT's suffixed number renderer (the "-*"/"-k|m|b" keys). ACT surfaces a NaN/Infinity DPS/HPS
+        // (a zero-duration combatant's damage÷0) as the "NaN"/"Infinity" sentinel by casting the double
+        // to long and letting DamageString map long.MinValue→"NaN". That cast is the *only* TFM-divergent
+        // step: .NET Framework's cvttsd2si folds every non-finite double to long.MinValue, but .NET Core
+        // defines (long)NaN==0. Reproduce the net48 sentinel explicitly so the shared engine renders the
+        // identical string on both runtimes (held to real ACT by ExportVarsCompatTests + OracleParityTests).
         private static string Cds(double v, bool dec) =>
-            DamageString.Create((long)v, true, dec);
+            DamageString.Create(double.IsNaN(v) || double.IsInfinity(v) ? long.MinValue : (long)v, true, dec);
         // ACT's NAME{n}: the name truncated to n characters (trimmed).
         private static string Short(string n, int k) =>
             n != null && n.Length > k ? n.Substring(0, k).Trim() : n;
@@ -156,13 +161,13 @@ namespace Advanced_Combat_Tracker
             E("DPS", (d, a, e) => DpsOf(d, a).ToString("0"));
             E("DPS-k", (d, a, e) => (DpsOf(d, a) / 1000.0).ToString("0"));
             E("DPS-m", (d, a, e) => "DPS-m");   // ACT registers this key but its switch echoes the name
-            E("DPS-*", (d, a, e) => Cds((long)DpsOf(d, a), false));
+            E("DPS-*", (d, a, e) => Cds(DpsOf(d, a), false));
             E("encdps", (d, a, e) => DpsOf(d, a).ToString("F"));
-            E("encdps-*", (d, a, e) => Cds((long)DpsOf(d, a), true));
+            E("encdps-*", (d, a, e) => Cds(DpsOf(d, a), true));
             E("ENCDPS", (d, a, e) => DpsOf(d, a).ToString("0"));
             E("ENCDPS-k", (d, a, e) => (DpsOf(d, a) / 1000.0).ToString("0"));
             E("ENCDPS-m", (d, a, e) => (DpsOf(d, a) / 1000000.0).ToString("0"));
-            E("ENCDPS-*", (d, a, e) => Cds((long)DpsOf(d, a), false));
+            E("ENCDPS-*", (d, a, e) => Cds(DpsOf(d, a), false));
 
             E("hits", (d, a, e) => a.Sum(c => c.Hits).ToString());
             E("crithits", (d, a, e) => a.Sum(c => c.CritHits).ToString());
@@ -180,11 +185,11 @@ namespace Advanced_Combat_Tracker
 
             E("healed", (d, a, e) => Heal(a).ToString());
             E("enchps", (d, a, e) => HpsOf(d, a).ToString("F"));
-            E("enchps-*", (d, a, e) => Cds((long)HpsOf(d, a), true));
+            E("enchps-*", (d, a, e) => Cds(HpsOf(d, a), true));
             E("ENCHPS", (d, a, e) => HpsOf(d, a).ToString("0"));
             E("ENCHPS-k", (d, a, e) => (HpsOf(d, a) / 1000.0).ToString("0"));
             E("ENCHPS-m", (d, a, e) => (HpsOf(d, a) / 1000000.0).ToString("0"));
-            E("ENCHPS-*", (d, a, e) => Cds((long)HpsOf(d, a), false));
+            E("ENCHPS-*", (d, a, e) => Cds(HpsOf(d, a), false));
 
             E("heals", (d, a, e) => a.Sum(c => c.Heals).ToString());
             E("critheals", (d, a, e) => a.Sum(c => c.CritHits).ToString());   // ACT quirk: sums CritHits
