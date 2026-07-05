@@ -49,12 +49,19 @@ public sealed class DataRepository : IDataRepository
     // ACT's AV-detection diagnostic has no equivalent here.
     public string[] GetAntiVirusNames() => Array.Empty<string>();
 
-    // No FFXIV game Process handle exists on the net10 side — the game connection lives in the net48
-    // satellite. Consumers null-check this to mean "not attached" (e.g. OverlayPlugin's FFXIVRepository).
-    public Process GetCurrentFFXIVProcess() => null!;
+    // The game connection lives in the parser satellite; its PID is forwarded onto the snapshot so a
+    // consumer materializes a live Process handle by id. Null when no PID is reported or the process is
+    // gone — consumers null-check this to mean "not attached" (e.g. OverlayPlugin's FFXIVRepository).
+    public Process GetCurrentFFXIVProcess()
+    {
+        var pid = Snapshot().Client.ProcessId;
+        if (pid is null or 0) return null!;
+        try { return Process.GetProcessById(pid.Value); }
+        catch (ArgumentException) { return null!; }   // no such process
+    }
 
-    // Name tables are not sourced yet (IResourceCatalog is a tracked open item); until then the modern
-    // catalog is empty and this returns an empty dictionary.
+    // Name tables are sourced from the parser satellite's forwarded resource dictionaries (folded into
+    // the snapshot's IResourceCatalog); an unforwarded kind resolves to an empty dictionary.
     public IDictionary<uint, string> GetResourceDictionary(ResourceType resourceType)
     {
         var kind = MapResource(resourceType);

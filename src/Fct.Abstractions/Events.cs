@@ -124,4 +124,28 @@ namespace Fct.Abstractions
     /// </summary>
     public sealed record RawPacketReceived(long Sequence, DateTimeOffset Timestamp, string Connection, long Epoch, PacketDirection Direction, byte[] Bytes)
         : GameEvent(Sequence, Timestamp);
+
+    /// <summary>
+    /// A fixed-rate full combatant roster with fresh HP/position/party — the poll surface
+    /// OverlayPlugin/Hojoring consume through <c>IDataRepository.GetCombatantList()</c>. Unlike the
+    /// incremental <see cref="CombatantAdded"/> (add-time HP, no position), this carries the whole list
+    /// at snapshot time so a consumer satellite mirrors the parser's live repository.
+    /// </summary>
+    public sealed record RepositorySnapshot(long Sequence, DateTimeOffset Timestamp, IReadOnlyList<Actor> Combatants)
+        : GameEvent(Sequence, Timestamp);
+
+    /// <summary>
+    /// An id→name resource dictionary forwarded once per <see cref="ResourceKind"/> (the parser's
+    /// <c>GetResourceDictionary</c> tables), so a consumer satellite can serve those reads without a parser.
+    /// </summary>
+    public sealed record ResourceDictionaryForwarded(long Sequence, DateTimeOffset Timestamp, ResourceKind Kind, IReadOnlyDictionary<uint, string> Entries)
+        : GameEvent(Sequence, Timestamp);
+
+    /// <summary>
+    /// The FFXIV game process id, forwarded so a consumer satellite materializes
+    /// <c>GetCurrentFFXIVProcess()</c> locally via <c>Process.GetProcessById</c>. <see cref="Pid"/> 0 =
+    /// no live game process.
+    /// </summary>
+    public sealed record GameProcessChanged(long Sequence, DateTimeOffset Timestamp, int Pid)
+        : GameEvent(Sequence, Timestamp);
 }

@@ -114,7 +114,10 @@ namespace Fct.LegacyHost
                 var consumePipe = ParseBridgeArg(args);
                 if (consumePipe != null)
                 {
-                    RunConsume(args[ci + 1], ParseArgValue(args, "--subscribe") ?? SatelliteProtocol.StreamSwings, consumePipe);
+                    RunConsume(args[ci + 1], ParseArgValue(args, "--subscribe") ?? SatelliteProtocol.StreamSwings,
+                        consumePipe, ParseArgValue(args, "--verify-loglines"),
+                        Array.IndexOf(args, "--stand-in") >= 0, ParseArgValue(args, "--verify-standin"),
+                        Array.IndexOf(args, "--probe") >= 0);
                     return;
                 }
             }
@@ -359,7 +362,8 @@ namespace Fct.LegacyHost
         // Fct.Aggregation replica — exactly as a real consumer plugin (OverlayPlugin/Triggernometry) would
         // read ActiveZone.ActiveEncounter + ExportVariables. On shutdown, dump the YOU total summed across
         // the encounters the fanned lifecycle split the stream into (the parity value vs the host engine).
-        private static void RunConsume(string dumpPath, string streams, string pipeName)
+        private static void RunConsume(string dumpPath, string streams, string pipeName,
+            string logLineVerifyPath = null, bool standIn = false, string standInVerifyPath = null, bool probe = false)
         {
             SatelliteLogging.Initialize(_satelliteId);
             _log = SatelliteLogging.Log;
@@ -383,6 +387,41 @@ namespace Fct.LegacyHost
                 if (you != null) System.Threading.Interlocked.Add(ref youTotal, you.Damage);
             };
 
+            // Log-line re-raise verification (plugin-free gate): count re-raised lines and prove the
+            // Before→On args instance is shared by mutating logLine in a Before-handler and observing
+            // it in an On-handler. Written to a sibling artifact so the YOU-total dump stays a bare int.
+            _logLineVerifyPath = logLineVerifyPath;
+            if (logLineVerifyPath != null)
+            {
+                act.BeforeLogLineRead += (imp, a) => { a.logLine = LogLineMutationMarker + a.logLine; };
+                act.OnLogLineRead += (imp, a) =>
+                {
+                    System.Threading.Interlocked.Increment(ref _logLineCount);
+                    if (a.logLine != null && a.logLine.StartsWith(LogLineMutationMarker, StringComparison.Ordinal))
+                        System.Threading.Interlocked.Increment(ref _logLineMutationObserved);
+                };
+            }
+
+            // Synthetic parser stand-in (ISOLATION-PLAN P5): expose the SDK surface an unmodified consumer
+            // discovers + binds, backed by the same host-routed frames — no parser. Make the Costura-embedded
+            // FFXIV_ACT_Plugin.Common resolvable first (load the installed parser DLL + run its module
+            // initializer), then materialize the stand-in only through the SDK-type-free seam so this path
+            // is the only place that JITs SDK-touching code.
+            if (standIn)
+            {
+                _standInVerifyPath = standInVerifyPath;
+                if (TryEnsureSdkResolvable())
+                {
+                    _standIn = Fct.Parser.Legacy.ConsumerStandInFactory.Create(FacadeHost.Log);
+                    _standIn.Register();
+                }
+                else
+                {
+                    _log.LogError(LogEvents.PluginNotFound,
+                        "Stand-in requested but FFXIV_ACT_Plugin.dll is not installed; the SDK surface is unavailable");
+                }
+            }
+
             try
             {
                 _bridge = new NamedPipeClientStream(".", pipeName, PipeDirection.Out);
@@ -398,6 +437,14 @@ namespace Fct.LegacyHost
             {
                 _log.LogError(LogEvents.SatelliteBridgeConnectFailed, ex, "Consumer bridge connect failed");
                 Environment.Exit(1);
+                return;
+            }
+
+            // Probe discovery variant (ISOLATION-PLAN P5): host the real, unmodified Fct.StreamProbe so it
+            // discovers the stand-in by reflection under a message loop. Never returns (exits inside).
+            if (probe)
+            {
+                RunConsumeProbeLoop(act, ref youTotal, dumpPath, pipeName);
                 return;
             }
 
@@ -459,17 +506,133 @@ namespace Fct.LegacyHost
                 case Fct.Abstractions.EndCombatRequested c:
                     act.EndCombat(c.Export);
                     break;
+                case Fct.Abstractions.RawLogLine r:
+                    // Re-raise the fanned raw line through ACT's Before/OnLogLineRead hooks so an
+                    // unmodified consumer (Trig/cactbot regex) reads it exactly as under real ACT. The
+                    // SAME LogLineEventArgs instance flows through both hooks, so a Before-handler edit
+                    // of the mutable logLine/detectedType is visible to OnLogLineRead.
+                    var logArgs = new LogLineEventArgs(r.Line ?? "", (int)r.Type,
+                        r.Timestamp.LocalDateTime, act.CurrentZone ?? "", act.InCombat);
+                    act.FireBeforeLogLineRead(false, logArgs);
+                    act.FireLogLineRead(false, logArgs);
+                    break;
             }
+            // Also feed the synthetic parser stand-in (its SDK subscription + repository mirror), so a
+            // discovered consumer plugin sees the same host-routed frames. No-op unless --stand-in.
+            _standIn?.Fold(evt);
         }
 
         // Flush the parity value once. Any encounter still open (no trailing EndCombat) is closed so its
         // YOU damage is counted. Idempotent via the file existence + a one-shot guard.
         private static int _consumeFlushed;
+        private const string LogLineMutationMarker = "MUT|";
+        private static string _logLineVerifyPath;
+        private static long _logLineCount;
+        private static long _logLineMutationObserved;
+        private static Fct.Parser.Legacy.IConsumerStandIn _standIn;
+        private static string _standInVerifyPath;
         private static void FlushConsume(FormActMain act, ref long youTotal, string dumpPath)
         {
             if (System.Threading.Interlocked.Exchange(ref _consumeFlushed, 1) != 0) return;
             try { if (act.InCombat) act.EndCombat(true); } catch { }
             try { File.WriteAllText(dumpPath, youTotal.ToString(System.Globalization.CultureInfo.InvariantCulture)); } catch { }
+            // Sibling log-line verification artifact: "<re-raised count>\t<mutation-observed count>".
+            if (_logLineVerifyPath != null)
+            {
+                try
+                {
+                    File.WriteAllText(_logLineVerifyPath, string.Format(System.Globalization.CultureInfo.InvariantCulture,
+                        "{0}\t{1}", System.Threading.Interlocked.Read(ref _logLineCount),
+                        System.Threading.Interlocked.Read(ref _logLineMutationObserved)));
+                }
+                catch { }
+            }
+            // Stand-in discovery artifact: "<found>\t<sdkBound>\t<logLines>\t<combatants>\t<title>\t<status>".
+            if (_standInVerifyPath != null && _standIn != null)
+            {
+                try
+                {
+                    var v = _standIn.SelfVerify();
+                    var inv = System.Globalization.CultureInfo.InvariantCulture;
+                    File.WriteAllText(_standInVerifyPath, string.Join("\t", new[]
+                    {
+                        v.Found ? "1" : "0", v.SdkTypesBound ? "1" : "0",
+                        v.LogLines.ToString(inv), v.Combatants.ToString(inv),
+                        v.Title ?? "", v.Status ?? "",
+                    }));
+                }
+                catch { }
+            }
+        }
+
+        // Probe discovery variant (ISOLATION-PLAN P5 M4): host the real, unmodified Fct.StreamProbe as an
+        // IActPluginV1 so it discovers the stand-in by reflection (title scan → cast DataSubscription/
+        // DataRepository → poll the repository) exactly as OverlayPlugin's FFXIVRepository does — across an
+        // assembly boundary, binding FFXIV_ACT_Plugin.Common through the facade's AssemblyResolve. StreamProbe
+        // drives UI-thread timers, so this runs a WinForms message loop with the command-pipe fold on a
+        // background thread; teardown (pipe close or host shutdown) exits the loop and flushes the probe log.
+        private static void RunConsumeProbeLoop(FormActMain act, ref long youTotal, string dumpPath, string pipeName)
+        {
+            try { FacadeHost.LoadProbe(FacadeHost.StreamProbePath); }
+            catch (Exception ex) { _log.LogError(LogEvents.PluginLoadFailed, ex, "[Probe] load failed"); }
+
+            var reader = new System.Threading.Thread(() =>
+            {
+                try
+                {
+                    _cmdPipe = new NamedPipeClientStream(".", pipeName + "-cmd", PipeDirection.In);
+                    _cmdPipe.Connect(30000);
+                    using var r = new StreamReader(_cmdPipe);
+                    string line;
+                    while ((line = r.ReadLine()) != null)
+                        if (GameEventFrame.TryParse(line, out var evt) && evt != null) FoldConsume(act, evt);
+                }
+                catch (Exception ex) { _log.LogError(LogEvents.SatelliteBridgeConnectFailed, ex, "[Probe] command-pipe read failed"); }
+                finally { try { Application.Exit(); } catch { } }
+            }) { IsBackground = true, Name = "consume-probe-read" };
+            reader.Start();
+
+            try
+            {
+                var shutdown = System.Threading.EventWaitHandle.OpenExisting(pipeName + "-shutdown");
+                new System.Threading.Thread(() => { shutdown.WaitOne(); try { Application.Exit(); } catch { } })
+                    { IsBackground = true, Name = "consume-probe-shutdown" }.Start();
+            }
+            catch { /* best-effort */ }
+
+            using (var pump = new Form { ShowInTaskbar = false, FormBorderStyle = FormBorderStyle.None,
+                                         WindowState = FormWindowState.Minimized, Visible = false })
+            {
+                _ = pump.Handle;
+                Application.Run(pump);   // pumps StreamProbe's discover/snapshot timers until Application.Exit
+            }
+
+            try { FacadeHost.DeInitPlugins(); } catch { }   // flushes the StreamProbe log
+            FlushConsume(act, ref youTotal, dumpPath);
+            SatelliteLogging.Shutdown();
+            Environment.Exit(0);
+        }
+
+        // Make the Costura-embedded FFXIV_ACT_Plugin.Common resolvable in a plugin-free consumer: load the
+        // installed parser DLL and run its module initializer so Costura's AssemblyResolve hook registers
+        // (Assembly.LoadFrom alone executes no code). No plugin type is constructed. The facade's Common
+        // resolver (registered first) then unifies every request onto this one loaded copy.
+        private static bool TryEnsureSdkResolvable()
+        {
+            var path = FacadeHost.FfxivPluginPath;
+            if (!File.Exists(path)) return false;
+            try
+            {
+                var asm = System.Reflection.Assembly.LoadFrom(path);
+                System.Runtime.CompilerServices.RuntimeHelpers.RunModuleConstructor(asm.ManifestModule.ModuleHandle);
+                _log.LogInformation(LogEvents.PluginLoading, "[StandIn] SDK made resolvable via {Path}", path);
+                return true;
+            }
+            catch (Exception ex)
+            {
+                _log.LogError(LogEvents.PluginLoadFailed, ex, "[StandIn] failed to make the SDK resolvable from {Path}", path);
+                return false;
+            }
         }
 
         // Boot the satellite with NO plugins loaded: a clean host ships nothing and boot-loads nothing.

@@ -327,6 +327,7 @@ public sealed class SatelliteHost : Fct.Host.Plugins.ISatellitePluginChannel
             var now = DateTimeOffset.UtcNow;
             bool zoneParty = Array.IndexOf(tokens, SatelliteProtocol.StreamZoneParty) >= 0;
             bool combatants = Array.IndexOf(tokens, SatelliteProtocol.StreamCombatants) >= 0;
+            bool repository = Array.IndexOf(tokens, SatelliteProtocol.StreamRepository) >= 0;
 
             if (zoneParty)
             {
@@ -340,6 +341,20 @@ public sealed class SatelliteHost : Fct.Host.Plugins.ISatellitePluginChannel
             if (combatants)
                 foreach (var a in snap.Actors)
                     SendDownstream(GameEventFrame.ToWire(new CombatantAdded(0, now, a)));
+            if (repository)
+            {
+                // The repository combatant list refreshes on the next live snapshot; the PID and resource
+                // dictionaries are one-shot upstream, so seed them here for a late subscriber to converge.
+                if (snap.Client.ProcessId is int pid && pid != 0)
+                    SendDownstream(GameEventFrame.ToWire(new GameProcessChanged(0, now, pid)));
+                SendDownstream(GameEventFrame.ToWire(new RepositorySnapshot(0, now, snap.Actors)));
+                foreach (ResourceKind kind in Enum.GetValues(typeof(ResourceKind)))
+                {
+                    var entries = snap.Resources.All(kind);
+                    if (entries.Count > 0)
+                        SendDownstream(GameEventFrame.ToWire(new ResourceDictionaryForwarded(0, now, kind, entries)));
+                }
+            }
         }
         catch (Exception ex)
         {

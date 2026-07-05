@@ -50,6 +50,7 @@ public static class SatelliteProtocol
     public const string StreamPackets = "packets";        // the RawPacketReceived firehose
     public const string StreamCombatants = "combatants";  // CombatantAdded/Removed
     public const string StreamZoneParty = "zoneparty";    // ZoneChanged/PartyChanged/PrimaryPlayerChanged
+    public const string StreamRepository = "repository";  // RepositorySnapshot + ResourceDictionaryForwarded + GameProcessChanged
 
     // ---- satellite -> host handshake frames (formatted on the satellite, parsed on the host) ----
 

@@ -45,6 +45,11 @@ namespace Fct.Host
                     case SatelliteProtocol.StreamRawLog:
                         rawLog = true;
                         break;
+                    case SatelliteProtocol.StreamRepository:
+                        types.Add(typeof(RepositorySnapshot));
+                        types.Add(typeof(ResourceDictionaryForwarded));
+                        types.Add(typeof(GameProcessChanged));
+                        break;
                     default:
                         break; // unknown token — ignored
                 }

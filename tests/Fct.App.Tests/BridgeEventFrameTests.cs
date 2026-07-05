@@ -252,6 +252,90 @@ namespace Fct.App.Tests
         }
 
         [Fact]
+        public void RepositorySnapshot_roundtrips_combatants_with_fresh_hp_position_party()
+        {
+            var you = new Actor(
+                Id: 0x1000, OwnerId: 0, Kind: ActorKind.Player, Job: 24, Level: 90, Name: "You\tHero",
+                Hp: 73210, MaxHp: 100000, Mp: 8000, MaxMp: 10000,
+                Cast: null, Position: new Position(10.5f, 20.25f, 30.125f, 1.5f),
+                WorldId: 40, WorldName: "Odin",
+                BNpcNameId: 0, BNpcId: 0, TargetId: 0x2000, TargetOfTargetId: 0, EffectiveDistance: 7,
+                Party: PartyMembership.Party, InCombat: true,
+                Statuses: Array.Empty<StatusEffect>(), Enmity: Array.Empty<EnmityEntry>())
+            {
+                CurrentWorldId = 41, CurrentCp = 500, MaxCp = 600, CurrentGp = 700, MaxGp = 800, Order = 1,
+            };
+            var boss = new Actor(
+                Id: 0x2000, OwnerId: 0, Kind: ActorKind.Npc, Job: 0, Level: 0, Name: "Boss",
+                Hp: 5000000, MaxHp: 5000000, Mp: 0, MaxMp: 0,
+                Cast: null, Position: new Position(-100.5f, 0f, 100.5f, 3.140625f),
+                WorldId: 0, WorldName: "",
+                BNpcNameId: 123, BNpcId: 456, TargetId: 0x1000, TargetOfTargetId: 0, EffectiveDistance: 30,
+                Party: PartyMembership.None, InCombat: true,
+                Statuses: Array.Empty<StatusEffect>(), Enmity: Array.Empty<EnmityEntry>());
+
+            var e = Assert.IsType<RepositorySnapshot>(RoundTrip(new RepositorySnapshot(1, Ts, new[] { you, boss })));
+            Assert.Equal(2, e.Combatants.Count);
+
+            var a = e.Combatants[0];
+            Assert.Equal(0x1000u, a.Id);
+            Assert.Equal("You\tHero", a.Name);
+            Assert.Equal(73210u, a.Hp);
+            Assert.Equal(100000u, a.MaxHp);
+            Assert.Equal(new Position(10.5f, 20.25f, 30.125f, 1.5f), a.Position);
+            Assert.Equal(0x2000u, a.TargetId);
+            Assert.Equal(PartyMembership.Party, a.Party);
+            Assert.Equal((byte)7, a.EffectiveDistance);
+            Assert.True(a.InCombat);
+            Assert.Equal(41u, a.CurrentWorldId);
+            Assert.Equal(1, a.Order);
+
+            var b = e.Combatants[1];
+            Assert.Equal(ActorKind.Npc, b.Kind);
+            Assert.Equal(5000000u, b.MaxHp);
+            Assert.Equal(new Position(-100.5f, 0f, 100.5f, 3.140625f), b.Position);
+            Assert.Null(b.CurrentWorldId);
+            Assert.Null(b.Order);
+        }
+
+        [Fact]
+        public void RepositorySnapshot_roundtrips_empty_roster()
+        {
+            var e = Assert.IsType<RepositorySnapshot>(RoundTrip(new RepositorySnapshot(1, Ts, Array.Empty<Actor>())));
+            Assert.Empty(e.Combatants);
+        }
+
+        [Fact]
+        public void ResourceDictionaryForwarded_roundtrips_entries_and_kind()
+        {
+            var entries = new Dictionary<uint, string>
+            {
+                [1] = "Heavy Swing",
+                [42] = "Status\tWith\\Delims",
+                [65535] = "",
+            };
+            var e = Assert.IsType<ResourceDictionaryForwarded>(
+                RoundTrip(new ResourceDictionaryForwarded(1, Ts, ResourceKind.Status, entries)));
+            Assert.Equal(ResourceKind.Status, e.Kind);
+            Assert.Equal(3, e.Entries.Count);
+            Assert.Equal("Heavy Swing", e.Entries[1]);
+            Assert.Equal("Status\tWith\\Delims", e.Entries[42]);
+            Assert.Equal("", e.Entries[65535]);
+
+            var empty = Assert.IsType<ResourceDictionaryForwarded>(
+                RoundTrip(new ResourceDictionaryForwarded(1, Ts, ResourceKind.Action, new Dictionary<uint, string>())));
+            Assert.Empty(empty.Entries);
+        }
+
+        [Fact]
+        public void GameProcessChanged_roundtrips()
+        {
+            var e = Assert.IsType<GameProcessChanged>(RoundTrip(new GameProcessChanged(1, Ts, 48213)));
+            Assert.Equal(48213, e.Pid);
+            Assert.Equal(0, Assert.IsType<GameProcessChanged>(RoundTrip(new GameProcessChanged(1, Ts, 0))).Pid);
+        }
+
+        [Fact]
         public void ToWire_returns_null_for_firehose_only_events()
         {
             // Events with no structured SDK/ACT source are not forwarded as typed frames — they reach

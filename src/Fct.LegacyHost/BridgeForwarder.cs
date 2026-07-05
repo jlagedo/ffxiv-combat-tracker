@@ -35,6 +35,11 @@ namespace Fct.LegacyHost
         private IDataSubscription _sub;
         private IDataRepository _repo;
         private Timer _discover;   // polls until the FFXIV plugin SDK is reachable
+        private Timer _repoTimer;  // fixed-rate combatant-list snapshot poll (fresh HP/position/party)
+
+        // Repository-snapshot poll cadence. The mirror's freshness must satisfy OverlayPlugin/Hojoring
+        // polls without flooding the pipe (ISOLATION-PLAN §5 open question — pinned in the P9 soak).
+        private const int RepositorySnapshotIntervalMs = 250;
 
         // Bounded ring drained by one writer thread — mirrors RingBufferDataSubscription's model.
         private readonly GameEvent[] _ring;
@@ -109,6 +114,8 @@ namespace Fct.LegacyHost
                 _discover.Stop(); _discover.Dispose(); _discover = null;
                 _sub = sub; _repo = repo;
                 SubscribeSdk(sub);
+                EmitInitialRepositoryState();   // PID + one-shot resource dictionaries
+                StartRepositoryTimer();          // fixed-rate combatant-list snapshots
                 _log.LogInformation(Fct.Logging.LogEvents.ForwarderBound,
                     "[Forwarder] bound to FFXIV SDK; forwarding typed events over the bridge");
             }
@@ -128,6 +135,78 @@ namespace Fct.LegacyHost
             sub.CombatantRemoved += OnCombatantRemoved;
             sub.NetworkReceived += OnNetworkReceived;
             sub.NetworkSent += OnNetworkSent;
+            sub.ProcessChanged += OnProcessChanged;
+        }
+
+        // ---- Repository snapshots / resource dictionaries / game PID (ISOLATION-PLAN P5) -------------
+
+        // The game process id — forwarded so a consumer satellite materializes GetCurrentFFXIVProcess()
+        // locally (Process.GetProcessById). A null process (game closed) forwards pid 0.
+        private void OnProcessChanged(System.Diagnostics.Process process) =>
+            Enqueue(new GameProcessChanged(0, DateTimeOffset.Now, process?.Id ?? 0));
+
+        // One-shot on bind: the current PID + the id→name tables consumers read via GetResourceDictionary.
+        private void EmitInitialRepositoryState()
+        {
+            try
+            {
+                var p = _repo?.GetCurrentFFXIVProcess();
+                if (p != null) Enqueue(new GameProcessChanged(0, DateTimeOffset.Now, p.Id));
+            }
+            catch { /* best-effort PID */ }
+
+            // The combat-relevant tables (EN; the host catalog is locale-neutral). ItemList is omitted —
+            // the target consumers don't read it and it is large enough to bloat a single wire line.
+            ForwardResource(ResourceType.SkillList_EN, ResourceKind.Action);
+            ForwardResource(ResourceType.BuffList_EN, ResourceKind.Status);
+            ForwardResource(ResourceType.ZoneList_EN, ResourceKind.Zone);
+            ForwardResource(ResourceType.WorldList_EN, ResourceKind.World);
+        }
+
+        private void ForwardResource(ResourceType type, ResourceKind kind)
+        {
+            try
+            {
+                var dict = _repo?.GetResourceDictionary(type);
+                if (dict == null || dict.Count == 0) return;
+                Enqueue(new ResourceDictionaryForwarded(0, DateTimeOffset.Now, kind, new Dictionary<uint, string>(dict)));
+            }
+            catch { /* best-effort table */ }
+        }
+
+        private void StartRepositoryTimer()
+        {
+            _repoTimer = new Timer { Interval = RepositorySnapshotIntervalMs };
+            _repoTimer.Tick += (s, e) => EmitRepositorySnapshot();
+            _repoTimer.Start();
+        }
+
+        // Test seam: bind directly to a supplied SDK surface (no ActPlugins discovery / message loop),
+        // then run the same one-shot forward the live bind does. Lets a headless unit test exercise the
+        // producer projection deterministically. EmitRepositorySnapshot is invoked explicitly by the test
+        // (the live poll timer needs a message pump). Not used on any production path.
+        internal void BindForTest(IDataSubscription sub, IDataRepository repo)
+        {
+            _sub = sub; _repo = repo;
+            SubscribeSdk(sub);
+            EmitInitialRepositoryState();
+        }
+
+        // The full combatant roster with fresh HP/position/party — the poll surface OverlayPlugin/Hojoring
+        // consume through IDataRepository.GetCombatantList(). Enqueued onto the same drop-oldest ring.
+        internal void EmitRepositorySnapshot()
+        {
+            try
+            {
+                var repo = _repo;
+                if (repo == null) return;
+                var list = repo.GetCombatantList();
+                if (list == null) return;
+                var actors = new List<Actor>(list.Count);
+                foreach (var c in list) if (c != null) actors.Add(ToActor(c));
+                Enqueue(new RepositorySnapshot(0, DateTimeOffset.Now, actors));
+            }
+            catch { /* a bad poll must not kill the timer */ }
         }
 
         // ---- SDK / ACT handlers → GameEvent projection (no parsing) ---------------------------------
@@ -214,7 +293,7 @@ namespace Fct.LegacyHost
             Id: c.ID, OwnerId: c.OwnerID, Kind: MapKind(c.type, c.OwnerID),
             Job: c.Job, Level: c.Level, Name: c.Name ?? "",
             Hp: c.CurrentHP, MaxHp: c.MaxHP, Mp: c.CurrentMP, MaxMp: c.MaxMP,
-            Cast: null, Position: default,
+            Cast: null, Position: new Position(c.PosX, c.PosY, c.PosZ, c.Heading),
             WorldId: c.WorldID, WorldName: c.WorldName ?? "",
             BNpcNameId: c.BNpcNameID, BNpcId: c.BNpcID,
             TargetId: c.TargetID, TargetOfTargetId: 0,
@@ -310,14 +389,11 @@ namespace Fct.LegacyHost
             try { _writer.Join(2000); } catch { }
 
             try { _discover?.Stop(); _discover?.Dispose(); } catch { }
-            var act = ActGlobals.oFormActMain;
-            if (act != null)
-            {
-                try { act.BeforeCombatAction -= OnBeforeCombatAction; } catch { }
-                try { act.EncounterSetRaised -= OnEncounterSet; } catch { }
-                try { act.ZoneChangeRaised -= OnZoneChange; } catch { }
-                try { act.CombatEndRaised -= OnCombatEnd; } catch { }
-            }
+            try { _repoTimer?.Stop(); _repoTimer?.Dispose(); } catch { }
+            // Isolated in its own method so Dispose itself carries no ActGlobals type reference: reading it
+            // loads the facade assembly, which resolves only inside the satellite's AssemblyResolve
+            // environment, and that load faults at JIT time (a headless test without it must not fault here).
+            try { UnsubscribeActEvents(); } catch { }
             if (_sub != null)
             {
                 try { _sub.LogLine -= OnLogLine; } catch { }
@@ -328,8 +404,19 @@ namespace Fct.LegacyHost
                 try { _sub.CombatantRemoved -= OnCombatantRemoved; } catch { }
                 try { _sub.NetworkReceived -= OnNetworkReceived; } catch { }
                 try { _sub.NetworkSent -= OnNetworkSent; } catch { }
+                try { _sub.ProcessChanged -= OnProcessChanged; } catch { }
             }
             try { _signal.Dispose(); } catch { }
+        }
+
+        private void UnsubscribeActEvents()
+        {
+            var act = ActGlobals.oFormActMain;
+            if (act == null) return;
+            try { act.BeforeCombatAction -= OnBeforeCombatAction; } catch { }
+            try { act.EncounterSetRaised -= OnEncounterSet; } catch { }
+            try { act.ZoneChangeRaised -= OnZoneChange; } catch { }
+            try { act.CombatEndRaised -= OnCombatEnd; } catch { }
         }
     }
 }

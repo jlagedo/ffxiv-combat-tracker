@@ -16,6 +16,9 @@
 
   <ItemGroup>
     <ProjectReference Include="..\..\src\Fct.Parser.Legacy\Fct.Parser.Legacy.csproj" />
+    <!-- The satellite exe: its BridgeForwarder (the upstream producer) is unit-tested here against fake
+         SDK surfaces (InternalsVisibleTo). Referenced as a library; ReferenceOutputAssembly stays on. -->
+    <ProjectReference Include="..\..\src\Fct.LegacyHost\Fct.LegacyHost.csproj" />
   </ItemGroup>
 
   <ItemGroup>

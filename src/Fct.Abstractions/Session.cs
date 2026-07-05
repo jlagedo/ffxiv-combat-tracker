@@ -73,7 +73,14 @@ namespace Fct.Abstractions
     public enum GameRegion : byte { Unknown = 0, Global = 1, Chinese = 2, Korean = 3, TraditionalChinese = 4 }
 
     /// <summary>Client-level state (version/region/language + process liveness/foreground).</summary>
-    public sealed record GameClient(string Version, GameRegion Region, GameLanguage Language, bool IsRunning, bool IsForeground);
+    public sealed record GameClient(string Version, GameRegion Region, GameLanguage Language, bool IsRunning, bool IsForeground)
+    {
+        /// <summary>
+        /// The FFXIV game process id, when known (forwarded from the parser satellite so a consumer can
+        /// materialize <c>GetCurrentFFXIVProcess()</c> locally). Null when no game process is reported.
+        /// </summary>
+        public int? ProcessId { get; init; }
+    }
 
     /// <summary>Resource categories for id→name lookups.</summary>
     public enum ResourceKind { Action, Status, Zone, World, Item }

@@ -207,57 +207,61 @@ the Fct.App per-package spawn + per-satellite UI land with P7.)
 
 ### P5 — Consumer projection (the facade serves reads from host-routed data)
 
-- [ ] Parser-satellite additions: fixed-rate repository snapshots (combatant list with
-      HP/position/party — the poll surface OverlayPlugin/Hojoring consume), resource
-      dictionaries forwarded once, game PID forwarded (`GetCurrentFFXIVProcess` materialized
-      locally from the PID in consumer satellites).
+- [x] Parser-satellite additions: fixed-rate repository snapshots (`RepositorySnapshot` — the full
+      combatant list with fresh HP/position/party the poll surface OverlayPlugin/Hojoring consume, at
+      a 250 ms `BridgeForwarder` cadence), resource dictionaries forwarded once
+      (`ResourceDictionaryForwarded`, EN skill/buff/zone/world), and the game PID forwarded
+      (`GameProcessChanged` → `GetCurrentFFXIVProcess` materialized locally via `Process.GetProcessById`).
+      Folded into the host `IGameSnapshot` (`GameSnapshotAggregator`, live `IResourceCatalog` +
+      `GameClient.ProcessId`) and seeded to late subscribers by `SatelliteHost.PrimeSnapshot`. New
+      `repository` stream token in `StreamCatalog`.
 - [x] Consumer facade: the `Fct.Compat.Act` facade replica folds the fanned swing/lifecycle
       stream into its own `EncounterLifecycle`/`Fct.Aggregation` graph (installing `EngineTables`
       itself, no parser) → synchronous `ActiveZone.ActiveEncounter` + `ExportVariables` reads.
       The satellite `--consume` mode is the plugin-free consumer; gated below.
-- [ ] Consumer facade: `Before/OnLogLineRead` re-raised from fanned `RawLogLine`s (mutable
-      `logLine`, exact `LogLineEventArgs` shape). *Next: needs `rawlog` subscription + re-raise.*
-- [ ] Synthetic parser stand-in in `ActPlugins`: exact title/status strings,
-      `DataSubscription`/`DataRepository` properties (SDK events re-raised from the fanned
-      stream; repository served from the snapshot mirror), `_iocContainer`-shaped field whose
-      `ILogOutput.WriteLine` routes to the host (write-back lands in P6). *Next — with a
-      dependency wrinkle now known:* **`FFXIV_ACT_Plugin.Common` is Costura-embedded inside the
-      real parser DLL, not a standalone assembly**, so a plugin-free consumer cannot load the SDK
-      types the stand-in exposes (`FacadeHost.InstallAssemblyResolver`'s `Common` branch is a
-      unifier, not a provider — it only returns a copy already loaded in the AppDomain). The
-      stand-in must therefore (a) be reached only through an SDK-type-free seam
-      (`IConsumerStandIn`) so the replica path never JITs a method touching SDK types — the
-      implementation lives in `Fct.Parser.Legacy` (the SDK-referencing assembly), an assembly
-      boundary rather than a JIT-granularity class boundary; (b) make the SDK resolvable by
-      loading the installed parser DLL **and running its module initializer** —
-      `Assembly.LoadFrom` + `RuntimeHelpers.RunModuleConstructor(asm.ManifestModule.ModuleHandle)`
-      — because `LoadFrom` alone executes no code and Costura's `AssemblyResolve` hook is
-      registered by the module initializer; no plugin type is constructed. Resolver order stays
-      correct: the facade handler registers first, returns null for `Common` until it is loaded
-      (falling through to Costura), then unifies every later request onto that single copy;
-      and (c) be **plugin-gated** (the stand-in gate skips without `FFXIV_ACT_Plugin.dll`; the
-      replica gate above stays plugin-free) — a legitimate runtime precondition, since every
-      real deployment has the parser DLL installed on the machine even though a consumer
-      satellite hosts it in another process. **Accepted exposure:** the attached Costura
+- [x] Consumer facade: `Before/OnLogLineRead` re-raised from fanned `RawLogLine`s — the same mutable
+      `LogLineEventArgs` flows through both hooks (`FoldConsume`), so a Before-handler edit of
+      `logLine`/`detectedType` is visible to `OnLogLineRead`.
+- [x] Synthetic parser stand-in in `ActPlugins` (`Fct.Parser.Legacy`: `SyntheticFfxivPlugin` +
+      `ConsumerDataSubscription`/`ConsumerDataRepository`): exact title `FFXIV_ACT_Plugin` / status
+      `FFXIV_ACT_Plugin Started.`, public `DataSubscription`/`DataRepository` (SDK events re-raised from
+      the fanned stream; repository served from the snapshot mirror), a non-public `_iocContainer` field
+      (name is the contract; the `ILogOutput.WriteLine` write-back lands in P6). Reached only through the
+      SDK-type-free `IConsumerStandIn` seam, so the plugin-free replica path never JITs a method touching
+      `FFXIV_ACT_Plugin.Common` — an assembly boundary (the implementation lives in the SDK-referencing
+      `Fct.Parser.Legacy`), not a JIT-granularity class boundary. `Common` is Costura-embedded in the
+      real parser DLL (`FacadeHost.InstallAssemblyResolver`'s `Common` branch is a unifier, not a
+      provider), so the consumer makes it resolvable by loading the installed parser DLL **and running
+      its module initializer** (`Assembly.LoadFrom` +
+      `RuntimeHelpers.RunModuleConstructor(asm.ManifestModule.ModuleHandle)` — `LoadFrom` alone runs no
+      code and Costura's `AssemblyResolve` hook is registered by the module initializer); no plugin type
+      is constructed. Resolver order: the facade handler registers first and returns null for `Common`
+      until it is loaded (falling through to Costura), then unifies every later request onto that one
+      copy. Plugin-gated (the stand-in needs `FFXIV_ACT_Plugin.dll` installed — a legitimate runtime
+      precondition; the replica gate stays plugin-free). **Accepted exposure:** the attached Costura
       resolver also answers failed probes for every assembly the parser embeds (e.g. Machina),
-      process-wide in the consumer satellite; none of the target consumer plugins reference
-      those names. Fallback if that exposure must go (revisit at P8 for the OverlayPlugin
-      satellite): extract the embedded `FFXIV_ACT_Plugin.Common` resource from the installed
-      parser at catalog-install time and stage it into the consumer satellite's probe path —
-      no dormant parser image, same identity — at the cost of depending on Costura's private
-      resource format (the compile-time `lib\FFXIV_ACT_Plugin.Common.dll` is such an
-      extraction). The raiseable `ConsumerDataSubscription`/`ConsumerDataRepository`/
-      `SyntheticFfxivPlugin` shapes were prototyped and validated against the real net48 SDK
-      surface (see git history around this commit) before being reverted pending that seam.
+      process-wide in the consumer satellite; none of the target consumer plugins reference those names.
+      Fallback if that exposure must go (revisit at P8 for the OverlayPlugin satellite): extract the
+      embedded `FFXIV_ACT_Plugin.Common` resource at catalog-install time and stage it into the consumer
+      probe path — no dormant parser image, same identity — at the cost of depending on Costura's private
+      resource format (the compile-time `lib\FFXIV_ACT_Plugin.Common.dll` is such an extraction).
 - [x] Gate (e2e, no plugin): `Fct.Integration.Tests/ConsumerProjectionTests` — the host fans a
       committed frame-replay down to a `--consume` satellite; its facade replica's YOU total
       (summed across the idle-split encounters) equals the real-ACT oracle baseline. Three-way
-      parity **oracle → host engine → consumer replica**, over the real pipe. *The
-      `Fct.StreamProbe`-as-plugin discovery variant lands with the stand-in above.*
+      parity **oracle → host engine → consumer replica**, over the real pipe. Companion no-plugin gates:
+      `ConsumerLogLineTests` (log-line re-raise + shared mutable args), `GameSnapshotAggregatorTests`
+      (repository/resource/PID fold), `BridgeEventFrameTests` (the new wire frames round-trip),
+      `BridgeForwarderProducerTests` (the producer projection).
+- [x] Gate (e2e) **[plugin-gated]**: `ConsumerStandInTests` — a `--consume --stand-in` satellite
+      registers the stand-in and, folding host-fanned frames, reflects it exactly as OverlayPlugin does
+      (title scan → cast `DataSubscription`/`DataRepository` to the real SDK types → poll
+      `GetCombatantList`); `ConsumerProbeDiscoveryTests` runs the real, unmodified `Fct.StreamProbe` as
+      an `IActPluginV1` in a `--consume --stand-in --probe` satellite so a separately-compiled assembly
+      binds `Common` across the `AssemblyResolve` boundary and receives the fanned SDK events.
 
-**Exit:** an unmodified consumer plugin's entire read surface works in an isolated satellite.
-*(Partial: the encounter-replica read surface is done + parity-gated; the SDK/log-line stand-in
-that lets an unmodified plugin discover + bind lands next, ahead of P7/P8.)*
+**Exit:** an unmodified consumer plugin's entire read surface works in an isolated, parser-free
+satellite — the encounter replica, the log-line re-raise, the repository/resource/PID mirror, and the
+discover-and-bind stand-in, each parity- or discovery-gated. ✅
 
 ### P6 — Host-routed services (the cross-plugin pipes)
 
@@ -329,11 +333,12 @@ parity-gated, and budget-tested.
   OverlayPlugin over its WebSocket, isolation is transparent; if it binds OverlayPlugin
   in-process, that data must arrive as a host pipe (actor side-channel: statuses/enmity/
   target-of-target). Needs a source sweep of `E:\dev\ACT.Hojoring`.
-- **Repository snapshot rate (P5).** The mirror's freshness must satisfy OverlayPlugin's and
-  Hojoring's poll cadence without flooding the pipe; pin the rate from measured poll intervals
-  and assert it in the P9 soak.
-- **`ProcessChanged`/process-handle semantics in consumer satellites (P5).** Consumers get the
-  PID-materialized `Process`; anything reading game memory through it (none of the tested
+- **Repository snapshot rate (P5).** *Resolved:* `BridgeForwarder` emits `RepositorySnapshot` at a
+  250 ms cadence (`RepositorySnapshotIntervalMs`); the drop-oldest ring absorbs any burst. Re-pin
+  against measured OverlayPlugin/Hojoring poll intervals and assert it in the P9 soak.
+- **`ProcessChanged`/process-handle semantics in consumer satellites (P5).** *Resolved:* the parser
+  satellite forwards `GameProcessChanged` (PID); consumers materialize `GetCurrentFFXIVProcess` locally
+  via `Process.GetProcessById`. Anything reading game memory through the handle (none of the tested
   consumer plugins do — Hojoring's Sharlayan opens the process itself) is out of contract.
 - **Satellite WinForms UI at N processes (P3).** The shell already embeds the satellite HWND;
   it becomes one embedded view per satellite. Tab/window ergonomics are an `Fct.App` UX

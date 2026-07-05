@@ -86,8 +86,32 @@ public class DataRepositoryTests
     {
         var repo = NewRepo(new FakeSnapshot(), out _);
 
-        Assert.Null(repo.GetCurrentFFXIVProcess());   // no net10 game handle
+        Assert.Null(repo.GetCurrentFFXIVProcess());   // no PID forwarded → not attached
         Assert.Empty(repo.GetAntiVirusNames());
         Assert.True(repo.IsChatLogAvailable());
+    }
+
+    [Fact]
+    public void GetCurrentFFXIVProcess_materializes_the_forwarded_pid()
+    {
+        // The forwarded game PID lands on the snapshot's client; use this test process's own id as a
+        // deterministic live process to materialize (Process.GetProcessById returns a real handle).
+        var self = System.Diagnostics.Process.GetCurrentProcess().Id;
+        var state = new FakeSnapshot
+        {
+            Client = new GameClient("2024.1", GameRegion.Global, GameLanguage.English, true, true) { ProcessId = self },
+        };
+        var repo = NewRepo(state, out _);
+
+        var proc = repo.GetCurrentFFXIVProcess();
+        Assert.NotNull(proc);
+        Assert.Equal(self, proc.Id);
+
+        // A PID whose process does not exist resolves to null (not attached), never throws.
+        var goneState = new FakeSnapshot
+        {
+            Client = new GameClient("2024.1", GameRegion.Global, GameLanguage.English, true, true) { ProcessId = int.MaxValue },
+        };
+        Assert.Null(NewRepo(goneState, out _).GetCurrentFFXIVProcess());
     }
 }

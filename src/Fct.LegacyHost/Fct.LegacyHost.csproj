@@ -25,6 +25,10 @@
   </PropertyGroup>
 
   <ItemGroup>
+    <InternalsVisibleTo Include="Fct.Parser.Legacy.Tests" />
+  </ItemGroup>
+
+  <ItemGroup>
     <ProjectReference Include="..\Fct.Compat.Act\Fct.Compat.Act.csproj" />
     <ProjectReference Include="..\Fct.Parser.Legacy\Fct.Parser.Legacy.csproj" />
     <!-- The plugin SDK (multi-targets net48;net10): the BridgeForwarder projects the SDK/ACT stream

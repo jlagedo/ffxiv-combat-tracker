@@ -43,6 +43,9 @@ namespace Fct.Bridge
         private const string TagSetEnc = "SETENC";
         private const string TagZoneChange = "ZCHG";
         private const string TagEndCombat = "ENDC";
+        private const string TagRepo = "REPO";
+        private const string TagResource = "RSRC";
+        private const string TagPid = "PID";
 
         private static readonly CultureInfo Inv = CultureInfo.InvariantCulture;
 
@@ -94,6 +97,15 @@ namespace Fct.Bridge
 
                 case EndCombatRequested e:
                     return Head(TagEndCombat, e.Timestamp) + '\t' + (e.Export ? '1' : '0');
+
+                case RepositorySnapshot e:
+                    return Head(TagRepo, e.Timestamp) + '\t' + EncodeRepository(e);
+
+                case ResourceDictionaryForwarded e:
+                    return Head(TagResource, e.Timestamp) + '\t' + EncodeResource(e);
+
+                case GameProcessChanged e:
+                    return Head(TagPid, e.Timestamp) + '\t' + e.Pid.ToString(Inv);
 
                 case RawPacketReceived e:
                     // Bytes are base64 — the tab/backslash escaping (Enc) cannot carry arbitrary binary.
@@ -169,6 +181,17 @@ namespace Fct.Bridge
                 case TagEndCombat:
                     if (f.Length < 3) return false;
                     evt = new EndCombatRequested(0, ts, f[2] == "1");
+                    return true;
+
+                case TagRepo:
+                    return TryDecodeRepository(ts, f, out evt);
+
+                case TagResource:
+                    return TryDecodeResource(ts, f, out evt);
+
+                case TagPid:
+                    if (f.Length < 3 || !TryI(f[2], out var gamePid)) return false;
+                    evt = new GameProcessChanged(0, ts, gamePid);
                     return true;
 
                 case TagPacket:
@@ -411,6 +434,153 @@ namespace Fct.Bridge
             return true;
         }
 
+        // ---- RepositorySnapshot (fixed-rate combatant list) — count-prefixed run of fixed-width
+        // per-actor records. Carries fresh Hp/MaxHp, Position (X/Y/Z/Heading) and Party that the
+        // add-time EncodeActor drops; Cast/Statuses/Enmity stay firehose-only (default/empty). ----
+
+        private const int RepoActorFieldCount = 26;
+
+        private static string EncodeRepository(RepositorySnapshot e)
+        {
+            var sb = new StringBuilder(64 + e.Combatants.Count * 96);
+            sb.Append(e.Combatants.Count.ToString(Inv));
+            foreach (var a in e.Combatants) AppendRepoActor(sb, a);
+            return sb.ToString();
+        }
+
+        private static void AppendRepoActor(StringBuilder sb, Actor a)
+        {
+            sb.Append('\t').Append(a.Id.ToString(Inv));
+            sb.Append('\t').Append(a.OwnerId.ToString(Inv));
+            sb.Append('\t').Append(((byte)a.Kind).ToString(Inv));
+            sb.Append('\t').Append(a.Job.ToString(Inv));
+            sb.Append('\t').Append(a.Level.ToString(Inv));
+            sb.Append('\t').Append(Enc(a.Name));
+            sb.Append('\t').Append(a.Hp.ToString(Inv));
+            sb.Append('\t').Append(a.MaxHp.ToString(Inv));
+            sb.Append('\t').Append(a.Mp.ToString(Inv));
+            sb.Append('\t').Append(a.MaxMp.ToString(Inv));
+            sb.Append('\t').Append(EncF(a.Position.X));
+            sb.Append('\t').Append(EncF(a.Position.Y));
+            sb.Append('\t').Append(EncF(a.Position.Z));
+            sb.Append('\t').Append(EncF(a.Position.Heading));
+            sb.Append('\t').Append(a.WorldId.ToString(Inv));
+            sb.Append('\t').Append(Enc(a.WorldName));
+            sb.Append('\t').Append(a.TargetId.ToString(Inv));
+            sb.Append('\t').Append(((byte)a.Party).ToString(Inv));
+            sb.Append('\t').Append(a.EffectiveDistance.ToString(Inv));
+            sb.Append('\t').Append(a.InCombat ? '1' : '0');
+            sb.Append('\t').Append(NU(a.CurrentWorldId));
+            sb.Append('\t').Append(NU(a.CurrentCp));
+            sb.Append('\t').Append(NU(a.MaxCp));
+            sb.Append('\t').Append(NU(a.CurrentGp));
+            sb.Append('\t').Append(NU(a.MaxGp));
+            sb.Append('\t').Append(a.Order.HasValue ? a.Order.Value.ToString(Inv) : "");
+        }
+
+        private static bool TryDecodeRepository(DateTimeOffset ts, string[] f, out GameEvent? evt)
+        {
+            evt = null;
+            // 2 header + 1 count, then count * RepoActorFieldCount actor fields.
+            if (f.Length < 3 || !TryI(f[2], out var count) || count < 0) return false;
+            if (f.Length < 3 + count * RepoActorFieldCount) return false;
+            int i = 3;
+            var list = new List<Actor>(count);
+            for (int c = 0; c < count; c++)
+            {
+                if (!TryDecodeRepoActor(f, ref i, out var a)) return false;
+                list.Add(a);
+            }
+            evt = new RepositorySnapshot(0, ts, list);
+            return true;
+        }
+
+        private static bool TryDecodeRepoActor(string[] f, ref int i, out Actor actor)
+        {
+            actor = null!;
+            if (!TryU(f[i++], out var id)) return false;
+            if (!TryU(f[i++], out var ownerId)) return false;
+            if (!TryB(f[i++], out var kind)) return false;
+            if (!TryI(f[i++], out var job)) return false;
+            if (!TryI(f[i++], out var level)) return false;
+            var name = Dec(f[i++]);
+            if (!TryU(f[i++], out var hp)) return false;
+            if (!TryU(f[i++], out var maxHp)) return false;
+            if (!TryU(f[i++], out var mp)) return false;
+            if (!TryU(f[i++], out var maxMp)) return false;
+            if (!TryF(f[i++], out var px)) return false;
+            if (!TryF(f[i++], out var py)) return false;
+            if (!TryF(f[i++], out var pz)) return false;
+            if (!TryF(f[i++], out var heading)) return false;
+            if (!TryU(f[i++], out var worldId)) return false;
+            var worldName = Dec(f[i++]);
+            if (!TryU(f[i++], out var targetId)) return false;
+            if (!TryB(f[i++], out var party)) return false;
+            if (!TryB(f[i++], out var effDist)) return false;
+            var inCombat = f[i++] == "1";
+            var currentWorldId = ParseNU(f[i++]);
+            var currentCp = ParseNU(f[i++]);
+            var maxCp = ParseNU(f[i++]);
+            var currentGp = ParseNU(f[i++]);
+            var maxGp = ParseNU(f[i++]);
+            var order = ParseNI(f[i++]);
+
+            actor = new Actor(
+                id, ownerId, (ActorKind)kind, job, level, name,
+                hp, maxHp, mp, maxMp,
+                Cast: null,
+                Position: new Position(px, py, pz, heading),
+                WorldId: worldId, WorldName: worldName,
+                BNpcNameId: 0, BNpcId: 0,
+                TargetId: targetId, TargetOfTargetId: 0,
+                EffectiveDistance: effDist,
+                Party: (PartyMembership)party,
+                InCombat: inCombat,
+                Statuses: Array.Empty<StatusEffect>(),
+                Enmity: Array.Empty<EnmityEntry>())
+            {
+                CurrentWorldId = currentWorldId,
+                CurrentCp = currentCp,
+                MaxCp = maxCp,
+                CurrentGp = currentGp,
+                MaxGp = maxGp,
+                Order = order,
+            };
+            return true;
+        }
+
+        // ---- ResourceDictionaryForwarded — kind byte + count-prefixed (id, name) pairs. ----
+
+        private static string EncodeResource(ResourceDictionaryForwarded e)
+        {
+            var sb = new StringBuilder(32 + e.Entries.Count * 24);
+            sb.Append(((byte)e.Kind).ToString(Inv));
+            sb.Append('\t').Append(e.Entries.Count.ToString(Inv));
+            foreach (var kv in e.Entries)
+            {
+                sb.Append('\t').Append(kv.Key.ToString(Inv));
+                sb.Append('\t').Append(Enc(kv.Value));
+            }
+            return sb.ToString();
+        }
+
+        private static bool TryDecodeResource(DateTimeOffset ts, string[] f, out GameEvent? evt)
+        {
+            evt = null;
+            // 2 header + 2 fixed (kind, count), then count * 2 (id, name).
+            if (f.Length < 4 || !TryB(f[2], out var kind) || !TryI(f[3], out var count) || count < 0) return false;
+            if (f.Length < 4 + count * 2) return false;
+            int i = 4;
+            var d = new Dictionary<uint, string>(count);
+            for (int c = 0; c < count; c++)
+            {
+                if (!TryU(f[i++], out var key)) return false;
+                d[key] = Dec(f[i++]);
+            }
+            evt = new ResourceDictionaryForwarded(0, ts, (ResourceKind)kind, d);
+            return true;
+        }
+
         // ---- Primitives ----------------------------------------------------------------------
 
         private static string Head(string tag, DateTimeOffset ts) =>
@@ -449,6 +619,10 @@ namespace Fct.Bridge
         private static bool TryI(string s, out int v) => int.TryParse(s, NumberStyles.Integer, Inv, out v);
         private static bool TryL(string s, out long v) => long.TryParse(s, NumberStyles.Integer, Inv, out v);
         private static bool TryB(string s, out byte v) => byte.TryParse(s, NumberStyles.Integer, Inv, out v);
+
+        // Round-trippable float wire form ("R" round-trips Single on both net48 and net10).
+        private static string EncF(float v) => v.ToString("R", Inv);
+        private static bool TryF(string s, out float v) => float.TryParse(s, NumberStyles.Float, Inv, out v);
 
         // Same backslash escaping as BridgeLogRecord: a field never contains a raw tab/newline.
         private static string Enc(string? s)

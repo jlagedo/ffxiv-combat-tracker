@@ -22,6 +22,9 @@
 
   <ItemGroup>
     <ProjectReference Include="..\Fct.Compat.Act\Fct.Compat.Act.csproj" />
+    <!-- The typed domain records the consumer stand-in folds (GameEvent/Actor/RepositorySnapshot).
+         SDK-type-free; the IConsumerStandIn seam signatures use only these. -->
+    <ProjectReference Include="..\Fct.Abstractions\Fct.Abstractions.csproj" />
   </ItemGroup>
 
   <ItemGroup>
