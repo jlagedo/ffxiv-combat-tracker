@@ -43,6 +43,15 @@ namespace Fct.LegacyHost
             // run keeps its historical s2-ffxiv.log artifact.
             _satelliteId = ParseArgValue(args, "--satellite-id") ?? "ffxiv";
             _package = ParseArgValue(args, "--package") ?? "";
+            // The satellite's role (ISOLATION-PLAN P7): "producer" hosts the parser and forwards its stream
+            // up; "consumer" hosts one real consumer plugin on the host-fanned projection. Default producer
+            // so the parser satellite and dev-standalone keep their existing behavior. Only an EXPLICIT
+            // --role opts into the one-package-per-process guard, so legacy/test harnesses that load several
+            // plugins into one satellite without a role stay permissive (the production router always passes
+            // --role, so the guard is always active there).
+            var roleArg = ParseArgValue(args, "--role");
+            _roleExplicit = roleArg != null;
+            _role = roleArg ?? RoleProducer;
 
             // Oracle capture mode: replay a log through the real plugin and dump its parse.
             //   --parse-oracle <logPath> <maxLines> <outPath>
@@ -118,6 +127,22 @@ namespace Fct.LegacyHost
                         consumePipe, ParseArgValue(args, "--verify-loglines"),
                         Array.IndexOf(args, "--stand-in") >= 0, ParseArgValue(args, "--verify-standin"),
                         Array.IndexOf(args, "--probe") >= 0);
+                    return;
+                }
+            }
+
+            // Production consumer-package satellite (ISOLATION-PLAN P7): a parser-free satellite that hosts
+            // ONE real consumer plugin (Triggernometry/Discord) on the P5/P6 projection — subscribes to its
+            // stream set, folds host-fanned frames into its facade replica, re-raises log lines, routes the
+            // plugin's audio/callbacks up through the host, and loads the plugin on demand via LOADPLUGIN.
+            // Selected by --role consumer (distinct from the plugin-free --consume test driver above).
+            //   --role consumer --subscribe <streams> --bridge <pipe>
+            if (string.Equals(_role, RoleConsumer, StringComparison.OrdinalIgnoreCase))
+            {
+                var consumerPipe = ParseBridgeArg(args);
+                if (consumerPipe != null)
+                {
+                    RunConsumerPackage(ParseArgValue(args, "--subscribe") ?? SatelliteProtocol.StreamSwings, consumerPipe);
                     return;
                 }
             }
@@ -753,6 +778,96 @@ namespace Fct.LegacyHost
             }
         }
 
+        // Production consumer-package satellite (ISOLATION-PLAN P7): stand up a parser-free ACT facade that
+        // serves one real consumer plugin (Triggernometry/Discord) from host-routed data. It installs the
+        // engine tables the parser would (so the replica aggregates), SUBSCRIBEs to its stream set, folds
+        // every host-fanned frame into the replica + re-raises log lines (the command reader, IsConsumer),
+        // routes the plugin's TTS/PlaySound/callbacks up through the host (ConnectBridge's ServiceRoute +
+        // the audio-sink poll), and loads the plugin on demand via LOADPLUGIN. This is the generalization
+        // of RunConsumeProbeLoop into a real plugin host — the WinForms message loop pumps the plugin's
+        // UI-thread timers while the reader folds frames on a background thread.
+        private static void RunConsumerPackage(string streams, string pipeName)
+        {
+            SatelliteLogging.Initialize(_satelliteId);
+            _log = SatelliteLogging.Log;
+            FacadeHost.Log = SatelliteLogging.WriteLegacy;
+            _log.LogInformation(LogEvents.SatelliteBooting,
+                "Consumer package '{Pkg}': streams={Streams} pipe={Pipe}", _package, streams, pipeName);
+
+            FacadeHost.InstallAssemblyResolver();
+            Application.EnableVisualStyles();
+            Application.SetCompatibleTextRenderingDefault(false);
+            FacadeHost.CreateAct();
+            // No parser to install ACT's FFXIV damage-type routing tables — the replica installs them itself,
+            // exactly the shared state the host engine stands up.
+            EngineTables.Install();
+            var act = ActGlobals.oFormActMain;
+            _standalone = false;
+
+            // Advance the idle-end clock off the fanned log stream so combat splits into per-pull encounters
+            // (matching ACT), and consumers reading ActiveZone.ActiveEncounter see live per-encounter state.
+            act.OnLogLineRead += (isImport, a) =>
+            {
+                if (a.detectedTime > DateTime.MinValue) act.AdvanceClock(a.detectedTime);
+            };
+
+            // Synthetic parser stand-in (P5), runtime plugin-gated: a consumer that discovers FFXIV_ACT_Plugin
+            // by reflection (Triggernometry/OverlayPlugin) binds the stand-in's SDK surface backed by the same
+            // fanned frames. Absent the installed parser DLL the consumer still works (log-line re-raise +
+            // encounter replica), so this never blocks a plugin-free run. The stand-in's ILogOutput write-back
+            // rides LOGLINE up the bridge (P6).
+            if (TryEnsureSdkResolvable())
+            {
+                try
+                {
+                    _standIn = Fct.Parser.Legacy.ConsumerStandInFactory.Create(FacadeHost.Log,
+                        (id, text) => SendLine(SatelliteProtocol.FormatLogLine(id, text)));
+                    _standIn.Register();
+                }
+                catch (Exception ex) { _log.LogError(LogEvents.PluginLoadFailed, ex, "[Consumer] stand-in register failed"); }
+            }
+            else
+            {
+                _log.LogInformation(LogEvents.PluginLoading, "[Consumer] parser not installed; running without the SDK stand-in");
+            }
+
+            // ConnectBridge sends READY (with _package), installs FormActMain.ServiceRoute = BridgeServiceRoute
+            // (so the plugin's TTS/PlaySound/callbacks route UP the bridge as SPEAK/PLAYSND/INVOKECB, never a
+            // local slot), and starts the graceful-shutdown waiter. Required — the plugin-free --consume driver
+            // deliberately omits the service route; a real consumer must have it.
+            ConnectBridge(pipeName);
+            if (_writer == null)
+            {
+                _log.LogError(LogEvents.SatelliteBridgeConnectFailed, "Consumer bridge connect failed on {Pipe}", pipeName);
+                Environment.Exit(1);
+                return;
+            }
+            SendLine(SatelliteProtocol.PluginsEnd);                            // empty roster; plugin arrives via LOADPLUGIN
+            SendLine(SatelliteProtocol.FormatSubscribe(streams.Split(',')));   // declare the downstream stream set
+
+            // Announce audio-slot takeovers (Discord's PlayTts/PlaySound hijack) so the host registers a
+            // terminal sink and relays produced audio down to this satellite (P6).
+            StartAudioSinkPoll();
+
+            // The unified command-pipe reader (folds fanned frames + dispatches LOADPLUGIN/service relays)
+            // runs on a background thread; the message loop pumps the consumer plugin's UI-thread timers.
+            StartCommandReader(pipeName);
+
+            _log.LogInformation(LogEvents.SatelliteBooting, "[Consumer] entering message loop");
+            using (var pump = new Form { ShowInTaskbar = false, FormBorderStyle = FormBorderStyle.None,
+                                         WindowState = FormWindowState.Minimized, Visible = false })
+            {
+                _ = pump.Handle;
+                Application.Run(pump);
+            }
+
+            // On the graceful path OnShutdownCommand already de-init'd the plugins; only clean up here when
+            // the loop ended via pipe-close (reader finally → Application.Exit) without a SHUTDOWN.
+            if (!_shuttingDown) { try { FacadeHost.DeInitPlugins(); } catch { } }
+            SatelliteLogging.Shutdown();
+            Environment.Exit(0);
+        }
+
         // Boot the satellite with NO plugins loaded: a clean host ships nothing and boot-loads nothing.
         // Every plugin (parser included) arrives on demand via the host's LOADPLUGIN command
         // (HandleCommand). The one dev exception is a standalone run (no --bridge), which auto-loads the
@@ -1039,6 +1154,15 @@ namespace Fct.LegacyHost
         private static string _satelliteId = "ffxiv";
         private static string _package = "";
 
+        // The satellite's role (P7): producer hosts the parser (forwards its stream up); consumer hosts one
+        // real consumer plugin on the host-fanned projection. Gates the LOADPLUGIN one-package guard and the
+        // command-reader downstream-frame fold.
+        internal const string RoleProducer = "producer";
+        internal const string RoleConsumer = "consumer";
+        private static string _role = RoleProducer;
+        private static bool _roleExplicit;   // true only when --role was passed → the one-package guard is active
+        private static bool IsConsumer => string.Equals(_role, RoleConsumer, StringComparison.OrdinalIgnoreCase);
+
         private static string ParseArgValue(string[] args, string name)
         {
             for (int i = 0; i < args.Length - 1; i++)
@@ -1076,12 +1200,15 @@ namespace Fct.LegacyHost
             }
         }
 
-        // Connect the host->satellite command pipe and read LOADPLUGIN/UNLOADPLUGIN frames on a
-        // background thread, marshaling each onto the WinForms UI thread (plugin Init/DeInit build and
-        // destroy WinForms controls). The host creates the server before launching us, so the connect
-        // succeeds immediately. Connect BEFORE the first log call: log records are forwarded
-        // synchronously over the event pipe (SendLine), so a host that isn't draining that pipe must
-        // never be able to keep this thread from reaching the command pipe.
+        // Connect the host->satellite command pipe and read frames on a background thread. In a producer
+        // satellite this carries only control commands (LOADPLUGIN/UNLOADPLUGIN, P6 service relays),
+        // marshaled onto the WinForms UI thread (plugin Init/DeInit build and destroy WinForms controls).
+        // In a CONSUMER satellite (P7) the same pipe ALSO carries the host's downstream game-event fan-out
+        // (SatelliteEgress), so each line is disambiguated by its EVT prefix and folded into the facade
+        // replica; everything else is a control command. The host creates the server before launching us,
+        // so the connect succeeds immediately. Connect BEFORE the first log call: log records are forwarded
+        // synchronously over the event pipe (SendLine), so a host that isn't draining that pipe must never
+        // be able to keep this thread from reaching the command pipe.
         private static void StartCommandReader(string pipeName)
         {
             var t = new System.Threading.Thread(() =>
@@ -1091,17 +1218,31 @@ namespace Fct.LegacyHost
                     _cmdPipe = new NamedPipeClientStream(".", pipeName + "-cmd", PipeDirection.In);
                     _cmdPipe.Connect(30000);
                     _log.LogDebug(LogEvents.SatelliteBridgeConnected, "Command pipe connected");
+                    var consumer = IsConsumer;
+                    var act = ActGlobals.oFormActMain;
                     using (var reader = new StreamReader(_cmdPipe))
                     {
                         string line;
                         while ((line = reader.ReadLine()) != null)
-                            HandleCommand(line);
+                        {
+                            // Consumer: fold a fanned game-event frame into the replica; else it's a command.
+                            if (consumer && GameEventFrame.TryParse(line, out var evt) && evt != null)
+                                FoldConsume(act, evt);
+                            else
+                                HandleCommand(line);
+                        }
                     }
                 }
                 catch (Exception ex)
                 {
                     _log.LogWarning(LogEvents.SatelliteBridgeConnectFailed, ex,
                         "Command pipe unavailable; live load/unload disabled");
+                }
+                finally
+                {
+                    // Consumer satellites pump a WinForms loop for their plugin's UI-thread timers; when the
+                    // host closes the pipe (shutdown), end the loop so the process exits cleanly.
+                    if (IsConsumer) try { Application.Exit(); } catch { }
                 }
             })
             { IsBackground = true, Name = "cmd-reader" };
@@ -1112,13 +1253,28 @@ namespace Fct.LegacyHost
         {
             if (SatelliteProtocol.TryParseLoadPlugin(line, out var loadKey, out var dll, out var title))
             {
+                // One-package-per-process guard (ISOLATION-PLAN P7): a producer satellite hosts ONLY the
+                // parser; a consumer satellite NEVER hosts the parser. The host router never misroutes, so
+                // this is defense-in-depth that also keeps the multi-package path physically impossible.
+                bool isParser = string.Equals(Path.GetFileName(dll), "FFXIV_ACT_Plugin.dll", StringComparison.OrdinalIgnoreCase);
+                if (_roleExplicit && IsConsumer && isParser)
+                {
+                    _log.LogWarning(LogEvents.PluginLoadFailed,
+                        "LOADPLUGIN {Key} rejected: the parser cannot load in a consumer satellite ('{Pkg}')", loadKey, _package);
+                    return;
+                }
+                if (_roleExplicit && !IsConsumer && !isParser)
+                {
+                    _log.LogWarning(LogEvents.PluginLoadFailed,
+                        "LOADPLUGIN {Key} rejected: a producer satellite ('{Pkg}') hosts only the parser", loadKey, _package);
+                    return;
+                }
                 InvokeOnUi(() =>
                 {
                     try
                     {
                         // The parser needs the ring-buffer wrapper OverlayPlugin binds to; every other
-                        // legacy plugin takes the generic path. Detect it by its (fixed) DLL name.
-                        bool isParser = string.Equals(Path.GetFileName(dll), "FFXIV_ACT_Plugin.dll", StringComparison.OrdinalIgnoreCase);
+                        // legacy plugin takes the generic path.
                         var loaded = isParser
                             ? FacadeHost.LoadWrappedFfxivPlugin(dll, loadKey)
                             : FacadeHost.LoadPlugin(loadKey, title, dll, null);

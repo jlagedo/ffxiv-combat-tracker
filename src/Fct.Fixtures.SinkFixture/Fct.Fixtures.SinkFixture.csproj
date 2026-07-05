@@ -1,0 +1,32 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!--
+    A real (net48) IActPluginV1 TEST FIXTURE that stands in for ACT-Discord-Triggers as a terminal audio
+    sink in the P7 topology gate. On init it hijacks ActGlobals.oFormActMain.PlayTtsMethod/PlaySoundMethod
+    with a recording delegate (exactly the Discord-Triggers ldfld/stfld takeover), which makes the
+    satellite announce REGISTERSINK so the host relays produced audio down to it. Each relayed call is
+    appended to a record file (path from the FCT_SINK_RECORD env var) so a test can assert delivery.
+
+    Built against the REAL signed Advanced Combat Tracker.exe like Fct.StreamProbe (Private=false; never
+    copied to output). Not bundled or shipped — a test asset only.
+  -->
+  <PropertyGroup>
+    <TargetFramework>net48</TargetFramework>
+    <UseWindowsForms>true</UseWindowsForms>
+    <Nullable>disable</Nullable>
+    <PlatformTarget>x64</PlatformTarget>
+    <Prefer32Bit>false</Prefer32Bit>
+    <AssemblyName>Fct.Fixtures.SinkFixture</AssemblyName>
+    <RootNamespace>Fct.Fixtures.SinkFixture</RootNamespace>
+    <!-- The real ACT install (override on other machines). -->
+    <ActExePath Condition="'$(ActExePath)' == ''">E:\dev\Advanced Combat Tracker\Advanced Combat Tracker.exe</ActExePath>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <Reference Include="Advanced Combat Tracker">
+      <HintPath>$(ActExePath)</HintPath>
+      <Private>false</Private>
+    </Reference>
+  </ItemGroup>
+
+</Project>

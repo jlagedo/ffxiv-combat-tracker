@@ -27,7 +27,7 @@ namespace Fct.Host
         private volatile bool _running = true;
 
         public SatelliteEgress(string satelliteId, IGameEventStream stream, GameEventFilter filter,
-            Action<string> send, int capacity = 4096)
+            Action<string> send, int capacity = 4096, System.Collections.Generic.IReadOnlyList<GameEvent>? prime = null)
         {
             if (stream is null) throw new ArgumentNullException(nameof(stream));
             if (capacity < 2 || (capacity & (capacity - 1)) != 0)
@@ -37,6 +37,11 @@ namespace Fct.Host
             _mask = capacity - 1;
             _writer = new Thread(WriteLoop) { IsBackground = true, Name = "Fct.SatelliteEgress." + satelliteId };
             _writer.Start();
+            // Snapshot-priming frames ride the same ring as the live fan-out, so the caller (the bridge
+            // pump thread) never writes to the pipe itself and a stalled satellite can never block it.
+            // Enqueued before the subscription, so a late joiner converges before the first live event.
+            if (prime is not null)
+                foreach (var evt in prime) Enqueue(evt);
             // Subscribe last, so the writer thread is live before the first event can arrive.
             _subscription = stream.Subscribe(filter ?? GameEventFilter.All, Enqueue);
         }

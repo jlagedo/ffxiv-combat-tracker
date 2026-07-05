@@ -303,6 +303,22 @@ bus); the custom-log-line write-back rides a control command upstream that the h
 
 ### P7 — Cutover: parser, Triggernometry, Discord-Triggers isolated
 
+> **In progress — landed so far:** the host-side package/role resolver
+> (`Fct.Host/Plugins/PackageResolver`: classified plugin → package identity + producer/consumer role +
+> subscription set; `InstalledPluginRecord.Package`; `PackageResolverTests`); the CI fixture consumer
+> plugins (`Fct.Fixtures.TriggerFixture` — OnLogLineRead marker → `TTS()`; `Fct.Fixtures.SinkFixture`
+> — PlayTts/PlaySound slot hijack recorder); and the production consumer-package satellite mode
+> (`--role consumer`: parser-free facade replica + `EngineTables.Install()` + optional SDK stand-in +
+> `ConnectBridge` service route + audio-sink poll + the unified `-cmd` reader that folds fanned frames
+> and dispatches control commands, with the role-gated one-package-per-process `LOADPLUGIN` guard),
+> gated by `ConsumerPackageLoadTests` (a real `IActPluginV1` fires a trigger from a host-fanned log
+> line, observed on the shared host audio). The bridge pipes carry explicit 1 MB kernel buffers — a
+> byte-mode pipe with the default zero-byte buffer makes every write a rendezvous with the peer's
+> reader — and snapshot priming rides the `SatelliteEgress` ring, so the bridge-pump thread (the
+> event-pipe drainer) never writes to the command pipe itself.
+> Remaining: supervisor/router production wiring, per-satellite UI, removal of the multi-package
+> path, and the three-satellite topology gate (the checkboxes below).
+
 - [ ] Real FFXIV_ACT_Plugin runs alone in the parser satellite (already the sole producer).
 - [ ] Triggernometry and ACT-Discord-Triggers each run in their own satellite on the P5/P6
       projection.

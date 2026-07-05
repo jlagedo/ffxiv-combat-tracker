@@ -26,4 +26,14 @@
     <ProjectReference Include="..\..\src\Fct.Host\Fct.Host.csproj" />
   </ItemGroup>
 
+  <!-- P7 fixture consumer plugins (net48 IActPluginV1s): built (no assembly reference — they load only
+       through the satellite's facade AssemblyResolve) so the P7 gates can load them into a consumer
+       satellite by path. Cross-TFM, so skip target-framework negotiation. -->
+  <ItemGroup>
+    <ProjectReference Include="..\..\src\Fct.Fixtures.TriggerFixture\Fct.Fixtures.TriggerFixture.csproj"
+                      ReferenceOutputAssembly="false" SkipGetTargetFrameworkProperties="true" Private="false" />
+    <ProjectReference Include="..\..\src\Fct.Fixtures.SinkFixture\Fct.Fixtures.SinkFixture.csproj"
+                      ReferenceOutputAssembly="false" SkipGetTargetFrameworkProperties="true" Private="false" />
+  </ItemGroup>
+
 </Project>

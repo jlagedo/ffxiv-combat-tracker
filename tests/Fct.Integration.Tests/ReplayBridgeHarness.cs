@@ -33,6 +33,11 @@ namespace Fct.Integration.Tests
         public static string FramesFixture(string root, string slice) =>
             Path.Combine(root, "tests", "fixtures", "frames", slice + ".frames.tsv");
 
+        // A built P7 fixture consumer plugin (net48 IActPluginV1), e.g. "Fct.Fixtures.TriggerFixture".
+        // Built alongside the integration test project (build-only ProjectReference); loaded by path.
+        public static string FixturePluginDll(string root, string assemblyName) =>
+            Path.Combine(root, "src", assemblyName, "bin", Config(), "net48", assemblyName + ".dll");
+
         // Launch the satellite replaying <sliceLog> over a fresh bridge pipe, drain every line it sends
         // for the process lifetime, and return them in order. Throws on launch/handshake failure.
         public static List<string> RunAndCollect(string exe, string sliceLog, int maxLines = 100000) =>

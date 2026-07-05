@@ -120,14 +120,22 @@ public sealed class SatelliteHost : Fct.Host.Plugins.ISatellitePluginChannel
             throw new FileNotFoundException("Satellite executable not staged", exe);
         }
 
+        // Explicit kernel buffer sizes on both pipes: a byte-mode pipe created with the default (0)
+        // buffer size has ZERO write quota — every write is a rendezvous that only completes while the
+        // peer is actively blocked in a read. A real buffer decouples writer and reader, so a satellite
+        // thread logging up the event pipe never stalls on a momentarily-busy host pump, and a host
+        // command/fan-out write never stalls on a momentarily-busy satellite reader.
+        const int PipeBufferBytes = 1 << 20;
         _server = new NamedPipeServerStream(
-            pipeName, PipeDirection.In, 1, PipeTransmissionMode.Byte, PipeOptions.Asynchronous);
+            pipeName, PipeDirection.In, 1, PipeTransmissionMode.Byte, PipeOptions.Asynchronous,
+            inBufferSize: PipeBufferBytes, outBufferSize: 0);
 
         // A second, host->satellite pipe for load/unload commands. Kept separate from the log/EVT
         // stream (which stays strictly satellite->host) so a user command never interleaves with the
         // high-rate firehose. The satellite connects to it as a client after the log pipe.
         _cmdServer = new NamedPipeServerStream(
-            pipeName + "-cmd", PipeDirection.Out, 1, PipeTransmissionMode.Byte, PipeOptions.Asynchronous);
+            pipeName + "-cmd", PipeDirection.Out, 1, PipeTransmissionMode.Byte, PipeOptions.Asynchronous,
+            inBufferSize: 0, outBufferSize: PipeBufferBytes);
 
         // Cross-process graceful-shutdown signal. A named event (not a second pipe) avoids any
         // connection rendezvous or stream contention — it is one bit the satellite waits on. Created
@@ -333,17 +341,22 @@ public sealed class SatelliteHost : Fct.Host.Plugins.ISatellitePluginChannel
         lock (_egressLock)
         {
             _egress?.Dispose();
-            PrimeSnapshot(tokens);   // snapshot-on-subscribe, before the live fan-out starts
-            _egress = new SatelliteEgress(_satelliteId, _session.Events, filter, SendDownstream);
+            // Snapshot-on-subscribe: the priming frames ride the egress ring ahead of the live fan-out,
+            // so this (bridge-pump) thread never writes to the command pipe itself — a stalled satellite
+            // reader must never be able to wedge the pump (it is also the event-pipe drainer).
+            _egress = new SatelliteEgress(_satelliteId, _session.Events, filter, SendDownstream,
+                prime: BuildPrimeEvents(tokens));
         }
         _log.LogInformation(LogEvents.BridgeHandshake,
             "Satellite '{Id}' subscribed to downstream streams [{Streams}]", _satelliteId, string.Join(",", tokens));
     }
 
-    // Prime a newly-subscribed satellite with current state as synthesized frames, so it converges
-    // without waiting for the next live change (IGameSnapshot → zone/party/player/combatant frames).
-    private void PrimeSnapshot(string[] tokens)
+    // Build the priming frames for a newly-subscribed satellite from the current snapshot, so it
+    // converges without waiting for the next live change (IGameSnapshot → zone/party/player/combatant
+    // frames). Pure — the caller hands these to the egress ring; nothing here touches the pipe.
+    private List<GameEvent> BuildPrimeEvents(string[] tokens)
     {
+        var events = new List<GameEvent>();
         try
         {
             var snap = _session!.Snapshot();
@@ -354,28 +367,28 @@ public sealed class SatelliteHost : Fct.Host.Plugins.ISatellitePluginChannel
 
             if (zoneParty)
             {
-                SendDownstream(GameEventFrame.ToWire(new ZoneChanged(0, now, snap.Zone.Id, snap.Zone.Name)));
+                events.Add(new ZoneChanged(0, now, snap.Zone.Id, snap.Zone.Name));
                 if (snap.Player is { } me)
-                    SendDownstream(GameEventFrame.ToWire(new PrimaryPlayerChanged(0, now, me.Id, me.Name)));
+                    events.Add(new PrimaryPlayerChanged(0, now, me.Id, me.Name));
                 var members = new List<uint>();
                 foreach (var m in snap.Party.Members) members.Add(m.Id);
-                SendDownstream(GameEventFrame.ToWire(new PartyChanged(0, now, members)));
+                events.Add(new PartyChanged(0, now, members));
             }
             if (combatants)
                 foreach (var a in snap.Actors)
-                    SendDownstream(GameEventFrame.ToWire(new CombatantAdded(0, now, a)));
+                    events.Add(new CombatantAdded(0, now, a));
             if (repository)
             {
                 // The repository combatant list refreshes on the next live snapshot; the PID and resource
                 // dictionaries are one-shot upstream, so seed them here for a late subscriber to converge.
                 if (snap.Client.ProcessId is int pid && pid != 0)
-                    SendDownstream(GameEventFrame.ToWire(new GameProcessChanged(0, now, pid)));
-                SendDownstream(GameEventFrame.ToWire(new RepositorySnapshot(0, now, snap.Actors)));
+                    events.Add(new GameProcessChanged(0, now, pid));
+                events.Add(new RepositorySnapshot(0, now, snap.Actors));
                 foreach (ResourceKind kind in Enum.GetValues(typeof(ResourceKind)))
                 {
                     var entries = snap.Resources.All(kind);
                     if (entries.Count > 0)
-                        SendDownstream(GameEventFrame.ToWire(new ResourceDictionaryForwarded(0, now, kind, entries)));
+                        events.Add(new ResourceDictionaryForwarded(0, now, kind, entries));
                 }
             }
         }
@@ -383,6 +396,7 @@ public sealed class SatelliteHost : Fct.Host.Plugins.ISatellitePluginChannel
         {
             _log.LogWarning(LogEvents.BridgeFrameMalformed, ex, "Snapshot priming for '{Id}' failed", _satelliteId);
         }
+        return events;
     }
 
     // Host-routed service commands from this satellite over the event pipe (P6). Point-to-point RPC that

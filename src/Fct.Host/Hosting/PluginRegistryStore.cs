@@ -19,6 +19,11 @@ internal sealed record InstalledPluginRecord(string Id, LoadKind Kind, string Di
     /// <summary>The entry assembly's file name (relative to <see cref="Dir"/>); used to re-send a
     /// real-legacy plugin to the satellite on restart.</summary>
     public string? AssemblyFile { get; init; }
+
+    /// <summary>The satellite package this plugin runs in (ISOLATION-PLAN §2), for observability. Real
+    /// routing derives it from <see cref="PackageResolver"/> at load time, so this is a back-fillable
+    /// hint that can be absent on older records — never the routing authority.</summary>
+    public string? Package { get; init; }
 }
 
 /// <summary>The on-disk registry document: the installed set plus any dirs whose deletion was

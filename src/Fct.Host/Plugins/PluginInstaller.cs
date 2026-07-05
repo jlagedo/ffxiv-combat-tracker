@@ -110,6 +110,9 @@ internal sealed class PluginInstaller
             {
                 Title = title,
                 AssemblyFile = c.AssemblyFile,
+                // Record the satellite package for real-legacy plugins (observability; routing re-resolves).
+                Package = c.Kind == LoadKind.RealLegacy
+                    ? PackageResolver.Resolve(c.AssemblyFile, c.Id, title).Package : null,
             };
 
             bool loaded = await RouteLoadAsync(c, destDir, title, ct).ConfigureAwait(false);

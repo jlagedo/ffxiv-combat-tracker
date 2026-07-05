@@ -1,0 +1,33 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!--
+    A real (net48) IActPluginV1 TEST FIXTURE that stands in for a Triggernometry-style trigger plugin
+    in the P7 topology gate. On a matched log line (re-raised by the consumer satellite's FoldConsume)
+    it calls ActGlobals.oFormActMain.TTS(...) — so it exercises the production consumer-satellite path
+    (log-line re-raise → TTS → SPEAK up the bridge → host audio fan-out) with no third-party binary.
+
+    Built against the REAL signed Advanced Combat Tracker.exe exactly like Fct.StreamProbe (Private=false;
+    the ACT binary is never copied to output). At runtime the satellite binds "Advanced Combat Tracker"
+    to the Fct.Compat.Act facade, so loading this fixture also proves the facade's TTS/OnLogLineRead
+    surface is real-plugin-compatible. Not bundled or shipped — a test asset only.
+  -->
+  <PropertyGroup>
+    <TargetFramework>net48</TargetFramework>
+    <UseWindowsForms>true</UseWindowsForms>
+    <Nullable>disable</Nullable>
+    <PlatformTarget>x64</PlatformTarget>
+    <Prefer32Bit>false</Prefer32Bit>
+    <AssemblyName>Fct.Fixtures.TriggerFixture</AssemblyName>
+    <RootNamespace>Fct.Fixtures.TriggerFixture</RootNamespace>
+    <!-- The real ACT install (override on other machines). -->
+    <ActExePath Condition="'$(ActExePath)' == ''">E:\dev\Advanced Combat Tracker\Advanced Combat Tracker.exe</ActExePath>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <Reference Include="Advanced Combat Tracker">
+      <HintPath>$(ActExePath)</HintPath>
+      <Private>false</Private>
+    </Reference>
+  </ItemGroup>
+
+</Project>
