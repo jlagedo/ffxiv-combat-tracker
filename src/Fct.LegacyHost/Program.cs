@@ -1254,8 +1254,12 @@ namespace Fct.LegacyHost
             if (SatelliteProtocol.TryParseLoadPlugin(line, out var loadKey, out var dll, out var title))
             {
                 // One-package-per-process guard (ISOLATION-PLAN P7): a producer satellite hosts ONLY the
-                // parser; a consumer satellite NEVER hosts the parser. The host router never misroutes, so
-                // this is defense-in-depth that also keeps the multi-package path physically impossible.
+                // parser; a consumer satellite NEVER hosts the parser. The production host ALWAYS launches a
+                // satellite with an explicit --role (the SatelliteRouter/SatelliteSupervisor pass
+                // --role producer|consumer), so this guard is always active there and the multi-package path
+                // is gone in production. The no-role bridged path stays permissive only for in-process
+                // diagnostic harnesses (SatelliteRunFixture co-loads parser + OverlayPlugin), the same
+                // dev/test carve-out as dev-standalone's LoadStandalonePlugins.
                 bool isParser = string.Equals(Path.GetFileName(dll), "FFXIV_ACT_Plugin.dll", StringComparison.OrdinalIgnoreCase);
                 if (_roleExplicit && IsConsumer && isParser)
                 {

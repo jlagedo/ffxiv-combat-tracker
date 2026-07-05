@@ -46,9 +46,10 @@ harnesses the gates build on).
   synchronous `IDataRepository` polls are served by a local mirror fed from the host-routed
   repository-snapshot stream.
 - **Hard cutover.** The runtime is built directly to the multi-satellite topology on `main`
-  (nothing has shipped; there is no compatibility mode to preserve). The single
-  multi-package satellite exists only until P7 removes it. The satellite's dev-standalone
-  mode (`Fct.LegacyHost.exe` with no `--bridge`) remains a dev-only convenience.
+  (nothing has shipped; there is no compatibility mode to preserve). Production runs one satellite
+  per package (the `SatelliteRouter`, P7); the no-role permissive path survives only for in-process
+  diagnostic harnesses, and the satellite's dev-standalone mode (`Fct.LegacyHost.exe` with no
+  `--bridge`) remains a dev-only convenience.
 - **E2E strategy — replay-driven, headless.** End-to-end gates run real satellite processes
   fed by recorded game streams (frame replay and `--replay` log replay); no live game in CI.
   Tests that need the real FFXIV_ACT_Plugin binary skip cleanly when it is not installed.
@@ -172,17 +173,18 @@ input; divergence fails CI. ✅
 - [x] Satellite: single-package hosting (`--satellite-id`, one process per identity); the
       per-satellite verification artifact is now identity-keyed (`s2-<id>.log`). *Rejecting a
       second package on one process is enforced at P7 when the packages actually split.*
-- [ ] `Fct.App`: spawns one satellite per installed legacy package (catalog-driven). *Deferred
-      to P7 — the App still runs one satellite until the packages are split; the supervisor it
-      will drive is in place. `AppData` gained an `FCT_INSTALL_DIR` override so the host runtime
-      can be driven from a staged tree.*
+- [x] `Fct.App`: spawns one satellite per installed legacy package (catalog-driven). *Landed in P7:
+      `SatelliteRouter` over the supervisor spawns per-package satellites on demand from the catalog +
+      `PackageResolver`. `AppData` gained an `FCT_INSTALL_DIR` override so the host runtime can be
+      driven from a staged tree.*
 - [x] Gate (e2e, no plugins): `Fct.Integration.Tests/SatelliteSupervisorTests` launches three
       empty satellites with distinct identities; killing one leaves the others' processes live
       and the host healthy; the dead one restarts and re-handshakes with the same id + a new
       pid; each writes its own `s2-<id>.log`.
 
-**Exit:** process-per-package fabric with crash isolation, supervised, observable. ✅ (data plane;
-the Fct.App per-package spawn + per-satellite UI land with P7.)
+**Exit:** process-per-package fabric with crash isolation, supervised, observable. ✅ (the Fct.App
+per-package spawn landed with P7; the roster is flat — one row per plugin, aggregated across
+satellites — with each plugin's config window embedded by its own HWND regardless of host process.)
 
 ### P4 — Downstream data plane (host → satellite fan-out)
 
@@ -301,35 +303,53 @@ bus); the custom-log-line write-back rides a control command upstream that the h
 
 **Exit:** every known cross-plugin signal path exists as a host pipe with tests. ✅
 
-### P7 — Cutover: parser, Triggernometry, Discord-Triggers isolated
+### P7 — Cutover: parser, Triggernometry, Discord-Triggers isolated ✅
 
-> **In progress — landed so far:** the host-side package/role resolver
-> (`Fct.Host/Plugins/PackageResolver`: classified plugin → package identity + producer/consumer role +
-> subscription set; `InstalledPluginRecord.Package`; `PackageResolverTests`); the CI fixture consumer
-> plugins (`Fct.Fixtures.TriggerFixture` — OnLogLineRead marker → `TTS()`; `Fct.Fixtures.SinkFixture`
-> — PlayTts/PlaySound slot hijack recorder); and the production consumer-package satellite mode
-> (`--role consumer`: parser-free facade replica + `EngineTables.Install()` + optional SDK stand-in +
-> `ConnectBridge` service route + audio-sink poll + the unified `-cmd` reader that folds fanned frames
-> and dispatches control commands, with the role-gated one-package-per-process `LOADPLUGIN` guard),
-> gated by `ConsumerPackageLoadTests` (a real `IActPluginV1` fires a trigger from a host-fanned log
-> line, observed on the shared host audio). The bridge pipes carry explicit 1 MB kernel buffers — a
-> byte-mode pipe with the default zero-byte buffer makes every write a rendezvous with the peer's
-> reader — and snapshot priming rides the `SatelliteEgress` ring, so the bridge-pump thread (the
-> event-pipe drainer) never writes to the command pipe itself.
-> Remaining: supervisor/router production wiring, per-satellite UI, removal of the multi-package
-> path, and the three-satellite topology gate (the checkboxes below).
+The host-side package/role resolver (`Fct.Host/Plugins/PackageResolver`: classified plugin → package
+identity + producer/consumer role + subscription set; `InstalledPluginRecord.Package`;
+`PackageResolverTests`), the CI fixture consumer plugins (`Fct.Fixtures.TriggerFixture` — OnLogLineRead
+marker → `TTS()`; `Fct.Fixtures.SinkFixture` — PlayTts/PlaySound slot hijack recorder), and the
+production consumer-package satellite mode (`--role consumer`: parser-free facade replica +
+`EngineTables.Install()` + optional SDK stand-in + `ConnectBridge` service route + audio-sink poll +
+the unified `-cmd` reader that folds fanned frames and dispatches control commands, with the
+role-gated one-package-per-process `LOADPLUGIN` guard). The bridge pipes carry explicit 1 MB kernel
+buffers, and snapshot priming rides the `SatelliteEgress` ring so the bridge-pump thread never writes
+to the command pipe itself. The production wiring: `SatelliteRouter` (`Fct.Host/SatelliteRouter`)
+composes over `SatelliteSupervisor`, mapping each installed plugin to its package, spawning that
+package's satellite on demand with the resolved role + subscriptions (`SatelliteSpec.Role/Subscriptions`
+→ `--role`/`--subscribe` launch args), forwarding its `LOADPLUGIN`, aggregating the per-satellite
+roster, replaying loads onto a restarted satellite (`SatelliteSupervisor.SatelliteStarted`), and
+stopping+killing a package's satellite when its last plugin is uninstalled
+(`SatelliteSupervisor.StopOneAsync`). The command-pipe race is closed deterministically
+(`SatelliteHost.WaitForCommandChannelAsync`); `ISatellitePluginChannel.RequestLoadPluginAsync` is async.
+`AddFctHostServices` registers the supervisor + router (`ISatellitePluginChannel` → router); the shell
+drives the router (flat roster aggregated across satellites; replay spawns one satellite per installed
+package; `StopAllAsync` on close).
 
-- [ ] Real FFXIV_ACT_Plugin runs alone in the parser satellite (already the sole producer).
-- [ ] Triggernometry and ACT-Discord-Triggers each run in their own satellite on the P5/P6
-      projection.
-- [ ] The multi-package satellite path is **removed** (`FacadeHost` hosts exactly one
-      package; dev-standalone keeps its convenience auto-load, dev-only).
-- [ ] Gate (e2e) **[plugin-gated]**: a `--replay` session in the parser satellite drives the
-      host; a fixture Triggernometry trigger fires in its satellite (observed on the audio
-      pipe); the Discord satellite receives it through its registered terminal sink. All
-      pre-existing suites green under the new topology.
+- [x] Real FFXIV_ACT_Plugin runs alone in the parser satellite (already the sole producer; the router
+      spawns it as the `ffxiv` producer only when the parser is installed).
+- [x] Triggernometry and ACT-Discord-Triggers each run in their own satellite on the P5/P6
+      projection (the router resolves each to its package and launches a `--role consumer` satellite
+      with its subscription set).
+- [x] The multi-package path is **removed in production**: the host runs one satellite per package
+      (router + supervisor), and the satellite's role-gated `LOADPLUGIN` guard is always active there
+      because the router always passes `--role`. Dev-standalone keeps its convenience auto-load, and
+      the no-role bridged path stays permissive **only** for in-process diagnostic harnesses
+      (`SatelliteRunFixture` co-loads parser + OverlayPlugin) — the same dev/test carve-out.
+- [x] Gate (e2e): `Fct.Integration.Tests/ThreeSatelliteTopologyTests` — the production router spawns
+      one satellite per package; a host-fanned rawlog line fires a fixture trigger in the
+      `triggernometry` satellite, whose `TTS()` routes up to the shared host audio and fans down to the
+      `discord` satellite's registered terminal sink. Gate A is plugin-free (two consumer satellites,
+      marker injected on the bus); Gate B **[plugin-gated]** stands the real FFXIV_ACT_Plugin producer
+      up as the third process (three distinct pids). All pre-existing suites green under the new topology.
 
-**Exit:** three real plugins run isolated in production topology; M0/M2/M3 hold multi-process.
+**Exit:** three real plugins run isolated in production topology; M0/M2/M3 hold multi-process. ✅
+
+> **Known follow-up (pre-existing, from the P1 note):** `Fct.App`'s `deps.json` still lists
+> `Fct.Aggregation` (via `Fct.Engine`'s `ProjectReference`) *and* it is staged under `compat\` — two
+> identities (`Fct.App.Tests/StaticGraphTests` red for `Fct.Aggregation`). Making `Fct.Engine`'s
+> reference non-shipping (resolve the single `compat\` copy via `CompatRuntime`) is a separable
+> build-graph/startup-ordering change, tracked into P9 finalization.
 
 ### P8 — OverlayPlugin satellite
 

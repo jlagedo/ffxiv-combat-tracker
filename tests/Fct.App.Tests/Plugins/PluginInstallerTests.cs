@@ -49,7 +49,7 @@ public class PluginInstallerTests
         "Advanced Combat Tracker", "Plugins", "FFXIV_ACT_Plugin.dll");
 
     [Fact]
-    public void Replay_loads_present_legacy_records_and_reports_the_missing_ones()
+    public async Task Replay_loads_present_legacy_records_and_reports_the_missing_ones()
     {
         using var h = new Harness();
 
@@ -65,7 +65,7 @@ public class PluginInstallerTests
             Path.Combine(h.Base, "nowhere"), null, "1.0")
         { Title = "Gone Legacy", AssemblyFile = "Gone_Legacy.dll" });
 
-        var missing = h.Installer.ReplayLegacyToSatellite();
+        var missing = await h.Installer.ReplayLegacyToSatelliteAsync();
 
         Assert.Single(missing);
         Assert.Equal("gone_legacy", missing[0].Id);
@@ -75,7 +75,7 @@ public class PluginInstallerTests
     }
 
     [Fact]
-    public void Relink_rejects_a_dll_that_is_not_a_classic_plugin()
+    public async Task Relink_rejects_a_dll_that_is_not_a_classic_plugin()
     {
         using var h = new Harness();
         var dir = Path.Combine(h.Base, "old-home");
@@ -83,7 +83,7 @@ public class PluginInstallerTests
         { Title = "Sample", AssemblyFile = "Fct.SamplePlugin.dll" });
 
         // The sample plugin classifies as Native, so relinking to it must be refused.
-        var result = h.Installer.RelinkLegacy("fct.sampleplugin", Path.Combine(SampleDir, "Fct.SamplePlugin.dll"));
+        var result = await h.Installer.RelinkLegacyAsync("fct.sampleplugin", Path.Combine(SampleDir, "Fct.SamplePlugin.dll"));
 
         Assert.False(result.Success);
         Assert.Equal(dir, h.Registry.Find("fct.sampleplugin")!.Dir);   // record untouched
@@ -91,15 +91,15 @@ public class PluginInstallerTests
     }
 
     [Fact]
-    public void Relink_rejects_an_unknown_plugin_id()
+    public async Task Relink_rejects_an_unknown_plugin_id()
     {
         using var h = new Harness();
-        var result = h.Installer.RelinkLegacy("nope", Path.Combine(SampleDir, "Fct.SamplePlugin.dll"));
+        var result = await h.Installer.RelinkLegacyAsync("nope", Path.Combine(SampleDir, "Fct.SamplePlugin.dll"));
         Assert.False(result.Success);
     }
 
     [SkippableFact]
-    public void Relink_repoints_the_record_and_requests_a_load()
+    public async Task Relink_repoints_the_record_and_requests_a_load()
     {
         Skip.IfNot(File.Exists(FfxivPluginPath), $"FFXIV_ACT_Plugin not installed at {FfxivPluginPath}.");
         using var h = new Harness();
@@ -114,7 +114,7 @@ public class PluginInstallerTests
             Path.Combine(h.Base, "old-home"), null, "0.0.0")
         { Title = "FFXIV_ACT_Plugin", AssemblyFile = "FFXIV_ACT_Plugin.dll" });
 
-        var result = h.Installer.RelinkLegacy("ffxiv_act_plugin", dll);
+        var result = await h.Installer.RelinkLegacyAsync("ffxiv_act_plugin", dll);
 
         Assert.True(result.Success, result.Error);
         Assert.Equal(LoadKind.RealLegacy, result.Kind);
@@ -192,10 +192,10 @@ public class PluginInstallerTests
     {
         public readonly System.Collections.Generic.List<(string Key, string DllPath, string Title)> LoadRequests = new();
 
-        public bool RequestLoadPlugin(string key, string dllPath, string title)
+        public Task<bool> RequestLoadPluginAsync(string key, string dllPath, string title)
         {
             LoadRequests.Add((key, dllPath, title));
-            return true;
+            return Task.FromResult(true);
         }
 
         public Task<bool> RequestUnloadPluginAsync(string key, TimeSpan timeout) => Task.FromResult(true);

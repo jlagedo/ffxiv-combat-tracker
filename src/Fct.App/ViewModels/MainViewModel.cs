@@ -349,8 +349,12 @@ public sealed partial class MainViewModel : ObservableObject
             SelectedPlugin = LegacyPlugins.FirstOrDefault() ?? ModernPlugins.FirstOrDefault();
         RaiseRosterChanged();
 
+        // With the multi-satellite topology the roster fills via PluginAnnounced events as each package
+        // satellite comes up (plugins is empty here), so only announce a count once we actually have one.
         _hub?.Publish(NotificationSeverity.Success, Resources.Notify_Source_ClassicEngine, Resources.Notify_EngineRunningTitle,
-            plugins.Count == 1 ? Resources.Notify_EngineReady_One : string.Format(Resources.Notify_EngineReady_Many, plugins.Count));
+            plugins.Count == 0 ? Resources.Status_Running
+            : plugins.Count == 1 ? Resources.Notify_EngineReady_One
+            : string.Format(Resources.Notify_EngineReady_Many, plugins.Count));
     }
 
     // A legacy plugin was loaded live on the satellite after startup (install / restart replay /

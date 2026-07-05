@@ -24,19 +24,23 @@ public partial class MainWindow : Window
 {
     private readonly MainViewModel _vm;
     private readonly ILogger<MainWindow> _log;
-    private readonly SatelliteHost _satellite;
+    private readonly SatelliteRouter _router;
     private readonly INotificationHub _notifications;
 
     // Parameterless path is for the XAML previewer only; the running app resolves the DI ctor.
     public MainWindow() : this(new MainViewModel(),
-        new SatelliteHost(NullLoggerFactory.Instance, NullGameEventSink.Instance),
+        new SatelliteRouter(
+            new SatelliteSupervisor(NullLoggerFactory.Instance, NullGameEventSink.Instance),
+            NullLoggerFactory.Instance),
         NullLoggerFactory.Instance, new NotificationService()) { }
 
-    public MainWindow(MainViewModel vm, SatelliteHost satellite, ILoggerFactory loggerFactory,
+    // Internal (the SatelliteRouter it takes is internal to Fct.Host, visible here via InternalsVisibleTo);
+    // Program registers MainWindow with an explicit factory that calls this ctor.
+    internal MainWindow(MainViewModel vm, SatelliteRouter router, ILoggerFactory loggerFactory,
         INotificationHub notifications)
     {
         _vm = vm;
-        _satellite = satellite;
+        _router = router;
         _notifications = notifications;
         _log = loggerFactory.CreateLogger<MainWindow>();
 
@@ -49,9 +53,9 @@ public partial class MainWindow : Window
         _vm.UnloadPluginRequested += row => _ = UnloadPluginAsync(row);
         _vm.LocatePluginRequested += row => _ = LocatePluginAsync(row);
 
-        // Legacy plugins loaded/unloaded live on the satellite after startup reconcile the roster.
-        _satellite.PluginAnnounced += p => _vm.AddLegacyPlugin(p);
-        _satellite.PluginUnloaded += key => _vm.RemoveLegacyPlugin(key);
+        // Legacy plugins loaded/unloaded live across the package satellites reconcile the flat roster.
+        _router.PluginAnnounced += p => _vm.AddLegacyPlugin(p);
+        _router.PluginUnloaded += key => _vm.RemoveLegacyPlugin(key);
     }
 
     // Kick off the satellite once the shell is on screen, so the window paints first — unless the
@@ -117,7 +121,7 @@ public partial class MainWindow : Window
             },
         });
         if (files.FirstOrDefault() is { } file)
-            installer.RelinkLegacy(row.Key, file.Path.LocalPath);   // installer surfaces its own notifications
+            await installer.RelinkLegacyAsync(row.Key, file.Path.LocalPath);   // installer surfaces its own notifications
     }
 
     private async Task InstallAsync(string source)
@@ -154,23 +158,19 @@ public partial class MainWindow : Window
         _vm.SetStarting();
         try
         {
-            var result = await _satellite.StartAsync();
-            var pid = _satellite.Process?.Id ?? 0;
-
-            _vm.SetOnline(result.Plugins);
-            // Re-load any persisted real-legacy plugins onto the now-online satellite; records whose
-            // files vanished (install-by-reference sources move) get a re-locatable roster row.
+            // No global satellite anymore: the router spawns one satellite per installed package as we
+            // replay the persisted real-legacy plugins. Roster rows arrive via router.PluginAnnounced;
+            // records whose files vanished (install-by-reference sources move) get a re-locatable row.
+            _vm.SetOnline(Array.Empty<SatellitePlugin>());
             if (App.Services?.GetService<PluginInstaller>() is { } installer)
-                foreach (var missing in installer.ReplayLegacyToSatellite())
+                foreach (var missing in await installer.ReplayLegacyToSatelliteAsync())
                     _vm.AddMissingLegacyPlugin(missing.Id, missing.Title ?? missing.Id, missing.Dir);
-            _log.LogInformation(LogEvents.SatelliteStarted,
-                "Satellite online: pid {Pid}, {PluginCount} plugin window(s) [{Handshake}]",
-                pid, result.Plugins.Count, result.Handshake);
+            _log.LogInformation(LogEvents.SatelliteStarted, "Satellite topology online (one process per installed package)");
         }
         catch (Exception ex)
         {
             _vm.SetOffline(ex.Message);
-            _log.LogError(LogEvents.SatelliteLaunchFailed, ex, "Satellite launch failed");
+            _log.LogError(LogEvents.SatelliteLaunchFailed, ex, "Satellite topology start failed");
         }
     }
 
@@ -186,9 +186,9 @@ public partial class MainWindow : Window
 
     private void OnClose(object? sender, Avalonia.Interactivity.RoutedEventArgs e) => Close();
 
-    // Drain the satellite (plugins DeInit -> persist state, then it exits) BEFORE this window is
+    // Drain every satellite (plugins DeInit -> persist state, then each exits) BEFORE this window is
     // destroyed. The plugin config windows are SetParent-embedded into this window, so tearing it
-    // down first wedges the satellite's UI thread on cross-process window teardown and the deinit
+    // down first wedges a satellite's UI thread on cross-process window teardown and the deinit
     // Invoke never runs. So cancel the first close, await the graceful shutdown, then close for real.
     private bool _satelliteDrained;
 
@@ -197,7 +197,7 @@ public partial class MainWindow : Window
         if (!_satelliteDrained)
         {
             e.Cancel = true;
-            try { await _satellite.ShutdownAsync(TimeSpan.FromSeconds(8)); }
+            try { await _router.StopAllAsync(TimeSpan.FromSeconds(8)); }
             catch (Exception ex) { _log.LogWarning(LogEvents.SatelliteShutdownTimeout, ex, "Satellite drain on close faulted"); }
             _satelliteDrained = true;
             Close();

@@ -32,8 +32,10 @@ public sealed class SatelliteStartResult
 // named pipe: a READY handshake and the HWND of its window (to embed). The pipe is kept
 // open for the host lifetime and becomes the live log channel: after startup the satellite
 // forwards its Serilog records as LOG frames, which we re-emit into the host's logging
-// pipeline so the whole stack logs to one place.
-public sealed class SatelliteHost : Fct.Host.Plugins.ISatellitePluginChannel
+// pipeline so the whole stack logs to one place. Load/unload are per-satellite primitives
+// (RequestLoadPlugin/RequestUnloadPluginAsync); the SatelliteRouter owns the package→satellite
+// routing that ISatellitePluginChannel exposes to the installer.
+public sealed class SatelliteHost
 {
     // A single kill-on-close job for the host process: any satellite enrolled here (and the CEF
     // subprocesses it spawns) is terminated by the OS when the host exits or is killed, so no
@@ -64,6 +66,10 @@ public sealed class SatelliteHost : Fct.Host.Plugins.ISatellitePluginChannel
     private NamedPipeServerStream? _cmdServer;  // host -> satellite: load/unload commands
     private StreamWriter? _cmdWriter;
     private readonly object _cmdLock = new();
+    // Completes once the command pipe is connected (true) or gave up (false). The router awaits this
+    // before forwarding a LOADPLUGIN so it never races the background command-pipe accept — a fresh
+    // instance per (re)start means a restarted satellite gets a fresh signal automatically.
+    private readonly TaskCompletionSource<bool> _cmdReady = new(TaskCreationOptions.RunContinuationsAsynchronously);
     private EventWaitHandle? _shutdownEvent;    // host -> satellite: graceful-shutdown signal
     private volatile bool _shuttingDown;        // suppress the "exited" notice during a requested drain
     public Process? Process { get; private set; }
@@ -288,13 +294,30 @@ public sealed class SatelliteHost : Fct.Host.Plugins.ISatellitePluginChannel
             await _cmdServer.WaitForConnectionAsync(ct).ConfigureAwait(false);
             var writer = new StreamWriter(_cmdServer) { AutoFlush = true };
             lock (_cmdLock) _cmdWriter = writer;
+            _cmdReady.TrySetResult(true);
             _log.LogDebug(LogEvents.BridgeConnected, "Satellite connected to command pipe");
         }
-        catch (OperationCanceledException) { /* host shutting down */ }
+        catch (OperationCanceledException) { _cmdReady.TrySetResult(false); /* host shutting down */ }
         catch (Exception ex)
         {
+            _cmdReady.TrySetResult(false);
             _log.LogWarning(LogEvents.BridgeReaderStopped, ex, "Command pipe accept faulted; live load/unload unavailable");
         }
+    }
+
+    /// <summary>Await the command pipe becoming writable (the background accept completes after the
+    /// satellite connects — slow for a consumer that loads the SDK stand-in). Returns false if the pipe
+    /// never connected or the wait timed out, so the caller can surface "not running yet".</summary>
+    internal async Task<bool> WaitForCommandChannelAsync(TimeSpan timeout, CancellationToken ct = default)
+    {
+        try
+        {
+            using var cts = CancellationTokenSource.CreateLinkedTokenSource(ct);
+            cts.CancelAfter(timeout);
+            using (cts.Token.Register(() => _cmdReady.TrySetResult(false)))
+                return await _cmdReady.Task.ConfigureAwait(false);
+        }
+        catch (OperationCanceledException) { return false; }
     }
 
     /// <summary>Ask the satellite to load a real-legacy plugin DLL and host it. Fire-and-forget: the

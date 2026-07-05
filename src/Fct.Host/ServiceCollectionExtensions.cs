@@ -27,20 +27,25 @@ public static class ServiceCollectionExtensions
         services.AddSingleton<PluginClassifier>();
         services.AddSingleton<PluginRegistryStore>();
         services.AddSingleton<PluginInstallPaths>();
-        services.AddSingleton<ISatellitePluginChannel>(sp => sp.GetRequiredService<SatelliteHost>());
+        services.AddSingleton<ISatellitePluginChannel>(sp => sp.GetRequiredService<SatelliteRouter>());
         services.AddSingleton<PluginInstaller>();
 
-        // The satellite decodes live game-event frames onto the bus (piece C) and surfaces notable
-        // records as notifications. It also carries the host-routed service pipes (P6): audio produced in
-        // the satellite fans to the shared IAudioOutput, and a slot takeover registers a terminal sink.
-        services.AddSingleton<SatelliteHost>(sp => new SatelliteHost(
+        // The multi-satellite fabric (ISOLATION-PLAN P7): the supervisor launches/supervises one net48
+        // satellite process per legacy package; the router maps each installed plugin to its package,
+        // spawns that satellite on demand, and forwards its load/unload. Each satellite decodes live
+        // game-event frames onto the bus and carries the host-routed service pipes (P6): audio produced in
+        // a satellite fans to the shared IAudioOutput, a slot takeover registers a terminal sink.
+        services.AddSingleton<SatelliteSupervisor>(sp => new SatelliteSupervisor(
             sp.GetRequiredService<ILoggerFactory>(), sp.GetRequiredService<IGameEventSink>(),
             sp.GetRequiredService<INotificationHub>(), sp.GetService<ISatelliteNotificationText>(),
+            session: sp.GetService<IGameSession>(),
             audio: sp.GetService<IAudioOutput>(),
             registry: sp.GetService<IPluginRegistry>(),
             rawLog: sp.GetService<IRawLogLineEmitter>()));
+        services.AddSingleton<SatelliteRouter>(sp => new SatelliteRouter(
+            sp.GetRequiredService<SatelliteSupervisor>(), sp.GetRequiredService<ILoggerFactory>()));
 
-        // Gracefully de-init the satellite's plugins on host shutdown (persists their state).
+        // Gracefully drain every satellite's plugins on host shutdown (persists their state).
         services.AddHostedService<SatelliteLifetime>();
 
         // Native plugin host (slice A+B): the real IPluginHost services + the ALC-per-plugin loader.

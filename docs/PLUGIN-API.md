@@ -819,12 +819,13 @@ satellite channel (real-legacy face). `PluginRegistryStore` persists the install
   dir is transient, so they are always copied). Either way the plugin loads live and is recorded.
 - **Route load** — net10 kinds load in-process (`PluginManager.LoadDirectoryAsync` → fresh collectible
   ALC, `contract` gate, time-boxed fault-guarded init, quarantine on fault). Real-legacy kinds are sent
-  to the net48 satellite as a `LOADPLUGIN` command frame (`ISatellitePluginChannel` /
-  `SatelliteProtocol`) and hosted out-of-process there.
+  to their **package** satellite as a `LOADPLUGIN` command frame (`ISatellitePluginChannel` →
+  `SatelliteRouter`, which resolves the package and spawns its satellite on demand; `SatelliteProtocol`)
+  and hosted out-of-process there.
 - **Startup** — `PluginLifetime` clears pending deletes, then loads every persisted net10 plugin
   (`LoadPersistedAsync`) — registry-driven only, nothing is auto-discovered from disk; persisted
-  real-legacy plugins are replayed to the satellite (`ReplayLegacyToSatellite`) once it is
-  online.
+  real-legacy plugins are replayed to their package satellites (`ReplayLegacyToSatelliteAsync`),
+  each spawned on demand by the router.
 - **Re-locate** — `ReplayLegacyToSatellite` returns the real-legacy records whose entry DLL no longer
   exists (install-by-reference sources can move). The shell shows those as a *Files missing* roster row
   with a *Locate…* action; picking the DLL at its new home calls `PluginInstaller.RelinkLegacy`, which

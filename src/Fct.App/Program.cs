@@ -77,9 +77,14 @@ class Program
         // SatelliteHost decodes EVT frames from the satellite and publishes them through IGameEventSink.
         builder.Services.AddFctHostServices();
 
-        // Shell view + view model.
+        // Shell view + view model. MainWindow's ctor takes the internal SatelliteRouter, so register it
+        // with an explicit factory (constructor scanning only picks public ctors).
         builder.Services.AddSingleton<MainViewModel>();
-        builder.Services.AddSingleton<MainWindow>();
+        builder.Services.AddSingleton<MainWindow>(sp => new MainWindow(
+            sp.GetRequiredService<MainViewModel>(),
+            sp.GetRequiredService<Fct.Host.SatelliteRouter>(),
+            sp.GetRequiredService<ILoggerFactory>(),
+            sp.GetRequiredService<Fct.Host.Hosting.INotificationHub>()));
 
         // Localized text for the satellite's notifications (host runtime binds ISatelliteNotificationText).
         builder.Services.AddSingleton<ISatelliteNotificationText, SatelliteNotificationText>();

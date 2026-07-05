@@ -182,8 +182,8 @@ internal sealed class PluginInstaller
     }
 
     /// <summary>Startup (pre-UI): clear any deferred deletes, then load every persisted <i>net10</i>
-    /// plugin in-process. Real-legacy records are replayed to the satellite once it is online
-    /// (<see cref="ReplayLegacyToSatellite"/>).</summary>
+    /// plugin in-process. Real-legacy records are replayed to their package satellites
+    /// (<see cref="ReplayLegacyToSatelliteAsync"/>).</summary>
     public async Task LoadPersistedAsync(CancellationToken ct)
     {
         _registry.Load();   // read installed-plugins.json back into memory so installs survive restarts
@@ -201,10 +201,11 @@ internal sealed class PluginInstaller
         }
     }
 
-    /// <summary>Once the satellite is online, (re)send a LOADPLUGIN for every persisted real-legacy
-    /// plugin so they come back after a restart. Returns the records whose entry DLL no longer exists
+    /// <summary>On startup, (re)send a LOADPLUGIN for every persisted real-legacy plugin so they come
+    /// back after a restart — each routes through the router, which spawns exactly the package satellites
+    /// that have installed plugins (catalog-driven). Returns the records whose entry DLL no longer exists
     /// (install-by-reference sources can move or vanish) so the shell can offer to re-locate them.</summary>
-    public IReadOnlyList<InstalledPluginRecord> ReplayLegacyToSatellite()
+    public async Task<IReadOnlyList<InstalledPluginRecord>> ReplayLegacyToSatelliteAsync()
     {
         var missing = new List<InstalledPluginRecord>();
         foreach (var record in _registry.All().Where(r => r.Kind == LoadKind.RealLegacy))
@@ -217,7 +218,7 @@ internal sealed class PluginInstaller
                 missing.Add(record);
                 continue;
             }
-            _satellite.RequestLoadPlugin(record.Id, dll, record.Title ?? record.Id);
+            await _satellite.RequestLoadPluginAsync(record.Id, dll, record.Title ?? record.Id).ConfigureAwait(false);
         }
         return missing;
     }
@@ -225,7 +226,7 @@ internal sealed class PluginInstaller
     /// <summary>Re-point a real-legacy record whose install-by-reference source moved: classify the
     /// newly picked DLL, verify it is the same plugin, update the registry record, and ask the
     /// satellite to load it from the new location.</summary>
-    public InstallResult RelinkLegacy(string id, string dllPath)
+    public async Task<InstallResult> RelinkLegacyAsync(string id, string dllPath)
     {
         try
         {
@@ -246,7 +247,7 @@ internal sealed class PluginInstaller
                 Version = c.Version,
                 AssemblyFile = c.AssemblyFile,
             });
-            bool loaded = _satellite.RequestLoadPlugin(record.Id, dllPath, title);
+            bool loaded = await _satellite.RequestLoadPluginAsync(record.Id, dllPath, title).ConfigureAwait(false);
 
             _log.LogInformation(LogEvents.NativePluginLoaded, "Relinked legacy plugin {Id} -> {Dll}", id, dllPath);
             _notifications?.Publish(NotificationSeverity.Success, "Plugins", $"{title} relinked",
@@ -274,7 +275,8 @@ internal sealed class PluginInstaller
         if (c.Kind == LoadKind.RealLegacy)
         {
             var dll = Path.Combine(destDir, c.AssemblyFile);
-            return _satellite.RequestLoadPlugin(c.Id, dll, title);   // false if the satellite isn't running yet
+            // The router resolves the package, spawns its satellite on demand, and forwards the load.
+            return await _satellite.RequestLoadPluginAsync(c.Id, dll, title).ConfigureAwait(false);
         }
         var loaded = await _manager.LoadDirectoryAsync(destDir, ct).ConfigureAwait(false);
         return loaded is not null;

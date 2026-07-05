@@ -10,11 +10,15 @@ using Microsoft.Extensions.Logging;
 namespace Fct.Host
 {
     /// <summary>One package a satellite hosts. The id is the routing/identity key; the package names the
-    /// legacy plugin set (informational at P3 — used for the handshake echo + logs).</summary>
+    /// legacy plugin set. <see cref="Role"/> + <see cref="Subscriptions"/> become the satellite's launch
+    /// args (P7): a producer forwards its stream and never subscribes; a consumer declares the downstream
+    /// stream set its facade reads.</summary>
     internal sealed class SatelliteSpec
     {
         public string Id { get; init; } = "";
         public string Package { get; init; } = "";
+        public string Role { get; init; } = "producer";
+        public string[] Subscriptions { get; init; } = Array.Empty<string>();
     }
 
     internal enum SatelliteState { Starting, Running, Restarting, Quarantined, Stopped }
@@ -22,10 +26,29 @@ namespace Fct.Host
     /// <summary>Live supervision state for one satellite. Mutated by the supervisor under its lock.</summary>
     internal sealed class SupervisedSatellite
     {
-        internal SupervisedSatellite(SatelliteSpec spec) { Id = spec.Id; Package = spec.Package; }
+        internal SupervisedSatellite(SatelliteSpec spec)
+        {
+            Id = spec.Id;
+            Package = spec.Package;
+            ExtraArgs = BuildExtraArgs(spec);
+        }
 
         public string Id { get; }
         public string Package { get; }
+
+        /// <summary>The launch args derived from the spec (role + optional subscription set), handed to
+        /// each <see cref="SatelliteHost"/> so a restart relaunches with the same identity + role.</summary>
+        internal string ExtraArgs { get; }
+
+        // --package/--role are always present; a consumer also declares its stream set. Stream tokens are
+        // bare identifiers joined by commas (no spaces), so the raw append is shell-safe.
+        private static string BuildExtraArgs(SatelliteSpec spec)
+        {
+            var args = "--package " + spec.Package + " --role " + spec.Role;
+            if (spec.Subscriptions.Length > 0)
+                args += " --subscribe " + string.Join(",", spec.Subscriptions);
+            return args;
+        }
 
         private readonly object _gate = new();
         private readonly List<DateTimeOffset> _failures = new();
@@ -77,6 +100,11 @@ namespace Fct.Host
         private readonly object _listLock = new();
         private readonly List<SupervisedSatellite> _satellites = new();
 
+        /// <summary>Raised at the end of every (re)start of a satellite, carrying whether this was a
+        /// restart. The <see cref="SatelliteRouter"/> uses it to (re)wire the new <see cref="SatelliteHost"/>'s
+        /// roster events and, on a restart, replay the package's LOADPLUGIN commands onto the fresh process.</summary>
+        public event Action<SupervisedSatellite, bool>? SatelliteStarted;
+
         public SatelliteSupervisor(
             ILoggerFactory loggerFactory,
             IGameEventSink sink,
@@ -127,13 +155,14 @@ namespace Fct.Host
         private async Task StartOneAsync(SupervisedSatellite sat, bool isRestart, CancellationToken ct)
         {
             var host = new SatelliteHost(_loggerFactory, _sink, _notifications, _texts, sat.Id, _session,
-                extraArgs: "", audio: _audio, registry: _registry, rawLog: _rawLog);
+                extraArgs: sat.ExtraArgs, audio: _audio, registry: _registry, rawLog: _rawLog);
             host.ProcessExited += code => OnExited(sat, code);
             sat.Host = host;
             sat.Set(isRestart ? SatelliteState.Restarting : SatelliteState.Starting);
 
             var result = await host.StartAsync(ct).ConfigureAwait(false);
             sat.OnStarted(host.Process?.Id ?? -1, result.Handshake, isRestart);
+            SatelliteStarted?.Invoke(sat, isRestart);
         }
 
         // An unexpected process exit (Process.Exited fired outside a requested shutdown). Record the
@@ -200,6 +229,22 @@ namespace Fct.Host
                     try { await host.ShutdownAsync(timeout).ConfigureAwait(false); } catch { /* best-effort */ }
                 }
             }
+        }
+
+        /// <summary>Stop supervising and gracefully drain a single satellite, then forget it (used when a
+        /// package's last plugin is uninstalled — the emptied satellite is torn down). Suppresses its
+        /// restart path and removes it from the supervised set. Idempotent.</summary>
+        public async Task StopOneAsync(SupervisedSatellite sat, TimeSpan timeout)
+        {
+            if (sat is null) return;
+            sat.Set(SatelliteState.Stopped);   // suppress the restart path before we drain
+            lock (_listLock) _satellites.Remove(sat);
+            var host = sat.Host;
+            if (host != null)
+            {
+                try { await host.ShutdownAsync(timeout).ConfigureAwait(false); } catch { /* best-effort */ }
+            }
+            _log.LogInformation(LogEvents.SatelliteExited, "Supervisor stopped satellite '{Id}' (pkg '{Pkg}')", sat.Id, sat.Package);
         }
 
         public async ValueTask DisposeAsync()

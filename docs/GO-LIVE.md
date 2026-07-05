@@ -36,7 +36,8 @@ Catalog-only, so the catalog path must be trustworthy and cover all five.
 
 - **A1 — Verify the pipeline against the real 3 DLLs.** Run Triggernometry, ACT-Discord-Triggers,
   and Hojoring through `PluginInstaller.InstallAsync` → `PluginClassifier.Classify` →
-  `RequestLoadPlugin` → satellite `FacadeHost.LoadPlugin` end-to-end on a machine with the real ACT
+  `SatelliteRouter.RequestLoadPluginAsync` (per-package satellite) → satellite `FacadeHost.LoadPlugin`
+  end-to-end on a machine with the real ACT
   install. Fix bugs in `Fct.Host/Plugins/PluginClassifier.cs`, `Fct.LegacyHost/FacadeHost.cs`,
   `Fct.LegacyHost/Program.cs` as they surface.
   - **Accept:** each of the five loads, `InitPlugin` runs, its WinForms config tab embeds via
