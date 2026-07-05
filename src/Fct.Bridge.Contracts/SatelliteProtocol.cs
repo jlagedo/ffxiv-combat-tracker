@@ -55,6 +55,11 @@ public static class SatelliteProtocol
     public const string RegisterSinkPrefix = "REGISTERSINK ";    // <tts|sound|both>
     public const string UnregisterSinkPrefix = "UNREGISTERSINK "; // <tts|sound|both>
 
+    // Satellite -> host: a custom log line a consumer wrote back through ILogOutput.WriteLine (P6). The
+    // host re-emits it as a bus RawLogLine (fresh sequence + clock), fanned to every rawlog subscriber
+    // including the origin, in bus order. Id is the numeric line type (custom lines are 256+).
+    public const string LogLinePrefix = "LOGLINE ";          // <id>|<b64 line>
+
     // Canonical downstream stream tokens. The host maps them to concrete event types; unknown tokens
     // are ignored. Kept as protocol constants so both ends name the streams identically.
     public const string StreamSwings = "swings";          // CombatSwing + the encounter lifecycle
@@ -275,6 +280,20 @@ public static class SatelliteProtocol
         if (line == null || !line.StartsWith(UnregisterSinkPrefix, StringComparison.Ordinal)) return false;
         caps = line.Substring(UnregisterSinkPrefix.Length).Trim();
         return caps.Length != 0;
+    }
+
+    /// <summary>Format "LOGLINE &lt;id&gt;|&lt;b64 line&gt;" — a custom-log-line write-back (satellite → host).</summary>
+    public static string FormatLogLine(int id, string line)
+        => LogLinePrefix + $"{id}|{B64(line)}";
+
+    public static bool TryParseLogLine(string? line, out int id, out string text)
+    {
+        id = 0; text = "";
+        if (line == null || !line.StartsWith(LogLinePrefix, StringComparison.Ordinal)) return false;
+        var parts = line.Substring(LogLinePrefix.Length).Split(new[] { '|' }, 2);
+        if (parts.Length < 2 || !int.TryParse(parts[0], NumberStyles.Integer, CultureInfo.InvariantCulture, out id)) return false;
+        text = UnB64(parts[1]);
+        return true;
     }
 
     // Loss-free field encoding for free text (TTS strings, file paths, log lines, callback args): base64

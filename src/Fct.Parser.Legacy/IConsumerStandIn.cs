@@ -41,6 +41,11 @@ namespace Fct.Parser.Legacy
     // (RunConsume loads the installed parser DLL + runs its module initializer first).
     public static class ConsumerStandInFactory
     {
-        public static IConsumerStandIn Create(Action<string> log = null) => new ConsumerStandIn(log);
+        public static IConsumerStandIn Create(Action<string> log = null) => new ConsumerStandIn(log, null);
+
+        // Write-back overload (P6): writeBack(id, line) is called when a discovered consumer writes a
+        // custom log line through the stand-in's ILogOutput.WriteLine — RunConsume routes it up the bridge.
+        public static IConsumerStandIn Create(Action<string> log, Action<int, string> writeBack)
+            => new ConsumerStandIn(log, writeBack);
     }
 }

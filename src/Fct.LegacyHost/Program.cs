@@ -152,6 +152,39 @@ namespace Fct.LegacyHost
                 }
             }
 
+            // Custom-log-line write-back driver (ISOLATION-PLAN P6): a plugin-free satellite that SUBSCRIBEs
+            // to rawlog, writes back N custom lines (LOGLINE up the event pipe), and records the fanned
+            // RawLogLines the host sends back down — proving a written line is fanned to every rawlog
+            // subscriber including the origin, in bus order.
+            //   --emit-logline <recordPath> [--count N] --bridge <pipe>
+            int eli = Array.IndexOf(args, "--emit-logline");
+            if (eli >= 0 && args.Length >= eli + 2)
+            {
+                var elPipe = ParseBridgeArg(args);
+                if (elPipe != null)
+                {
+                    RunEmitLogLine(args[eli + 1],
+                        int.TryParse(ParseArgValue(args, "--count"), out var cnt) ? cnt : 10, elPipe);
+                    return;
+                }
+            }
+
+            // Stand-in write-back seam (ISOLATION-PLAN P6, plugin-gated): register the synthetic stand-in,
+            // then reflect its _iocContainer → GetService(ILogOutput) → WriteLine EXACTLY as OverlayPlugin's
+            // FFXIVRepository does, and record the RawLogLine the host fans back — proving a consumer's
+            // ILogOutput write-back round-trips through the host. Needs FFXIV_ACT_Plugin.dll installed.
+            //   --standin-writeback <recordPath> --bridge <pipe>
+            int swi = Array.IndexOf(args, "--standin-writeback");
+            if (swi >= 0 && args.Length >= swi + 2)
+            {
+                var swPipe = ParseBridgeArg(args);
+                if (swPipe != null)
+                {
+                    RunStandInWriteBack(args[swi + 1], swPipe);
+                    return;
+                }
+            }
+
             // Batch oracle over a whole log folder (months of logs), one plugin load:
             //   --mass-oracle <logFolder> <outFolder> [maxLinesPerFile]
             int mo = Array.IndexOf(args, "--mass-oracle");
@@ -446,7 +479,10 @@ namespace Fct.LegacyHost
                 _standInVerifyPath = standInVerifyPath;
                 if (TryEnsureSdkResolvable())
                 {
-                    _standIn = Fct.Parser.Legacy.ConsumerStandInFactory.Create(FacadeHost.Log);
+                    // Route the stand-in's ILogOutput.WriteLine write-back up the bridge (P6): the host
+                    // re-emits it as a bus RawLogLine fanned back to every rawlog subscriber incl. origin.
+                    _standIn = Fct.Parser.Legacy.ConsumerStandInFactory.Create(FacadeHost.Log,
+                        (id, text) => SendLine(SatelliteProtocol.FormatLogLine(id, text)));
                     _standIn.Register();
                 }
                 else
@@ -1283,6 +1319,188 @@ namespace Fct.LegacyHost
                 SatelliteLogging.Shutdown();
                 Environment.Exit(0);
             }
+        }
+
+        // Custom-log-line write-back driver (ISOLATION-PLAN P6): SUBSCRIBE to rawlog, write back N custom
+        // lines up the event pipe, and record the RawLogLines the host fans back down. No plugin, no facade.
+        private static void RunEmitLogLine(string recordPath, int count, string pipeName)
+        {
+            SatelliteLogging.Initialize(_satelliteId);
+            _log = SatelliteLogging.Log;
+            _log.LogInformation(LogEvents.SatelliteBooting,
+                "Emit-logline: record={Record} count={Count} pipe={Pipe}", recordPath, count, pipeName);
+
+            try
+            {
+                _bridge = new NamedPipeClientStream(".", pipeName, PipeDirection.Out);
+                _bridge.Connect(5000);
+                _writer = new StreamWriter(_bridge) { AutoFlush = true };
+                SendLine(SatelliteProtocol.FormatReady(
+                    System.Diagnostics.Process.GetCurrentProcess().Id,
+                    Environment.Is64BitProcess, Environment.Version.ToString(), _satelliteId, _package));
+                SendLine(SatelliteProtocol.PluginsEnd);
+                SendLine(SatelliteProtocol.FormatSubscribe(SatelliteProtocol.StreamRawLog));
+            }
+            catch (Exception ex)
+            {
+                _log.LogError(LogEvents.SatelliteBridgeConnectFailed, ex, "Emit-logline bridge connect failed");
+                Environment.Exit(1);
+                return;
+            }
+
+            try
+            {
+                var shutdown = System.Threading.EventWaitHandle.OpenExisting(pipeName + "-shutdown");
+                new System.Threading.Thread(() => { shutdown.WaitOne(); Environment.Exit(0); })
+                    { IsBackground = true, Name = "emit-logline-shutdown" }.Start();
+            }
+            catch { /* best-effort */ }
+
+            // Write the custom lines back after a beat, so both this satellite's and any peer's egress are
+            // subscribed before the first line is emitted. Custom lines are id 256+.
+            new System.Threading.Thread(() =>
+            {
+                try
+                {
+                    System.Threading.Thread.Sleep(1500);
+                    for (int i = 0; i < count; i++)
+                        SendLine(SatelliteProtocol.FormatLogLine(256, "P6LINE|" + i.ToString(System.Globalization.CultureInfo.InvariantCulture)));
+                    _log.LogInformation(LogEvents.SatelliteBooting, "Emit-logline: wrote {Count} custom lines", count);
+                }
+                catch (Exception ex) { _log.LogError(LogEvents.SatelliteBooting, ex, "Emit-logline write failed"); }
+            }) { IsBackground = true, Name = "emit-logline-write" }.Start();
+
+            try
+            {
+                _cmdPipe = new NamedPipeClientStream(".", pipeName + "-cmd", PipeDirection.In);
+                _cmdPipe.Connect(30000);
+                using var reader = new StreamReader(_cmdPipe);
+                using var record = new StreamWriter(recordPath, append: false) { AutoFlush = true };
+                string line;
+                while ((line = reader.ReadLine()) != null)
+                    if (line.StartsWith(GameEventFrame.Prefix, StringComparison.Ordinal))
+                        record.WriteLine(line);
+            }
+            catch (Exception ex)
+            {
+                _log.LogError(LogEvents.SatelliteBridgeConnectFailed, ex, "Emit-logline command-pipe read failed");
+            }
+            finally
+            {
+                SatelliteLogging.Shutdown();
+                Environment.Exit(0);
+            }
+        }
+
+        // Stand-in write-back seam driver (ISOLATION-PLAN P6, plugin-gated): register the synthetic parser
+        // stand-in, subscribe to rawlog, then reflect the _iocContainer → GetService(ILogOutput) → WriteLine
+        // exactly as OverlayPlugin's FFXIVRepository.WriteLogLineImpl does, and record the RawLogLine the
+        // host fans back down — the real seam a consumer plugin uses for custom lines 256+.
+        private static void RunStandInWriteBack(string recordPath, string pipeName)
+        {
+            SatelliteLogging.Initialize(_satelliteId);
+            _log = SatelliteLogging.Log;
+            FacadeHost.Log = SatelliteLogging.WriteLegacy;
+            _log.LogInformation(LogEvents.SatelliteBooting, "StandIn-writeback: record={Record} pipe={Pipe}", recordPath, pipeName);
+
+            FacadeHost.InstallAssemblyResolver();
+            Application.EnableVisualStyles();
+            Application.SetCompatibleTextRenderingDefault(false);
+            FacadeHost.CreateAct();
+            EngineTables.Install();
+
+            if (!TryEnsureSdkResolvable())
+            {
+                _log.LogError(LogEvents.PluginNotFound, "StandIn-writeback needs FFXIV_ACT_Plugin.dll installed");
+                Environment.Exit(2);
+                return;
+            }
+            _standIn = Fct.Parser.Legacy.ConsumerStandInFactory.Create(FacadeHost.Log,
+                (id, text) => SendLine(SatelliteProtocol.FormatLogLine(id, text)));
+            _standIn.Register();
+
+            try
+            {
+                _bridge = new NamedPipeClientStream(".", pipeName, PipeDirection.Out);
+                _bridge.Connect(5000);
+                _writer = new StreamWriter(_bridge) { AutoFlush = true };
+                SendLine(SatelliteProtocol.FormatReady(
+                    System.Diagnostics.Process.GetCurrentProcess().Id,
+                    Environment.Is64BitProcess, Environment.Version.ToString(), _satelliteId, _package));
+                SendLine(SatelliteProtocol.PluginsEnd);
+                SendLine(SatelliteProtocol.FormatSubscribe(SatelliteProtocol.StreamRawLog));
+            }
+            catch (Exception ex)
+            {
+                _log.LogError(LogEvents.SatelliteBridgeConnectFailed, ex, "StandIn-writeback bridge connect failed");
+                Environment.Exit(1);
+                return;
+            }
+
+            try
+            {
+                var shutdown = System.Threading.EventWaitHandle.OpenExisting(pipeName + "-shutdown");
+                new System.Threading.Thread(() => { shutdown.WaitOne(); Environment.Exit(0); })
+                    { IsBackground = true, Name = "standin-writeback-shutdown" }.Start();
+            }
+            catch { /* best-effort */ }
+
+            // After the egress is up, drive the exact OverlayPlugin reflection to write a custom line back.
+            new System.Threading.Thread(() =>
+            {
+                try
+                {
+                    System.Threading.Thread.Sleep(1500);
+                    ReflectAndWriteCustomLine("STANDIN|hi");
+                }
+                catch (Exception ex) { _log.LogError(LogEvents.SatelliteBooting, ex, "StandIn-writeback reflect failed"); }
+            }) { IsBackground = true, Name = "standin-writeback-write" }.Start();
+
+            try
+            {
+                _cmdPipe = new NamedPipeClientStream(".", pipeName + "-cmd", PipeDirection.In);
+                _cmdPipe.Connect(30000);
+                using var reader = new StreamReader(_cmdPipe);
+                using var record = new StreamWriter(recordPath, append: false) { AutoFlush = true };
+                string line;
+                while ((line = reader.ReadLine()) != null)
+                    if (line.StartsWith(GameEventFrame.Prefix, StringComparison.Ordinal))
+                        record.WriteLine(line);
+            }
+            catch (Exception ex)
+            {
+                _log.LogError(LogEvents.SatelliteBridgeConnectFailed, ex, "StandIn-writeback command-pipe read failed");
+            }
+            finally
+            {
+                SatelliteLogging.Shutdown();
+                Environment.Exit(0);
+            }
+        }
+
+        // The reflection OverlayPlugin's FFXIVRepository performs to write a custom log line: find the
+        // stand-in plugin, read its non-public _iocContainer, GetService(ILogOutput-by-name), then invoke
+        // WriteLine((int)id, timestamp, line). Binds only by name/shape — no SDK type referenced here.
+        private static void ReflectAndWriteCustomLine(string line)
+        {
+            const System.Reflection.BindingFlags nonPub = System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance;
+            var act = ActGlobals.oFormActMain;
+            var pdata = act.ActPlugins.First(p => p.lblPluginTitle != null &&
+                p.lblPluginTitle.Text.StartsWith("FFXIV_ACT_Plugin", StringComparison.Ordinal));
+            var pluginObj = pdata.pluginObj;
+            var ioc = pluginObj.GetType().GetField("_iocContainer", nonPub).GetValue(pluginObj);
+            var getService = ioc.GetType().GetMethod("GetService");
+            // ILogOutput lives in the Costura-embedded FFXIV_ACT_Plugin.Logfile sub-assembly (the exact
+            // parentAssemblyName OverlayPlugin passes) — force-load it so its Type is resolvable, then look
+            // it up there exactly as GetFFXIVACTPluginIOCService does.
+            System.Reflection.Assembly logfileAsm = null;
+            try { logfileAsm = System.Reflection.Assembly.Load("FFXIV_ACT_Plugin.Logfile"); } catch { }
+            logfileAsm ??= AppDomain.CurrentDomain.GetAssemblies().FirstOrDefault(a => a.GetName().Name == "FFXIV_ACT_Plugin.Logfile");
+            var ilogType = logfileAsm?.GetType("FFXIV_ACT_Plugin.Logfile.ILogOutput");
+            var logOutput = getService.Invoke(ioc, new object[] { ilogType });
+            var writeLine = logOutput.GetType().GetMethod("WriteLine");
+            writeLine.Invoke(logOutput, new object[] { 256, DateTime.Now, line });
+            _log.LogInformation(LogEvents.SatelliteBooting, "StandIn-writeback: wrote custom line via ILogOutput reflection");
         }
 
         // The host-routed service seam (P6): the facade calls these on FormActMain.ServiceRoute; each is

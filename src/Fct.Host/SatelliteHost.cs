@@ -401,6 +401,13 @@ public sealed class SatelliteHost : Fct.Host.Plugins.ISatellitePluginChannel
             _audio?.Play(path, pvol);
             return true;
         }
+        if (SatelliteProtocol.TryParseLogLine(line, out var logId, out var logText))
+        {
+            // Custom-log-line write-back (P6): re-emit as a bus RawLogLine (fresh sequence + clock), which
+            // fans through the existing rawlog egress to every subscriber including the origin, in bus order.
+            _rawLog?.Emit((LogMessageType)logId, logText);
+            return true;
+        }
         return false;
     }
 

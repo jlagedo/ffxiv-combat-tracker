@@ -117,5 +117,17 @@ namespace Fct.App.Tests
         [InlineData(null)]
         public void Speak_parser_rejects_foreign_lines(string? line)
             => Assert.False(SatelliteProtocol.TryParseSpeak(line, out _, out _, out _, out _));
+
+        [Theory]
+        [InlineData(256, "00:1234:cactbot|say|hi\tthere")]   // custom line with '|' and tab
+        [InlineData(257, "")]
+        public void LogLine_round_trips(int id, string text)
+        {
+            var line = SatelliteProtocol.FormatLogLine(id, text);
+            Assert.DoesNotContain('\n', line);
+            Assert.True(SatelliteProtocol.TryParseLogLine(line, out var gotId, out var gotText));
+            Assert.Equal(id, gotId);
+            Assert.Equal(text, gotText);
+        }
     }
 }
