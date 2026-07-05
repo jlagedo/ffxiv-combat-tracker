@@ -18,6 +18,7 @@ namespace Fct.Integration.Tests
     // as a bus RawLogLine (fresh sequence + clock) and fans it through the rawlog egress to BOTH a peer
     // sink satellite and back to the origin, in bus order. Two satellites share one host bus/session/
     // emitter so the fan is genuinely cross-satellite. Plugin-free (no FFXIV_ACT_Plugin needed).
+    [Collection("satellite")]   // serialize with the other satellite-launching e2e tests
     public sealed class LogWriteBackTests
     {
         private readonly ITestOutputHelper _out;

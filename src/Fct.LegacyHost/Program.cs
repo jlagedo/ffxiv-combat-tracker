@@ -185,6 +185,31 @@ namespace Fct.LegacyHost
                 }
             }
 
+            // Named-callback drivers (ISOLATION-PLAN P6): register a facade callback that records each
+            // invoke, invoke a callback registered elsewhere, or self-test (register + invoke in one
+            // satellite → receive its own, proving the single host fan). Plugin-free.
+            //   --cb-register <name> <recordPath> --bridge <pipe>
+            //   --cb-invoke   <name> <arg>        --bridge <pipe>
+            //   --cb-selftest <name> <arg> <recordPath> --bridge <pipe>
+            int cri = Array.IndexOf(args, "--cb-register");
+            if (cri >= 0 && args.Length >= cri + 3)
+            {
+                var p = ParseBridgeArg(args);
+                if (p != null) { RunCallbackRegister(args[cri + 1], args[cri + 2], p); return; }
+            }
+            int cii = Array.IndexOf(args, "--cb-invoke");
+            if (cii >= 0 && args.Length >= cii + 3)
+            {
+                var p = ParseBridgeArg(args);
+                if (p != null) { RunCallbackInvoke(args[cii + 1], args[cii + 2], p); return; }
+            }
+            int csi = Array.IndexOf(args, "--cb-selftest");
+            if (csi >= 0 && args.Length >= csi + 4)
+            {
+                var p = ParseBridgeArg(args);
+                if (p != null) { RunCallbackSelfTest(args[csi + 1], args[csi + 2], args[csi + 3], p); return; }
+            }
+
             // Batch oracle over a whole log folder (months of logs), one plugin load:
             //   --mass-oracle <logFolder> <outFolder> [maxLinesPerFile]
             int mo = Array.IndexOf(args, "--mass-oracle");
@@ -1128,6 +1153,16 @@ namespace Fct.LegacyHost
                     System.Threading.ThreadPool.QueueUserWorkItem(_ =>
                     { try { snd(sndPath, sndVol); } catch (Exception ex) { _log.LogError(LogEvents.SatelliteBooting, ex, "Relayed sound sink threw"); } });
             }
+            // Host-relayed named-callback invoke (P6): the host fanned an invoke to this satellite (it owns
+            // the callback). Dispatch to the local delegate(s) off-thread — the callback owns its own
+            // thread affinity, as the in-process registry model does.
+            else if (SatelliteProtocol.TryParseInvokeCb(line, out var cbName, out var cbArg))
+            {
+                var act = ActGlobals.oFormActMain;
+                if (act != null)
+                    System.Threading.ThreadPool.QueueUserWorkItem(_ =>
+                    { try { act.InvokeNamedCallbackLocal(cbName, cbArg); } catch (Exception ex) { _log.LogError(LogEvents.SatelliteBooting, ex, "Relayed named callback threw"); } });
+            }
         }
 
         // Run an action on the satellite's WinForms UI thread (where plugins were Init'd).
@@ -1503,6 +1538,117 @@ namespace Fct.LegacyHost
             _log.LogInformation(LogEvents.SatelliteBooting, "StandIn-writeback: wrote custom line via ILogOutput reflection");
         }
 
+        // Named-callback register driver (ISOLATION-PLAN P6): register a facade callback that appends each
+        // invoke's argument to a record file, then serve host-fanned invokes off the command pipe.
+        private static void RunCallbackRegister(string name, string recordPath, string pipeName)
+        {
+            if (!CallbackDriverBoot("cb-register", pipeName)) return;
+            var recWriter = new StreamWriter(recordPath, append: false) { AutoFlush = true };
+            ActGlobals.oFormActMain.RegisterNamedCallback(name,
+                arg => { lock (recWriter) recWriter.WriteLine(arg?.ToString() ?? ""); });
+            _log.LogInformation(LogEvents.SatelliteBooting, "Cb-register: registered '{Name}'", name);
+
+            StartShutdownExit(pipeName);
+            try
+            {
+                _cmdPipe = new NamedPipeClientStream(".", pipeName + "-cmd", PipeDirection.In);
+                _cmdPipe.Connect(30000);
+                using var reader = new StreamReader(_cmdPipe);
+                string line;
+                while ((line = reader.ReadLine()) != null)
+                    HandleCommand(line);   // INVOKECB -> InvokeNamedCallbackLocal -> the recording callback
+            }
+            catch (Exception ex) { _log.LogError(LogEvents.SatelliteBridgeConnectFailed, ex, "Cb-register command-pipe read failed"); }
+            finally { SatelliteLogging.Shutdown(); Environment.Exit(0); }
+        }
+
+        // Named-callback invoke driver (ISOLATION-PLAN P6): invoke a callback registered elsewhere, once.
+        private static void RunCallbackInvoke(string name, string arg, string pipeName)
+        {
+            if (!CallbackDriverBoot("cb-invoke", pipeName)) return;
+            System.Threading.Thread.Sleep(1500);   // let the target's registration reach the host
+            ActGlobals.oFormActMain.InvokeNamedCallback(name, arg);
+            _log.LogInformation(LogEvents.SatelliteBooting, "Cb-invoke: invoked '{Name}' with '{Arg}'", name, arg);
+            System.Threading.Thread.Sleep(500);
+            SatelliteLogging.Shutdown();
+            Environment.Exit(0);
+        }
+
+        // Named-callback self-test driver (ISOLATION-PLAN P6): register AND invoke in one satellite and
+        // record what comes back — proving the host is the single fan point (origin receives its own).
+        private static void RunCallbackSelfTest(string name, string arg, string recordPath, string pipeName)
+        {
+            if (!CallbackDriverBoot("cb-selftest", pipeName)) return;
+            var recWriter = new StreamWriter(recordPath, append: false) { AutoFlush = true };
+            ActGlobals.oFormActMain.RegisterNamedCallback(name,
+                arg2 => { lock (recWriter) recWriter.WriteLine(arg2?.ToString() ?? ""); });
+
+            StartShutdownExit(pipeName);
+            new System.Threading.Thread(() =>
+            {
+                try { System.Threading.Thread.Sleep(1500); ActGlobals.oFormActMain.InvokeNamedCallback(name, arg); }
+                catch (Exception ex) { _log.LogError(LogEvents.SatelliteBooting, ex, "Cb-selftest invoke failed"); }
+            }) { IsBackground = true, Name = "cb-selftest-invoke" }.Start();
+
+            try
+            {
+                _cmdPipe = new NamedPipeClientStream(".", pipeName + "-cmd", PipeDirection.In);
+                _cmdPipe.Connect(30000);
+                using var reader = new StreamReader(_cmdPipe);
+                string line;
+                while ((line = reader.ReadLine()) != null)
+                    HandleCommand(line);
+            }
+            catch (Exception ex) { _log.LogError(LogEvents.SatelliteBridgeConnectFailed, ex, "Cb-selftest command-pipe read failed"); }
+            finally { SatelliteLogging.Shutdown(); Environment.Exit(0); }
+        }
+
+        // Shared boot for the callback drivers: stand up the ACT facade, connect the event pipe (READY +
+        // empty roster), and install the host route. Returns false when the bridge connect failed (the
+        // process has already exited via Environment.Exit).
+        private static bool CallbackDriverBoot(string mode, string pipeName)
+        {
+            SatelliteLogging.Initialize(_satelliteId);
+            _log = SatelliteLogging.Log;
+            FacadeHost.Log = SatelliteLogging.WriteLegacy;
+            _log.LogInformation(LogEvents.SatelliteBooting, "{Mode}: pipe={Pipe}", mode, pipeName);
+
+            Application.EnableVisualStyles();
+            Application.SetCompatibleTextRenderingDefault(false);
+            FacadeHost.CreateAct();
+
+            try
+            {
+                _bridge = new NamedPipeClientStream(".", pipeName, PipeDirection.Out);
+                _bridge.Connect(5000);
+                _writer = new StreamWriter(_bridge) { AutoFlush = true };
+                SendLine(SatelliteProtocol.FormatReady(
+                    System.Diagnostics.Process.GetCurrentProcess().Id,
+                    Environment.Is64BitProcess, Environment.Version.ToString(), _satelliteId, _package));
+                SendLine(SatelliteProtocol.PluginsEnd);
+            }
+            catch (Exception ex)
+            {
+                _log.LogError(LogEvents.SatelliteBridgeConnectFailed, ex, "{Mode} bridge connect failed", mode);
+                Environment.Exit(1);
+                return false;
+            }
+            FormActMain.ServiceRoute = new BridgeServiceRoute();
+            return true;
+        }
+
+        // Exit the process the instant the host signals shutdown (drivers with no message loop).
+        private static void StartShutdownExit(string pipeName)
+        {
+            try
+            {
+                var shutdown = System.Threading.EventWaitHandle.OpenExisting(pipeName + "-shutdown");
+                new System.Threading.Thread(() => { shutdown.WaitOne(); Environment.Exit(0); })
+                    { IsBackground = true, Name = "driver-shutdown" }.Start();
+            }
+            catch { /* best-effort */ }
+        }
+
         // The host-routed service seam (P6): the facade calls these on FormActMain.ServiceRoute; each is
         // marshaled up the event pipe. Installed only when bridged (a standalone run leaves ServiceRoute
         // null so the facade's local delegate slots serve directly).
@@ -1512,6 +1658,12 @@ namespace Fct.LegacyHost
                 => SendLine(SatelliteProtocol.FormatSpeak(text ?? "", volume, channel, synchronous));
             public void PlaySound(string filePath, int volume)
                 => SendLine(SatelliteProtocol.FormatPlaySound(filePath ?? "", volume));
+            public void RegisterCallback(string name, bool allowDuplicate)
+                => SendLine(SatelliteProtocol.FormatRegisterCb(name ?? "", allowDuplicate));
+            public void UnregisterCallback(string name)
+                => SendLine(SatelliteProtocol.FormatUnregisterCb(name ?? ""));
+            public void InvokeCallback(string name, object argument)
+                => SendLine(SatelliteProtocol.FormatInvokeCb(name ?? "", argument?.ToString() ?? ""));
         }
 
         private static System.Threading.Timer _audioSinkPoll;

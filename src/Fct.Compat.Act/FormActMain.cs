@@ -65,6 +65,81 @@ namespace Advanced_Combat_Tracker
         public bool TtsHijacked => PlayTtsMethod != null && !ReferenceEquals(PlayTtsMethod, _ttsSentinel);
         public bool SoundHijacked => PlaySoundMethod != null && !ReferenceEquals(PlaySoundMethod, _soundSentinel);
 
+        // --- Named callbacks (Triggernometry peer interop) ---
+        // Register/invoke/unregister route through the host so a callback registered in one satellite is
+        // invocable from another (routing invariant: every inter-plugin path crosses the host). Local int
+        // ids (ACT's convention) map to the host's per-name registration; only string args cross the wire.
+        // With no ServiceRoute installed (standalone/unit tests) they degrade to a local in-process registry.
+        private int _nextCallbackId = 1;
+        private readonly System.Collections.Generic.Dictionary<int, KeyValuePair<string, Action<object>>> _callbacksById
+            = new System.Collections.Generic.Dictionary<int, KeyValuePair<string, Action<object>>>();
+        private readonly System.Collections.Generic.Dictionary<string, System.Collections.Generic.List<int>> _callbackIdsByName
+            = new System.Collections.Generic.Dictionary<string, System.Collections.Generic.List<int>>(StringComparer.Ordinal);
+        private readonly object _cbLock = new object();
+
+        // Register a named callback; returns an int id (ACT convention) for UnregisterNamedCallback. The
+        // first registration for a name installs the host-side proxy for this satellite.
+        public int RegisterNamedCallback(string name, Action<object> callback, object owner = null, string registrant = null)
+        {
+            if (string.IsNullOrEmpty(name) || callback == null) return -1;
+            int id; bool firstForName;
+            lock (_cbLock)
+            {
+                id = _nextCallbackId++;
+                _callbacksById[id] = new KeyValuePair<string, Action<object>>(name, callback);
+                if (!_callbackIdsByName.TryGetValue(name, out var list))
+                { list = new System.Collections.Generic.List<int>(); _callbackIdsByName[name] = list; }
+                firstForName = list.Count == 0;
+                list.Add(id);
+            }
+            if (firstForName) ServiceRoute?.RegisterCallback(name, true);
+            return id;
+        }
+
+        // Unregister by id; the last registration for a name releases this satellite's host proxy.
+        public void UnregisterNamedCallback(int id)
+        {
+            string name = null; bool lastForName = false;
+            lock (_cbLock)
+            {
+                if (_callbacksById.TryGetValue(id, out var entry))
+                {
+                    name = entry.Key;
+                    _callbacksById.Remove(id);
+                    if (_callbackIdsByName.TryGetValue(name, out var list))
+                    {
+                        list.Remove(id);
+                        lastForName = list.Count == 0;
+                        if (lastForName) _callbackIdsByName.Remove(name);
+                    }
+                }
+            }
+            if (lastForName && name != null) ServiceRoute?.UnregisterCallback(name);
+        }
+
+        // Invoke a named callback. The host is the single fan-out point: marshal up (do NOT invoke
+        // locally); the host fans back down to every owner, including this origin, which dispatches via
+        // InvokeNamedCallbackLocal. With no route, invoke the local registry directly (standalone fallback).
+        public void InvokeNamedCallback(string name, object argument = null)
+        {
+            var route = ServiceRoute;
+            if (route != null) route.InvokeCallback(name, argument);
+            else InvokeNamedCallbackLocal(name, argument);
+        }
+
+        // Dispatch a host-fanned invoke to every locally-registered callback for the name (called from the
+        // satellite's command reader with the decoded string argument).
+        public void InvokeNamedCallbackLocal(string name, object argument)
+        {
+            Action<object>[] targets;
+            lock (_cbLock)
+            {
+                if (!_callbackIdsByName.TryGetValue(name, out var list) || list.Count == 0) return;
+                targets = list.Select(id => _callbacksById[id].Value).ToArray();
+            }
+            foreach (var cb in targets) { try { cb(argument); } catch (Exception ex) { Log($"[NamedCallback] '{name}' threw: {ex.Message}"); } }
+        }
+
         // ACT exposes this as a public delegate FIELD (plugins assign their own parser).
         public DateTimeLogParser GetDateTimeFromLog;
 

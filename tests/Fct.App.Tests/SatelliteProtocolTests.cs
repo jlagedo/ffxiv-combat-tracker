@@ -129,5 +129,29 @@ namespace Fct.App.Tests
             Assert.Equal(id, gotId);
             Assert.Equal(text, gotText);
         }
+
+        [Theory]
+        [InlineData("peer.spawn|weird name", true)]   // name with '|' and space survives base64
+        [InlineData("simple", false)]
+        public void RegisterCb_round_trips(string name, bool dup)
+        {
+            Assert.True(SatelliteProtocol.TryParseRegisterCb(SatelliteProtocol.FormatRegisterCb(name, dup), out var n, out var d));
+            Assert.Equal(name, n);
+            Assert.Equal(dup, d);
+            Assert.True(SatelliteProtocol.TryParseUnregisterCb(SatelliteProtocol.FormatUnregisterCb(name), out var un));
+            Assert.Equal(name, un);
+        }
+
+        [Theory]
+        [InlineData("cb.name", "arg|with\ttabs")]
+        [InlineData("x", "")]
+        public void InvokeCb_round_trips(string name, string arg)
+        {
+            var line = SatelliteProtocol.FormatInvokeCb(name, arg);
+            Assert.DoesNotContain('\n', line);
+            Assert.True(SatelliteProtocol.TryParseInvokeCb(line, out var n, out var a));
+            Assert.Equal(name, n);
+            Assert.Equal(arg, a);
+        }
     }
 }

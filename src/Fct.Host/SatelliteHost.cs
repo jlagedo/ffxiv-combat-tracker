@@ -86,6 +86,8 @@ public sealed class SatelliteHost : Fct.Host.Plugins.ISatellitePluginChannel
     private readonly object _sinkLock = new();
     private IDisposable? _audioSink;            // this satellite's terminal audio sink proxy (P6)
     private bool _sinkTts, _sinkSound;          // which slots its plugin has taken over
+    private readonly object _cbLock = new();
+    private readonly Dictionary<string, IDisposable> _callbackProxies = new(StringComparer.Ordinal); // named-callback proxies (P6)
 
     internal SatelliteHost(ILoggerFactory loggerFactory, IGameEventSink sink,
         INotificationHub? notifications = null, ISatelliteNotificationText? texts = null,
@@ -408,7 +410,45 @@ public sealed class SatelliteHost : Fct.Host.Plugins.ISatellitePluginChannel
             _rawLog?.Emit((LogMessageType)logId, logText);
             return true;
         }
+        if (SatelliteProtocol.TryParseRegisterCb(line, out var cbName, out _)) { RegisterCallbackProxy(cbName); return true; }
+        if (SatelliteProtocol.TryParseUnregisterCb(line, out var ucbName)) { UnregisterCallbackProxy(ucbName); return true; }
+        if (SatelliteProtocol.TryParseInvokeCb(line, out var icbName, out var icbArg))
+        {
+            // A satellite invoked a named callback: fan through the shared registry to every owner across
+            // all satellites (each owner's proxy relays it down its own command pipe), incl. the origin.
+            _registry?.InvokeCallback(icbName, icbArg);
+            return true;
+        }
         return false;
+    }
+
+    // Register/release this satellite's proxy for a named callback (P6). One proxy per name per satellite;
+    // when the shared registry fans an invoke, the proxy relays it DOWN this satellite's command pipe so
+    // its facade dispatches to the plugin's local delegate. allowDuplicate is always true at the host: each
+    // satellite contributes at most one proxy per name, and peers legitimately share a callback name.
+    private void RegisterCallbackProxy(string name)
+    {
+        if (_registry is null)
+        {
+            _log.LogWarning(LogEvents.BridgeFrameMalformed, "Callback registration from '{Id}' ignored: no registry wired", _satelliteId);
+            return;
+        }
+        lock (_cbLock)
+        {
+            if (_callbackProxies.ContainsKey(name)) return;
+            _callbackProxies[name] = _registry.RegisterCallback(name,
+                arg => SendCommand(SatelliteProtocol.FormatInvokeCb(name, arg?.ToString() ?? "")),
+                owner: this, allowDuplicate: true);
+        }
+        _log.LogInformation(LogEvents.BridgeHandshake, "Satellite '{Id}' registered named callback '{Name}'", _satelliteId, name);
+    }
+
+    private void UnregisterCallbackProxy(string name)
+    {
+        lock (_cbLock)
+        {
+            if (_callbackProxies.TryGetValue(name, out var reg)) { reg.Dispose(); _callbackProxies.Remove(name); }
+        }
     }
 
     // Register or release this satellite's terminal audio-sink proxy (P6). One proxy per satellite carries
@@ -448,6 +488,11 @@ public sealed class SatelliteHost : Fct.Host.Plugins.ISatellitePluginChannel
             _audioSink?.Dispose();
             _audioSink = null;
             _sinkTts = _sinkSound = false;
+        }
+        lock (_cbLock)
+        {
+            foreach (var reg in _callbackProxies.Values) reg.Dispose();
+            _callbackProxies.Clear();
         }
     }
 

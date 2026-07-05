@@ -60,6 +60,15 @@ public static class SatelliteProtocol
     // including the origin, in bus order. Id is the numeric line type (custom lines are 256+).
     public const string LogLinePrefix = "LOGLINE ";          // <id>|<b64 line>
 
+    // Named callbacks (Triggernometry peer interop, P6). REGISTERCB/UNREGISTERCB are satellite->host (a
+    // facade registered/released a named callback → the host adds/removes a proxy in its shared
+    // IPluginRegistry). INVOKECB flows BOTH ways with one codec: satellite->host is an invoke request the
+    // host fans to every registered owner; host->satellite is the host relaying that invoke down to a
+    // satellite that owns the callback. Only string args cross (arg.ToString()).
+    public const string RegisterCbPrefix = "REGISTERCB ";    // <b64 name>|<dup 0/1>
+    public const string UnregisterCbPrefix = "UNREGISTERCB ";// <b64 name>
+    public const string InvokeCbPrefix = "INVOKECB ";        // <b64 name>|<b64 arg>
+
     // Canonical downstream stream tokens. The host maps them to concrete event types; unknown tokens
     // are ignored. Kept as protocol constants so both ends name the streams identically.
     public const string StreamSwings = "swings";          // CombatSwing + the encounter lifecycle
@@ -294,6 +303,49 @@ public static class SatelliteProtocol
         if (parts.Length < 2 || !int.TryParse(parts[0], NumberStyles.Integer, CultureInfo.InvariantCulture, out id)) return false;
         text = UnB64(parts[1]);
         return true;
+    }
+
+    // ---- named callbacks (P6) ----
+
+    /// <summary>Format "REGISTERCB &lt;b64 name&gt;|&lt;dup&gt;" — a facade registered a named callback (sat → host).</summary>
+    public static string FormatRegisterCb(string name, bool allowDuplicate)
+        => RegisterCbPrefix + $"{B64(name)}|{(allowDuplicate ? 1 : 0)}";
+
+    public static bool TryParseRegisterCb(string? line, out string name, out bool allowDuplicate)
+    {
+        name = ""; allowDuplicate = false;
+        if (line == null || !line.StartsWith(RegisterCbPrefix, StringComparison.Ordinal)) return false;
+        var parts = line.Substring(RegisterCbPrefix.Length).Split(new[] { '|' }, 2);
+        if (parts.Length < 2) return false;
+        name = UnB64(parts[0]);
+        allowDuplicate = parts[1].Trim() == "1";
+        return name.Length != 0;
+    }
+
+    /// <summary>Format "UNREGISTERCB &lt;b64 name&gt;" — a facade released a named callback (sat → host).</summary>
+    public static string FormatUnregisterCb(string name) => UnregisterCbPrefix + B64(name);
+
+    public static bool TryParseUnregisterCb(string? line, out string name)
+    {
+        name = "";
+        if (line == null || !line.StartsWith(UnregisterCbPrefix, StringComparison.Ordinal)) return false;
+        name = UnB64(line.Substring(UnregisterCbPrefix.Length).Trim());
+        return name.Length != 0;
+    }
+
+    /// <summary>Format "INVOKECB &lt;b64 name&gt;|&lt;b64 arg&gt;" — invoke a named callback (either direction).</summary>
+    public static string FormatInvokeCb(string name, string arg)
+        => InvokeCbPrefix + $"{B64(name)}|{B64(arg)}";
+
+    public static bool TryParseInvokeCb(string? line, out string name, out string arg)
+    {
+        name = ""; arg = "";
+        if (line == null || !line.StartsWith(InvokeCbPrefix, StringComparison.Ordinal)) return false;
+        var parts = line.Substring(InvokeCbPrefix.Length).Split(new[] { '|' }, 2);
+        if (parts.Length < 2) return false;
+        name = UnB64(parts[0]);
+        arg = UnB64(parts[1]);
+        return name.Length != 0;
     }
 
     // Loss-free field encoding for free text (TTS strings, file paths, log lines, callback args): base64

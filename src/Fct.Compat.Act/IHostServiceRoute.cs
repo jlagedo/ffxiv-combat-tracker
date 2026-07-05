@@ -10,5 +10,11 @@ namespace Advanced_Combat_Tracker
     {
         void Speak(string text, int volume, int channel, bool synchronous);
         void PlaySound(string filePath, int volume);
+
+        // Named callbacks (P6): register/release a per-name host proxy, and invoke (the host is the single
+        // fan-out point — it fans back down to every owner, including this origin).
+        void RegisterCallback(string name, bool allowDuplicate);
+        void UnregisterCallback(string name);
+        void InvokeCallback(string name, object argument);
     }
 }

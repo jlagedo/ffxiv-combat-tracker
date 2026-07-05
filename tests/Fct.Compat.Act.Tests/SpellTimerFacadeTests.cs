@@ -44,6 +44,30 @@ namespace Fct.Compat.Act.Tests
             act.PlaySound("x");
         }
 
+        // --- Named callbacks (local fallback when no host route is installed) ---
+
+        [Fact]
+        public void RegisterNamedCallback_invoke_fires_locally_without_a_route()
+        {
+            var act = new FormActMain();
+            object got = null;
+            act.RegisterNamedCallback("peer.spawn", a => got = a);
+            act.InvokeNamedCallback("peer.spawn", "hello");
+            Assert.Equal("hello", got);
+        }
+
+        [Fact]
+        public void UnregisterNamedCallback_by_id_stops_delivery()
+        {
+            var act = new FormActMain();
+            int count = 0;
+            int id = act.RegisterNamedCallback("peer.spawn", _ => count++);
+            act.InvokeNamedCallback("peer.spawn", "a");
+            act.UnregisterNamedCallback(id);
+            act.InvokeNamedCallback("peer.spawn", "b");
+            Assert.Equal(1, count);
+        }
+
         // --- G-3: DpiScale ---
 
         [Fact]
