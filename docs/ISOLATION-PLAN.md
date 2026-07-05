@@ -220,7 +220,17 @@ the Fct.App per-package spawn + per-satellite UI land with P7.)
 - [ ] Synthetic parser stand-in in `ActPlugins`: exact title/status strings,
       `DataSubscription`/`DataRepository` properties (SDK events re-raised from the fanned
       stream; repository served from the snapshot mirror), `_iocContainer`-shaped field whose
-      `ILogOutput.WriteLine` routes to the host (write-back lands in P6). *Next.*
+      `ILogOutput.WriteLine` routes to the host (write-back lands in P6). *Next — with a
+      dependency wrinkle now known:* **`FFXIV_ACT_Plugin.Common` is Costura-embedded inside the
+      real parser DLL, not a standalone assembly**, so a plugin-free consumer cannot load the SDK
+      types the stand-in exposes. The stand-in must therefore (a) be reached only through an
+      SDK-type-free seam (`IConsumerStandIn`) so the replica path never forces the SDK to load,
+      (b) make the SDK resolvable by `Assembly.LoadFrom`-ing the installed parser DLL (registers
+      its Costura resolver) without initializing it, and (c) be **plugin-gated** (the stand-in
+      gate skips without `FFXIV_ACT_Plugin.dll`; the replica gate above stays plugin-free). The
+      raiseable `ConsumerDataSubscription`/`ConsumerDataRepository`/`SyntheticFfxivPlugin` shapes
+      were prototyped and validated against the real net48 SDK surface (see git history around
+      this commit) before being reverted pending that seam.
 - [x] Gate (e2e, no plugin): `Fct.Integration.Tests/ConsumerProjectionTests` — the host fans a
       committed frame-replay down to a `--consume` satellite; its facade replica's YOU total
       (summed across the idle-split encounters) equals the real-ACT oracle baseline. Three-way
