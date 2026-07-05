@@ -263,24 +263,43 @@ the Fct.App per-package spawn + per-satellite UI land with P7.)
 satellite — the encounter replica, the log-line re-raise, the repository/resource/PID mirror, and the
 discover-and-bind stand-in, each parity- or discovery-gated. ✅
 
-### P6 — Host-routed services (the cross-plugin pipes)
+### P6 — Host-routed services (the cross-plugin pipes) ✅
 
-- [ ] Audio producer path: facade `TTS()`/`PlaySound()` → host `IAudioOutput`.
-- [ ] Audio sink-provider path: assigning the facade's `PlayTtsMethod`/`PlaySoundMethod`
-      delegate slots registers a **terminal sink** with the host (G3 semantics across the
-      bridge) — the ACT-Discord-Triggers hijack becomes a routed capability; with no
-      registered sink the host's default output plays.
-- [ ] Custom-log-line write-back: satellite `ILogOutput.WriteLine` (lines 256+) → host
-      `IRawLogLineEmitter` → fanned to every `RawLogLine` subscriber including the origin, in
+The three host services already existed in-process (`IAudioOutput`/`AudioService`,
+`IRawLogLineEmitter`/`RawLogLineEmitter`, `IPluginRegistry`/`RegistryService`); P6 is the bridge
+wiring that carries the net48 facade's traffic to them. Audio/sink/callback messages ride
+`SatelliteProtocol` **control commands** (point-to-point RPC — never the re-sequenced game-event
+bus); the custom-log-line write-back rides a control command upstream that the host converts to a bus
+`RawLogLine`. `SatelliteHost`/`SatelliteSupervisor` gained `IAudioOutput`/`IPluginRegistry`/
+`IRawLogLineEmitter` refs (one shared singleton each, so every satellite fans through the same host).
+
+- [x] Audio producer path: facade `TTS()`/`PlaySound()` → `SPEAK`/`PLAYSND` up → host `IAudioOutput`.
+      The facade routes through `IHostServiceRoute` (`FormActMain.ServiceRoute`, installed by the
+      satellite) or, with none, falls back to the local delegate slots.
+- [x] Audio sink-provider path: the facade's `PlayTtsMethod`/`PlaySoundMethod` stay plain fields
+      (precompiled Discord-Triggers reads + restores them by `ldfld`/`stfld`); a no-op sentinel makes a
+      takeover detectable by reference, and a 1 s satellite poll sends `REGISTERSINK`/`UNREGISTERSINK`.
+      The host registers a terminal `SatelliteAudioSinkProxy` (priority 10) that relays a produced call
+      DOWN the owning satellite's command pipe — the ACT-Discord-Triggers hijack becomes a routed
+      capability (G3 across the bridge). **The host produces no audio itself**: with no registered sink,
+      a produced call fans to nobody (silence). Sink implementation is entirely the plugin's job.
+- [x] Custom-log-line write-back: the stand-in's `_iocContainer.GetService(ILogOutput)` →
+      `WriteLine` (the exact shape OverlayPlugin reflects) → `LOGLINE` up → host `IRawLogLineEmitter`
+      → bus `RawLogLine` fanned through the `rawlog` egress to every subscriber including the origin, in
       bus order.
-- [ ] Named callbacks (Triggernometry peer interop): facade register/invoke → host
-      `IPluginRegistry` over the control channel, cross-satellite.
-- [ ] Gate (e2e): TTS produced in satellite A plays through the sink registered from satellite
-      B; with no sink, the host default path is invoked; a custom line emitted in A is
-      observed in B's (and A's) log-line stream in order; a named callback registered in B is
-      invocable from A.
+- [x] Named callbacks (Triggernometry peer interop): facade `RegisterNamedCallback`/`InvokeNamedCallback`/
+      `UnregisterNamedCallback` (int-id, ACT convention) → `REGISTERCB`/`INVOKECB`/`UNREGISTERCB` →
+      host `IPluginRegistry`. The host is the single fan point: an invoke reaches every owner's per-name
+      proxy (across satellites, incl. the origin), each relaying it down its own command pipe. Only
+      string args cross.
+- [x] Gate (e2e, plugin-free): `AudioCrossSatelliteTests` (TTS+sound from satellite A play through the
+      sink registered in B; no-sink drops silently), `LogWriteBackTests` (a written line observed in both
+      a peer and the origin, in order — plus a plugin-gated variant driving the real OverlayPlugin
+      `_iocContainer`→`ILogOutput` reflection), `NamedCallbackTests` (a callback registered in B invocable
+      from A; a self-invoke returns to the origin), and `P6SoakTests` (all three concerns across two
+      satellites in one run, N of each, zero drops). Protocol round-trips + facade local-fallback units.
 
-**Exit:** every known cross-plugin signal path exists as a host pipe with tests.
+**Exit:** every known cross-plugin signal path exists as a host pipe with tests. ✅
 
 ### P7 — Cutover: parser, Triggernometry, Discord-Triggers isolated
 

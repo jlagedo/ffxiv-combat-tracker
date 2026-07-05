@@ -18,7 +18,7 @@ namespace Fct.Integration.Tests
     // proxy, and are relayed down the peer's command pipe to the recording delegate. Proves audio produced
     // in satellite A plays through the sink registered from satellite B — cross-process, host-routed, with
     // the host producing no audio of its own. Plugin-free (no FFXIV_ACT_Plugin needed).
-    [Collection("satellite")]   // serialize with the other satellite-launching e2e tests
+    [Collection("satellite-p6")]   // serialize the P6 host-routed-service e2e tests with each other (see SatelliteP6Collection)
     public sealed class AudioCrossSatelliteTests
     {
         private readonly ITestOutputHelper _out;

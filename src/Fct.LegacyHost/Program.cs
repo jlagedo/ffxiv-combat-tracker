@@ -210,6 +210,29 @@ namespace Fct.LegacyHost
                 if (p != null) { RunCallbackSelfTest(args[csi + 1], args[csi + 2], args[csi + 3], p); return; }
             }
 
+            // Combined P6 soak drivers (ISOLATION-PLAN P6): exercise all three host-routed concerns at once
+            // across two satellites — a sink that registers an audio sink + a named callback + a rawlog
+            // subscription and records everything it receives, and a driver that produces audio, invokes the
+            // callback, and writes log lines in a loop. Proves the three routes coexist without interference.
+            //   --p6-sink  <recordPath>            --bridge <pipe>
+            //   --p6-drive <recordPath> [--count N] --bridge <pipe>
+            int psi = Array.IndexOf(args, "--p6-sink");
+            if (psi >= 0 && args.Length >= psi + 2)
+            {
+                var p = ParseBridgeArg(args);
+                if (p != null) { RunP6Sink(args[psi + 1], p); return; }
+            }
+            int pdi = Array.IndexOf(args, "--p6-drive");
+            if (pdi >= 0 && args.Length >= pdi + 2)
+            {
+                var p = ParseBridgeArg(args);
+                if (p != null)
+                {
+                    RunP6Drive(args[pdi + 1], int.TryParse(ParseArgValue(args, "--count"), out var c) ? c : 20, p);
+                    return;
+                }
+            }
+
             // Batch oracle over a whole log folder (months of logs), one plugin load:
             //   --mass-oracle <logFolder> <outFolder> [maxLinesPerFile]
             int mo = Array.IndexOf(args, "--mass-oracle");
@@ -1647,6 +1670,132 @@ namespace Fct.LegacyHost
                     { IsBackground = true, Name = "driver-shutdown" }.Start();
             }
             catch { /* best-effort */ }
+        }
+
+        // Combined P6 soak sink (ISOLATION-PLAN P6): hijack the audio slots, register a named callback,
+        // subscribe to rawlog, and record every audio call, callback invoke, and fanned log line the host
+        // routes here — the receiving end of the three-concern soak.
+        private static void RunP6Sink(string recordPath, string pipeName)
+        {
+            SatelliteLogging.Initialize(_satelliteId);
+            _log = SatelliteLogging.Log;
+            FacadeHost.Log = SatelliteLogging.WriteLegacy;
+            _log.LogInformation(LogEvents.SatelliteBooting, "P6-sink: record={Record} pipe={Pipe}", recordPath, pipeName);
+
+            Application.EnableVisualStyles();
+            Application.SetCompatibleTextRenderingDefault(false);
+            FacadeHost.CreateAct();
+            var act = ActGlobals.oFormActMain;
+            var rec = new StreamWriter(recordPath, append: false) { AutoFlush = true };
+            void Write(string s) { lock (rec) rec.WriteLine(s); }
+
+            act.PlayTtsMethod = t => Write("TTS|" + t);
+            act.PlaySoundMethod = (w, v) => Write("SND|" + w);
+
+            try
+            {
+                _bridge = new NamedPipeClientStream(".", pipeName, PipeDirection.Out);
+                _bridge.Connect(5000);
+                _writer = new StreamWriter(_bridge) { AutoFlush = true };
+                SendLine(SatelliteProtocol.FormatReady(
+                    System.Diagnostics.Process.GetCurrentProcess().Id,
+                    Environment.Is64BitProcess, Environment.Version.ToString(), _satelliteId, _package));
+                SendLine(SatelliteProtocol.PluginsEnd);
+                SendLine(SatelliteProtocol.FormatSubscribe(SatelliteProtocol.StreamRawLog));
+            }
+            catch (Exception ex)
+            {
+                _log.LogError(LogEvents.SatelliteBridgeConnectFailed, ex, "P6-sink bridge connect failed");
+                Environment.Exit(1);
+                return;
+            }
+
+            FormActMain.ServiceRoute = new BridgeServiceRoute();
+            act.RegisterNamedCallback("soak.cb", a => Write("CB|" + (a?.ToString() ?? "")));
+            StartAudioSinkPoll();
+            StartShutdownExit(pipeName);
+
+            try
+            {
+                _cmdPipe = new NamedPipeClientStream(".", pipeName + "-cmd", PipeDirection.In);
+                _cmdPipe.Connect(30000);
+                using var reader = new StreamReader(_cmdPipe);
+                string line;
+                while ((line = reader.ReadLine()) != null)
+                {
+                    if (GameEventFrame.TryParse(line, out var evt) && evt is Fct.Abstractions.RawLogLine r)
+                        Write("RAW|" + r.Line);
+                    else
+                        HandleCommand(line);   // SPEAK/PLAYSND/INVOKECB -> the recording delegate/callback
+                }
+            }
+            catch (Exception ex) { _log.LogError(LogEvents.SatelliteBridgeConnectFailed, ex, "P6-sink command-pipe read failed"); }
+            finally { SatelliteLogging.Shutdown(); Environment.Exit(0); }
+        }
+
+        // Combined P6 soak driver (ISOLATION-PLAN P6): produce audio, invoke the named callback, and write a
+        // log line — count times — and record the log lines the host fans back to this origin.
+        private static void RunP6Drive(string recordPath, int count, string pipeName)
+        {
+            SatelliteLogging.Initialize(_satelliteId);
+            _log = SatelliteLogging.Log;
+            FacadeHost.Log = SatelliteLogging.WriteLegacy;
+            _log.LogInformation(LogEvents.SatelliteBooting, "P6-drive: record={Record} count={Count} pipe={Pipe}", recordPath, count, pipeName);
+
+            Application.EnableVisualStyles();
+            Application.SetCompatibleTextRenderingDefault(false);
+            FacadeHost.CreateAct();
+            var act = ActGlobals.oFormActMain;
+
+            try
+            {
+                _bridge = new NamedPipeClientStream(".", pipeName, PipeDirection.Out);
+                _bridge.Connect(5000);
+                _writer = new StreamWriter(_bridge) { AutoFlush = true };
+                SendLine(SatelliteProtocol.FormatReady(
+                    System.Diagnostics.Process.GetCurrentProcess().Id,
+                    Environment.Is64BitProcess, Environment.Version.ToString(), _satelliteId, _package));
+                SendLine(SatelliteProtocol.PluginsEnd);
+                SendLine(SatelliteProtocol.FormatSubscribe(SatelliteProtocol.StreamRawLog));
+            }
+            catch (Exception ex)
+            {
+                _log.LogError(LogEvents.SatelliteBridgeConnectFailed, ex, "P6-drive bridge connect failed");
+                Environment.Exit(1);
+                return;
+            }
+
+            FormActMain.ServiceRoute = new BridgeServiceRoute();
+            StartShutdownExit(pipeName);
+
+            // Record the log lines the host fans back to this origin on a background thread.
+            new System.Threading.Thread(() =>
+            {
+                try
+                {
+                    _cmdPipe = new NamedPipeClientStream(".", pipeName + "-cmd", PipeDirection.In);
+                    _cmdPipe.Connect(30000);
+                    using var reader = new StreamReader(_cmdPipe);
+                    using var rec = new StreamWriter(recordPath, append: false) { AutoFlush = true };
+                    string line;
+                    while ((line = reader.ReadLine()) != null)
+                        if (GameEventFrame.TryParse(line, out var evt) && evt is Fct.Abstractions.RawLogLine r)
+                            rec.WriteLine("RAW|" + r.Line);
+                }
+                catch (Exception ex) { _log.LogError(LogEvents.SatelliteBridgeConnectFailed, ex, "P6-drive record failed"); }
+            }) { IsBackground = true, Name = "p6-drive-record" }.Start();
+
+            // Drive all three concerns in a loop after a settle so the sink's registrations are in place.
+            System.Threading.Thread.Sleep(2000);
+            for (int i = 0; i < count; i++)
+            {
+                act.TTS("tts" + i.ToString(System.Globalization.CultureInfo.InvariantCulture));
+                act.PlaySound("snd" + i.ToString(System.Globalization.CultureInfo.InvariantCulture));
+                act.InvokeNamedCallback("soak.cb", "cb" + i.ToString(System.Globalization.CultureInfo.InvariantCulture));
+                SendLine(SatelliteProtocol.FormatLogLine(256, "P6LINE|" + i.ToString(System.Globalization.CultureInfo.InvariantCulture)));
+            }
+            _log.LogInformation(LogEvents.SatelliteBooting, "P6-drive: drove {Count} of each concern", count);
+            System.Threading.Thread.Sleep(2000);   // let the fan drain before the host tears us down
         }
 
         // The host-routed service seam (P6): the facade calls these on FormActMain.ServiceRoute; each is

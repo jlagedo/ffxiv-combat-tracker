@@ -15,7 +15,7 @@ namespace Fct.Integration.Tests
     // per-name proxy in the host's shared IPluginRegistry; invoke routes INVOKECB up, the host fans it to
     // every owner (including the origin), each proxy relays it down to its satellite's facade. Two
     // satellites share one host registry so the fan is genuinely cross-satellite. Plugin-free.
-    [Collection("satellite")]   // serialize with the other satellite-launching e2e tests
+    [Collection("satellite-p6")]   // serialize the P6 host-routed-service e2e tests with each other (see SatelliteP6Collection)
     public sealed class NamedCallbackTests
     {
         private readonly ITestOutputHelper _out;
