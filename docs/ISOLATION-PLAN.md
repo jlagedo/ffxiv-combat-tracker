@@ -211,21 +211,25 @@ the Fct.App per-package spawn + per-satellite UI land with P7.)
       HP/position/party — the poll surface OverlayPlugin/Hojoring consume), resource
       dictionaries forwarded once, game PID forwarded (`GetCurrentFFXIVProcess` materialized
       locally from the PID in consumer satellites).
-- [ ] Consumer facade: local `EncounterLifecycle` + `Fct.Aggregation` replica replaying the
-      fanned swing/lifecycle stream → synchronous `ActiveZone.ActiveEncounter` +
-      `ExportVariables` reads.
+- [x] Consumer facade: the `Fct.Compat.Act` facade replica folds the fanned swing/lifecycle
+      stream into its own `EncounterLifecycle`/`Fct.Aggregation` graph (installing `EngineTables`
+      itself, no parser) → synchronous `ActiveZone.ActiveEncounter` + `ExportVariables` reads.
+      The satellite `--consume` mode is the plugin-free consumer; gated below.
 - [ ] Consumer facade: `Before/OnLogLineRead` re-raised from fanned `RawLogLine`s (mutable
-      `logLine`, exact `LogLineEventArgs` shape).
+      `logLine`, exact `LogLineEventArgs` shape). *Next: needs `rawlog` subscription + re-raise.*
 - [ ] Synthetic parser stand-in in `ActPlugins`: exact title/status strings,
       `DataSubscription`/`DataRepository` properties (SDK events re-raised from the fanned
       stream; repository served from the snapshot mirror), `_iocContainer`-shaped field whose
-      `ILogOutput.WriteLine` routes to the host (write-back lands in P6).
-- [ ] Gate (e2e): `Fct.StreamProbe` hosted as a consumer satellite's plugin against a
-      frame-replay session — discovery-by-title binds the stand-in; log lines, combatants and
-      SDK events arrive; the replica's encounter numbers equal the host engine's and the
-      fixture's recorded baseline (three-way parity).
+      `ILogOutput.WriteLine` routes to the host (write-back lands in P6). *Next.*
+- [x] Gate (e2e, no plugin): `Fct.Integration.Tests/ConsumerProjectionTests` — the host fans a
+      committed frame-replay down to a `--consume` satellite; its facade replica's YOU total
+      (summed across the idle-split encounters) equals the real-ACT oracle baseline. Three-way
+      parity **oracle → host engine → consumer replica**, over the real pipe. *The
+      `Fct.StreamProbe`-as-plugin discovery variant lands with the stand-in above.*
 
 **Exit:** an unmodified consumer plugin's entire read surface works in an isolated satellite.
+*(Partial: the encounter-replica read surface is done + parity-gated; the SDK/log-line stand-in
+that lets an unmodified plugin discover + bind lands next, ahead of P7/P8.)*
 
 ### P6 — Host-routed services (the cross-plugin pipes)
 

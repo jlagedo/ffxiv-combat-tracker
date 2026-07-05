@@ -104,6 +104,21 @@ namespace Fct.LegacyHost
                 }
             }
 
+            // Consumer projection (ISOLATION-PLAN P5): a plugin-free consumer satellite that folds the
+            // host-fanned swing/lifecycle stream into its OWN ACT-facade replica and dumps the resulting
+            // YOU total — proving the facade serves synchronous encounter reads from host-routed data.
+            //   --consume <dumpPath> --subscribe <streams> --bridge <pipe>
+            int ci = Array.IndexOf(args, "--consume");
+            if (ci >= 0 && args.Length >= ci + 2)
+            {
+                var consumePipe = ParseBridgeArg(args);
+                if (consumePipe != null)
+                {
+                    RunConsume(args[ci + 1], ParseArgValue(args, "--subscribe") ?? SatelliteProtocol.StreamSwings, consumePipe);
+                    return;
+                }
+            }
+
             // Batch oracle over a whole log folder (months of logs), one plugin load:
             //   --mass-oracle <logFolder> <outFolder> [maxLinesPerFile]
             int mo = Array.IndexOf(args, "--mass-oracle");
@@ -337,6 +352,124 @@ namespace Fct.LegacyHost
                 SatelliteLogging.Shutdown();
                 Environment.Exit(0);
             }
+        }
+
+        // Consumer projection (ISOLATION-PLAN P5): stand up the ACT facade with NO parser, SUBSCRIBE to
+        // the swing/lifecycle stream, and fold every host-fanned frame into the facade's own
+        // Fct.Aggregation replica — exactly as a real consumer plugin (OverlayPlugin/Triggernometry) would
+        // read ActiveZone.ActiveEncounter + ExportVariables. On shutdown, dump the YOU total summed across
+        // the encounters the fanned lifecycle split the stream into (the parity value vs the host engine).
+        private static void RunConsume(string dumpPath, string streams, string pipeName)
+        {
+            SatelliteLogging.Initialize(_satelliteId);
+            _log = SatelliteLogging.Log;
+            FacadeHost.Log = SatelliteLogging.WriteLegacy;
+            _log.LogInformation(LogEvents.SatelliteBooting,
+                "Consumer: dump={Dump} streams={Streams} pipe={Pipe}", dumpPath, streams, pipeName);
+
+            FacadeHost.InstallAssemblyResolver();
+            Application.EnableVisualStyles();
+            Application.SetCompatibleTextRenderingDefault(false);
+            FacadeHost.CreateAct();
+            // No parser to install ACT's FFXIV damage-type routing tables (ACT_UIMods) — the consumer
+            // replica installs them itself, exactly the shared state the host engine stands up.
+            EngineTables.Install();
+            var act = ActGlobals.oFormActMain;
+
+            long youTotal = 0;
+            act.OnCombatEnd += (imp, info) =>
+            {
+                var you = info.encounter?.GetCombatant("YOU");
+                if (you != null) System.Threading.Interlocked.Add(ref youTotal, you.Damage);
+            };
+
+            try
+            {
+                _bridge = new NamedPipeClientStream(".", pipeName, PipeDirection.Out);
+                _bridge.Connect(5000);
+                _writer = new StreamWriter(_bridge) { AutoFlush = true };
+                SendLine(SatelliteProtocol.FormatReady(
+                    System.Diagnostics.Process.GetCurrentProcess().Id,
+                    Environment.Is64BitProcess, Environment.Version.ToString(), _satelliteId, _package));
+                SendLine(SatelliteProtocol.PluginsEnd);
+                SendLine(SatelliteProtocol.FormatSubscribe(streams.Split(',')));
+            }
+            catch (Exception ex)
+            {
+                _log.LogError(LogEvents.SatelliteBridgeConnectFailed, ex, "Consumer bridge connect failed");
+                Environment.Exit(1);
+                return;
+            }
+
+            try
+            {
+                var shutdown = System.Threading.EventWaitHandle.OpenExisting(pipeName + "-shutdown");
+                new System.Threading.Thread(() => { shutdown.WaitOne(); FlushConsume(act, ref youTotal, dumpPath); Environment.Exit(0); })
+                    { IsBackground = true, Name = "consume-shutdown" }.Start();
+            }
+            catch { /* best-effort */ }
+
+            try
+            {
+                _cmdPipe = new NamedPipeClientStream(".", pipeName + "-cmd", PipeDirection.In);
+                _cmdPipe.Connect(30000);
+                using var reader = new StreamReader(_cmdPipe);
+                string line;
+                while ((line = reader.ReadLine()) != null)
+                {
+                    if (!GameEventFrame.TryParse(line, out var evt) || evt == null) continue;
+                    FoldConsume(act, evt);
+                }
+            }
+            catch (Exception ex)
+            {
+                _log.LogError(LogEvents.SatelliteBridgeConnectFailed, ex, "Consumer command-pipe read failed");
+            }
+            finally
+            {
+                FlushConsume(act, ref youTotal, dumpPath);
+                SatelliteLogging.Shutdown();
+                Environment.Exit(0);
+            }
+        }
+
+        // Fold one host-routed frame into the consumer's ACT-facade replica (the mirror of the host
+        // engine's ModernEncounterEngine.OnEvent — same MasterSwing rebuild, same lifecycle calls).
+        private static void FoldConsume(FormActMain act, Fct.Abstractions.GameEvent evt)
+        {
+            switch (evt)
+            {
+                case Fct.Abstractions.CombatSwing s:
+                    var ms = new MasterSwing(s.SwingType, s.Critical, s.Special, new Dnum(s.Damage),
+                        s.Timestamp.LocalDateTime, s.TimeSorter, s.AttackType, s.Attacker, s.DamageType, s.Victim);
+                    if (s.Tags != null && s.Tags.Count > 0)
+                    {
+                        var tags = new Dictionary<string, object>(s.Tags.Count);
+                        foreach (var kv in s.Tags) tags[kv.Key] = kv.Value;
+                        ms.Tags = tags;
+                    }
+                    act.AddCombatAction(ms);
+                    break;
+                case Fct.Abstractions.SetEncounterRequested r:
+                    act.SetEncounter(r.Timestamp.LocalDateTime, r.Attacker, r.Victim);
+                    break;
+                case Fct.Abstractions.ZoneChangeRequested z:
+                    act.ChangeZone(z.ZoneName);
+                    break;
+                case Fct.Abstractions.EndCombatRequested c:
+                    act.EndCombat(c.Export);
+                    break;
+            }
+        }
+
+        // Flush the parity value once. Any encounter still open (no trailing EndCombat) is closed so its
+        // YOU damage is counted. Idempotent via the file existence + a one-shot guard.
+        private static int _consumeFlushed;
+        private static void FlushConsume(FormActMain act, ref long youTotal, string dumpPath)
+        {
+            if (System.Threading.Interlocked.Exchange(ref _consumeFlushed, 1) != 0) return;
+            try { if (act.InCombat) act.EndCombat(true); } catch { }
+            try { File.WriteAllText(dumpPath, youTotal.ToString(System.Globalization.CultureInfo.InvariantCulture)); } catch { }
         }
 
         // Boot the satellite with NO plugins loaded: a clean host ships nothing and boot-loads nothing.
