@@ -1,0 +1,840 @@
+# fct-frame-session v1
+0	EVT ZCHG	2026-07-04T22:50:37.7561685-03:00	Shirogane
+16943	EVT ZCHG	2026-07-04T22:50:37.7731123-03:00	Futures Rewritten (Ultimate)
+0	EVT SETENC	2026-06-17T21:13:58.4350000-03:00	Combatant-013	Combatant-019
+0	EVT SWING	2026-06-17T21:13:58.4350000-03:00	2	0		23363	0	Piercing Talon	Combatant-013	Piercing	Combatant-019	10	potency	d	0	StatusEffects	s		CritRate	s	15.00	DHRate	s	50.00	Job	s	Drg	SourceId	s	1001FF13	TargetId	s	40001C03	CritEffects	s		DHEffects	s		DirectHit	s	True
+0	EVT SETENC	2026-06-17T21:13:58.6140000-03:00	Combatant-005	Combatant-019
+0	EVT SWING	2026-06-17T21:13:58.6140000-03:00	2	0		71051	0	Rainbow Drip	Combatant-005	Magic	Combatant-019	9	potency	d	0	StatusEffects	s		CritRate	s	15.00	DHRate	s	50.00	Job	s	Pct	SourceId	s	10029426	TargetId	s	40001C03	CritEffects	s		DHEffects	s	
+0	EVT SETENC	2026-06-17T21:13:58.7470000-03:00	Combatant-010	Combatant-019
+0	EVT SWING	2026-06-17T21:13:58.7470000-03:00	2	0		17812	0	Holy Spirit	Combatant-010	Magic	Combatant-019	9	potency	d	0	StatusEffects	s		CritRate	s	15.00	DHRate	s	50.00	Job	s	Pld	SourceId	s	10050AB5	TargetId	s	40001C03	CritEffects	s		DHEffects	s	
+0	EVT SETENC	2026-06-17T21:13:58.7470000-03:00	Combatant-010	Combatant-010
+0	EVT SWING	2026-06-17T21:13:58.7470000-03:00	4	0		17056	0	Holy Spirit	Combatant-010		Combatant-010	6	potency	d	42.640000000000001	StatusEffects	s		CritEffects	s		CritRate	s	15.00	Job	s	Pld	overheal	s	17056
+0	EVT SETENC	2026-06-17T21:13:58.9690000-03:00	Combatant-017	Combatant-019
+0	EVT SWING	2026-06-17T21:13:58.9690000-03:00	0	1		8610	0	attack	Combatant-017	Piercing	Combatant-019	9	potency	d	0	StatusEffects	s		CritRate	s	15.00	DHRate	s	50.00	Job	s	Dnc	SourceId	s	1004CB77	TargetId	s	40001C03	CritEffects	s		DHEffects	s	
+0	EVT SWING	2026-06-17T21:13:59.1030000-03:00	1	0		0	0	Thunderclap	Combatant-009		Combatant-019	0
+0	EVT SETENC	2026-06-17T21:13:59.2370000-03:00	Combatant-005	Combatant-019
+0	EVT SWING	2026-06-17T21:13:59.2370000-03:00	2	0		61375	0	Pom Muse	Combatant-005	Magic	Combatant-019	9	potency	d	0	StatusEffects	s		CritRate	s	15.00	DHRate	s	50.00	Job	s	Pct	SourceId	s	10029426	TargetId	s	40001C03	CritEffects	s		DHEffects	s	
+0	EVT SETENC	2026-06-17T21:13:59.2370000-03:00	Combatant-016	Combatant-019
+0	EVT SWING	2026-06-17T21:13:59.2370000-03:00	2	0		25615	0	Glare III	Combatant-016	Magic	Combatant-019	9	potency	d	73.185714285714283	StatusEffects	s		CritRate	s	15.00	DHRate	s	50.00	Job	s	Whm	SourceId	s	1002072C	TargetId	s	40001C03	CritEffects	s		DHEffects	s	
+0	EVT SETENC	2026-06-17T21:13:59.2820000-03:00	Combatant-019	Combatant-013
+0	EVT SWING	2026-06-17T21:13:59.2820000-03:00	0	0		50793	0	unknown_9cb4	Combatant-019	Slashing	Combatant-013	9	potency	d	0	StatusEffects	s		CritRate	s	15.00	DHRate	s	50.00	Job	s		SourceId	s	40001C03	TargetId	s	1001FF13	CritEffects	s		DHEffects	s	
+0	EVT SETENC	2026-06-17T21:13:59.5030000-03:00	YOU	Combatant-019
+0	EVT SWING	2026-06-17T21:13:59.5030000-03:00	2	0		11197	0	Heavy Swing	YOU	Slashing	Combatant-019	9	potency	d	46.654166666666669	StatusEffects	s		CritRate	s	15.00	DHRate	s	50.00	Job	s	War	SourceId	s	1003FD26	TargetId	s	40001C03	CritEffects	s		DHEffects	s	
+0	EVT SETENC	2026-06-17T21:13:59.6370000-03:00	Combatant-017	Combatant-019
+0	EVT SWING	2026-06-17T21:13:59.6370000-03:00	2	0		55092	0	Double Standard Finish	Combatant-017	Piercing	Combatant-019	9	potency	d	0	StatusEffects	s		CritRate	s	15.00	DHRate	s	50.00	Job	s	Dnc	SourceId	s	1004CB77	TargetId	s	40001C03	CritEffects	s		DHEffects	s	
+0	EVT SETENC	2026-06-17T21:13:59.7710000-03:00	Combatant-009	Combatant-019
+0	EVT SWING	2026-06-17T21:13:59.7710000-03:00	2	1		33093	0	Dragon Kick	Combatant-009	Blunt	Combatant-019	10	potency	d	55.155000000000008	StatusEffects	s		CritRate	s	15.00	DHRate	s	50.00	Job	s	Mnk	SourceId	s	1004C5BB	TargetId	s	40001C03	CritEffects	s		DHEffects	s		DirectHit	s	True
+0	EVT SETENC	2026-06-17T21:13:59.7710000-03:00	Combatant-009	Combatant-019
+0	EVT SWING	2026-06-17T21:13:59.7710000-03:00	0	1		6786	0	attack	Combatant-009	Blunt	Combatant-019	9	potency	d	0	StatusEffects	s		CritRate	s	15.00	DHRate	s	50.00	Job	s	Mnk	SourceId	s	1004C5BB	TargetId	s	40001C03	CritEffects	s		DHEffects	s	
+0	EVT SETENC	2026-06-17T21:14:00.1720000-03:00	YOU	Combatant-019
+0	EVT SWING	2026-06-17T21:14:00.1720000-03:00	10	0	Threat	-25630	0	Provoke	YOU		Combatant-019	0
+0	EVT SETENC	2026-06-17T21:14:00.3050000-03:00	YOU	Combatant-019
+0	EVT SWING	2026-06-17T21:14:00.3050000-03:00	0	0		6048	0	attack	YOU	Slashing	Combatant-019	10	potency	d	0	StatusEffects	s		CritRate	s	15.00	DHRate	s	50.00	Job	s	War	SourceId	s	1003FD26	TargetId	s	40001C03	CritEffects	s		DHEffects	s		DirectHit	s	True
+0	EVT SETENC	2026-06-17T21:14:00.4850000-03:00	Combatant-013	Combatant-019
+0	EVT SWING	2026-06-17T21:14:00.4850000-03:00	0	0		5902	0	attack	Combatant-013	Piercing	Combatant-019	10	potency	d	0	StatusEffects	s		CritRate	s	15.00	DHRate	s	50.00	Job	s	Drg	SourceId	s	1001FF13	TargetId	s	40001C03	CritEffects	s		DHEffects	s		DirectHit	s	True
+0	EVT SETENC	2026-06-17T21:14:00.5730000-03:00	Combatant-010	Combatant-019
+0	EVT SWING	2026-06-17T21:14:00.5730000-03:00	2	0		10029	0	Fast Blade	Combatant-010	Slashing	Combatant-019	9	potency	d	45.586363636363636	StatusEffects	s		CritRate	s	9.09	DHRate	s	50.00	Job	s	Pld	SourceId	s	10050AB5	TargetId	s	40001C03	CritEffects	s		DHEffects	s	
+0	EVT SETENC	2026-06-17T21:14:00.7520000-03:00	Combatant-016	Combatant-019
+0	EVT SWING	2026-06-17T21:14:00.7520000-03:00	2	1		9929	0	Dia	Combatant-016	Magic	Combatant-019	9	potency	d	77.874509803921569	StatusEffects	s		CritRate	s	15.00	DHRate	s	50.00	Job	s	Whm	SourceId	s	1002072C	TargetId	s	40001C03	CritEffects	s		DHEffects	s	
+0	EVT SETENC	2026-06-17T21:14:00.8410000-03:00	Combatant-010	Combatant-019
+0	EVT SWING	2026-06-17T21:14:00.8410000-03:00	0	0		2944	0	attack	Combatant-010	Slashing	Combatant-019	9	potency	d	0	StatusEffects	s		CritRate	s	8.33	DHRate	s	50.00	Job	s	Pld	SourceId	s	10050AB5	TargetId	s	40001C03	CritEffects	s		DHEffects	s	
+0	EVT SETENC	2026-06-17T21:14:00.8850000-03:00	Combatant-013	Combatant-019
+0	EVT SWING	2026-06-17T21:14:00.8850000-03:00	2	0		13263	0	True Thrust	Combatant-013	Piercing	Combatant-019	9	potency	d	57.665217391304346	StatusEffects	s		CritRate	s	15.00	DHRate	s	50.00	Job	s	Drg	SourceId	s	1001FF13	TargetId	s	40001C03	CritEffects	s		DHEffects	s	
+0	EVT SETENC	2026-06-17T21:14:01.5530000-03:00	Combatant-013	Combatant-013
+0	EVT SWING	2026-06-17T21:14:01.5530000-03:00	4	0		33276	0	Second Wind	Combatant-013		Combatant-013	6	potency	d	41.594999999999999	StatusEffects	s		CritEffects	s		CritRate	s	15.00	Job	s	Drg	overheal	s	0
+0	EVT SETENC	2026-06-17T21:14:01.5530000-03:00	Combatant-016	Combatant-016
+0	EVT SWING	2026-06-17T21:14:01.5530000-03:00	4	0		23321	0	Assize	Combatant-016		Combatant-016	6	potency	d	58.302500000000002	StatusEffects	s		CritEffects	s		CritRate	s	15.00	Job	s	Whm	overheal	s	23321
+0	EVT SETENC	2026-06-17T21:14:01.5530000-03:00	Combatant-016	Combatant-016
+0	EVT SWING	2026-06-17T21:14:01.5530000-03:00	7	0	Power	500	0	Assize	Combatant-016		Combatant-016	0
+0	EVT SETENC	2026-06-17T21:14:01.5530000-03:00	Combatant-016	Combatant-019
+0	EVT SWING	2026-06-17T21:14:01.5530000-03:00	2	1		59020	0	Assize	Combatant-016	Magic	Combatant-019	10	potency	d	78.693333333333328	StatusEffects	s		CritRate	s	15.00	DHRate	s	50.00	Job	s	Whm	SourceId	s	1002072C	TargetId	s	40001C03	CritEffects	s		DHEffects	s		DirectHit	s	True
+0	EVT SETENC	2026-06-17T21:14:01.5530000-03:00	Combatant-016	Combatant-013
+0	EVT SWING	2026-06-17T21:14:01.5530000-03:00	4	0		22337	0	Assize	Combatant-016		Combatant-013	6	potency	d	55.842500000000001	StatusEffects	s		CritEffects	s		CritRate	s	15.00	Job	s	Whm	overheal	s	0
+0	EVT SETENC	2026-06-17T21:14:01.5530000-03:00	Combatant-016	Combatant-009
+0	EVT SWING	2026-06-17T21:14:01.5530000-03:00	4	0		22417	0	Assize	Combatant-016		Combatant-009	6	potency	d	56.042499999999997	StatusEffects	s		CritEffects	s		CritRate	s	15.00	Job	s	Whm	overheal	s	22417
+0	EVT SETENC	2026-06-17T21:14:01.5530000-03:00	Combatant-016	Combatant-017
+0	EVT SWING	2026-06-17T21:14:01.5530000-03:00	4	0		22278	0	Assize	Combatant-016		Combatant-017	6	potency	d	55.695	StatusEffects	s		CritEffects	s		CritRate	s	15.00	Job	s	Whm	overheal	s	22278
+0	EVT SETENC	2026-06-17T21:14:01.5530000-03:00	Combatant-016	Combatant-015
+0	EVT SWING	2026-06-17T21:14:01.5530000-03:00	4	0		23393	0	Assize	Combatant-016		Combatant-015	6	potency	d	58.482500000000002	StatusEffects	s		CritEffects	s		CritRate	s	15.00	Job	s	Whm	overheal	s	23393
+0	EVT SETENC	2026-06-17T21:14:01.5530000-03:00	Combatant-016	YOU
+0	EVT SWING	2026-06-17T21:14:01.5530000-03:00	4	0		22443	0	Assize	Combatant-016		YOU	6	potency	d	56.107500000000002	StatusEffects	s		CritEffects	s		CritRate	s	15.00	Job	s	Whm	overheal	s	22443
+0	EVT SETENC	2026-06-17T21:14:01.5530000-03:00	Combatant-016	Combatant-010
+0	EVT SWING	2026-06-17T21:14:01.5530000-03:00	4	0		22748	0	Assize	Combatant-016		Combatant-010	6	potency	d	56.869999999999997	StatusEffects	s		CritEffects	s		CritRate	s	15.00	Job	s	Whm	overheal	s	22748
+0	EVT SETENC	2026-06-17T21:14:01.5530000-03:00	Combatant-016	Combatant-005
+0	EVT SWING	2026-06-17T21:14:01.5530000-03:00	4	1		37417	0	Assize	Combatant-016		Combatant-005	6	potency	d	57.645238095238092	StatusEffects	s		CritEffects	s		CritRate	s	27.27	Job	s	Whm	overheal	s	37417
+0	EVT SETENC	2026-06-17T21:14:01.6410000-03:00	Combatant-009	Combatant-019
+0	EVT SWING	2026-06-17T21:14:01.6410000-03:00	2	1		49818	0	Leaping Opo	Combatant-009	Blunt	Combatant-019	10	potency	d	0	StatusEffects	s		CritRate	s	15.00	DHRate	s	50.00	Job	s	Mnk	SourceId	s	1004C5BB	TargetId	s	40001C03	CritEffects	s		DHEffects	s		DirectHit	s	True
+0	EVT SETENC	2026-06-17T21:14:01.8190000-03:00	Combatant-009	Combatant-019
+0	EVT SWING	2026-06-17T21:14:01.8190000-03:00	0	1		9161	0	attack	Combatant-009	Blunt	Combatant-019	10	potency	d	0	StatusEffects	s		CritRate	s	15.00	DHRate	s	50.00	Job	s	Mnk	SourceId	s	1004C5BB	TargetId	s	40001C03	CritEffects	s		DHEffects	s		DirectHit	s	True
+0	EVT SETENC	2026-06-17T21:14:01.8190000-03:00	Combatant-015	Combatant-019
+0	EVT SWING	2026-06-17T21:14:01.8190000-03:00	2	0		30014	0	Dosis III	Combatant-015	Magic	Combatant-019	9	potency	d	78.984210526315792	StatusEffects	s		CritRate	s	15.00	DHRate	s	50.00	Job	s	Sge	SourceId	s	1004DC74	TargetId	s	40001C03	CritEffects	s		DHEffects	s	
+0	EVT SETENC	2026-06-17T21:14:02.1310000-03:00	Combatant-017	Combatant-019
+0	EVT SWING	2026-06-17T21:14:02.1310000-03:00	0	0		5314	0	attack	Combatant-017	Piercing	Combatant-019	9	potency	d	0	StatusEffects	s		CritRate	s	15.00	DHRate	s	50.00	Job	s	Dnc	SourceId	s	1004CB77	TargetId	s	40001C03	CritEffects	s		DHEffects	s	
+0	EVT SETENC	2026-06-17T21:14:02.3110000-03:00	Combatant-019	YOU
+0	EVT SWING	2026-06-17T21:14:02.3110000-03:00	0	0		14590	0	unknown_9cb4	Combatant-019	Slashing	YOU	9	potency	d	0	StatusEffects	s		CritRate	s	15.00	DHRate	s	50.00	Job	s		SourceId	s	40001C03	TargetId	s	1003FD26	CritEffects	s		DHEffects	s	
+0	EVT SETENC	2026-06-17T21:14:02.3110000-03:00	YOU	Combatant-019
+0	EVT SWING	2026-06-17T21:14:02.3110000-03:00	2	0		15752	0	Maim	YOU	Slashing	Combatant-019	9	potency	d	46.329411764705881	StatusEffects	s		CritRate	s	15.00	DHRate	s	50.00	Job	s	War	SourceId	s	1003FD26	TargetId	s	40001C03	CritEffects	s		DHEffects	s	
+0	EVT SETENC	2026-06-17T21:14:02.3570000-03:00	Combatant-016	Combatant-019
+0	EVT SWING	2026-06-17T21:14:02.3570000-03:00	0	0		1	0	attack	Combatant-016	Blunt	Combatant-019	9	potency	d	0	StatusEffects	s		CritRate	s	25.00	DHRate	s	50.00	Job	s	Whm	SourceId	s	1002072C	TargetId	s	40001C03	CritEffects	s		DHEffects	s	
+0	EVT SWING	2026-06-17T21:14:02.7570000-03:00	1	0		0	0	Emboite	Combatant-017		Combatant-017	0
+0	EVT SETENC	2026-06-17T21:14:02.8460000-03:00	Combatant-009	Combatant-019
+0	EVT SWING	2026-06-17T21:14:02.8460000-03:00	0	0		4429	0	attack	Combatant-009	Blunt	Combatant-019	9	potency	d	0	StatusEffects	s		CritRate	s	15.00	DHRate	s	50.00	Job	s	Mnk	SourceId	s	1004C5BB	TargetId	s	40001C03	CritEffects	s		DHEffects	s	
+0	EVT SETENC	2026-06-17T21:14:03.0690000-03:00	Combatant-010	Combatant-019
+0	EVT SWING	2026-06-17T21:14:03.0690000-03:00	2	0		14918	0	Riot Blade	Combatant-010	Slashing	Combatant-019	9	potency	d	45.206060606060603	StatusEffects	s		CritRate	s	7.69	DHRate	s	50.00	Job	s	Pld	SourceId	s	10050AB5	TargetId	s	40001C03	CritEffects	s		DHEffects	s	
+0	EVT SETENC	2026-06-17T21:14:03.0690000-03:00	Combatant-010	Combatant-010
+0	EVT SWING	2026-06-17T21:14:03.0690000-03:00	7	0	Power	1000	0	Riot Blade	Combatant-010		Combatant-010	0
+0	EVT SETENC	2026-06-17T21:14:03.1130000-03:00	Combatant-010	Combatant-019
+0	EVT SWING	2026-06-17T21:14:03.1130000-03:00	0	0		3085	0	attack	Combatant-010	Slashing	Combatant-019	9	potency	d	0	StatusEffects	s		CritRate	s	7.14	DHRate	s	50.00	Job	s	Pld	SourceId	s	10050AB5	TargetId	s	40001C03	CritEffects	s		DHEffects	s	
+0	EVT SETENC	2026-06-17T21:14:03.2470000-03:00	YOU	Combatant-019
+0	EVT SWING	2026-06-17T21:14:03.2470000-03:00	2	1		29748	0	Upheaval	YOU	Blunt	Combatant-019	9	potency	d	47.219047619047622	StatusEffects	s		CritRate	s	15.00	DHRate	s	50.00	Job	s	War	SourceId	s	1003FD26	TargetId	s	40001C03	CritEffects	s		DHEffects	s	
+0	EVT SETENC	2026-06-17T21:14:03.2920000-03:00	Combatant-013	Combatant-019
+0	EVT SWING	2026-06-17T21:14:03.2920000-03:00	0	0		5269	0	attack	Combatant-013	Piercing	Combatant-019	9	potency	d	0	StatusEffects	s		CritRate	s	15.00	DHRate	s	50.00	Job	s	Drg	SourceId	s	1001FF13	TargetId	s	40001C03	CritEffects	s		DHEffects	s	
+0	EVT SETENC	2026-06-17T21:14:03.3820000-03:00	Combatant-013	Combatant-019
+0	EVT SWING	2026-06-17T21:14:03.3820000-03:00	2	1		28055	0	Spiral Blow	Combatant-013	Piercing	Combatant-019	9	potency	d	62.344444444444441	StatusEffects	s		CritRate	s	15.00	DHRate	s	50.00	Job	s	Drg	SourceId	s	1001FF13	TargetId	s	40001C03	CritEffects	s		DHEffects	s	
+0	EVT SETENC	2026-06-17T21:14:03.6060000-03:00	Combatant-009	Combatant-019
+0	EVT SWING	2026-06-17T21:14:03.6060000-03:00	2	0		17733	0	Dragon Kick	Combatant-009	Blunt	Combatant-019	9	potency	d	55.415624999999999	StatusEffects	s		CritRate	s	15.00	DHRate	s	50.00	Job	s	Mnk	SourceId	s	1004C5BB	TargetId	s	40001C03	CritEffects	s		DHEffects	s	
+0	EVT SWING	2026-06-17T21:14:03.6490000-03:00	1	0		0	0	Wing Motif	Combatant-005		Combatant-005	0
+0	EVT SETENC	2026-06-17T21:14:03.6930000-03:00	YOU	Combatant-019
+0	EVT SWING	2026-06-17T21:14:03.6930000-03:00	0	0		4509	0	attack	YOU	Slashing	Combatant-019	9	potency	d	0	StatusEffects	s		CritRate	s	15.00	DHRate	s	50.00	Job	s	War	SourceId	s	1003FD26	TargetId	s	40001C03	CritEffects	s		DHEffects	s	
+0	EVT SWING	2026-06-17T21:14:03.7390000-03:00	1	0		0	0	Jete	Combatant-017		Combatant-017	0
+0	EVT SETENC	2026-06-17T21:14:03.8730000-03:00	Combatant-016	Combatant-019
+0	EVT SWING	2026-06-17T21:14:03.8730000-03:00	2	0		26076	0	Glare III	Combatant-016	Magic	Combatant-019	9	potency	d	74.502857142857138	StatusEffects	s		CritRate	s	23.08	DHRate	s	50.00	Job	s	Whm	SourceId	s	1002072C	TargetId	s	40001C03	CritEffects	s		DHEffects	s	
+0	EVT SETENC	2026-06-17T21:14:03.8730000-03:00	Combatant-009	Combatant-019
+0	EVT SWING	2026-06-17T21:14:03.8730000-03:00	0	1		7300	0	attack	Combatant-009	Blunt	Combatant-019	9	potency	d	0	StatusEffects	s		CritRate	s	15.00	DHRate	s	50.00	Job	s	Mnk	SourceId	s	1004C5BB	TargetId	s	40001C03	CritEffects	s		DHEffects	s	
+0	EVT SETENC	2026-06-17T21:14:04.2300000-03:00	Combatant-015	Combatant-019
+0	EVT SWING	2026-06-17T21:14:04.2300000-03:00	2	0		29932	0	Dosis III	Combatant-015	Magic	Combatant-019	9	potency	d	78.768421052631581	StatusEffects	s		CritRate	s	15.00	DHRate	s	50.00	Job	s	Sge	SourceId	s	1004DC74	TargetId	s	40001C03	CritEffects	s		DHEffects	s	
+0	EVT SWING	2026-06-17T21:14:04.7180000-03:00	1	0		0	0	Pirouette	Combatant-017		Combatant-017	0
+0	EVT SETENC	2026-06-17T21:14:04.8090000-03:00	YOU	Combatant-019
+0	EVT SWING	2026-06-17T21:14:04.8090000-03:00	2	0		23844	0	Storm's Eye	YOU	Slashing	Combatant-019	9	potency	d	47.688000000000002	StatusEffects	s		CritRate	s	15.00	DHRate	s	50.00	Job	s	War	SourceId	s	1003FD26	TargetId	s	40001C03	CritEffects	s		DHEffects	s	
+0	EVT SETENC	2026-06-17T21:14:04.8520000-03:00	Combatant-015	Combatant-015
+0	EVT SWING	2026-06-17T21:14:04.8520000-03:00	7	0	Power	700	0	Kerachole	Combatant-015		Combatant-015	0
+0	EVT SETENC	2026-06-17T21:14:04.8970000-03:00	Combatant-009	Combatant-019
+0	EVT SWING	2026-06-17T21:14:04.8970000-03:00	0	0		6603	0	attack	Combatant-009	Blunt	Combatant-019	10	potency	d	0	StatusEffects	s		CritRate	s	15.00	DHRate	s	50.00	Job	s	Mnk	SourceId	s	1004C5BB	TargetId	s	40001C03	CritEffects	s		DHEffects	s		DirectHit	s	True
+0	EVT SETENC	2026-06-17T21:14:05.1190000-03:00	Combatant-005	Combatant-019
+0	EVT SWING	2026-06-17T21:14:05.1190000-03:00	2	1		90458	0	Hammer Stamp	Combatant-005	Magic	Combatant-019	10	potency	d	0	StatusEffects	s		CritRate	s	15.00	DHRate	s	50.00	Job	s	Pct	SourceId	s	10029426	TargetId	s	40001C03	CritEffects	s		DHEffects	s		DirectHit	s	True
+0	EVT SETENC	2026-06-17T21:14:05.2540000-03:00	Combatant-017	Combatant-019
+0	EVT SWING	2026-06-17T21:14:05.2540000-03:00	0	0		5920	0	attack	Combatant-017	Piercing	Combatant-019	9	potency	d	0	StatusEffects	s		CritRate	s	15.00	DHRate	s	50.00	Job	s	Dnc	SourceId	s	1004CB77	TargetId	s	40001C03	CritEffects	s		DHEffects	s	
+0	EVT SETENC	2026-06-17T21:14:05.3430000-03:00	Combatant-019	YOU
+0	EVT SWING	2026-06-17T21:14:05.3430000-03:00	0	0		54971	0	unknown_9cb4	Combatant-019	Slashing	YOU	9	potency	d	0	StatusEffects	s		CritRate	s	15.00	DHRate	s	50.00	Job	s		SourceId	s	40001C03	TargetId	s	1003FD26	CritEffects	s		DHEffects	s	
+0	EVT SETENC	2026-06-17T21:14:05.3870000-03:00	Combatant-010	Combatant-019
+0	EVT SWING	2026-06-17T21:14:05.3870000-03:00	0	0		3115	0	attack	Combatant-010	Slashing	Combatant-019	9	potency	d	0	StatusEffects	s		CritRate	s	6.67	DHRate	s	50.00	Job	s	Pld	SourceId	s	10050AB5	TargetId	s	40001C03	CritEffects	s		DHEffects	s	
+0	EVT SETENC	2026-06-17T21:14:05.5660000-03:00	Combatant-010	Combatant-019
+0	EVT SWING	2026-06-17T21:14:05.5660000-03:00	2	0		22398	0	Royal Authority	Combatant-010	Slashing	Combatant-019	9	potency	d	48.69130434782609	StatusEffects	s		CritRate	s	6.25	DHRate	s	50.00	Job	s	Pld	SourceId	s	10050AB5	TargetId	s	40001C03	CritEffects	s		DHEffects	s	
+0	EVT SETENC	2026-06-17T21:14:05.5660000-03:00	Combatant-009	Combatant-019
+0	EVT SWING	2026-06-17T21:14:05.5660000-03:00	2	1		52136	0	Leaping Opo	Combatant-009	Blunt	Combatant-019	9	potency	d	0	StatusEffects	s		CritRate	s	15.00	DHRate	s	50.00	Job	s	Mnk	SourceId	s	1004C5BB	TargetId	s	40001C03	CritEffects	s		DHEffects	s	
+0	EVT SETENC	2026-06-17T21:14:05.6990000-03:00	Combatant-015	Combatant-019
+0	EVT SWING	2026-06-17T21:14:05.6990000-03:00	2	0		56478	0	Phlegma III	Combatant-015	Magic	Combatant-019	9	potency	d	81.852173913043472	StatusEffects	s		CritRate	s	15.00	DHRate	s	50.00	Job	s	Sge	SourceId	s	1004DC74	TargetId	s	40001C03	CritEffects	s		DHEffects	s	
+0	EVT SWING	2026-06-17T21:14:05.7430000-03:00	1	0		0	0	Entrechat	Combatant-017		Combatant-017	0
+0	EVT SETENC	2026-06-17T21:14:05.8760000-03:00	Combatant-013	Combatant-019
+0	EVT SWING	2026-06-17T21:14:05.8760000-03:00	2	0		33148	0	Chaotic Spring	Combatant-013	Piercing	Combatant-019	10	potency	d	0	StatusEffects	s		CritRate	s	15.00	DHRate	s	50.00	Job	s	Drg	SourceId	s	1001FF13	TargetId	s	40001C03	CritEffects	s		DHEffects	s		DirectHit	s	True
+0	EVT SETENC	2026-06-17T21:14:05.8760000-03:00	Combatant-016	Combatant-019
+0	EVT SWING	2026-06-17T21:14:05.8760000-03:00	2	1		43236	0	Glare III	Combatant-016	Magic	Combatant-019	9	potency	d	75.521397379912671	StatusEffects	s		CritRate	s	28.57	DHRate	s	50.00	Job	s	Whm	SourceId	s	1002072C	TargetId	s	40001C03	CritEffects	s		DHEffects	s	
+0	EVT SETENC	2026-06-17T21:14:05.9650000-03:00	Combatant-009	Combatant-019
+0	EVT SWING	2026-06-17T21:14:05.9650000-03:00	0	0		7073	0	attack	Combatant-009	Blunt	Combatant-019	10	potency	d	0	StatusEffects	s		CritRate	s	15.00	DHRate	s	50.00	Job	s	Mnk	SourceId	s	1004C5BB	TargetId	s	40001C03	CritEffects	s		DHEffects	s		DirectHit	s	True
+0	EVT SETENC	2026-06-17T21:14:06.0990000-03:00	Combatant-013	Combatant-019
+0	EVT SWING	2026-06-17T21:14:06.0990000-03:00	0	0		8256	0	attack	Combatant-013	Piercing	Combatant-019	10	potency	d	0	StatusEffects	s		CritRate	s	15.00	DHRate	s	50.00	Job	s	Drg	SourceId	s	1001FF13	TargetId	s	40001C03	CritEffects	s		DHEffects	s		DirectHit	s	True
+0	EVT SETENC	2026-06-17T21:14:06.1890000-03:00	YOU	Combatant-019
+0	EVT SWING	2026-06-17T21:14:06.1890000-03:00	2	0		8344	0	Onslaught	YOU	Slashing	Combatant-019	9	potency	d	55.626666666666665	StatusEffects	s		CritRate	s	15.00	DHRate	s	50.00	Job	s	War	SourceId	s	1003FD26	TargetId	s	40001C03	CritEffects	s		DHEffects	s	
+0	EVT SETENC	2026-06-17T21:14:06.3680000-03:00	Combatant-015	Combatant-019
+0	EVT SWING	2026-06-17T21:14:06.3680000-03:00	2	0		74686	0	Psyche	Combatant-015	Magic	Combatant-019	10	potency	d	86.592463768115948	StatusEffects	s		CritRate	s	9.09	DHRate	s	50.00	Job	s	Sge	SourceId	s	1004DC74	TargetId	s	40001C03	CritEffects	s		DHEffects	s		DirectHit	s	True
+0	EVT SETENC	2026-06-17T21:14:06.5470000-03:00	Combatant-016	Combatant-019
+0	EVT SWING	2026-06-17T21:14:06.5470000-03:00	0	0		1	0	attack	Combatant-016	Blunt	Combatant-019	9	potency	d	0	StatusEffects	s		CritRate	s	26.67	DHRate	s	50.00	Job	s	Whm	SourceId	s	1002072C	TargetId	s	40001C03	CritEffects	s		DHEffects	s	
+0	EVT SETENC	2026-06-17T21:14:06.5470000-03:00	Combatant-009	Combatant-019
+0	EVT SWING	2026-06-17T21:14:06.5470000-03:00	2	1		42000	0	the Forbidden Chakra	Combatant-009	Blunt	Combatant-019	9	potency	d	52.860411899313505	StatusEffects	s		CritRate	s	63.64	DHRate	s	56.82	Job	s	Mnk	SourceId	s	1004C5BB	TargetId	s	40001C03	CritEffects	s		DHEffects	s	
+0	EVT SETENC	2026-06-17T21:14:06.7690000-03:00	Combatant-017	Combatant-019
+0	EVT SWING	2026-06-17T21:14:06.7690000-03:00	2	0		123975	0	Quadruple Technical Finish	Combatant-017	Piercing	Combatant-019	10	potency	d	0	StatusEffects	s		CritRate	s	15.00	DHRate	s	50.00	Job	s	Dnc	SourceId	s	1004CB77	TargetId	s	40001C03	CritEffects	s		DHEffects	s		DirectHit	s	True
+0	EVT SETENC	2026-06-17T21:14:06.8140000-03:00	Combatant-010	Combatant-019
+0	EVT SWING	2026-06-17T21:14:06.8140000-03:00	2	0		36564	0	Imperator	Combatant-010	Magic	Combatant-019	9	potency	d	63.04137931034483	StatusEffects	s		CritRate	s	5.88	DHRate	s	50.00	Job	s	Pld	SourceId	s	10050AB5	TargetId	s	40001C03	CritEffects	s		DHEffects	s	
+0	EVT SETENC	2026-06-17T21:14:06.9920000-03:00	Combatant-009	Combatant-019
+0	EVT SWING	2026-06-17T21:14:06.9920000-03:00	0	0		5769	0	attack	Combatant-009	Blunt	Combatant-019	9	potency	d	0	StatusEffects	s		CritRate	s	58.33	DHRate	s	52.08	Job	s	Mnk	SourceId	s	1004C5BB	TargetId	s	40001C03	CritEffects	s		DHEffects	s	
+0	EVT SETENC	2026-06-17T21:14:07.0820000-03:00	YOU	Combatant-019
+0	EVT SWING	2026-06-17T21:14:07.0820000-03:00	0	0		5792	0	attack	YOU	Slashing	Combatant-019	9	potency	d	0	StatusEffects	s		CritRate	s	15.00	DHRate	s	50.00	Job	s	War	SourceId	s	1003FD26	TargetId	s	40001C03	CritEffects	s		DHEffects	s	
+0	EVT SETENC	2026-06-17T21:14:07.2140000-03:00	Combatant-013	Combatant-019
+0	EVT SWING	2026-06-17T21:14:07.2140000-03:00	2	1		35275	0	Geirskogul	Combatant-013	Piercing	Combatant-019	9	potency	d	83.988095238095241	StatusEffects	s		CritRate	s	15.00	DHRate	s	50.00	Job	s	Drg	SourceId	s	1001FF13	TargetId	s	40001C03	CritEffects	s		DHEffects	s	
+0	EVT SETENC	2026-06-17T21:14:07.3050000-03:00	YOU	Combatant-019
+0	EVT SWING	2026-06-17T21:14:07.3050000-03:00	2	1		95341	0	Primal Rend	YOU	Slashing	Combatant-019	10	potency	d	0	StatusEffects	s		CritRate	s	15.00	DHRate	s	50.00	Job	s	War	SourceId	s	1003FD26	TargetId	s	40001C03	CritEffects	s		DHEffects	s		DirectHit	s	True
+0	EVT SETENC	2026-06-17T21:14:07.3930000-03:00	Combatant-009	Combatant-019
+0	EVT SWING	2026-06-17T21:14:07.3930000-03:00	2	0		72549	0	Wind's Reply	Combatant-009	Blunt	Combatant-019	9	potency	d	69.758653846153848	StatusEffects	s		CritRate	s	53.85	DHRate	s	48.08	Job	s	Mnk	SourceId	s	1004C5BB	TargetId	s	40001C03	CritEffects	s		DHEffects	s	
+0	EVT SETENC	2026-06-17T21:14:07.6590000-03:00	Combatant-010	Combatant-019
+0	EVT SWING	2026-06-17T21:14:07.6590000-03:00	0	0		4655	0	attack	Combatant-010	Slashing	Combatant-019	9	potency	d	0	StatusEffects	s		CritRate	s	5.56	DHRate	s	50.00	Job	s	Pld	SourceId	s	10050AB5	TargetId	s	40001C03	CritEffects	s		DHEffects	s	
+0	EVT SETENC	2026-06-17T21:14:07.8380000-03:00	Combatant-016	Combatant-019
+0	EVT SWING	2026-06-17T21:14:07.8380000-03:00	2	0		29446	0	Glare III	Combatant-016	Magic	Combatant-019	9	potency	d	84.131428571428572	StatusEffects	s		CritRate	s	25.00	DHRate	s	50.00	Job	s	Whm	SourceId	s	1002072C	TargetId	s	40001C03	CritEffects	s		DHEffects	s	
+0	EVT SETENC	2026-06-17T21:14:08.0170000-03:00	Combatant-009	Combatant-019
+0	EVT SWING	2026-06-17T21:14:08.0170000-03:00	0	1		12117	0	attack	Combatant-009	Blunt	Combatant-019	10	potency	d	0	StatusEffects	s		CritRate	s	57.14	DHRate	s	53.57	Job	s	Mnk	SourceId	s	1004C5BB	TargetId	s	40001C03	CritEffects	s		DHEffects	s		DirectHit	s	True
+0	EVT SETENC	2026-06-17T21:14:08.0610000-03:00	Combatant-010	Combatant-019
+0	EVT SWING	2026-06-17T21:14:08.0610000-03:00	2	0		69353	0	Confiteor	Combatant-010	Magic	Combatant-019	9	potency	d	0	StatusEffects	s		CritRate	s	5.26	DHRate	s	50.00	Job	s	Pld	SourceId	s	10050AB5	TargetId	s	40001C03	CritEffects	s		DHEffects	s	
+0	EVT SETENC	2026-06-17T21:14:08.0610000-03:00	Combatant-010	Combatant-010
+0	EVT SWING	2026-06-17T21:14:08.0610000-03:00	4	0		16959	0	Confiteor	Combatant-010		Combatant-010	6	potency	d	42.397500000000001	StatusEffects	s		CritEffects	s		CritRate	s	5.00	Job	s	Pld	overheal	s	0
+0	EVT SETENC	2026-06-17T21:14:08.1500000-03:00	Combatant-015	Combatant-019
+0	EVT SWING	2026-06-17T21:14:08.1500000-03:00	2	1		93308	0	Phlegma III	Combatant-015	Magic	Combatant-019	9	potency	d	89.161968466316281	StatusEffects	s		CritRate	s	16.67	DHRate	s	50.00	Job	s	Sge	SourceId	s	1004DC74	TargetId	s	40001C03	CritEffects	s		DHEffects	s	
+0	EVT SETENC	2026-06-17T21:14:08.2390000-03:00	Combatant-017	Combatant-019
+0	EVT SWING	2026-06-17T21:14:08.2390000-03:00	2	1		81141	0	Tillana	Combatant-017	Piercing	Combatant-019	9	potency	d	90.156666666666666	StatusEffects	s		CritRate	s	15.00	DHRate	s	50.00	Job	s	Dnc	SourceId	s	1004CB77	TargetId	s	40001C03	CritEffects	s		DHEffects	s	
+0	EVT SETENC	2026-06-17T21:14:08.4180000-03:00	Combatant-013	Combatant-019
+0	EVT SWING	2026-06-17T21:14:08.4180000-03:00	2	1		54454	0	Wheeling Thrust	Combatant-013	Piercing	Combatant-019	9	potency	d	0	StatusEffects	s		CritRate	s	15.00	DHRate	s	50.00	Job	s	Drg	SourceId	s	1001FF13	TargetId	s	40001C03	CritEffects	s		DHEffects	s	
+0	EVT SETENC	2026-06-17T21:14:08.4180000-03:00	Unknown	Combatant-013
+0	EVT SWING	2026-06-17T21:14:08.4180000-03:00	4	0		10297	0	Unknown	Unknown		Combatant-013	6	potency	d	0	StatusEffects	s		CritEffects	s		CritRate	s	27.27	Job	s	Drg	overheal	s	0
+0	EVT SETENC	2026-06-17T21:14:08.4180000-03:00	Combatant-017	Combatant-019
+0	EVT SWING	2026-06-17T21:14:08.4180000-03:00	0	1		9741	0	attack	Combatant-017	Piercing	Combatant-019	9	potency	d	0	StatusEffects	s		CritRate	s	15.00	DHRate	s	50.00	Job	s	Dnc	SourceId	s	1004CB77	TargetId	s	40001C03	CritEffects	s		DHEffects	s	
+0	EVT SETENC	2026-06-17T21:14:08.5070000-03:00	YOU	YOU
+0	EVT SWING	2026-06-17T21:14:08.5070000-03:00	4	0		12899	0	Shake It Off	YOU		YOU	6	potency	d	42.99666666666667	StatusEffects	s		CritEffects	s		CritRate	s	15.00	Job	s	War	overheal	s	0
+0	EVT SETENC	2026-06-17T21:14:08.5070000-03:00	YOU	Combatant-017
+0	EVT SWING	2026-06-17T21:14:08.5070000-03:00	4	0		13213	0	Shake It Off	YOU		Combatant-017	6	potency	d	44.043333333333337	StatusEffects	s		CritEffects	s		CritRate	s	18.18	Job	s	War	overheal	s	13213
+0	EVT SETENC	2026-06-17T21:14:08.5070000-03:00	YOU	Combatant-005
+0	EVT SWING	2026-06-17T21:14:08.5070000-03:00	4	0		12987	0	Shake It Off	YOU		Combatant-005	6	potency	d	43.289999999999999	StatusEffects	s		CritEffects	s		CritRate	s	16.67	Job	s	War	overheal	s	12987
+0	EVT SETENC	2026-06-17T21:14:08.5070000-03:00	YOU	Combatant-010
+0	EVT SWING	2026-06-17T21:14:08.5070000-03:00	4	1		20696	0	Shake It Off	YOU		Combatant-010	6	potency	d	43.641200324411997	StatusEffects	s		CritEffects	s		CritRate	s	23.08	Job	s	War	overheal	s	20696
+0	EVT SETENC	2026-06-17T21:14:08.5070000-03:00	YOU	Combatant-016
+0	EVT SWING	2026-06-17T21:14:08.5070000-03:00	4	1		21382	0	Shake It Off	YOU		Combatant-016	6	potency	d	43.573216885007277	StatusEffects	s		CritEffects	s		CritRate	s	28.57	Job	s	War	overheal	s	21382
+0	EVT SETENC	2026-06-17T21:14:08.5070000-03:00	YOU	Combatant-013
+0	EVT SWING	2026-06-17T21:14:08.5070000-03:00	4	1		21406	0	Shake It Off	YOU		Combatant-013	6	potency	d	42.388118811881192	StatusEffects	s		CritEffects	s		CritRate	s	33.33	Job	s	War	overheal	s	21406
+0	EVT SETENC	2026-06-17T21:14:08.5070000-03:00	YOU	Combatant-015
+0	EVT SWING	2026-06-17T21:14:08.5070000-03:00	4	1		21180	0	Shake It Off	YOU		Combatant-015	6	potency	d	40.927536231884055	StatusEffects	s		CritEffects	s		CritRate	s	37.50	Job	s	War	overheal	s	21180
+0	EVT SETENC	2026-06-17T21:14:08.5070000-03:00	YOU	Combatant-009
+0	EVT SWING	2026-06-17T21:14:08.5070000-03:00	4	0		12908	0	Shake It Off	YOU		Combatant-009	6	potency	d	43.026666666666664	StatusEffects	s		CritEffects	s		CritRate	s	35.29	Job	s	War	overheal	s	12908
+0	EVT SETENC	2026-06-17T21:14:08.7280000-03:00	Combatant-010	Combatant-019
+0	EVT SWING	2026-06-17T21:14:08.7280000-03:00	2	1		14150	0	Circle of Scorn	Combatant-010	Slashing	Combatant-019	9	potency	d	69.934102141680384	StatusEffects	s		CritRate	s	9.52	DHRate	s	5.00	Job	s	Pld	SourceId	s	10050AB5	TargetId	s	40001C03	CritEffects	s		DHEffects	s	
+0	EVT SETENC	2026-06-17T21:14:08.8620000-03:00	Combatant-005	Combatant-019
+0	EVT SWING	2026-06-17T21:14:08.8620000-03:00	2	0		89710	0	Blizzard in Cyan	Combatant-005	Magic (Ice)	Combatant-019	10	potency	d	0	StatusEffects	s		CritRate	s	15.00	DHRate	s	50.00	Job	s	Pct	SourceId	s	10029426	TargetId	s	40001C03	CritEffects	s		DHEffects	s		DirectHit	s	True
+0	EVT SETENC	2026-06-17T21:14:08.9070000-03:00	Combatant-013	Combatant-019
+0	EVT SWING	2026-06-17T21:14:08.9070000-03:00	0	1		16625	0	attack	Combatant-013	Piercing	Combatant-019	10	potency	d	0	StatusEffects	s		CritRate	s	33.33	DHRate	s	50.00	Job	s	Drg	SourceId	s	1001FF13	TargetId	s	40001C03	CritEffects	s		DHEffects	s		DirectHit	s	True
+0	EVT SETENC	2026-06-17T21:14:09.0850000-03:00	Combatant-013	Combatant-019
+0	EVT SWING	2026-06-17T21:14:09.0850000-03:00	2	0		38728	0	High Jump	Combatant-013	Piercing	Combatant-019	9	potency	d	96.819999999999993	StatusEffects	s		CritRate	s	30.77	DHRate	s	56.82	Job	s	Drg	SourceId	s	1001FF13	TargetId	s	40001C03	CritEffects	s		DHEffects	s	
+0	EVT SETENC	2026-06-17T21:14:09.0850000-03:00	Combatant-009	Combatant-019
+0	EVT SWING	2026-06-17T21:14:09.0850000-03:00	0	0		6012	0	attack	Combatant-009	Blunt	Combatant-019	9	potency	d	0	StatusEffects	s		CritRate	s	53.33	DHRate	s	50.00	Job	s	Mnk	SourceId	s	1004C5BB	TargetId	s	40001C03	CritEffects	s		DHEffects	s	
+0	EVT SETENC	2026-06-17T21:14:09.2630000-03:00	Combatant-009	Combatant-019
+0	EVT SWING	2026-06-17T21:14:09.2630000-03:00	2	0		63500	0	Elixir Burst	Combatant-009	Blunt	Combatant-019	9	potency	d	70.555555555555557	StatusEffects	s		CritRate	s	50.00	DHRate	s	46.88	Job	s	Mnk	SourceId	s	1004C5BB	TargetId	s	40001C03	CritEffects	s		DHEffects	s	
+0	EVT SETENC	2026-06-17T21:14:09.3520000-03:00	Combatant-010	Combatant-019
+0	EVT SWING	2026-06-17T21:14:09.3520000-03:00	2	0		30079	0	Expiacion	Combatant-010	Slashing	Combatant-019	9	potency	d	66.842222222222219	StatusEffects	s		CritRate	s	9.09	DHRate	s	5.00	Job	s	Pld	SourceId	s	10050AB5	TargetId	s	40001C03	CritEffects	s		DHEffects	s	
+0	EVT SETENC	2026-06-17T21:14:09.3520000-03:00	Combatant-010	Combatant-010
+0	EVT SWING	2026-06-17T21:14:09.3520000-03:00	7	0	Power	500	0	Expiacion	Combatant-010		Combatant-010	0
+0	EVT SETENC	2026-06-17T21:14:09.5750000-03:00	Combatant-017	Combatant-019
+0	EVT SWING	2026-06-17T21:14:09.5750000-03:00	2	1		37081	0	Fan Dance III	Combatant-017	Piercing	Combatant-019	10	potency	d	89.893333333333331	StatusEffects	s		CritRate	s	15.00	DHRate	s	50.00	Job	s	Dnc	SourceId	s	1004CB77	TargetId	s	40001C03	CritEffects	s		DHEffects	s		DirectHit	s	True
+0	EVT SETENC	2026-06-17T21:14:09.7990000-03:00	YOU	Combatant-019
+0	EVT SWING	2026-06-17T21:14:09.7990000-03:00	2	1		88259	0	Inner Chaos	YOU	Slashing	Combatant-019	10	potency	d	0	StatusEffects	s		CritRate	s	35.29	DHRate	s	50.00	Job	s	War	SourceId	s	1003FD26	TargetId	s	40001C03	CritEffects	s	Inner Chaos (100%) 	DHEffects	s		DirectHit	s	True
+0	EVT SETENC	2026-06-17T21:14:09.8450000-03:00	Combatant-016	Combatant-019
+0	EVT SWING	2026-06-17T21:14:09.8450000-03:00	2	1		47133	0	Glare III	Combatant-016	Magic	Combatant-019	9	potency	d	81.907590084334259	StatusEffects	s		CritRate	s	29.41	DHRate	s	50.00	Job	s	Whm	SourceId	s	1002072C	TargetId	s	40001C03	CritEffects	s		DHEffects	s	
+0	EVT SETENC	2026-06-17T21:14:09.9330000-03:00	Combatant-010	Combatant-019
+0	EVT SWING	2026-06-17T21:14:09.9330000-03:00	0	0		4216	0	attack	Combatant-010	Slashing	Combatant-019	9	potency	d	0	StatusEffects	s		CritRate	s	8.70	DHRate	s	5.00	Job	s	Pld	SourceId	s	10050AB5	TargetId	s	40001C03	CritEffects	s		DHEffects	s	
+0	EVT SETENC	2026-06-17T21:14:10.1100000-03:00	Combatant-009	Combatant-019
+0	EVT SWING	2026-06-17T21:14:10.1100000-03:00	0	0		6055	0	attack	Combatant-009	Blunt	Combatant-019	9	potency	d	0	StatusEffects	s		CritRate	s	47.06	DHRate	s	44.12	Job	s	Mnk	SourceId	s	1004C5BB	TargetId	s	40001C03	CritEffects	s		DHEffects	s	
+0	EVT SETENC	2026-06-17T21:14:10.4220000-03:00	Combatant-009	Combatant-019
+0	EVT SWING	2026-06-17T21:14:10.4220000-03:00	2	0		27974	0	the Forbidden Chakra	Combatant-009	Blunt	Combatant-019	9	potency	d	69.935000000000002	StatusEffects	s		CritRate	s	44.44	DHRate	s	41.67	Job	s	Mnk	SourceId	s	1004C5BB	TargetId	s	40001C03	CritEffects	s		DHEffects	s	
+0	EVT SETENC	2026-06-17T21:14:10.4660000-03:00	YOU	Combatant-019
+0	EVT SWING	2026-06-17T21:14:10.4660000-03:00	0	1		9844	0	attack	YOU	Slashing	Combatant-019	9	potency	d	0	StatusEffects	s		CritRate	s	38.89	DHRate	s	34.09	Job	s	War	SourceId	s	1003FD26	TargetId	s	40001C03	CritEffects	s		DHEffects	s	
+0	EVT SETENC	2026-06-17T21:14:10.5550000-03:00	Combatant-010	Combatant-019
+0	EVT SWING	2026-06-17T21:14:10.5550000-03:00	2	1		77330	0	Blade of Faith	Combatant-010	Magic	Combatant-019	9	potency	d	0	StatusEffects	s		CritRate	s	12.50	DHRate	s	5.00	Job	s	Pld	SourceId	s	10050AB5	TargetId	s	40001C03	CritEffects	s		DHEffects	s	
+0	EVT SETENC	2026-06-17T21:14:10.5550000-03:00	Combatant-010	Combatant-010
+0	EVT SWING	2026-06-17T21:14:10.5550000-03:00	4	1		27485	0	Blade of Faith	Combatant-010		Combatant-010	6	potency	d	45.504966887417226	StatusEffects	s		CritEffects	s		CritRate	s	16.00	Job	s	Pld	overheal	s	0
+0	EVT SETENC	2026-06-17T21:14:10.6000000-03:00	Combatant-015	Combatant-019
+0	EVT SWING	2026-06-17T21:14:10.6000000-03:00	2	1		54919	0	Toxikon II	Combatant-015	Magic	Combatant-019	9	potency	d	91.426174926366997	StatusEffects	s		CritRate	s	23.08	DHRate	s	50.00	Job	s	Sge	SourceId	s	1004DC74	TargetId	s	40001C03	CritEffects	s		DHEffects	s	
+0	EVT SETENC	2026-06-17T21:14:10.7330000-03:00	Combatant-016	Combatant-019
+0	EVT SWING	2026-06-17T21:14:10.7330000-03:00	0	0		1	0	attack	Combatant-016	Blunt	Combatant-019	9	potency	d	0	StatusEffects	s		CritRate	s	27.78	DHRate	s	50.00	Job	s	Whm	SourceId	s	1002072C	TargetId	s	40001C03	CritEffects	s		DHEffects	s	
+0	EVT SETENC	2026-06-17T21:14:10.8220000-03:00	Combatant-017	Combatant-019
+0	EVT SWING	2026-06-17T21:14:10.8220000-03:00	2	0		82761	0	Dance of the Dawn	Combatant-017	Piercing	Combatant-019	9	potency	d	82.760999999999996	StatusEffects	s		CritRate	s	15.00	DHRate	s	50.00	Job	s	Dnc	SourceId	s	1004CB77	TargetId	s	40001C03	CritEffects	s		DHEffects	s	
+0	EVT SETENC	2026-06-17T21:14:10.9110000-03:00	Combatant-013	Combatant-019
+0	EVT SWING	2026-06-17T21:14:10.9110000-03:00	2	1		72885	0	Drakesbane	Combatant-013	Piercing	Combatant-019	9	potency	d	92.813352737857002	StatusEffects	s		CritRate	s	35.71	DHRate	s	52.08	Job	s	Drg	SourceId	s	1001FF13	TargetId	s	40001C03	CritEffects	s		DHEffects	s	
+0	EVT SETENC	2026-06-17T21:14:10.9110000-03:00	Unknown	Combatant-013
+0	EVT SWING	2026-06-17T21:14:10.9110000-03:00	4	0		13783	0	Unknown	Unknown		Combatant-013	6	potency	d	0	StatusEffects	s		CritEffects	s		CritRate	s	33.33	Job	s	Drg	overheal	s	0
+0	EVT SETENC	2026-06-17T21:14:11.1330000-03:00	Combatant-009	Combatant-019
+0	EVT SWING	2026-06-17T21:14:11.1330000-03:00	2	0		29296	0	Dragon Kick	Combatant-009	Blunt	Combatant-019	10	potency	d	73.239999999999995	StatusEffects	s		CritRate	s	42.11	DHRate	s	46.05	Job	s	Mnk	SourceId	s	1004C5BB	TargetId	s	40001C03	CritEffects	s		DHEffects	s		DirectHit	s	True
+0	EVT SETENC	2026-06-17T21:14:11.1770000-03:00	Combatant-009	Combatant-019
+0	EVT SWING	2026-06-17T21:14:11.1770000-03:00	0	0		5751	0	attack	Combatant-009	Blunt	Combatant-019	9	potency	d	0	StatusEffects	s		CritRate	s	40.00	DHRate	s	43.75	Job	s	Mnk	SourceId	s	1004C5BB	TargetId	s	40001C03	CritEffects	s		DHEffects	s	
+0	EVT SETENC	2026-06-17T21:14:11.3110000-03:00	Combatant-005	Combatant-019
+0	EVT SWING	2026-06-17T21:14:11.3110000-03:00	2	0		92750	0	Stone in Yellow	Combatant-005	Magic (Earth)	Combatant-019	10	potency	d	0	StatusEffects	s		CritRate	s	15.00	DHRate	s	50.00	Job	s	Pct	SourceId	s	10029426	TargetId	s	40001C03	CritEffects	s		DHEffects	s		DirectHit	s	True
+0	EVT SETENC	2026-06-17T21:14:11.3110000-03:00	YOU	Combatant-019
+0	EVT SWING	2026-06-17T21:14:11.3110000-03:00	2	0		8445	0	Onslaught	YOU	Slashing	Combatant-019	9	potency	d	56.299999999999997	StatusEffects	s		CritRate	s	36.84	DHRate	s	31.25	Job	s	War	SourceId	s	1003FD26	TargetId	s	40001C03	CritEffects	s		DHEffects	s	
+0	EVT SETENC	2026-06-17T21:14:11.3110000-03:00	Combatant-010	Combatant-019
+0	EVT SWING	2026-06-17T21:14:11.3110000-03:00	2	1		15811	0	Intervene	Combatant-010	Slashing	Combatant-019	9	potency	d	68.343474646716544	StatusEffects	s		CritRate	s	19.23	DHRate	s	5.00	Job	s	Pld	SourceId	s	10050AB5	TargetId	s	40001C03	CritEffects	s		DHEffects	s	
+0	EVT SETENC	2026-06-17T21:14:11.4880000-03:00	Combatant-017	Combatant-019
+0	EVT SWING	2026-06-17T21:14:11.4880000-03:00	2	0		47157	0	Fan Dance IV	Combatant-017	Piercing	Combatant-019	10	potency	d	82.012173913043469	StatusEffects	s		CritRate	s	15.00	DHRate	s	50.00	Job	s	Dnc	SourceId	s	1004CB77	TargetId	s	40001C03	CritEffects	s		DHEffects	s		DirectHit	s	True
+0	EVT SETENC	2026-06-17T21:14:11.5330000-03:00	Combatant-013	Combatant-019
+0	EVT SWING	2026-06-17T21:14:11.5330000-03:00	2	0		49392	0	Dragonfire Dive	Combatant-013	Piercing (Fire)	Combatant-019	9	potency	d	98.784000000000006	StatusEffects	s		CritRate	s	31.25	DHRate	s	48.08	Job	s	Drg	SourceId	s	1001FF13	TargetId	s	40001C03	CritEffects	s		DHEffects	s	
+0	EVT SETENC	2026-06-17T21:14:11.5770000-03:00	Combatant-017	Combatant-019
+0	EVT SWING	2026-06-17T21:14:11.5770000-03:00	0	1		9724	0	attack	Combatant-017	Piercing	Combatant-019	9	potency	d	0	StatusEffects	s		CritRate	s	45.45	DHRate	s	34.09	Job	s	Dnc	SourceId	s	1004CB77	TargetId	s	40001C03	CritEffects	s		DHEffects	s	
+0	EVT SETENC	2026-06-17T21:14:11.7110000-03:00	Combatant-013	Combatant-019
+0	EVT SWING	2026-06-17T21:14:11.7110000-03:00	0	0		10566	0	attack	Combatant-013	Piercing	Combatant-019	10	potency	d	0	StatusEffects	s		CritRate	s	29.41	DHRate	s	53.57	Job	s	Drg	SourceId	s	1001FF13	TargetId	s	40001C03	CritEffects	s		DHEffects	s		DirectHit	s	True
+0	EVT SETENC	2026-06-17T21:14:11.8450000-03:00	Combatant-016	Combatant-019
+0	EVT SWING	2026-06-17T21:14:11.8450000-03:00	2	0		29534	0	Glare III	Combatant-016	Magic	Combatant-019	9	potency	d	84.382857142857148	StatusEffects	s		CritRate	s	26.32	DHRate	s	11.36	Job	s	Whm	SourceId	s	1002072C	TargetId	s	40001C03	CritEffects	s		DHEffects	s	
+0	EVT SETENC	2026-06-17T21:14:12.2010000-03:00	Combatant-010	Combatant-019
+0	EVT SWING	2026-06-17T21:14:12.2010000-03:00	0	0		4501	0	attack	Combatant-010	Slashing	Combatant-019	9	potency	d	0	StatusEffects	s		CritRate	s	18.52	DHRate	s	5.00	Job	s	Pld	SourceId	s	10050AB5	TargetId	s	40001C03	CritEffects	s		DHEffects	s	
+0	EVT SETENC	2026-06-17T21:14:12.2010000-03:00	Combatant-009	Combatant-019
+0	EVT SWING	2026-06-17T21:14:12.2010000-03:00	0	1		9249	0	attack	Combatant-009	Blunt	Combatant-019	9	potency	d	0	StatusEffects	s		CritRate	s	42.86	DHRate	s	41.67	Job	s	Mnk	SourceId	s	1004C5BB	TargetId	s	40001C03	CritEffects	s		DHEffects	s	
+0	EVT SETENC	2026-06-17T21:14:12.2900000-03:00	YOU	Combatant-019
+0	EVT SWING	2026-06-17T21:14:12.2900000-03:00	2	1		73117	0	Fell Cleave	YOU	Slashing	Combatant-019	10	potency	d	0	StatusEffects	s		CritRate	s	40.00	DHRate	s	38.46	Job	s	War	SourceId	s	1003FD26	TargetId	s	40001C03	CritEffects	s		DHEffects	s		DirectHit	s	True
+0	EVT SETENC	2026-06-17T21:14:12.3780000-03:00	Combatant-013	Combatant-019
+0	EVT SWING	2026-06-17T21:14:12.3780000-03:00	2	1		112939	0	Nastrond	Combatant-013	Piercing	Combatant-019	9	potency	d	93.183993399339926	StatusEffects	s		CritRate	s	33.33	DHRate	s	50.00	Job	s	Drg	SourceId	s	1001FF13	TargetId	s	40001C03	CritEffects	s		DHEffects	s	
+0	EVT SETENC	2026-06-17T21:14:12.6010000-03:00	Combatant-005	Combatant-019
+0	EVT SWING	2026-06-17T21:14:12.6010000-03:00	2	1		165749	0	Comet in Black	Combatant-005	Magic	Combatant-019	10	potency	d	0	StatusEffects	s		CritRate	s	15.00	DHRate	s	50.00	Job	s	Pct	SourceId	s	10029426	TargetId	s	40001C03	CritEffects	s		DHEffects	s		DirectHit	s	True
+0	EVT SWING	2026-06-17T21:14:12.9130000-03:00	1	0		0	0	Cyclonic Break	Combatant-019		Combatant-019	0
+0	EVT SETENC	2026-06-17T21:14:13.0040000-03:00	Combatant-009	Combatant-019
+0	EVT SWING	2026-06-17T21:14:13.0040000-03:00	2	1		58633	0	Leaping Opo	Combatant-009	Blunt	Combatant-019	9	potency	d	0	StatusEffects	s		CritRate	s	45.45	DHRate	s	39.77	Job	s	Mnk	SourceId	s	1004C5BB	TargetId	s	40001C03	CritEffects	s		DHEffects	s	
+0	EVT SETENC	2026-06-17T21:14:13.0040000-03:00	Combatant-015	Combatant-019
+0	EVT SWING	2026-06-17T21:14:13.0040000-03:00	2	0		33405	0	Toxikon II	Combatant-015	Magic	Combatant-019	9	potency	d	87.90789473684211	StatusEffects	s		CritRate	s	21.43	DHRate	s	50.00	Job	s	Sge	SourceId	s	1004DC74	TargetId	s	40001C03	CritEffects	s		DHEffects	s	
+0	EVT SETENC	2026-06-17T21:14:13.0480000-03:00	Combatant-010	Combatant-019
+0	EVT SWING	2026-06-17T21:14:13.0480000-03:00	2	0		57275	0	Blade of Truth	Combatant-010	Magic	Combatant-019	9	potency	d	0	StatusEffects	s		CritRate	s	17.86	DHRate	s	5.00	Job	s	Pld	SourceId	s	10050AB5	TargetId	s	40001C03	CritEffects	s		DHEffects	s	
+0	EVT SETENC	2026-06-17T21:14:13.0480000-03:00	Combatant-010	Combatant-010
+0	EVT SWING	2026-06-17T21:14:13.0480000-03:00	4	0		17679	0	Blade of Truth	Combatant-010		Combatant-010	6	potency	d	44.197499999999998	StatusEffects	s		CritEffects	s		CritRate	s	17.24	Job	s	Pld	overheal	s	0
+0	EVT SETENC	2026-06-17T21:14:13.2250000-03:00	Combatant-009	Combatant-019
+0	EVT SWING	2026-06-17T21:14:13.2250000-03:00	0	1		9478	0	attack	Combatant-009	Blunt	Combatant-019	9	potency	d	0	StatusEffects	s		CritRate	s	47.83	DHRate	s	38.04	Job	s	Mnk	SourceId	s	1004C5BB	TargetId	s	40001C03	CritEffects	s		DHEffects	s	
+0	EVT SETENC	2026-06-17T21:14:13.2690000-03:00	Combatant-005	Combatant-019
+0	EVT SWING	2026-06-17T21:14:13.2690000-03:00	2	1		106828	0	Winged Muse	Combatant-005	Magic	Combatant-019	9	potency	d	0	StatusEffects	s		CritRate	s	15.00	DHRate	s	50.00	Job	s	Pct	SourceId	s	10029426	TargetId	s	40001C03	CritEffects	s		DHEffects	s	
+0	EVT SETENC	2026-06-17T21:14:13.2690000-03:00	Combatant-016	Combatant-019
+0	EVT SWING	2026-06-17T21:14:13.2690000-03:00	2	0		147430	0	Afflatus Misery	Combatant-016	Magic	Combatant-019	10	potency	d	84.245714285714286	StatusEffects	s		CritRate	s	25.00	DHRate	s	20.83	Job	s	Whm	SourceId	s	1002072C	TargetId	s	40001C03	CritEffects	s		DHEffects	s		DirectHit	s	True
+0	EVT SETENC	2026-06-17T21:14:13.3150000-03:00	Combatant-017	Combatant-019
+0	EVT SWING	2026-06-17T21:14:13.3150000-03:00	2	0		52978	0	Last Dance	Combatant-017	Piercing	Combatant-019	10	potency	d	78.485925925925926	StatusEffects	s		CritRate	s	41.67	DHRate	s	41.67	Job	s	Dnc	SourceId	s	1004CB77	TargetId	s	40001C03	CritEffects	s		DHEffects	s		DirectHit	s	True
+0	EVT SETENC	2026-06-17T21:14:13.3580000-03:00	YOU	Combatant-019
+0	EVT SWING	2026-06-17T21:14:13.3580000-03:00	2	0		8888	0	Onslaught	YOU	Slashing	Combatant-019	9	potency	d	59.25333333333333	StatusEffects	s		CritRate	s	38.10	DHRate	s	35.71	Job	s	War	SourceId	s	1003FD26	TargetId	s	40001C03	CritEffects	s		DHEffects	s	
+0	EVT SETENC	2026-06-17T21:14:13.4030000-03:00	Combatant-013	Combatant-019
+0	EVT SWING	2026-06-17T21:14:13.4030000-03:00	2	1		48335	0	Raiden Thrust	Combatant-013	Piercing	Combatant-019	9	potency	d	87.898640888208263	StatusEffects	s		CritRate	s	36.84	DHRate	s	46.88	Job	s	Drg	SourceId	s	1001FF13	TargetId	s	40001C03	CritEffects	s		DHEffects	s	
+0	EVT SETENC	2026-06-17T21:14:13.5370000-03:00	Combatant-019	Combatant-009
+0	EVT SWING	2026-06-17T21:14:13.5370000-03:00	2	0		0	0	Cyclonic Break	Combatant-019	Slashing	Combatant-009	9	potency	d	0	StatusEffects	s		CritRate	s	15.00	DHRate	s	5.00	Job	s		SourceId	s	40001C15	TargetId	s	1004C5BB	CritEffects	s		DHEffects	s	
+0	EVT SETENC	2026-06-17T21:14:13.5370000-03:00	Combatant-019	Combatant-015
+0	EVT SWING	2026-06-17T21:14:13.5370000-03:00	2	0	Parried	0	0	Cyclonic Break	Combatant-019	Slashing	Combatant-015	9	potency	d	0	StatusEffects	s		CritRate	s	15.00	DHRate	s	5.00	Job	s		SourceId	s	40001C14	TargetId	s	1004DC74	CritEffects	s		DHEffects	s	
+0	EVT SETENC	2026-06-17T21:14:13.5370000-03:00	Combatant-019	Combatant-016
+0	EVT SWING	2026-06-17T21:14:13.5370000-03:00	2	0		0	0	Cyclonic Break	Combatant-019	Slashing	Combatant-016	9	potency	d	0	StatusEffects	s		CritRate	s	15.00	DHRate	s	5.00	Job	s		SourceId	s	40001C17	TargetId	s	1002072C	CritEffects	s		DHEffects	s	
+0	EVT SETENC	2026-06-17T21:14:13.5370000-03:00	Combatant-019	Combatant-010
+0	EVT SWING	2026-06-17T21:14:13.5370000-03:00	2	0		0	0	Cyclonic Break	Combatant-019	Slashing	Combatant-010	9	potency	d	0	StatusEffects	s		CritRate	s	15.00	DHRate	s	5.00	Job	s		SourceId	s	40001C16	TargetId	s	10050AB5	CritEffects	s		DHEffects	s	
+0	EVT SETENC	2026-06-17T21:14:13.5370000-03:00	Combatant-019	Combatant-005
+0	EVT SWING	2026-06-17T21:14:13.5370000-03:00	2	0		20955	0	Cyclonic Break	Combatant-019	Slashing	Combatant-005	9	potency	d	0	StatusEffects	s		CritRate	s	15.00	DHRate	s	5.00	Job	s		SourceId	s	40001C19	TargetId	s	10029426	CritEffects	s		DHEffects	s	
+0	EVT SETENC	2026-06-17T21:14:13.5370000-03:00	Combatant-019	YOU
+0	EVT SWING	2026-06-17T21:14:13.5370000-03:00	2	0		4598	0	Cyclonic Break	Combatant-019	Slashing	YOU	9	potency	d	0	StatusEffects	s		CritRate	s	15.00	DHRate	s	5.00	Job	s		SourceId	s	40001C18	TargetId	s	1003FD26	CritEffects	s		DHEffects	s	
+0	EVT SETENC	2026-06-17T21:14:13.5390000-03:00	Combatant-019	Combatant-013
+0	EVT SWING	2026-06-17T21:14:13.5390000-03:00	2	0		31992	0	Cyclonic Break	Combatant-019	Slashing	Combatant-013	9	potency	d	0	StatusEffects	s		CritRate	s	15.00	DHRate	s	5.00	Job	s		SourceId	s	40001C1B	TargetId	s	1001FF13	CritEffects	s		DHEffects	s	
+0	EVT SETENC	2026-06-17T21:14:13.5390000-03:00	Combatant-019	Combatant-017
+0	EVT SWING	2026-06-17T21:14:13.5390000-03:00	2	0		0	0	Cyclonic Break	Combatant-019	Slashing	Combatant-017	9	potency	d	0	StatusEffects	s		CritRate	s	15.00	DHRate	s	5.00	Job	s		SourceId	s	40001C1A	TargetId	s	1004CB77	CritEffects	s		DHEffects	s	
+0	EVT SETENC	2026-06-17T21:14:13.8500000-03:00	YOU	Combatant-019
+0	EVT SWING	2026-06-17T21:14:13.8500000-03:00	0	0		5780	0	attack	YOU	Slashing	Combatant-019	9	potency	d	0	StatusEffects	s		CritRate	s	36.36	DHRate	s	33.33	Job	s	War	SourceId	s	1003FD26	TargetId	s	40001C03	CritEffects	s		DHEffects	s	
+0	EVT SETENC	2026-06-17T21:14:13.8940000-03:00	Combatant-005	Combatant-019
+0	EVT SWING	2026-06-17T21:14:13.8940000-03:00	2	1		134403	0	Mog of the Ages	Combatant-005	Magic	Combatant-019	9	potency	d	0	StatusEffects	s		CritRate	s	15.00	DHRate	s	50.00	Job	s	Pct	SourceId	s	10029426	TargetId	s	40001C03	CritEffects	s		DHEffects	s	
+0	EVT SETENC	2026-06-17T21:14:14.0710000-03:00	Combatant-013	Combatant-019
+0	EVT SWING	2026-06-17T21:14:14.0710000-03:00	2	1		134674	0	Stardiver	Combatant-013	Piercing (Fire)	Combatant-019	9	potency	d	91.614965986394566	StatusEffects	s		CritRate	s	40.00	DHRate	s	44.12	Job	s	Drg	SourceId	s	1001FF13	TargetId	s	40001C03	CritEffects	s		DHEffects	s	
+0	EVT SETENC	2026-06-17T21:14:14.1620000-03:00	Combatant-009	Combatant-019
+0	EVT SWING	2026-06-17T21:14:14.1620000-03:00	2	1		46620	0	the Forbidden Chakra	Combatant-009	Blunt	Combatant-019	9	potency	d	63	StatusEffects	s		CritRate	s	50.00	DHRate	s	36.46	Job	s	Mnk	SourceId	s	1004C5BB	TargetId	s	40001C03	CritEffects	s		DHEffects	s	
+0	EVT SETENC	2026-06-17T21:14:14.2050000-03:00	Combatant-016	Combatant-019
+0	EVT SWING	2026-06-17T21:14:14.2050000-03:00	0	1		1	0	attack	Combatant-016	Blunt	Combatant-019	10	potency	d	0	StatusEffects	s		CritRate	s	28.57	DHRate	s	28.85	Job	s	Whm	SourceId	s	1002072C	TargetId	s	40001C03	CritEffects	s		DHEffects	s		DirectHit	s	True
+0	EVT SETENC	2026-06-17T21:14:14.2930000-03:00	Combatant-009	Combatant-019
+0	EVT SWING	2026-06-17T21:14:14.2930000-03:00	0	0		5906	0	attack	Combatant-009	Blunt	Combatant-019	9	potency	d	0	StatusEffects	s		CritRate	s	48.00	DHRate	s	35.00	Job	s	Mnk	SourceId	s	1004C5BB	TargetId	s	40001C03	CritEffects	s		DHEffects	s	
+0	EVT SETENC	2026-06-17T21:14:14.4730000-03:00	Combatant-010	Combatant-019
+0	EVT SWING	2026-06-17T21:14:14.4730000-03:00	0	0		4217	0	attack	Combatant-010	Slashing	Combatant-019	9	potency	d	0	StatusEffects	s		CritRate	s	16.67	DHRate	s	5.00	Job	s	Pld	SourceId	s	10050AB5	TargetId	s	40001C03	CritEffects	s		DHEffects	s	
+0	EVT SETENC	2026-06-17T21:14:14.5160000-03:00	Combatant-013	Combatant-019
+0	EVT SWING	2026-06-17T21:14:14.5160000-03:00	0	1		13114	0	attack	Combatant-013	Piercing	Combatant-019	9	potency	d	0	StatusEffects	s		CritRate	s	42.86	DHRate	s	41.67	Job	s	Drg	SourceId	s	1001FF13	TargetId	s	40001C03	CritEffects	s		DHEffects	s	
+0	EVT SETENC	2026-06-17T21:14:14.5610000-03:00	Combatant-010	Combatant-019
+0	EVT SWING	2026-06-17T21:14:14.5610000-03:00	2	0		9679	0	Intervene	Combatant-010	Slashing	Combatant-019	9	potency	d	64.526666666666671	StatusEffects	s		CritRate	s	16.13	DHRate	s	5.00	Job	s	Pld	SourceId	s	10050AB5	TargetId	s	40001C03	CritEffects	s		DHEffects	s	
+0	EVT SETENC	2026-06-17T21:14:14.7390000-03:00	Combatant-017	Combatant-019
+0	EVT SWING	2026-06-17T21:14:14.7390000-03:00	0	0		6312	0	attack	Combatant-017	Piercing	Combatant-019	9	potency	d	0	StatusEffects	s		CritRate	s	38.46	DHRate	s	38.46	Job	s	Dnc	SourceId	s	1004CB77	TargetId	s	40001C03	CritEffects	s		DHEffects	s	
+0	EVT SETENC	2026-06-17T21:14:14.8270000-03:00	YOU	Combatant-019
+0	EVT SWING	2026-06-17T21:14:14.8270000-03:00	2	1		71677	0	Fell Cleave	YOU	Slashing	Combatant-019	10	potency	d	0	StatusEffects	s		CritRate	s	39.13	DHRate	s	39.06	Job	s	War	SourceId	s	1003FD26	TargetId	s	40001C03	CritEffects	s		DHEffects	s		DirectHit	s	True
+0	EVT SETENC	2026-06-17T21:14:14.8720000-03:00	Combatant-009	Combatant-019
+0	EVT SWING	2026-06-17T21:14:14.8720000-03:00	2	0		23973	0	Dragon Kick	Combatant-009	Blunt	Combatant-019	9	potency	d	74.915625000000006	StatusEffects	s		CritRate	s	46.15	DHRate	s	33.65	Job	s	Mnk	SourceId	s	1004C5BB	TargetId	s	40001C03	CritEffects	s		DHEffects	s	
+0	EVT SETENC	2026-06-17T21:14:15.0940000-03:00	Combatant-005	Combatant-019
+0	EVT SWING	2026-06-17T21:14:15.0940000-03:00	2	1		181013	0	Star Prism	Combatant-005	Magic	Combatant-019	10	potency	d	0	StatusEffects	s		CritRate	s	15.00	DHRate	s	50.00	Job	s	Pct	SourceId	s	10029426	TargetId	s	40001C03	CritEffects	s		DHEffects	s		DirectHit	s	True
+0	EVT SETENC	2026-06-17T21:14:15.2280000-03:00	Combatant-016	Combatant-019
+0	EVT SWING	2026-06-17T21:14:15.2280000-03:00	2	0		56349	0	Glare IV	Combatant-016	Magic	Combatant-019	9	potency	d	88.045312499999994	StatusEffects	s		CritRate	s	27.27	DHRate	s	26.79	Job	s	Whm	SourceId	s	1002072C	TargetId	s	40001C03	CritEffects	s		DHEffects	s	
+0	EVT SETENC	2026-06-17T21:14:15.3620000-03:00	Combatant-009	Combatant-019
+0	EVT SWING	2026-06-17T21:14:15.3620000-03:00	0	0		6029	0	attack	Combatant-009	Blunt	Combatant-019	9	potency	d	0	StatusEffects	s		CritRate	s	44.44	DHRate	s	32.41	Job	s	Mnk	SourceId	s	1004C5BB	TargetId	s	40001C03	CritEffects	s		DHEffects	s	
+0	EVT SETENC	2026-06-17T21:14:15.4050000-03:00	Combatant-015	Combatant-019
+0	EVT SWING	2026-06-17T21:14:15.4050000-03:00	2	1		54996	0	Toxikon II	Combatant-015	Magic	Combatant-019	9	potency	d	89.521432447097126	StatusEffects	s		CritRate	s	26.67	DHRate	s	50.00	Job	s	Sge	SourceId	s	1004DC74	TargetId	s	40001C03	CritEffects	s		DHEffects	s	
+0	EVT SWING	2026-06-17T21:14:15.5840000-03:00	1	0		0	0	Cyclonic Break	Combatant-019		Unknown	0
+0	EVT SWING	2026-06-17T21:14:15.5840000-03:00	1	0		0	0	Cyclonic Break	Combatant-019		Unknown	0
+0	EVT SWING	2026-06-17T21:14:15.5840000-03:00	1	0		0	0	Cyclonic Break	Combatant-019		Unknown	0
+0	EVT SWING	2026-06-17T21:14:15.5840000-03:00	1	0		0	0	Cyclonic Break	Combatant-019		Unknown	0
+0	EVT SWING	2026-06-17T21:14:15.5840000-03:00	1	0		0	0	Cyclonic Break	Combatant-019		Unknown	0
+0	EVT SWING	2026-06-17T21:14:15.5840000-03:00	1	0		0	0	Cyclonic Break	Combatant-019		Unknown	0
+0	EVT SWING	2026-06-17T21:14:15.5840000-03:00	1	0		0	0	Cyclonic Break	Combatant-019		Unknown	0
+0	EVT SWING	2026-06-17T21:14:15.5840000-03:00	1	0		0	0	Cyclonic Break	Combatant-019		Unknown	0
+0	EVT SETENC	2026-06-17T21:14:15.5840000-03:00	Combatant-010	Combatant-019
+0	EVT SWING	2026-06-17T21:14:15.5840000-03:00	2	0		85903	0	Blade of Valor	Combatant-010	Magic	Combatant-019	10	potency	d	0	StatusEffects	s		CritRate	s	15.63	DHRate	s	6.25	Job	s	Pld	SourceId	s	10050AB5	TargetId	s	40001C03	CritEffects	s		DHEffects	s		DirectHit	s	True
+0	EVT SETENC	2026-06-17T21:14:15.5840000-03:00	Combatant-010	Combatant-010
+0	EVT SWING	2026-06-17T21:14:15.5840000-03:00	4	0		17046	0	Blade of Valor	Combatant-010		Combatant-010	6	potency	d	42.615000000000002	StatusEffects	s		CritEffects	s		CritRate	s	15.15	Job	s	Pld	overheal	s	0
+0	EVT SETENC	2026-06-17T21:14:15.6290000-03:00	Combatant-019	Combatant-015
+0	EVT SWING	2026-06-17T21:14:15.6290000-03:00	2	0		60732	0	Sinsmite	Combatant-019	Magic (Lightning)	Combatant-015	9	potency	d	0	StatusEffects	s		CritRate	s	15.00	DHRate	s	5.00	Job	s		SourceId	s	40001C0C	TargetId	s	1004DC74	CritEffects	s		DHEffects	s	
+0	EVT SETENC	2026-06-17T21:14:15.6290000-03:00	Combatant-019	Combatant-009
+0	EVT SWING	2026-06-17T21:14:15.6290000-03:00	2	0		65699	0	Sinsmite	Combatant-019	Magic (Lightning)	Combatant-009	9	potency	d	0	StatusEffects	s		CritRate	s	15.00	DHRate	s	5.00	Job	s		SourceId	s	40001C0D	TargetId	s	1004C5BB	CritEffects	s		DHEffects	s	
+0	EVT SETENC	2026-06-17T21:14:15.6290000-03:00	Combatant-019	Combatant-010
+0	EVT SWING	2026-06-17T21:14:15.6290000-03:00	2	0		2035	0	Sinsmite	Combatant-019	Magic (Lightning)	Combatant-010	9	potency	d	0	StatusEffects	s		CritRate	s	15.00	DHRate	s	5.00	Job	s		SourceId	s	40001C0E	TargetId	s	10050AB5	CritEffects	s		DHEffects	s	
+0	EVT SETENC	2026-06-17T21:14:15.6290000-03:00	Combatant-019	Combatant-016
+0	EVT SWING	2026-06-17T21:14:15.6290000-03:00	2	0		61967	0	Sinsmite	Combatant-019	Magic (Lightning)	Combatant-016	9	potency	d	0	StatusEffects	s		CritRate	s	15.00	DHRate	s	5.00	Job	s		SourceId	s	40001C0F	TargetId	s	1002072C	CritEffects	s		DHEffects	s	
+0	EVT SETENC	2026-06-17T21:14:15.6290000-03:00	Combatant-019	YOU
+0	EVT SWING	2026-06-17T21:14:15.6290000-03:00	2	0		42272	0	Sinsmite	Combatant-019	Magic (Lightning)	YOU	9	potency	d	0	StatusEffects	s		CritRate	s	15.00	DHRate	s	5.00	Job	s		SourceId	s	40001C10	TargetId	s	1003FD26	CritEffects	s		DHEffects	s	
+0	EVT SETENC	2026-06-17T21:14:15.6290000-03:00	Combatant-019	Combatant-005
+0	EVT SWING	2026-06-17T21:14:15.6290000-03:00	2	0		62490	0	Sinsmite	Combatant-019	Magic (Lightning)	Combatant-005	9	potency	d	0	StatusEffects	s		CritRate	s	15.00	DHRate	s	5.00	Job	s		SourceId	s	40001C11	TargetId	s	10029426	CritEffects	s		DHEffects	s	
+0	EVT SETENC	2026-06-17T21:14:15.6290000-03:00	Combatant-019	Combatant-013
+0	EVT SWING	2026-06-17T21:14:15.6290000-03:00	2	0		71349	0	Sinsmite	Combatant-019	Magic (Lightning)	Combatant-013	9	potency	d	0	StatusEffects	s		CritRate	s	15.00	DHRate	s	5.00	Job	s		SourceId	s	40001C13	TargetId	s	1001FF13	CritEffects	s		DHEffects	s	
+0	EVT SETENC	2026-06-17T21:14:15.6290000-03:00	Combatant-019	Combatant-017
+0	EVT SWING	2026-06-17T21:14:15.6290000-03:00	2	0		54404	0	Sinsmite	Combatant-019	Magic (Lightning)	Combatant-017	9	potency	d	0	StatusEffects	s		CritRate	s	15.00	DHRate	s	5.00	Job	s		SourceId	s	40001C12	TargetId	s	1004CB77	CritEffects	s		DHEffects	s	
+0	EVT SETENC	2026-06-17T21:14:15.8050000-03:00	Combatant-017	Combatant-019
+0	EVT SWING	2026-06-17T21:14:15.8050000-03:00	2	0		66468	0	Finishing Move	Combatant-017	Piercing	Combatant-019	9	potency	d	195.49411764705883	StatusEffects	s		CritRate	s	35.71	DHRate	s	35.71	Job	s	Dnc	SourceId	s	1004CB77	TargetId	s	40001C03	CritEffects	s		DHEffects	s	
+0	EVT SETENC	2026-06-17T21:14:15.8940000-03:00	Combatant-013	Combatant-019
+0	EVT SWING	2026-06-17T21:14:15.8940000-03:00	2	1		64722	0	Lance Barrage	Combatant-013	Piercing	Combatant-019	10	potency	d	84.390813453844999	StatusEffects	s		CritRate	s	45.45	DHRate	s	46.05	Job	s	Drg	SourceId	s	1001FF13	TargetId	s	40001C03	CritEffects	s		DHEffects	s		DirectHit	s	True
+0	EVT SETENC	2026-06-17T21:14:16.0280000-03:00	Combatant-015	Combatant-015
+0	EVT SWING	2026-06-17T21:14:16.0280000-03:00	4	1		37539	0	Ixochole	Combatant-015		Combatant-015	6	potency	d	56.44962406015037	StatusEffects	s		CritEffects	s		CritRate	s	31.25	Job	s	Sge	overheal	s	37539
+0	EVT SETENC	2026-06-17T21:14:16.0280000-03:00	Combatant-015	Combatant-015
+0	EVT SWING	2026-06-17T21:14:16.0280000-03:00	7	0	Power	700	0	Ixochole	Combatant-015		Combatant-015	0
+0	EVT SETENC	2026-06-17T21:14:16.0280000-03:00	Combatant-015	Combatant-013
+0	EVT SWING	2026-06-17T21:14:16.0280000-03:00	4	0		22656	0	Ixochole	Combatant-015		Combatant-013	6	potency	d	56.640000000000001	StatusEffects	s		CritEffects	s		CritRate	s	29.41	Job	s	Sge	overheal	s	6224
+0	EVT SETENC	2026-06-17T21:14:16.0280000-03:00	Combatant-015	Combatant-009
+0	EVT SWING	2026-06-17T21:14:16.0280000-03:00	4	0		23489	0	Ixochole	Combatant-015		Combatant-009	6	potency	d	58.722499999999997	StatusEffects	s		CritEffects	s		CritRate	s	27.78	Job	s	Sge	overheal	s	23489
+0	EVT SETENC	2026-06-17T21:14:16.0280000-03:00	Combatant-015	Combatant-010
+0	EVT SWING	2026-06-17T21:14:16.0280000-03:00	4	0		22956	0	Ixochole	Combatant-015		Combatant-010	6	potency	d	57.390000000000001	StatusEffects	s		CritEffects	s		CritRate	s	26.32	Job	s	Sge	overheal	s	22956
+0	EVT SETENC	2026-06-17T21:14:16.3390000-03:00	Combatant-005	Combatant-010
+0	EVT SWING	2026-06-17T21:14:16.3390000-03:00	4	0		17416	0	Star Prism	Combatant-005		Combatant-010	6	potency	d	0	StatusEffects	s		CritEffects	s		CritRate	s	15.00	Job	s	Pct	overheal	s	17416
+0	EVT SETENC	2026-06-17T21:14:16.3390000-03:00	Combatant-005	Combatant-013
+0	EVT SWING	2026-06-17T21:14:16.3390000-03:00	4	0		17413	0	Star Prism	Combatant-005		Combatant-013	6	potency	d	0	StatusEffects	s		CritEffects	s		CritRate	s	45.45	Job	s	Pct	overheal	s	981
+0	EVT SETENC	2026-06-17T21:14:16.3390000-03:00	Combatant-005	YOU
+0	EVT SWING	2026-06-17T21:14:16.3390000-03:00	4	1		28012	0	Star Prism	Combatant-005		YOU	6	potency	d	0	StatusEffects	s		CritEffects	s		CritRate	s	50.00	Job	s	Pct	overheal	s	28012
+0	EVT SETENC	2026-06-17T21:14:16.3390000-03:00	Combatant-005	Combatant-009
+0	EVT SWING	2026-06-17T21:14:16.3390000-03:00	4	1		27393	0	Star Prism	Combatant-005		Combatant-009	6	potency	d	0	StatusEffects	s		CritEffects	s		CritRate	s	53.85	Job	s	Pct	overheal	s	27393
+0	EVT SETENC	2026-06-17T21:14:16.3390000-03:00	Combatant-005	Combatant-016
+0	EVT SWING	2026-06-17T21:14:16.3390000-03:00	4	1		26890	0	Star Prism	Combatant-005		Combatant-016	6	potency	d	0	StatusEffects	s		CritEffects	s		CritRate	s	57.14	Job	s	Pct	overheal	s	26890
+0	EVT SETENC	2026-06-17T21:14:16.3390000-03:00	Combatant-005	Combatant-005
+0	EVT SWING	2026-06-17T21:14:16.3390000-03:00	4	1		27249	0	Star Prism	Combatant-005		Combatant-005	6	potency	d	0	StatusEffects	s		CritEffects	s		CritRate	s	60.00	Job	s	Pct	overheal	s	18361
+0	EVT SETENC	2026-06-17T21:14:16.3390000-03:00	Combatant-005	Combatant-015
+0	EVT SWING	2026-06-17T21:14:16.3390000-03:00	4	1		26712	0	Star Prism	Combatant-005		Combatant-015	6	potency	d	0	StatusEffects	s		CritEffects	s		CritRate	s	62.50	Job	s	Pct	overheal	s	26712
+0	EVT SETENC	2026-06-17T21:14:16.3390000-03:00	Combatant-005	Combatant-017
+0	EVT SWING	2026-06-17T21:14:16.3390000-03:00	4	1		26807	0	Star Prism	Combatant-005		Combatant-017	6	potency	d	0	StatusEffects	s		CritEffects	s		CritRate	s	64.71	Job	s	Pct	overheal	s	26807
+0	EVT SETENC	2026-06-17T21:14:16.4280000-03:00	Combatant-009	Combatant-019
+0	EVT SWING	2026-06-17T21:14:16.4280000-03:00	0	1		9489	0	attack	Combatant-009	Blunt	Combatant-019	9	potency	d	0	StatusEffects	s		CritRate	s	46.43	DHRate	s	31.25	Job	s	Mnk	SourceId	s	1004C5BB	TargetId	s	40001C03	CritEffects	s		DHEffects	s	
+0	EVT SETENC	2026-06-17T21:14:16.5170000-03:00	Combatant-013	Combatant-019
+0	EVT SWING	2026-06-17T21:14:16.5170000-03:00	2	1		200686	0	Starcross	Combatant-013	Piercing	Combatant-019	10	potency	d	87.81503923900118	StatusEffects	s		CritRate	s	47.83	DHRate	s	50.00	Job	s	Drg	SourceId	s	1001FF13	TargetId	s	40001C03	CritEffects	s		DHEffects	s		DirectHit	s	True
+0	EVT SETENC	2026-06-17T21:14:16.6950000-03:00	Combatant-010	Combatant-019
+0	EVT SWING	2026-06-17T21:14:16.6950000-03:00	2	0		66554	0	Blade of Honor	Combatant-010	Magic	Combatant-019	9	potency	d	66.554000000000002	StatusEffects	s		CritRate	s	14.71	DHRate	s	5.95	Job	s	Pld	SourceId	s	10050AB5	TargetId	s	40001C03	CritEffects	s		DHEffects	s	
+0	EVT SETENC	2026-06-17T21:14:16.7410000-03:00	Combatant-010	Combatant-019
+0	EVT SWING	2026-06-17T21:14:16.7410000-03:00	0	1		6735	0	attack	Combatant-010	Slashing	Combatant-019	9	potency	d	0	StatusEffects	s		CritRate	s	17.14	DHRate	s	5.68	Job	s	Pld	SourceId	s	10050AB5	TargetId	s	40001C03	CritEffects	s		DHEffects	s	
+0	EVT SETENC	2026-06-17T21:14:16.7410000-03:00	Combatant-009	Combatant-019
+0	EVT SWING	2026-06-17T21:14:16.7410000-03:00	2	1		54652	0	Leaping Opo	Combatant-009	Blunt	Combatant-019	9	potency	d	0	StatusEffects	s		CritRate	s	48.28	DHRate	s	30.17	Job	s	Mnk	SourceId	s	1004C5BB	TargetId	s	40001C03	CritEffects	s		DHEffects	s	
+0	EVT SETENC	2026-06-17T21:14:16.9630000-03:00	Combatant-005	Combatant-019
+0	EVT SWING	2026-06-17T21:14:16.9630000-03:00	2	1		134337	0	Hammer Brush	Combatant-005	Magic	Combatant-019	10	potency	d	0	StatusEffects	s		CritRate	s	66.67	DHRate	s	50.00	Job	s	Pct	SourceId	s	10029426	TargetId	s	40001C03	CritEffects	s		DHEffects	s		DirectHit	s	True
+0	EVT SETENC	2026-06-17T21:14:17.1840000-03:00	Combatant-013	Combatant-019
+0	EVT SWING	2026-06-17T21:14:17.1840000-03:00	2	0		53557	0	Rise of the Dragon	Combatant-013	Piercing	Combatant-019	9	potency	d	97.376363636363635	StatusEffects	s		CritRate	s	45.83	DHRate	s	47.62	Job	s	Drg	SourceId	s	1001FF13	TargetId	s	40001C03	CritEffects	s		DHEffects	s	
+0	EVT SETENC	2026-06-17T21:14:17.2300000-03:00	YOU	Combatant-019
+0	EVT SWING	2026-06-17T21:14:17.2300000-03:00	0	0		5705	0	attack	YOU	Slashing	Combatant-019	9	potency	d	0	StatusEffects	s		CritRate	s	37.50	DHRate	s	36.76	Job	s	War	SourceId	s	1003FD26	TargetId	s	40001C03	CritEffects	s		DHEffects	s	
+0	EVT SETENC	2026-06-17T21:14:17.2300000-03:00	Combatant-016	Combatant-019
+0	EVT SWING	2026-06-17T21:14:17.2300000-03:00	2	0		57719	0	Glare IV	Combatant-016	Magic	Combatant-019	9	potency	d	90.185937499999994	StatusEffects	s		CritRate	s	26.09	DHRate	s	25.00	Job	s	Whm	SourceId	s	1002072C	TargetId	s	40001C03	CritEffects	s		DHEffects	s	
+0	EVT SETENC	2026-06-17T21:14:17.3190000-03:00	Combatant-013	Combatant-019
+0	EVT SWING	2026-06-17T21:14:17.3190000-03:00	0	0		10328	0	attack	Combatant-013	Piercing	Combatant-019	10	potency	d	0	StatusEffects	s		CritRate	s	44.00	DHRate	s	51.14	Job	s	Drg	SourceId	s	1001FF13	TargetId	s	40001C03	CritEffects	s		DHEffects	s		DirectHit	s	True
+0	EVT SETENC	2026-06-17T21:14:17.3190000-03:00	YOU	Combatant-019
+0	EVT SWING	2026-06-17T21:14:17.3190000-03:00	2	1		75460	0	Fell Cleave	YOU	Slashing	Combatant-019	10	potency	d	0	StatusEffects	s		CritRate	s	40.00	DHRate	s	41.67	Job	s	War	SourceId	s	1003FD26	TargetId	s	40001C03	CritEffects	s		DHEffects	s		DirectHit	s	True
+0	EVT SETENC	2026-06-17T21:14:17.4940000-03:00	Combatant-009	Combatant-019
+0	EVT SWING	2026-06-17T21:14:17.4940000-03:00	0	1		8955	0	attack	Combatant-009	Blunt	Combatant-019	9	potency	d	0	StatusEffects	s		CritRate	s	50.00	DHRate	s	29.17	Job	s	Mnk	SourceId	s	1004C5BB	TargetId	s	40001C03	CritEffects	s		DHEffects	s	
+0	EVT SWING	2026-06-17T21:14:17.6730000-03:00	1	0		0	0	Cyclonic Break	Combatant-019		Unknown	0
+0	EVT SWING	2026-06-17T21:14:17.6730000-03:00	1	0		0	0	Cyclonic Break	Combatant-019		Unknown	0
+0	EVT SWING	2026-06-17T21:14:17.6730000-03:00	1	0		0	0	Cyclonic Break	Combatant-019		Unknown	0
+0	EVT SWING	2026-06-17T21:14:17.6730000-03:00	1	0		0	0	Cyclonic Break	Combatant-019		Unknown	0
+0	EVT SWING	2026-06-17T21:14:17.6730000-03:00	1	0		0	0	Cyclonic Break	Combatant-019		Unknown	0
+0	EVT SWING	2026-06-17T21:14:17.6730000-03:00	1	0		0	0	Cyclonic Break	Combatant-019		Unknown	0
+0	EVT SWING	2026-06-17T21:14:17.6730000-03:00	1	0		0	0	Cyclonic Break	Combatant-019		Unknown	0
+0	EVT SWING	2026-06-17T21:14:17.6730000-03:00	1	0		0	0	Cyclonic Break	Combatant-019		Unknown	0
+0	EVT SETENC	2026-06-17T21:14:17.8060000-03:00	Combatant-015	Combatant-019
+0	EVT SWING	2026-06-17T21:14:17.8060000-03:00	2	1		53152	0	Toxikon II	Combatant-015	Magic	Combatant-019	9	potency	d	84.771929824561397	StatusEffects	s		CritRate	s	30.00	DHRate	s	50.00	Job	s	Sge	SourceId	s	1004DC74	TargetId	s	40001C03	CritEffects	s		DHEffects	s	
+0	EVT SETENC	2026-06-17T21:14:17.8950000-03:00	Combatant-017	Combatant-019
+0	EVT SWING	2026-06-17T21:14:17.8950000-03:00	0	0		6395	0	attack	Combatant-017	Piercing	Combatant-019	9	potency	d	0	StatusEffects	s		CritRate	s	33.33	DHRate	s	33.33	Job	s	Dnc	SourceId	s	1004CB77	TargetId	s	40001C03	CritEffects	s		DHEffects	s	
+0	EVT SETENC	2026-06-17T21:14:17.9860000-03:00	YOU	Combatant-019
+0	EVT SWING	2026-06-17T21:14:17.9860000-03:00	2	0		42327	0	Primal Wrath	YOU	Slashing	Combatant-019	9	potency	d	60.467142857142861	StatusEffects	s		CritRate	s	38.46	DHRate	s	39.47	Job	s	War	SourceId	s	1003FD26	TargetId	s	40001C03	CritEffects	s		DHEffects	s	
+0	EVT SETENC	2026-06-17T21:14:18.0740000-03:00	Combatant-010	Combatant-019
+0	EVT SWING	2026-06-17T21:14:18.0740000-03:00	2	0		47082	0	Goring Blade	Combatant-010	Slashing	Combatant-019	9	potency	d	67.260000000000005	StatusEffects	s		CritRate	s	16.67	DHRate	s	5.43	Job	s	Pld	SourceId	s	10050AB5	TargetId	s	40001C03	CritEffects	s		DHEffects	s	
+0	EVT SETENC	2026-06-17T21:14:18.3410000-03:00	Combatant-017	Combatant-019
+0	EVT SWING	2026-06-17T21:14:18.3410000-03:00	2	1		129749	0	Starfall Dance	Combatant-017	Piercing	Combatant-019	10	potency	d	100.28908212560385	StatusEffects	s		CritRate	s	37.50	DHRate	s	39.06	Job	s	Dnc	SourceId	s	1004CB77	TargetId	s	40001C03	CritEffects	s		DHEffects	s		DirectHit	s	True
+0	EVT SETENC	2026-06-17T21:14:18.3860000-03:00	Combatant-013	Combatant-019
+0	EVT SWING	2026-06-17T21:14:18.3860000-03:00	2	0		43411	0	Heavens' Thrust	Combatant-013	Piercing	Combatant-019	9	potency	d	94.371739130434776	StatusEffects	s		CritRate	s	42.31	DHRate	s	48.91	Job	s	Drg	SourceId	s	1001FF13	TargetId	s	40001C03	CritEffects	s		DHEffects	s	
+0	EVT SETENC	2026-06-17T21:14:18.6520000-03:00	Combatant-009	Combatant-019
+0	EVT SWING	2026-06-17T21:14:18.6520000-03:00	2	0		101124	0	Fire's Reply	Combatant-009	Blunt	Combatant-019	9	potency	d	72.231428571428566	StatusEffects	s		CritRate	s	48.39	DHRate	s	28.23	Job	s	Mnk	SourceId	s	1004C5BB	TargetId	s	40001C03	CritEffects	s		DHEffects	s	
+0	EVT SETENC	2026-06-17T21:14:19.0100000-03:00	Combatant-010	Combatant-019
+0	EVT SWING	2026-06-17T21:14:19.0100000-03:00	0	0		4492	0	attack	Combatant-010	Slashing	Combatant-019	9	potency	d	0	StatusEffects	s		CritRate	s	16.22	DHRate	s	5.21	Job	s	Pld	SourceId	s	10050AB5	TargetId	s	40001C03	CritEffects	s		DHEffects	s	
+0	EVT SETENC	2026-06-17T21:14:19.0540000-03:00	Combatant-013	Combatant-019
+0	EVT SWING	2026-06-17T21:14:19.0540000-03:00	2	0		46274	0	Mirage Dive	Combatant-013	Piercing	Combatant-019	10	potency	d	97.418947368421044	StatusEffects	s		CritRate	s	40.74	DHRate	s	52.08	Job	s	Drg	SourceId	s	1001FF13	TargetId	s	40001C03	CritEffects	s		DHEffects	s		DirectHit	s	True
+0	EVT SETENC	2026-06-17T21:14:19.2330000-03:00	Combatant-016	Combatant-019
+0	EVT SWING	2026-06-17T21:14:19.2330000-03:00	2	0		56890	0	Glare IV	Combatant-016	Magic	Combatant-019	9	potency	d	88.890625	StatusEffects	s		CritRate	s	25.00	DHRate	s	23.44	Job	s	Whm	SourceId	s	1002072C	TargetId	s	40001C03	CritEffects	s		DHEffects	s	
+0	EVT SETENC	2026-06-17T21:14:19.5450000-03:00	Combatant-009	Combatant-019
+0	EVT SWING	2026-06-17T21:14:19.5450000-03:00	0	0		5557	0	attack	Combatant-009	Blunt	Combatant-019	9	potency	d	0	StatusEffects	s		CritRate	s	46.88	DHRate	s	27.34	Job	s	Mnk	SourceId	s	1004C5BB	TargetId	s	40001C03	CritEffects	s		DHEffects	s	
+0	EVT SWING	2026-06-17T21:14:19.7240000-03:00	1	0		0	0	Cyclonic Break	Combatant-019		Unknown	0
+0	EVT SWING	2026-06-17T21:14:19.7240000-03:00	1	0		0	0	Cyclonic Break	Combatant-019		Unknown	0
+0	EVT SWING	2026-06-17T21:14:19.7240000-03:00	1	0		0	0	Cyclonic Break	Combatant-019		Unknown	0
+0	EVT SWING	2026-06-17T21:14:19.7240000-03:00	1	0		0	0	Cyclonic Break	Combatant-019		Unknown	0
+0	EVT SWING	2026-06-17T21:14:19.7240000-03:00	1	0		0	0	Cyclonic Break	Combatant-019		Unknown	0
+0	EVT SWING	2026-06-17T21:14:19.7240000-03:00	1	0		0	0	Cyclonic Break	Combatant-019		Unknown	0
+0	EVT SWING	2026-06-17T21:14:19.7240000-03:00	1	0		0	0	Cyclonic Break	Combatant-019		Unknown	0
+0	EVT SWING	2026-06-17T21:14:19.7240000-03:00	1	0		0	0	Cyclonic Break	Combatant-019		Unknown	0
+0	EVT SETENC	2026-06-17T21:14:19.8140000-03:00	YOU	Combatant-019
+0	EVT SWING	2026-06-17T21:14:19.8140000-03:00	2	1		97962	0	Primal Ruination	YOU	Slashing	Combatant-019	10	potency	d	0	StatusEffects	s		CritRate	s	40.74	DHRate	s	43.75	Job	s	War	SourceId	s	1003FD26	TargetId	s	40001C03	CritEffects	s		DHEffects	s		DirectHit	s	True
+0	EVT SETENC	2026-06-17T21:14:19.8140000-03:00	Combatant-009	Combatant-019
+0	EVT SWING	2026-06-17T21:14:19.8140000-03:00	2	1		47760	0	the Forbidden Chakra	Combatant-009	Blunt	Combatant-019	9	potency	d	65.073492981007433	StatusEffects	s		CritRate	s	48.48	DHRate	s	26.52	Job	s	Mnk	SourceId	s	1004C5BB	TargetId	s	40001C03	CritEffects	s		DHEffects	s	
+0	EVT SETENC	2026-06-17T21:14:20.1240000-03:00	Combatant-013	Combatant-019
+0	EVT SWING	2026-06-17T21:14:20.1240000-03:00	0	0		10241	0	attack	Combatant-013	Piercing	Combatant-019	10	potency	d	0	StatusEffects	s		CritRate	s	39.29	DHRate	s	55.00	Job	s	Drg	SourceId	s	1001FF13	TargetId	s	40001C03	CritEffects	s		DHEffects	s		DirectHit	s	True
+0	EVT SETENC	2026-06-17T21:14:20.6150000-03:00	YOU	Combatant-019
+0	EVT SWING	2026-06-17T21:14:20.6150000-03:00	0	1		11459	0	attack	YOU	Slashing	Combatant-019	10	potency	d	0	StatusEffects	s		CritRate	s	42.86	DHRate	s	47.62	Job	s	War	SourceId	s	1003FD26	TargetId	s	40001C03	CritEffects	s		DHEffects	s		DirectHit	s	True
+0	EVT SETENC	2026-06-17T21:14:20.6150000-03:00	Combatant-010	Combatant-019
+0	EVT SWING	2026-06-17T21:14:20.6150000-03:00	2	0		31997	0	Atonement	Combatant-010	Slashing	Combatant-019	9	potency	d	69.55869565217391	StatusEffects	s		CritRate	s	15.79	DHRate	s	5.00	Job	s	Pld	SourceId	s	10050AB5	TargetId	s	40001C03	CritEffects	s		DHEffects	s	
+0	EVT SETENC	2026-06-17T21:14:20.6150000-03:00	Combatant-010	Combatant-010
+0	EVT SWING	2026-06-17T21:14:20.6150000-03:00	7	0	Power	400	0	Atonement	Combatant-010		Combatant-010	0
+0	EVT SETENC	2026-06-17T21:14:20.6600000-03:00	Combatant-005	Combatant-019
+0	EVT SWING	2026-06-17T21:14:20.6600000-03:00	2	1		131653	0	Thunder in Magenta	Combatant-005	Magic (Lightning)	Combatant-019	9	potency	d	0	StatusEffects	s		CritRate	s	68.42	DHRate	s	68.18	Job	s	Pct	SourceId	s	10029426	TargetId	s	40001C03	CritEffects	s		DHEffects	s	
+0	EVT SETENC	2026-06-17T21:14:20.7480000-03:00	Combatant-009	Combatant-019
+0	EVT SWING	2026-06-17T21:14:20.7480000-03:00	2	0		23631	0	Dragon Kick	Combatant-009	Blunt	Combatant-019	9	potency	d	73.846874999999997	StatusEffects	s		CritRate	s	47.06	DHRate	s	25.74	Job	s	Mnk	SourceId	s	1004C5BB	TargetId	s	40001C03	CritEffects	s		DHEffects	s	
+0	EVT SETENC	2026-06-17T21:14:20.8380000-03:00	Combatant-017	Combatant-019
+0	EVT SWING	2026-06-17T21:14:20.8380000-03:00	2	0		54060	0	Saber Dance	Combatant-017	Piercing	Combatant-019	10	potency	d	80.088888888888889	StatusEffects	s		CritRate	s	35.29	DHRate	s	44.12	Job	s	Dnc	SourceId	s	1004CB77	TargetId	s	40001C03	CritEffects	s		DHEffects	s		DirectHit	s	True
+0	EVT SETENC	2026-06-17T21:14:20.8820000-03:00	Combatant-013	Combatant-019
+0	EVT SWING	2026-06-17T21:14:20.8820000-03:00	2	0		32821	0	Fang and Claw	Combatant-013	Piercing	Combatant-019	9	potency	d	0	StatusEffects	s		CritRate	s	37.93	DHRate	s	52.88	Job	s	Drg	SourceId	s	1001FF13	TargetId	s	40001C03	CritEffects	s		DHEffects	s	
+0	EVT SETENC	2026-06-17T21:14:21.0160000-03:00	Combatant-017	Combatant-019
+0	EVT SWING	2026-06-17T21:14:21.0160000-03:00	0	1		12344	0	attack	Combatant-017	Piercing	Combatant-019	10	potency	d	0	StatusEffects	s		CritRate	s	38.89	DHRate	s	48.61	Job	s	Dnc	SourceId	s	1004CB77	TargetId	s	40001C03	CritEffects	s		DHEffects	s		DirectHit	s	True
+0	EVT SETENC	2026-06-17T21:14:21.1500000-03:00	Combatant-015	Combatant-019
+0	EVT SWING	2026-06-17T21:14:21.1500000-03:00	2	0		33444	0	Dosis III	Combatant-015	Magic	Combatant-019	9	potency	d	88.010526315789477	StatusEffects	s		CritRate	s	28.57	DHRate	s	50.00	Job	s	Sge	SourceId	s	1004DC74	TargetId	s	40001C03	CritEffects	s		DHEffects	s	
+0	EVT SETENC	2026-06-17T21:14:21.2840000-03:00	Combatant-010	Combatant-019
+0	EVT SWING	2026-06-17T21:14:21.2840000-03:00	0	0		4399	0	attack	Combatant-010	Slashing	Combatant-019	9	potency	d	0	StatusEffects	s		CritRate	s	15.38	DHRate	s	5.00	Job	s	Pld	SourceId	s	10050AB5	TargetId	s	40001C03	CritEffects	s		DHEffects	s	
+0	EVT SETENC	2026-06-17T21:14:21.5950000-03:00	Combatant-009	Combatant-019
+0	EVT SWING	2026-06-17T21:14:21.5950000-03:00	0	0		5653	0	attack	Combatant-009	Blunt	Combatant-019	9	potency	d	0	StatusEffects	s		CritRate	s	45.71	DHRate	s	25.00	Job	s	Mnk	SourceId	s	1004C5BB	TargetId	s	40001C03	CritEffects	s		DHEffects	s	
+0	EVT SETENC	2026-06-17T21:14:21.9520000-03:00	Combatant-005	Combatant-019
+0	EVT SWING	2026-06-17T21:14:21.9520000-03:00	2	0		114730	0	Rainbow Drip	Combatant-005	Magic	Combatant-019	10	potency	d	0	StatusEffects	s		CritRate	s	65.00	DHRate	s	72.92	Job	s	Pct	SourceId	s	10029426	TargetId	s	40001C03	CritEffects	s		DHEffects	s		DirectHit	s	True
+0	EVT SETENC	2026-06-17T21:14:22.3520000-03:00	YOU	Combatant-019
+0	EVT SWING	2026-06-17T21:14:22.3520000-03:00	2	1		89173	0	Inner Chaos	YOU	Slashing	Combatant-019	10	potency	d	0	StatusEffects	s		CritRate	s	42.86	DHRate	s	51.14	Job	s	War	SourceId	s	1003FD26	TargetId	s	40001C03	CritEffects	s	Inner Chaos (100%) 	DHEffects	s		DirectHit	s	True
+0	EVT SETENC	2026-06-17T21:14:22.5750000-03:00	Combatant-009	Combatant-019
+0	EVT SWING	2026-06-17T21:14:22.5750000-03:00	2	1		99243	0	Elixir Burst	Combatant-009	Blunt	Combatant-019	9	potency	d	60.514024390243897	StatusEffects	s		CritRate	s	47.22	DHRate	s	24.31	Job	s	Mnk	SourceId	s	1004C5BB	TargetId	s	40001C03	CritEffects	s		DHEffects	s	
+0	EVT SETENC	2026-06-17T21:14:22.7070000-03:00	Combatant-016	Combatant-019
+0	EVT SWING	2026-06-17T21:14:22.7070000-03:00	2	1		46796	0	Glare III	Combatant-016	Magic	Combatant-019	9	potency	d	82.026292725679227	StatusEffects	s		CritRate	s	28.00	DHRate	s	22.06	Job	s	Whm	SourceId	s	1002072C	TargetId	s	40001C03	CritEffects	s		DHEffects	s	
+0	EVT SETENC	2026-06-17T21:14:22.9300000-03:00	Combatant-013	Combatant-019
+0	EVT SWING	2026-06-17T21:14:22.9300000-03:00	0	0		7893	0	attack	Combatant-013	Piercing	Combatant-019	9	potency	d	0	StatusEffects	s		CritRate	s	36.67	DHRate	s	50.93	Job	s	Drg	SourceId	s	1001FF13	TargetId	s	40001C03	CritEffects	s		DHEffects	s	
+0	EVT SETENC	2026-06-17T21:14:23.1090000-03:00	Combatant-010	Combatant-019
+0	EVT SWING	2026-06-17T21:14:23.1090000-03:00	2	1		54630	0	Supplication	Combatant-010	Slashing	Combatant-019	9	potency	d	71.64590163934426	StatusEffects	s		CritRate	s	17.50	DHRate	s	5.00	Job	s	Pld	SourceId	s	10050AB5	TargetId	s	40001C03	CritEffects	s		DHEffects	s	
+0	EVT SETENC	2026-06-17T21:14:23.1090000-03:00	Combatant-010	Combatant-010
+0	EVT SWING	2026-06-17T21:14:23.1090000-03:00	7	0	Power	400	0	Supplication	Combatant-010		Combatant-010	0
+0	EVT SETENC	2026-06-17T21:14:23.3320000-03:00	Combatant-017	Combatant-019
+0	EVT SWING	2026-06-17T21:14:23.3320000-03:00	2	1		88310	0	Last Dance	Combatant-017	Piercing	Combatant-019	10	potency	d	73.871113312420889	StatusEffects	s		CritRate	s	42.11	DHRate	s	52.63	Job	s	Dnc	SourceId	s	1004CB77	TargetId	s	40001C03	CritEffects	s		DHEffects	s		DirectHit	s	True
+0	EVT SETENC	2026-06-17T21:14:23.3780000-03:00	Combatant-013	Combatant-019
+0	EVT SWING	2026-06-17T21:14:23.3780000-03:00	2	0		43594	0	Drakesbane	Combatant-013	Piercing	Combatant-019	9	potency	d	94.769565217391303	StatusEffects	s		CritRate	s	35.48	DHRate	s	49.11	Job	s	Drg	SourceId	s	1001FF13	TargetId	s	40001C03	CritEffects	s		DHEffects	s	
+0	EVT SETENC	2026-06-17T21:14:23.4210000-03:00	Combatant-019	YOU
+0	EVT SWING	2026-06-17T21:14:23.4210000-03:00	2	0		596940	0	Powder Mark Trail	Combatant-019	Magic	YOU	9	potency	d	0	StatusEffects	s		CritRate	s	15.00	DHRate	s	50.00	Job	s		SourceId	s	40001C03	TargetId	s	1003FD26	CritEffects	s		DHEffects	s	
+0	EVT SETENC	2026-06-17T21:14:23.5550000-03:00	Combatant-010	Combatant-019
+0	EVT SWING	2026-06-17T21:14:23.5550000-03:00	0	0		4345	0	attack	Combatant-010	Slashing	Combatant-019	9	potency	d	0	StatusEffects	s		CritRate	s	17.07	DHRate	s	5.00	Job	s	Pld	SourceId	s	10050AB5	TargetId	s	40001C03	CritEffects	s		DHEffects	s	
+0	EVT SETENC	2026-06-17T21:14:23.5550000-03:00	Combatant-015	Combatant-019
+0	EVT SWING	2026-06-17T21:14:23.5550000-03:00	2	0		34696	0	Dosis III	Combatant-015	Magic	Combatant-019	9	potency	d	91.305263157894743	StatusEffects	s		CritRate	s	27.27	DHRate	s	11.36	Job	s	Sge	SourceId	s	1004DC74	TargetId	s	40001C03	CritEffects	s		DHEffects	s	
+0	EVT SETENC	2026-06-17T21:14:23.6440000-03:00	Combatant-009	Combatant-019
+0	EVT SWING	2026-06-17T21:14:23.6440000-03:00	0	1		8937	0	attack	Combatant-009	Blunt	Combatant-019	9	potency	d	0	StatusEffects	s		CritRate	s	48.65	DHRate	s	23.65	Job	s	Mnk	SourceId	s	1004C5BB	TargetId	s	40001C03	CritEffects	s		DHEffects	s	
+0	EVT SETENC	2026-06-17T21:14:23.9980000-03:00	YOU	Combatant-019
+0	EVT SWING	2026-06-17T21:14:23.9980000-03:00	0	0		6031	0	attack	YOU	Slashing	Combatant-019	9	potency	d	0	StatusEffects	s		CritRate	s	41.38	DHRate	s	48.91	Job	s	War	SourceId	s	1003FD26	TargetId	s	40001C03	CritEffects	s		DHEffects	s	
+0	EVT SETENC	2026-06-17T21:14:24.1760000-03:00	Combatant-017	Combatant-019
+0	EVT SWING	2026-06-17T21:14:24.1760000-03:00	0	1		12091	0	attack	Combatant-017	Piercing	Combatant-019	10	potency	d	0	StatusEffects	s		CritRate	s	45.00	DHRate	s	56.25	Job	s	Dnc	SourceId	s	1004CB77	TargetId	s	40001C03	CritEffects	s		DHEffects	s		DirectHit	s	True
+0	EVT SETENC	2026-06-17T21:14:24.4430000-03:00	Combatant-005	Combatant-019
+0	EVT SWING	2026-06-17T21:14:24.4430000-03:00	2	1		147305	0	Polishing Hammer	Combatant-005	Magic	Combatant-019	10	potency	d	0	StatusEffects	s		CritRate	s	66.67	DHRate	s	76.92	Job	s	Pct	SourceId	s	10029426	TargetId	s	40001C03	CritEffects	s		DHEffects	s		DirectHit	s	True
+0	EVT SETENC	2026-06-17T21:14:24.4430000-03:00	Combatant-009	Combatant-019
+0	EVT SWING	2026-06-17T21:14:24.4430000-03:00	2	1		55443	0	Leaping Opo	Combatant-009	Blunt	Combatant-019	9	potency	d	0	StatusEffects	s		CritRate	s	50.00	DHRate	s	23.03	Job	s	Mnk	SourceId	s	1004C5BB	TargetId	s	40001C03	CritEffects	s		DHEffects	s	
+0	EVT SETENC	2026-06-17T21:14:24.8450000-03:00	YOU	Combatant-019
+0	EVT SWING	2026-06-17T21:14:24.8450000-03:00	2	0		14765	0	Heavy Swing	YOU	Slashing	Combatant-019	9	potency	d	61.520833333333336	StatusEffects	s		CritRate	s	40.00	DHRate	s	46.88	Job	s	War	SourceId	s	1003FD26	TargetId	s	40001C03	CritEffects	s		DHEffects	s	
+0	EVT SETENC	2026-06-17T21:14:25.1120000-03:00	Combatant-009	Combatant-019
+0	EVT SWING	2026-06-17T21:14:25.1120000-03:00	2	0		23906	0	the Forbidden Chakra	Combatant-009	Blunt	Combatant-019	9	potency	d	59.765000000000001	StatusEffects	s		CritRate	s	48.72	DHRate	s	22.44	Job	s	Mnk	SourceId	s	1004C5BB	TargetId	s	40001C03	CritEffects	s		DHEffects	s	
+0	EVT SETENC	2026-06-17T21:14:25.1560000-03:00	Combatant-016	Combatant-019
+0	EVT SWING	2026-06-17T21:14:25.1560000-03:00	2	0		31307	0	Glare III	Combatant-016	Magic	Combatant-019	9	potency	d	89.448571428571427	StatusEffects	s		CritRate	s	26.92	DHRate	s	20.83	Job	s	Whm	SourceId	s	1002072C	TargetId	s	40001C03	CritEffects	s		DHEffects	s	
+0	EVT SETENC	2026-06-17T21:14:25.6030000-03:00	Combatant-010	Combatant-019
+0	EVT SWING	2026-06-17T21:14:25.6030000-03:00	2	1		57016	0	Sepulchre	Combatant-010	Slashing	Combatant-019	9	potency	d	68.540614803365969	StatusEffects	s		CritRate	s	19.05	DHRate	s	5.00	Job	s	Pld	SourceId	s	10050AB5	TargetId	s	40001C03	CritEffects	s		DHEffects	s	
+0	EVT SETENC	2026-06-17T21:14:25.6030000-03:00	Combatant-010	Combatant-010
+0	EVT SWING	2026-06-17T21:14:25.6030000-03:00	7	0	Power	400	0	Sepulchre	Combatant-010		Combatant-010	0
+0	EVT SETENC	2026-06-17T21:14:25.7340000-03:00	Combatant-013	Combatant-019
+0	EVT SWING	2026-06-17T21:14:25.7340000-03:00	0	1		11705	0	attack	Combatant-013	Piercing	Combatant-019	9	potency	d	0	StatusEffects	s		CritRate	s	37.50	DHRate	s	47.41	Job	s	Drg	SourceId	s	1001FF13	TargetId	s	40001C03	CritEffects	s		DHEffects	s	
+0	EVT SETENC	2026-06-17T21:14:25.7340000-03:00	Combatant-009	Combatant-019
+0	EVT SWING	2026-06-17T21:14:25.7340000-03:00	0	0		4384	0	attack	Combatant-009	Blunt	Combatant-019	9	potency	d	0	StatusEffects	s		CritRate	s	47.50	DHRate	s	21.88	Job	s	Mnk	SourceId	s	1004C5BB	TargetId	s	40001C03	CritEffects	s		DHEffects	s	
+0	EVT SETENC	2026-06-17T21:14:25.8240000-03:00	Combatant-019	YOU
+0	EVT SWING	2026-06-17T21:14:25.8240000-03:00	0	0		1938709	0	unknown_9cb4	Combatant-019	Slashing	YOU	9	potency	d	0	StatusEffects	s		CritRate	s	15.00	DHRate	s	50.00	Job	s		SourceId	s	40001C03	TargetId	s	1003FD26	CritEffects	s		DHEffects	s	
+0	EVT SETENC	2026-06-17T21:14:25.8240000-03:00	Combatant-017	Combatant-019
+0	EVT SWING	2026-06-17T21:14:25.8240000-03:00	2	1		50433	0	Fountainfall	Combatant-017	Piercing	Combatant-019	10	potency	d	64.980013804739627	StatusEffects	s		CritRate	s	47.62	DHRate	s	59.52	Job	s	Dnc	SourceId	s	1004CB77	TargetId	s	40001C03	CritEffects	s		DHEffects	s		DirectHit	s	True
+0	EVT SETENC	2026-06-17T21:14:25.8240000-03:00	Combatant-010	Combatant-019
+0	EVT SWING	2026-06-17T21:14:25.8240000-03:00	0	1		6840	0	attack	Combatant-010	Slashing	Combatant-019	9	potency	d	0	StatusEffects	s		CritRate	s	20.93	DHRate	s	5.00	Job	s	Pld	SourceId	s	10050AB5	TargetId	s	40001C03	CritEffects	s		DHEffects	s	
+0	EVT SETENC	2026-06-17T21:14:25.9130000-03:00	Combatant-013	Combatant-019
+0	EVT SWING	2026-06-17T21:14:25.9130000-03:00	2	0		34964	0	Raiden Thrust	Combatant-013	Piercing	Combatant-019	10	potency	d	87.409999999999997	StatusEffects	s		CritRate	s	36.36	DHRate	s	50.00	Job	s	Drg	SourceId	s	1001FF13	TargetId	s	40001C03	CritEffects	s		DHEffects	s		DirectHit	s	True
+0	EVT SETENC	2026-06-17T21:14:25.9580000-03:00	Combatant-015	Combatant-019
+0	EVT SWING	2026-06-17T21:14:25.9580000-03:00	2	0		31758	0	Dosis III	Combatant-015	Magic	Combatant-019	9	potency	d	83.573684210526309	StatusEffects	s		CritRate	s	26.09	DHRate	s	10.42	Job	s	Sge	SourceId	s	1004DC74	TargetId	s	40001C03	CritEffects	s		DHEffects	s	
+0	EVT SETENC	2026-06-17T21:14:26.3150000-03:00	Combatant-009	Combatant-019
+0	EVT SWING	2026-06-17T21:14:26.3150000-03:00	2	0		24870	0	Twin Snakes	Combatant-009	Blunt	Combatant-019	9	potency	d	59.214285714285715	StatusEffects	s		CritRate	s	46.34	DHRate	s	21.34	Job	s	Mnk	SourceId	s	1004C5BB	TargetId	s	40001C03	CritEffects	s		DHEffects	s	
+0	EVT SWING	2026-06-17T21:14:26.9410000-03:00	1	0		0	0	Claw Motif	Combatant-005		Combatant-005	0
+0	EVT SETENC	2026-06-17T21:14:27.1610000-03:00	Combatant-013	Combatant-019
+0	EVT SWING	2026-06-17T21:14:27.1610000-03:00	2	0		35206	0	Wyrmwind Thrust	Combatant-013	Piercing	Combatant-019	9	potency	d	80.013636363636365	StatusEffects	s		CritRate	s	35.29	DHRate	s	48.39	Job	s	Drg	SourceId	s	1001FF13	TargetId	s	40001C03	CritEffects	s		DHEffects	s	
+0	EVT SETENC	2026-06-17T21:14:27.2950000-03:00	Combatant-017	Combatant-019
+0	EVT SWING	2026-06-17T21:14:27.2950000-03:00	0	1		9597	0	attack	Combatant-017	Piercing	Combatant-019	9	potency	d	0	StatusEffects	s		CritRate	s	50.00	DHRate	s	56.82	Job	s	Dnc	SourceId	s	1004CB77	TargetId	s	40001C03	CritEffects	s		DHEffects	s	
+0	EVT SETENC	2026-06-17T21:14:27.3400000-03:00	YOU	Combatant-019
+0	EVT SWING	2026-06-17T21:14:27.3400000-03:00	2	1		29765	0	Maim	YOU	Slashing	Combatant-019	9	potency	d	49.477988095876455	StatusEffects	s		CritRate	s	41.94	DHRate	s	45.00	Job	s	War	SourceId	s	1003FD26	TargetId	s	40001C03	CritEffects	s		DHEffects	s	
+0	EVT SETENC	2026-06-17T21:14:27.3860000-03:00	YOU	Combatant-019
+0	EVT SWING	2026-06-17T21:14:27.3860000-03:00	0	0		5330	0	attack	YOU	Slashing	Combatant-019	9	potency	d	0	StatusEffects	s		CritRate	s	40.63	DHRate	s	43.27	Job	s	War	SourceId	s	1003FD26	TargetId	s	40001C03	CritEffects	s		DHEffects	s	
+0	EVT SWING	2026-06-17T21:14:27.5180000-03:00	1	0		0	0	unknown_9ced	Combatant-019		Combatant-019	0
+0	EVT SETENC	2026-06-17T21:14:27.6070000-03:00	Combatant-005	Combatant-019
+0	EVT SWING	2026-06-17T21:14:27.6070000-03:00	2	0		67905	0	Clawed Muse	Combatant-005	Magic	Combatant-019	9	potency	d	0	StatusEffects	s		CritRate	s	63.64	DHRate	s	71.43	Job	s	Pct	SourceId	s	10029426	TargetId	s	40001C03	CritEffects	s		DHEffects	s	
+0	EVT SETENC	2026-06-17T21:14:27.6510000-03:00	Combatant-016	Combatant-019
+0	EVT SWING	2026-06-17T21:14:27.6510000-03:00	2	1		40329	0	Glare III	Combatant-016	Magic	Combatant-019	9	potency	d	69.99087256950024	StatusEffects	s		CritRate	s	29.63	DHRate	s	19.74	Job	s	Whm	SourceId	s	1002072C	TargetId	s	40001C03	CritEffects	s		DHEffects	s	
+0	EVT SETENC	2026-06-17T21:14:27.7850000-03:00	Combatant-009	Combatant-019
+0	EVT SWING	2026-06-17T21:14:27.7850000-03:00	0	0		4334	0	attack	Combatant-009	Blunt	Combatant-019	9	potency	d	0	StatusEffects	s		CritRate	s	45.24	DHRate	s	20.83	Job	s	Mnk	SourceId	s	1004C5BB	TargetId	s	40001C03	CritEffects	s		DHEffects	s	
+0	EVT SETENC	2026-06-17T21:14:28.0950000-03:00	Combatant-010	Combatant-019
+0	EVT SWING	2026-06-17T21:14:28.0950000-03:00	0	0		3188	0	attack	Combatant-010	Slashing	Combatant-019	9	potency	d	0	StatusEffects	s		CritRate	s	20.45	DHRate	s	5.00	Job	s	Pld	SourceId	s	10050AB5	TargetId	s	40001C03	CritEffects	s		DHEffects	s	
+0	EVT SETENC	2026-06-17T21:14:28.1400000-03:00	Combatant-010	Combatant-019
+0	EVT SWING	2026-06-17T21:14:28.1400000-03:00	2	0		24696	0	Holy Spirit	Combatant-010	Magic	Combatant-019	9	potency	d	0	StatusEffects	s		CritRate	s	20.00	DHRate	s	5.00	Job	s	Pld	SourceId	s	10050AB5	TargetId	s	40001C03	CritEffects	s		DHEffects	s	
+0	EVT SETENC	2026-06-17T21:14:28.1400000-03:00	Combatant-010	Combatant-010
+0	EVT SWING	2026-06-17T21:14:28.1400000-03:00	4	1		28399	0	Holy Spirit	Combatant-010		Combatant-010	6	potency	d	45.296601941747568	StatusEffects	s		CritEffects	s		CritRate	s	21.74	Job	s	Pld	overheal	s	0
+0	EVT SETENC	2026-06-17T21:14:28.1850000-03:00	Combatant-009	Combatant-019
+0	EVT SWING	2026-06-17T21:14:28.1850000-03:00	2	0		22793	0	Demolish	Combatant-009	Blunt	Combatant-019	9	potency	d	0	StatusEffects	s		CritRate	s	44.19	DHRate	s	20.35	Job	s	Mnk	SourceId	s	1004C5BB	TargetId	s	40001C03	CritEffects	s		DHEffects	s	
+0	EVT SETENC	2026-06-17T21:14:28.3180000-03:00	Combatant-017	Combatant-019
+0	EVT SWING	2026-06-17T21:14:28.3180000-03:00	2	1		62321	0	Saber Dance	Combatant-017	Piercing	Combatant-019	9	potency	d	61.658837699488103	StatusEffects	s		CritRate	s	52.17	DHRate	s	54.35	Job	s	Dnc	SourceId	s	1004CB77	TargetId	s	40001C03	CritEffects	s		DHEffects	s	
+0	EVT SETENC	2026-06-17T21:14:28.3630000-03:00	Combatant-013	Combatant-019
+0	EVT SWING	2026-06-17T21:14:28.3630000-03:00	2	0		19193	0	Spiral Blow	Combatant-013	Piercing	Combatant-019	9	potency	d	63.976666666666667	StatusEffects	s		CritRate	s	34.29	DHRate	s	46.88	Job	s	Drg	SourceId	s	1001FF13	TargetId	s	40001C03	CritEffects	s		DHEffects	s	
+0	EVT SETENC	2026-06-17T21:14:28.3630000-03:00	Combatant-015	Combatant-019
+0	EVT SWING	2026-06-17T21:14:28.3630000-03:00	2	0		30088	0	Dosis III	Combatant-015	Magic	Combatant-019	9	potency	d	79.178947368421049	StatusEffects	s		CritRate	s	25.00	DHRate	s	9.62	Job	s	Sge	SourceId	s	1004DC74	TargetId	s	40001C03	CritEffects	s		DHEffects	s	
+0	EVT SETENC	2026-06-17T21:14:28.5410000-03:00	Combatant-013	Combatant-019
+0	EVT SWING	2026-06-17T21:14:28.5410000-03:00	0	0		7175	0	attack	Combatant-013	Piercing	Combatant-019	10	potency	d	0	StatusEffects	s		CritRate	s	33.33	DHRate	s	49.24	Job	s	Drg	SourceId	s	1001FF13	TargetId	s	40001C03	CritEffects	s		DHEffects	s		DirectHit	s	True
+0	EVT SETENC	2026-06-17T21:14:28.8520000-03:00	Combatant-019	YOU
+0	EVT SWING	2026-06-17T21:14:28.8520000-03:00	0	0		1803611	0	unknown_9cb4	Combatant-019	Slashing	YOU	9	potency	d	0	StatusEffects	s		CritRate	s	15.00	DHRate	s	50.00	Job	s		SourceId	s	40001C03	TargetId	s	1003FD26	CritEffects	s		DHEffects	s	
+0	EVT SETENC	2026-06-17T21:14:29.8350000-03:00	YOU	Combatant-019
+0	EVT SWING	2026-06-17T21:14:29.8350000-03:00	2	0		24715	0	Storm's Path	YOU	Slashing	Combatant-019	9	potency	d	49.43	StatusEffects	s		CritRate	s	39.39	DHRate	s	41.67	Job	s	War	SourceId	s	1003FD26	TargetId	s	40001C03	CritEffects	s		DHEffects	s	
+0	EVT SETENC	2026-06-17T21:14:29.8350000-03:00	YOU	YOU
+0	EVT SWING	2026-06-17T21:14:29.8350000-03:00	4	0		11002	0	Storm's Path	YOU		YOU	6	potency	d	44.008000000000003	StatusEffects	s		CritEffects	s		CritRate	s	38.24	Job	s	War	overheal	s	0
+0	EVT SETENC	2026-06-17T21:14:29.8350000-03:00	Combatant-009	Combatant-019
+0	EVT SWING	2026-06-17T21:14:29.8350000-03:00	0	0		4257	0	attack	Combatant-009	Blunt	Combatant-019	9	potency	d	0	StatusEffects	s		CritRate	s	43.18	DHRate	s	19.89	Job	s	Mnk	SourceId	s	1004C5BB	TargetId	s	40001C03	CritEffects	s		DHEffects	s	
+0	EVT SETENC	2026-06-17T21:14:30.0580000-03:00	Combatant-009	Combatant-019
+0	EVT SWING	2026-06-17T21:14:30.0580000-03:00	2	0		21540	0	Dragon Kick	Combatant-009	Blunt	Combatant-019	10	potency	d	53.850000000000001	StatusEffects	s		CritRate	s	42.22	DHRate	s	22.22	Job	s	Mnk	SourceId	s	1004C5BB	TargetId	s	40001C03	CritEffects	s		DHEffects	s		DirectHit	s	True
+0	EVT SETENC	2026-06-17T21:14:30.1470000-03:00	Combatant-016	Combatant-019
+0	EVT SWING	2026-06-17T21:14:30.1470000-03:00	2	0		25450	0	Glare III	Combatant-016	Magic	Combatant-019	9	potency	d	72.714285714285708	StatusEffects	s		CritRate	s	28.57	DHRate	s	18.75	Job	s	Whm	SourceId	s	1002072C	TargetId	s	40001C03	CritEffects	s		DHEffects	s	
+0	EVT SETENC	2026-06-17T21:14:30.3740000-03:00	Combatant-010	Combatant-019
+0	EVT SWING	2026-06-17T21:14:30.3740000-03:00	0	0		3131	0	attack	Combatant-010	Slashing	Combatant-019	9	potency	d	0	StatusEffects	s		CritRate	s	21.28	DHRate	s	5.00	Job	s	Pld	SourceId	s	10050AB5	TargetId	s	40001C03	CritEffects	s		DHEffects	s	
+0	EVT SETENC	2026-06-17T21:14:30.4580000-03:00	Combatant-017	Combatant-019
+0	EVT SWING	2026-06-17T21:14:30.4580000-03:00	0	0		5743	0	attack	Combatant-017	Piercing	Combatant-019	9	potency	d	0	StatusEffects	s		CritRate	s	50.00	DHRate	s	52.08	Job	s	Dnc	SourceId	s	1004CB77	TargetId	s	40001C03	CritEffects	s		DHEffects	s	
+0	EVT SETENC	2026-06-17T21:14:30.6370000-03:00	Combatant-010	Combatant-019
+0	EVT SWING	2026-06-17T21:14:30.6370000-03:00	2	0		10422	0	Fast Blade	Combatant-010	Slashing	Combatant-019	9	potency	d	47.372727272727275	StatusEffects	s		CritRate	s	20.83	DHRate	s	5.00	Job	s	Pld	SourceId	s	10050AB5	TargetId	s	40001C03	CritEffects	s		DHEffects	s	
+0	EVT SETENC	2026-06-17T21:14:30.7700000-03:00	YOU	Combatant-019
+0	EVT SWING	2026-06-17T21:14:30.7700000-03:00	0	1		8354	0	attack	YOU	Slashing	Combatant-019	9	potency	d	0	StatusEffects	s		CritRate	s	40.00	DHRate	s	40.18	Job	s	War	SourceId	s	1003FD26	TargetId	s	40001C03	CritEffects	s		DHEffects	s	
+0	EVT SETENC	2026-06-17T21:14:30.7700000-03:00	Combatant-016	YOU
+0	EVT SWING	2026-06-17T21:14:30.7700000-03:00	4	0		234173	0	Benediction	Combatant-016		YOU	6	potency	d	0	StatusEffects	s		CritEffects	s		CritRate	s	27.59	Job	s	Whm	overheal	s	1
+0	EVT SETENC	2026-06-17T21:14:30.8150000-03:00	Combatant-015	Combatant-019
+0	EVT SWING	2026-06-17T21:14:30.8150000-03:00	2	0		28137	0	Dosis III	Combatant-015	Magic	Combatant-019	9	potency	d	74.044736842105266	StatusEffects	s		CritRate	s	24.00	DHRate	s	8.93	Job	s	Sge	SourceId	s	1004DC74	TargetId	s	40001C03	CritEffects	s		DHEffects	s	
+0	EVT SETENC	2026-06-17T21:14:30.8590000-03:00	Combatant-013	Combatant-019
+0	EVT SWING	2026-06-17T21:14:30.8590000-03:00	2	0		23139	0	Chaotic Spring	Combatant-013	Piercing	Combatant-019	9	potency	d	0	StatusEffects	s		CritRate	s	32.43	DHRate	s	47.79	Job	s	Drg	SourceId	s	1001FF13	TargetId	s	40001C03	CritEffects	s		DHEffects	s	
+0	EVT SETENC	2026-06-17T21:14:30.8590000-03:00	Combatant-017	Combatant-019
+0	EVT SWING	2026-06-17T21:14:30.8590000-03:00	2	1		38516	0	Reverse Cascade	Combatant-017	Piercing	Combatant-019	10	potency	d	58.8479755538579	StatusEffects	s		CritRate	s	52.00	DHRate	s	55.00	Job	s	Dnc	SourceId	s	1004CB77	TargetId	s	40001C03	CritEffects	s		DHEffects	s		DirectHit	s	True
+0	EVT SETENC	2026-06-17T21:14:30.9470000-03:00	Combatant-005	Combatant-019
+0	EVT SWING	2026-06-17T21:14:30.9470000-03:00	2	0		41805	0	Holy in White	Combatant-005	Magic	Combatant-019	9	potency	d	0	StatusEffects	s		CritRate	s	60.87	DHRate	s	66.67	Job	s	Pct	SourceId	s	10029426	TargetId	s	40001C03	CritEffects	s		DHEffects	s	
+0	EVT SETENC	2026-06-17T21:14:31.3490000-03:00	Combatant-013	Combatant-019
+0	EVT SWING	2026-06-17T21:14:31.3490000-03:00	0	0		5733	0	attack	Combatant-013	Piercing	Combatant-019	9	potency	d	0	StatusEffects	s		CritRate	s	31.58	DHRate	s	46.43	Job	s	Drg	SourceId	s	1001FF13	TargetId	s	40001C03	CritEffects	s		DHEffects	s	
+0	EVT SETENC	2026-06-17T21:14:31.8850000-03:00	Combatant-009	Combatant-019
+0	EVT SWING	2026-06-17T21:14:31.8850000-03:00	0	0		4198	0	attack	Combatant-009	Blunt	Combatant-019	9	potency	d	0	StatusEffects	s		CritRate	s	41.30	DHRate	s	21.74	Job	s	Mnk	SourceId	s	1004C5BB	TargetId	s	40001C03	CritEffects	s		DHEffects	s	
+0	EVT SETENC	2026-06-17T21:14:31.9300000-03:00	Combatant-009	Combatant-019
+0	EVT SWING	2026-06-17T21:14:31.9300000-03:00	2	1		46974	0	Rising Raptor	Combatant-009	Blunt	Combatant-019	9	potency	d	0	StatusEffects	s		CritRate	s	42.55	DHRate	s	21.28	Job	s	Mnk	SourceId	s	1004C5BB	TargetId	s	40001C03	CritEffects	s		DHEffects	s	
+0	EVT SETENC	2026-06-17T21:14:32.3320000-03:00	YOU	Combatant-019
+0	EVT SWING	2026-06-17T21:14:32.3320000-03:00	2	0		36181	0	Fell Cleave	YOU	Slashing	Combatant-019	10	potency	d	0	StatusEffects	s		CritRate	s	38.89	DHRate	s	43.10	Job	s	War	SourceId	s	1003FD26	TargetId	s	40001C03	CritEffects	s		DHEffects	s		DirectHit	s	True
+0	EVT SETENC	2026-06-17T21:14:32.6000000-03:00	Combatant-009	Combatant-019
+0	EVT SWING	2026-06-17T21:14:32.6000000-03:00	2	0		20454	0	the Forbidden Chakra	Combatant-009	Blunt	Combatant-019	9	potency	d	51.134999999999998	StatusEffects	s		CritRate	s	41.67	DHRate	s	20.83	Job	s	Mnk	SourceId	s	1004C5BB	TargetId	s	40001C03	CritEffects	s		DHEffects	s	
+0	EVT SETENC	2026-06-17T21:14:32.6440000-03:00	Combatant-016	Combatant-019
+0	EVT SWING	2026-06-17T21:14:32.6440000-03:00	2	1		40253	0	Glare III	Combatant-016	Magic	Combatant-019	9	potency	d	69.702164502164493	StatusEffects	s		CritRate	s	30.00	DHRate	s	17.86	Job	s	Whm	SourceId	s	1002072C	TargetId	s	40001C03	CritEffects	s		DHEffects	s	
+0	EVT SETENC	2026-06-17T21:14:32.6440000-03:00	Combatant-010	Combatant-019
+0	EVT SWING	2026-06-17T21:14:32.6440000-03:00	0	0		3116	0	attack	Combatant-010	Slashing	Combatant-019	9	potency	d	0	StatusEffects	s		CritRate	s	20.41	DHRate	s	5.00	Job	s	Pld	SourceId	s	10050AB5	TargetId	s	40001C03	CritEffects	s		DHEffects	s	
+0	EVT SETENC	2026-06-17T21:14:33.2240000-03:00	Combatant-015	Combatant-019
+0	EVT SWING	2026-06-17T21:14:33.2240000-03:00	2	0		28967	0	Dosis III	Combatant-015	Magic	Combatant-019	9	potency	d	76.228947368421046	StatusEffects	s		CritRate	s	23.08	DHRate	s	8.33	Job	s	Sge	SourceId	s	1004DC74	TargetId	s	40001C03	CritEffects	s		DHEffects	s	
+0	EVT SETENC	2026-06-17T21:14:33.2670000-03:00	YOU	Combatant-019
+0	EVT SWING	2026-06-17T21:14:33.2670000-03:00	2	1		35539	0	Upheaval	YOU	Blunt	Combatant-019	9	potency	d	48.203489863997945	StatusEffects	s		CritRate	s	40.54	DHRate	s	41.67	Job	s	War	SourceId	s	1003FD26	TargetId	s	40001C03	CritEffects	s		DHEffects	s	
+0	EVT SETENC	2026-06-17T21:14:33.3560000-03:00	Combatant-013	Combatant-019
+0	EVT SWING	2026-06-17T21:14:33.3560000-03:00	2	0		20131	0	Wheeling Thrust	Combatant-013	Piercing	Combatant-019	9	potency	d	0	StatusEffects	s		CritRate	s	30.77	DHRate	s	45.14	Job	s	Drg	SourceId	s	1001FF13	TargetId	s	40001C03	CritEffects	s		DHEffects	s	
+0	EVT SETENC	2026-06-17T21:14:33.4010000-03:00	Combatant-017	Combatant-019
+0	EVT SWING	2026-06-17T21:14:33.4010000-03:00	2	0		39792	0	Saber Dance	Combatant-017	Piercing	Combatant-019	9	potency	d	73.688888888888883	StatusEffects	s		CritRate	s	50.00	DHRate	s	52.88	Job	s	Dnc	SourceId	s	1004CB77	TargetId	s	40001C03	CritEffects	s		DHEffects	s	
+0	EVT SETENC	2026-06-17T21:14:33.5790000-03:00	Combatant-017	Combatant-019
+0	EVT SWING	2026-06-17T21:14:33.5790000-03:00	0	1		10954	0	attack	Combatant-017	Piercing	Combatant-019	10	potency	d	0	StatusEffects	s		CritRate	s	51.85	DHRate	s	55.56	Job	s	Dnc	SourceId	s	1004CB77	TargetId	s	40001C03	CritEffects	s		DHEffects	s		DirectHit	s	True
+0	EVT SETENC	2026-06-17T21:14:33.8020000-03:00	Combatant-009	Combatant-019
+0	EVT SWING	2026-06-17T21:14:33.8020000-03:00	2	0		40883	0	Six-sided Star	Combatant-009	Blunt	Combatant-019	9	potency	d	0	StatusEffects	s		CritRate	s	40.82	DHRate	s	20.41	Job	s	Mnk	SourceId	s	1004C5BB	TargetId	s	40001C03	CritEffects	s		DHEffects	s	
+0	EVT SETENC	2026-06-17T21:14:33.9380000-03:00	Combatant-009	Combatant-019
+0	EVT SWING	2026-06-17T21:14:33.9380000-03:00	0	0		4198	0	attack	Combatant-009	Blunt	Combatant-019	9	potency	d	0	StatusEffects	s		CritRate	s	40.00	DHRate	s	20.00	Job	s	Mnk	SourceId	s	1004C5BB	TargetId	s	40001C03	CritEffects	s		DHEffects	s	
+0	EVT SWING	2026-06-17T21:14:34.1140000-03:00	1	0		0	0	Utopian Sky	Combatant-019		Combatant-019	0
+0	EVT SWING	2026-06-17T21:14:34.7370000-03:00	1	0		0	0	Eukrasia	Combatant-015		Combatant-015	0
+0	EVT SETENC	2026-06-17T21:14:35.0950000-03:00	Combatant-016	Combatant-016
+0	EVT SWING	2026-06-17T21:14:35.0950000-03:00	4	0		22806	0	Afflatus Rapture	Combatant-016		Combatant-016	6	potency	d	57.015000000000001	StatusEffects	s		CritEffects	s		CritRate	s	29.03	Job	s	Whm	overheal	s	22806
+0	EVT SETENC	2026-06-17T21:14:35.0950000-03:00	Combatant-016	Combatant-017
+0	EVT SWING	2026-06-17T21:14:35.0950000-03:00	4	1		37032	0	Afflatus Rapture	Combatant-016		Combatant-017	6	potency	d	55.687218045112779	StatusEffects	s		CritEffects	s		CritRate	s	31.25	Job	s	Whm	overheal	s	37032
+0	EVT SETENC	2026-06-17T21:14:35.0950000-03:00	Combatant-016	Combatant-009
+0	EVT SWING	2026-06-17T21:14:35.0950000-03:00	4	1		35694	0	Afflatus Rapture	Combatant-016		Combatant-009	6	potency	d	53.01089108910891	StatusEffects	s		CritEffects	s		CritRate	s	33.33	Job	s	Whm	overheal	s	35694
+0	EVT SETENC	2026-06-17T21:14:35.0950000-03:00	Combatant-016	YOU
+0	EVT SWING	2026-06-17T21:14:35.0950000-03:00	4	0		23089	0	Afflatus Rapture	Combatant-016		YOU	6	potency	d	57.722499999999997	StatusEffects	s		CritEffects	s		CritRate	s	32.35	Job	s	Whm	overheal	s	23089
+0	EVT SETENC	2026-06-17T21:14:35.0950000-03:00	Combatant-016	Combatant-015
+0	EVT SWING	2026-06-17T21:14:35.0950000-03:00	4	0		23471	0	Afflatus Rapture	Combatant-016		Combatant-015	6	potency	d	58.677500000000002	StatusEffects	s		CritEffects	s		CritRate	s	31.43	Job	s	Whm	overheal	s	23471
+0	EVT SETENC	2026-06-17T21:14:35.0950000-03:00	Combatant-016	Combatant-010
+0	EVT SWING	2026-06-17T21:14:35.0950000-03:00	4	0		23076	0	Afflatus Rapture	Combatant-016		Combatant-010	6	potency	d	57.689999999999998	StatusEffects	s		CritEffects	s		CritRate	s	30.56	Job	s	Whm	overheal	s	23076
+0	EVT SETENC	2026-06-17T21:14:35.0950000-03:00	Combatant-016	Combatant-013
+0	EVT SWING	2026-06-17T21:14:35.0950000-03:00	4	0		23341	0	Afflatus Rapture	Combatant-016		Combatant-013	6	potency	d	58.352499999999999	StatusEffects	s		CritEffects	s		CritRate	s	29.73	Job	s	Whm	overheal	s	15527
+0	EVT SETENC	2026-06-17T21:14:35.7620000-03:00	Combatant-015	Combatant-015
+0	EVT SWING	2026-06-17T21:14:35.7620000-03:00	4	1		9073	0	Eukrasian Prognosis II	Combatant-015		Combatant-015	6	potency	d	56.379976985040273	StatusEffects	s		CritEffects	s		CritRate	s	25.93	Job	s	Sge	overheal	s	9073
+0	EVT SETENC	2026-06-17T21:14:35.7620000-03:00	Combatant-015	Combatant-009
+0	EVT SWING	2026-06-17T21:14:35.7620000-03:00	4	1		9305	0	Eukrasian Prognosis II	Combatant-015		Combatant-009	6	potency	d	56.886462882096076	StatusEffects	s		CritEffects	s		CritRate	s	28.57	Job	s	Sge	overheal	s	9305
+0	EVT SETENC	2026-06-17T21:14:35.7620000-03:00	Combatant-015	Combatant-013
+0	EVT SWING	2026-06-17T21:14:35.7620000-03:00	4	1		9326	0	Eukrasian Prognosis II	Combatant-015		Combatant-013	6	potency	d	56.169055036344751	StatusEffects	s		CritEffects	s		CritRate	s	31.03	Job	s	Sge	overheal	s	1512
+0	EVT SETENC	2026-06-17T21:14:35.7620000-03:00	Combatant-015	YOU
+0	EVT SWING	2026-06-17T21:14:35.7620000-03:00	4	0		5666	0	Eukrasian Prognosis II	Combatant-015		YOU	6	potency	d	56.659999999999997	StatusEffects	s		CritEffects	s		CritRate	s	30.00	Job	s	Sge	overheal	s	5666
+0	EVT SETENC	2026-06-17T21:14:35.7620000-03:00	Combatant-015	Combatant-016
+0	EVT SWING	2026-06-17T21:14:35.7620000-03:00	4	0		5786	0	Eukrasian Prognosis II	Combatant-015		Combatant-016	6	potency	d	57.859999999999999	StatusEffects	s		CritEffects	s		CritRate	s	29.03	Job	s	Sge	overheal	s	5786
+0	EVT SETENC	2026-06-17T21:14:35.7620000-03:00	Combatant-015	Combatant-010
+0	EVT SWING	2026-06-17T21:14:35.7620000-03:00	4	0		5877	0	Eukrasian Prognosis II	Combatant-015		Combatant-010	6	potency	d	58.770000000000003	StatusEffects	s		CritEffects	s		CritRate	s	28.13	Job	s	Sge	overheal	s	5877
+0	EVT SETENC	2026-06-17T21:14:35.7620000-03:00	Combatant-015	Combatant-017
+0	EVT SWING	2026-06-17T21:14:35.7620000-03:00	4	0		5841	0	Eukrasian Prognosis II	Combatant-015		Combatant-017	6	potency	d	58.409999999999997	StatusEffects	s		CritEffects	s		CritRate	s	27.27	Job	s	Sge	overheal	s	5841
+0	EVT SETENC	2026-06-17T21:14:35.7620000-03:00	Combatant-015	Combatant-005
+0	EVT SWING	2026-06-17T21:14:35.7620000-03:00	4	0		5701	0	Eukrasian Prognosis II	Combatant-015		Combatant-005	6	potency	d	57.009999999999998	StatusEffects	s		CritEffects	s		CritRate	s	26.47	Job	s	Sge	overheal	s	179
+0	EVT SWING	2026-06-17T21:14:35.9400000-03:00	1	0		0	0	Maw Motif	Combatant-005		Combatant-005	0
+0	EVT SETENC	2026-06-17T21:14:36.7830000-03:00	YOU	YOU
+0	EVT SWING	2026-06-17T21:14:36.7830000-03:00	4	0		56201	0	Thrill of Battle	YOU		YOU	6	potency	d	0	StatusEffects	s		CritEffects	s		CritRate	s	39.47	Job	s	War	overheal	s	56201
+0	EVT SWING	2026-06-17T21:14:37.2740000-03:00	1	0		0	0	Eukrasia	Combatant-015		Combatant-015	0
+0	EVT SWING	2026-06-17T21:14:37.5850000-03:00	1	0		0	0	Forbidden Meditation	Combatant-009		Combatant-009	0
+0	EVT SWING	2026-06-17T21:14:38.5670000-03:00	1	0		0	0	Forbidden Meditation	Combatant-009		Combatant-009	0
+0	EVT SETENC	2026-06-17T21:14:39.5470000-03:00	Combatant-019	YOU
+0	EVT SWING	2026-06-17T21:14:39.5470000-03:00	2	0		142282	0	Burn Mark	Combatant-019	Magic	YOU	9	potency	d	0	StatusEffects	s		CritRate	s	15.00	DHRate	s	5.00	Job	s		SourceId	s	40001C1B	TargetId	s	1003FD26	CritEffects	s		DHEffects	s	
+0	EVT SETENC	2026-06-17T21:14:39.5470000-03:00	Combatant-019	Combatant-010
+0	EVT SWING	2026-06-17T21:14:39.5470000-03:00	2	0	Blocked	111088	0	Burn Mark	Combatant-019	Magic	Combatant-010	9	potency	d	0	StatusEffects	s		CritRate	s	15.00	DHRate	s	5.00	Job	s		SourceId	s	40001C1A	TargetId	s	10050AB5	CritEffects	s		DHEffects	s	
+0	EVT SWING	2026-06-17T21:14:39.5470000-03:00	1	0		0	0	Forbidden Meditation	Combatant-009		Combatant-009	0
+0	EVT SWING	2026-06-17T21:14:39.9500000-03:00	1	0		0	0	Hammer Motif	Combatant-005		Combatant-005	0
+0	EVT SWING	2026-06-17T21:14:40.5750000-03:00	1	0		0	0	Forbidden Meditation	Combatant-009		Combatant-009	0
+0	EVT SWING	2026-06-17T21:14:41.5560000-03:00	1	0		0	0	Forbidden Meditation	Combatant-009		Combatant-009	0
+0	EVT SETENC	2026-06-17T21:14:42.4920000-03:00	Combatant-015	Combatant-015
+0	EVT SWING	2026-06-17T21:14:42.4920000-03:00	4	0		5672	0	Eukrasian Prognosis II	Combatant-015		Combatant-015	6	potency	d	56.719999999999999	StatusEffects	s		CritEffects	s		CritRate	s	25.71	Job	s	Sge	overheal	s	5672
+0	EVT SETENC	2026-06-17T21:14:42.4920000-03:00	Combatant-015	Combatant-005
+0	EVT SWING	2026-06-17T21:14:42.4920000-03:00	4	0		5873	0	Eukrasian Prognosis II	Combatant-015		Combatant-005	6	potency	d	58.729999999999997	StatusEffects	s		CritEffects	s		CritRate	s	25.00	Job	s	Sge	overheal	s	5873
+0	EVT SETENC	2026-06-17T21:14:42.4920000-03:00	Combatant-015	Combatant-009
+0	EVT SWING	2026-06-17T21:14:42.4920000-03:00	4	1		9322	0	Eukrasian Prognosis II	Combatant-015		Combatant-009	6	potency	d	57.533611342785655	StatusEffects	s		CritEffects	s		CritRate	s	27.03	Job	s	Sge	overheal	s	9322
+0	EVT SETENC	2026-06-17T21:14:42.4920000-03:00	Combatant-015	Combatant-013
+0	EVT SWING	2026-06-17T21:14:42.4920000-03:00	4	0		5832	0	Eukrasian Prognosis II	Combatant-015		Combatant-013	6	potency	d	58.32	StatusEffects	s		CritEffects	s		CritRate	s	26.32	Job	s	Sge	overheal	s	5832
+0	EVT SETENC	2026-06-17T21:14:42.4920000-03:00	Combatant-015	Combatant-016
+0	EVT SWING	2026-06-17T21:14:42.4920000-03:00	4	0		5877	0	Eukrasian Prognosis II	Combatant-015		Combatant-016	6	potency	d	58.770000000000003	StatusEffects	s		CritEffects	s		CritRate	s	25.64	Job	s	Sge	overheal	s	5877
+0	EVT SETENC	2026-06-17T21:14:42.4920000-03:00	Combatant-015	Combatant-010
+0	EVT SWING	2026-06-17T21:14:42.4920000-03:00	4	0		6461	0	Eukrasian Prognosis II	Combatant-015		Combatant-010	6	potency	d	64.609999999999999	StatusEffects	s		CritEffects	s		CritRate	s	25.00	Job	s	Sge	overheal	s	0
+0	EVT SWING	2026-06-17T21:14:43.9630000-03:00	1	0		0	0	Eukrasia	Combatant-015		Combatant-015	0
+0	EVT SWING	2026-06-17T21:14:46.5920000-03:00	1	0		0	0	Starry Sky Motif	Combatant-005		Combatant-005	0
+0	EVT SWING	2026-06-17T21:14:47.4850000-03:00	1	0		0	0	Emboite	Combatant-017		Combatant-017	0
+0	EVT SWING	2026-06-17T21:14:48.4210000-03:00	1	0		0	0	Blasting Zone	Combatant-018		Unknown	0
+0	EVT SWING	2026-06-17T21:14:48.4210000-03:00	1	0		0	0	Blasting Zone	Combatant-018		Unknown	0
+0	EVT SWING	2026-06-17T21:14:48.4210000-03:00	1	0		0	0	Blasting Zone	Combatant-018		Unknown	0
+0	EVT SWING	2026-06-17T21:14:48.4640000-03:00	1	0		0	0	Jete	Combatant-017		Combatant-017	0
+0	EVT SETENC	2026-06-17T21:14:49.2240000-03:00	Combatant-018	Combatant-009
+0	EVT SWING	2026-06-17T21:14:49.2240000-03:00	2	0		89657	0	Sinbound Thunder III	Combatant-018	Magic (Lightning)	Combatant-009	9	potency	d	0	StatusEffects	s		CritRate	s	15.00	DHRate	s	5.00	Job	s		SourceId	s	40001C15	TargetId	s	1004C5BB	CritEffects	s		DHEffects	s	
+0	EVT SETENC	2026-06-17T21:14:49.2240000-03:00	Combatant-018	Combatant-015
+0	EVT SWING	2026-06-17T21:14:49.2240000-03:00	2	0		76899	0	Sinbound Thunder III	Combatant-018	Magic (Lightning)	Combatant-015	9	potency	d	0	StatusEffects	s		CritRate	s	15.00	DHRate	s	5.00	Job	s		SourceId	s	40001C14	TargetId	s	1004DC74	CritEffects	s		DHEffects	s	
+0	EVT SETENC	2026-06-17T21:14:49.2240000-03:00	Combatant-018	Combatant-016
+0	EVT SWING	2026-06-17T21:14:49.2240000-03:00	2	0		86780	0	Sinbound Thunder III	Combatant-018	Magic (Lightning)	Combatant-016	9	potency	d	0	StatusEffects	s		CritRate	s	15.00	DHRate	s	5.00	Job	s		SourceId	s	40001C17	TargetId	s	1002072C	CritEffects	s		DHEffects	s	
+0	EVT SETENC	2026-06-17T21:14:49.2240000-03:00	Combatant-018	Combatant-010
+0	EVT SWING	2026-06-17T21:14:49.2240000-03:00	2	0	Blocked	27566	0	Sinbound Thunder III	Combatant-018	Magic (Lightning)	Combatant-010	9	potency	d	0	StatusEffects	s		CritRate	s	15.00	DHRate	s	5.00	Job	s		SourceId	s	40001C16	TargetId	s	10050AB5	CritEffects	s		DHEffects	s	
+0	EVT SETENC	2026-06-17T21:14:49.2240000-03:00	Combatant-018	Combatant-005
+0	EVT SWING	2026-06-17T21:14:49.2240000-03:00	2	0		88586	0	Sinbound Thunder III	Combatant-018	Magic (Lightning)	Combatant-005	9	potency	d	0	StatusEffects	s		CritRate	s	15.00	DHRate	s	5.00	Job	s		SourceId	s	40001C19	TargetId	s	10029426	CritEffects	s		DHEffects	s	
+0	EVT SETENC	2026-06-17T21:14:49.2240000-03:00	Combatant-018	YOU
+0	EVT SWING	2026-06-17T21:14:49.2240000-03:00	2	0		60650	0	Sinbound Thunder III	Combatant-018	Magic (Lightning)	YOU	9	potency	d	0	StatusEffects	s		CritRate	s	15.00	DHRate	s	5.00	Job	s		SourceId	s	40001C18	TargetId	s	1003FD26	CritEffects	s		DHEffects	s	
+0	EVT SETENC	2026-06-17T21:14:49.2240000-03:00	Combatant-018	Combatant-013
+0	EVT SWING	2026-06-17T21:14:49.2240000-03:00	2	0		85388	0	Sinbound Thunder III	Combatant-018	Magic (Lightning)	Combatant-013	9	potency	d	0	StatusEffects	s		CritRate	s	15.00	DHRate	s	5.00	Job	s		SourceId	s	40001C1B	TargetId	s	1001FF13	CritEffects	s		DHEffects	s	
+0	EVT SETENC	2026-06-17T21:14:49.2240000-03:00	Combatant-018	Combatant-017
+0	EVT SWING	2026-06-17T21:14:49.2240000-03:00	2	0		104367	0	Sinbound Thunder III	Combatant-018	Magic (Lightning)	Combatant-017	9	potency	d	0	StatusEffects	s		CritRate	s	15.00	DHRate	s	5.00	Job	s		SourceId	s	40001C1A	TargetId	s	1004CB77	CritEffects	s		DHEffects	s	
+0	EVT SWING	2026-06-17T21:14:49.3570000-03:00	1	0		0	0	Blasting Zone	Combatant-018		Combatant-018	0
+0	EVT SWING	2026-06-17T21:14:49.3570000-03:00	1	0		0	0	Blasting Zone	Combatant-018		Combatant-018	0
+0	EVT SWING	2026-06-17T21:14:49.3570000-03:00	1	0		0	0	Blasting Zone	Combatant-018		Combatant-018	0
+0	EVT SETENC	2026-06-17T21:14:51.2300000-03:00	Combatant-015	Combatant-015
+0	EVT SWING	2026-06-17T21:14:51.2300000-03:00	4	0		5897	0	Eukrasian Prognosis II	Combatant-015		Combatant-015	6	potency	d	58.969999999999999	StatusEffects	s		CritEffects	s		CritRate	s	24.39	Job	s	Sge	overheal	s	0
+0	EVT SETENC	2026-06-17T21:14:51.2300000-03:00	Combatant-015	Combatant-013
+0	EVT SWING	2026-06-17T21:14:51.2300000-03:00	4	0		5820	0	Eukrasian Prognosis II	Combatant-015		Combatant-013	6	potency	d	58.200000000000003	StatusEffects	s		CritEffects	s		CritRate	s	23.81	Job	s	Sge	overheal	s	0
+0	EVT SETENC	2026-06-17T21:14:51.2300000-03:00	Combatant-015	Combatant-010
+0	EVT SWING	2026-06-17T21:14:51.2300000-03:00	4	0		6799	0	Eukrasian Prognosis II	Combatant-015		Combatant-010	6	potency	d	67.989999999999995	StatusEffects	s		CritEffects	s		CritRate	s	23.26	Job	s	Sge	overheal	s	0
+0	EVT SETENC	2026-06-17T21:14:51.2300000-03:00	Combatant-015	Combatant-005
+0	EVT SWING	2026-06-17T21:14:51.2300000-03:00	4	0		5731	0	Eukrasian Prognosis II	Combatant-015		Combatant-005	6	potency	d	57.310000000000002	StatusEffects	s		CritEffects	s		CritRate	s	22.73	Job	s	Sge	overheal	s	0
+0	EVT SETENC	2026-06-17T21:14:51.2300000-03:00	Combatant-015	YOU
+0	EVT SWING	2026-06-17T21:14:51.2300000-03:00	4	0		6591	0	Eukrasian Prognosis II	Combatant-015		YOU	6	potency	d	65.909999999999997	StatusEffects	s		CritEffects	s		CritRate	s	22.22	Job	s	Sge	overheal	s	0
+0	EVT SETENC	2026-06-17T21:14:51.8990000-03:00	Combatant-015	Combatant-015
+0	EVT SWING	2026-06-17T21:14:51.8990000-03:00	7	0	Power	700	0	Kerachole	Combatant-015		Combatant-015	0
+0	EVT SETENC	2026-06-17T21:14:52.5680000-03:00	Combatant-015	Combatant-015
+0	EVT SWING	2026-06-17T21:14:52.5680000-03:00	4	0		23813	0	Ixochole	Combatant-015		Combatant-015	6	potency	d	59.532499999999999	StatusEffects	s		CritEffects	s		CritRate	s	21.74	Job	s	Sge	overheal	s	0
+0	EVT SETENC	2026-06-17T21:14:52.5680000-03:00	Combatant-015	Combatant-015
+0	EVT SWING	2026-06-17T21:14:52.5680000-03:00	7	0	Power	700	0	Ixochole	Combatant-015		Combatant-015	0
+0	EVT SETENC	2026-06-17T21:14:52.5680000-03:00	Combatant-015	Combatant-013
+0	EVT SWING	2026-06-17T21:14:52.5680000-03:00	4	0		23378	0	Ixochole	Combatant-015		Combatant-013	6	potency	d	58.445	StatusEffects	s		CritEffects	s		CritRate	s	21.28	Job	s	Sge	overheal	s	0
+0	EVT SETENC	2026-06-17T21:14:52.5680000-03:00	Combatant-015	Combatant-005
+0	EVT SWING	2026-06-17T21:14:52.5680000-03:00	4	0		23476	0	Ixochole	Combatant-015		Combatant-005	6	potency	d	58.689999999999998	StatusEffects	s		CritEffects	s		CritRate	s	20.83	Job	s	Sge	overheal	s	0
+0	EVT SETENC	2026-06-17T21:14:52.5680000-03:00	Combatant-015	Combatant-010
+0	EVT SWING	2026-06-17T21:14:52.5680000-03:00	4	0		25927	0	Ixochole	Combatant-015		Combatant-010	6	potency	d	64.817499999999995	StatusEffects	s		CritEffects	s		CritRate	s	20.41	Job	s	Sge	overheal	s	0
+0	EVT SETENC	2026-06-17T21:14:52.5680000-03:00	Combatant-015	Combatant-017
+0	EVT SWING	2026-06-17T21:14:52.5680000-03:00	4	0		22893	0	Ixochole	Combatant-015		Combatant-017	6	potency	d	57.232500000000002	StatusEffects	s		CritEffects	s		CritRate	s	20.00	Job	s	Sge	overheal	s	0
+0	EVT SETENC	2026-06-17T21:14:52.5680000-03:00	Combatant-015	Combatant-016
+0	EVT SWING	2026-06-17T21:14:52.5680000-03:00	4	0		23304	0	Ixochole	Combatant-015		Combatant-016	6	potency	d	58.259999999999998	StatusEffects	s		CritEffects	s		CritRate	s	19.61	Job	s	Sge	overheal	s	0
+0	EVT SETENC	2026-06-17T21:14:52.5680000-03:00	Combatant-015	YOU
+0	EVT SWING	2026-06-17T21:14:52.5680000-03:00	4	0		27159	0	Ixochole	Combatant-015		YOU	6	potency	d	67.897499999999994	StatusEffects	s		CritEffects	s		CritRate	s	19.23	Job	s	Sge	overheal	s	0
+0	EVT SETENC	2026-06-17T21:14:52.5680000-03:00	Combatant-015	Combatant-009
+0	EVT SWING	2026-06-17T21:14:52.5680000-03:00	4	0		23796	0	Ixochole	Combatant-015		Combatant-009	6	potency	d	59.490000000000002	StatusEffects	s		CritEffects	s		CritRate	s	18.87	Job	s	Sge	overheal	s	0
+0	EVT SETENC	2026-06-17T21:14:52.6570000-03:00	Combatant-016	Combatant-016
+0	EVT SWING	2026-06-17T21:14:52.6570000-03:00	4	0		14732	0	Medica III	Combatant-016		Combatant-016	6	potency	d	58.927999999999997	StatusEffects	s		CritEffects	s		CritRate	s	28.95	Job	s	Whm	overheal	s	0
+0	EVT SETENC	2026-06-17T21:14:52.6570000-03:00	Combatant-016	YOU
+0	EVT SWING	2026-06-17T21:14:52.6570000-03:00	4	0		16961	0	Medica III	Combatant-016		YOU	6	potency	d	67.843999999999994	StatusEffects	s		CritEffects	s		CritRate	s	28.21	Job	s	Whm	overheal	s	0
+0	EVT SETENC	2026-06-17T21:14:52.6570000-03:00	Combatant-016	Combatant-017
+0	EVT SWING	2026-06-17T21:14:52.6570000-03:00	4	0		14204	0	Medica III	Combatant-016		Combatant-017	6	potency	d	56.816000000000003	StatusEffects	s		CritEffects	s		CritRate	s	27.50	Job	s	Whm	overheal	s	0
+0	EVT SETENC	2026-06-17T21:14:52.6570000-03:00	Combatant-016	Combatant-010
+0	EVT SWING	2026-06-17T21:14:52.6570000-03:00	4	0		16931	0	Medica III	Combatant-016		Combatant-010	6	potency	d	67.724000000000004	StatusEffects	s		CritEffects	s		CritRate	s	26.83	Job	s	Whm	overheal	s	0
+0	EVT SETENC	2026-06-17T21:14:52.6570000-03:00	Combatant-016	Combatant-009
+0	EVT SWING	2026-06-17T21:14:52.6570000-03:00	4	0		14091	0	Medica III	Combatant-016		Combatant-009	6	potency	d	56.363999999999997	StatusEffects	s		CritEffects	s		CritRate	s	26.19	Job	s	Whm	overheal	s	0
+0	EVT SETENC	2026-06-17T21:14:52.6570000-03:00	Combatant-016	Combatant-005
+0	EVT SWING	2026-06-17T21:14:52.6570000-03:00	4	0		14438	0	Medica III	Combatant-016		Combatant-005	6	potency	d	57.752000000000002	StatusEffects	s		CritEffects	s		CritRate	s	25.58	Job	s	Whm	overheal	s	0
+0	EVT SETENC	2026-06-17T21:14:52.6570000-03:00	Combatant-016	Combatant-015
+0	EVT SWING	2026-06-17T21:14:52.6570000-03:00	4	0		14421	0	Medica III	Combatant-016		Combatant-015	6	potency	d	57.683999999999997	StatusEffects	s		CritEffects	s		CritRate	s	25.00	Job	s	Whm	overheal	s	0
+0	EVT SETENC	2026-06-17T21:14:52.6570000-03:00	Combatant-016	Combatant-013
+0	EVT SWING	2026-06-17T21:14:52.6570000-03:00	4	0		14261	0	Medica III	Combatant-016		Combatant-013	6	potency	d	57.043999999999997	StatusEffects	s		CritEffects	s		CritRate	s	24.44	Job	s	Whm	overheal	s	0
+0	EVT SWING	2026-06-17T21:14:53.1910000-03:00	1	0		0	0	Eukrasia	Combatant-015		Combatant-015	0
+0	EVT SETENC	2026-06-17T21:14:53.2790000-03:00	Combatant-016	Combatant-016
+0	EVT SWING	2026-06-17T21:14:53.2790000-03:00	4	1		37245	0	Assize	Combatant-016		Combatant-016	6	potency	d	57.80263157894737	StatusEffects	s		CritEffects	s		CritRate	s	26.09	Job	s	Whm	overheal	s	0
+0	EVT SETENC	2026-06-17T21:14:53.2790000-03:00	Combatant-016	Combatant-016
+0	EVT SWING	2026-06-17T21:14:53.2790000-03:00	7	0	Power	500	0	Assize	Combatant-016		Combatant-016	0
+0	EVT SETENC	2026-06-17T21:14:53.2790000-03:00	Combatant-016	Combatant-017
+0	EVT SWING	2026-06-17T21:14:53.2790000-03:00	4	0		22622	0	Assize	Combatant-016		Combatant-017	6	potency	d	56.555	StatusEffects	s		CritEffects	s		CritRate	s	25.53	Job	s	Whm	overheal	s	0
+0	EVT SETENC	2026-06-17T21:14:53.2790000-03:00	Combatant-016	YOU
+0	EVT SWING	2026-06-17T21:14:53.2790000-03:00	4	0		26991	0	Assize	Combatant-016		YOU	6	potency	d	67.477500000000006	StatusEffects	s		CritEffects	s		CritRate	s	25.00	Job	s	Whm	overheal	s	0
+0	EVT SETENC	2026-06-17T21:14:53.2790000-03:00	Combatant-016	Combatant-009
+0	EVT SWING	2026-06-17T21:14:53.2790000-03:00	4	0		22587	0	Assize	Combatant-016		Combatant-009	6	potency	d	56.467500000000001	StatusEffects	s		CritEffects	s		CritRate	s	24.49	Job	s	Whm	overheal	s	0
+0	EVT SETENC	2026-06-17T21:14:53.2790000-03:00	Combatant-016	Combatant-010
+0	EVT SWING	2026-06-17T21:14:53.2790000-03:00	4	0		26254	0	Assize	Combatant-016		Combatant-010	6	potency	d	65.635000000000005	StatusEffects	s		CritEffects	s		CritRate	s	24.00	Job	s	Whm	overheal	s	0
+0	EVT SETENC	2026-06-17T21:14:53.2790000-03:00	Combatant-016	Combatant-005
+0	EVT SWING	2026-06-17T21:14:53.2790000-03:00	4	0		23458	0	Assize	Combatant-016		Combatant-005	6	potency	d	58.645000000000003	StatusEffects	s		CritEffects	s		CritRate	s	23.53	Job	s	Whm	overheal	s	0
+0	EVT SETENC	2026-06-17T21:14:53.2790000-03:00	Combatant-016	Combatant-015
+0	EVT SWING	2026-06-17T21:14:53.2790000-03:00	4	1		36546	0	Assize	Combatant-016		Combatant-015	6	potency	d	57.103124999999999	StatusEffects	s		CritEffects	s		CritRate	s	25.00	Job	s	Whm	overheal	s	0
+0	EVT SETENC	2026-06-17T21:14:53.2790000-03:00	Combatant-016	Combatant-013
+0	EVT SWING	2026-06-17T21:14:53.2790000-03:00	4	0		23053	0	Assize	Combatant-016		Combatant-013	6	potency	d	57.6325	StatusEffects	s		CritEffects	s		CritRate	s	24.53	Job	s	Whm	overheal	s	0
+0	EVT SWING	2026-06-17T21:14:54.9300000-03:00	1	0		0	0	Cyclonic Break	Combatant-018		Combatant-018	0
+0	EVT SETENC	2026-06-17T21:14:55.5540000-03:00	Combatant-018	Combatant-009
+0	EVT SWING	2026-06-17T21:14:55.5540000-03:00	2	0		72236	0	Cyclonic Break	Combatant-018	Slashing	Combatant-009	9	potency	d	0	StatusEffects	s		CritRate	s	15.00	DHRate	s	5.00	Job	s		SourceId	s	40001C15	TargetId	s	1004C5BB	CritEffects	s		DHEffects	s	
+0	EVT SETENC	2026-06-17T21:14:55.5540000-03:00	Combatant-018	Combatant-015
+0	EVT SWING	2026-06-17T21:14:55.5540000-03:00	2	0		65654	0	Cyclonic Break	Combatant-018	Slashing	Combatant-015	9	potency	d	0	StatusEffects	s		CritRate	s	15.00	DHRate	s	5.00	Job	s		SourceId	s	40001C14	TargetId	s	1004DC74	CritEffects	s		DHEffects	s	
+0	EVT SETENC	2026-06-17T21:14:55.5540000-03:00	Combatant-018	Combatant-016
+0	EVT SWING	2026-06-17T21:14:55.5540000-03:00	2	0		74829	0	Cyclonic Break	Combatant-018	Slashing	Combatant-016	9	potency	d	0	StatusEffects	s		CritRate	s	15.00	DHRate	s	5.00	Job	s		SourceId	s	40001C17	TargetId	s	1002072C	CritEffects	s		DHEffects	s	
+0	EVT SETENC	2026-06-17T21:14:55.5540000-03:00	Combatant-018	Combatant-010
+0	EVT SWING	2026-06-17T21:14:55.5540000-03:00	2	0	Blocked	6733	0	Cyclonic Break	Combatant-018	Slashing	Combatant-010	9	potency	d	0	StatusEffects	s		CritRate	s	15.00	DHRate	s	5.00	Job	s		SourceId	s	40001C16	TargetId	s	10050AB5	CritEffects	s		DHEffects	s	
+0	EVT SETENC	2026-06-17T21:14:55.5540000-03:00	Combatant-018	Combatant-005
+0	EVT SWING	2026-06-17T21:14:55.5540000-03:00	2	0	Parried	31520	0	Cyclonic Break	Combatant-018	Slashing	Combatant-005	9	potency	d	0	StatusEffects	s		CritRate	s	15.00	DHRate	s	5.00	Job	s		SourceId	s	40001C19	TargetId	s	10029426	CritEffects	s		DHEffects	s	
+0	EVT SETENC	2026-06-17T21:14:55.5540000-03:00	Combatant-018	YOU
+0	EVT SWING	2026-06-17T21:14:55.5540000-03:00	2	0		11902	0	Cyclonic Break	Combatant-018	Slashing	YOU	9	potency	d	0	StatusEffects	s		CritRate	s	15.00	DHRate	s	5.00	Job	s		SourceId	s	40001C18	TargetId	s	1003FD26	CritEffects	s		DHEffects	s	
+0	EVT SETENC	2026-06-17T21:14:55.5540000-03:00	Combatant-018	Combatant-013
+0	EVT SWING	2026-06-17T21:14:55.5540000-03:00	2	0		53037	0	Cyclonic Break	Combatant-018	Slashing	Combatant-013	9	potency	d	0	StatusEffects	s		CritRate	s	15.00	DHRate	s	5.00	Job	s		SourceId	s	40001C1B	TargetId	s	1001FF13	CritEffects	s		DHEffects	s	
+0	EVT SETENC	2026-06-17T21:14:55.5540000-03:00	Combatant-018	Combatant-017
+0	EVT SWING	2026-06-17T21:14:55.5540000-03:00	2	0	Parried	61029	0	Cyclonic Break	Combatant-018	Slashing	Combatant-017	9	potency	d	0	StatusEffects	s		CritRate	s	15.00	DHRate	s	5.00	Job	s		SourceId	s	40001C1A	TargetId	s	1004CB77	CritEffects	s		DHEffects	s	
+0	EVT SETENC	2026-06-17T21:14:55.9550000-03:00	Combatant-016	Combatant-016
+0	EVT SWING	2026-06-17T21:14:55.9550000-03:00	4	0		22901	0	Afflatus Rapture	Combatant-016		Combatant-016	6	potency	d	57.252499999999998	StatusEffects	s		CritEffects	s		CritRate	s	24.07	Job	s	Whm	overheal	s	22901
+0	EVT SETENC	2026-06-17T21:14:55.9550000-03:00	Combatant-016	Combatant-009
+0	EVT SWING	2026-06-17T21:14:55.9550000-03:00	4	1		36045	0	Afflatus Rapture	Combatant-016		Combatant-009	6	potency	d	56.160764872521248	StatusEffects	s		CritEffects	s		CritRate	s	25.45	Job	s	Whm	overheal	s	21980
+0	EVT SETENC	2026-06-17T21:14:55.9550000-03:00	Combatant-016	Combatant-017
+0	EVT SWING	2026-06-17T21:14:55.9550000-03:00	4	0		22477	0	Afflatus Rapture	Combatant-016		Combatant-017	6	potency	d	56.192500000000003	StatusEffects	s		CritEffects	s		CritRate	s	25.00	Job	s	Whm	overheal	s	0
+0	EVT SETENC	2026-06-17T21:14:55.9550000-03:00	Combatant-016	YOU
+0	EVT SWING	2026-06-17T21:14:55.9550000-03:00	4	0		26107	0	Afflatus Rapture	Combatant-016		YOU	6	potency	d	65.267499999999998	StatusEffects	s		CritEffects	s		CritRate	s	24.56	Job	s	Whm	overheal	s	0
+0	EVT SETENC	2026-06-17T21:14:55.9550000-03:00	Combatant-016	Combatant-015
+0	EVT SWING	2026-06-17T21:14:55.9550000-03:00	4	1		37192	0	Afflatus Rapture	Combatant-016		Combatant-015	6	potency	d	57.801071811361197	StatusEffects	s		CritEffects	s		CritRate	s	25.86	Job	s	Whm	overheal	s	37192
+0	EVT SETENC	2026-06-17T21:14:55.9550000-03:00	Combatant-016	Combatant-010
+0	EVT SWING	2026-06-17T21:14:55.9550000-03:00	4	0		26464	0	Afflatus Rapture	Combatant-016		Combatant-010	6	potency	d	66.159999999999997	StatusEffects	s		CritEffects	s		CritRate	s	25.42	Job	s	Whm	overheal	s	26464
+0	EVT SETENC	2026-06-17T21:14:55.9550000-03:00	Combatant-016	Combatant-005
+0	EVT SWING	2026-06-17T21:14:55.9550000-03:00	4	0		22967	0	Afflatus Rapture	Combatant-016		Combatant-005	6	potency	d	57.417499999999997	StatusEffects	s		CritEffects	s		CritRate	s	25.00	Job	s	Whm	overheal	s	10607
+0	EVT SETENC	2026-06-17T21:14:55.9550000-03:00	Combatant-016	Combatant-013
+0	EVT SWING	2026-06-17T21:14:55.9550000-03:00	4	1		36933	0	Afflatus Rapture	Combatant-016		Combatant-013	6	potency	d	57.267742755465171	StatusEffects	s		CritEffects	s		CritRate	s	26.23	Job	s	Whm	overheal	s	30804
+0	EVT SETENC	2026-06-17T21:14:56.5810000-03:00	Combatant-015	Combatant-015
+0	EVT SWING	2026-06-17T21:14:56.5810000-03:00	4	0		5663	0	Eukrasian Prognosis II	Combatant-015		Combatant-015	6	potency	d	56.630000000000003	StatusEffects	s		CritEffects	s		CritRate	s	18.52	Job	s	Sge	overheal	s	0
+0	EVT SETENC	2026-06-17T21:14:56.5810000-03:00	Combatant-015	Combatant-013
+0	EVT SWING	2026-06-17T21:14:56.5810000-03:00	4	1		9038	0	Eukrasian Prognosis II	Combatant-015		Combatant-013	6	potency	d	58.309677419354841	StatusEffects	s		CritEffects	s		CritRate	s	20.00	Job	s	Sge	overheal	s	0
+0	EVT SETENC	2026-06-17T21:14:56.5810000-03:00	Combatant-015	Combatant-010
+0	EVT SWING	2026-06-17T21:14:56.5810000-03:00	4	0		6768	0	Eukrasian Prognosis II	Combatant-015		Combatant-010	6	potency	d	67.680000000000007	StatusEffects	s		CritEffects	s		CritRate	s	19.64	Job	s	Sge	overheal	s	6768
+0	EVT SETENC	2026-06-17T21:14:56.5810000-03:00	Combatant-015	Combatant-009
+0	EVT SWING	2026-06-17T21:14:56.5810000-03:00	4	0		5760	0	Eukrasian Prognosis II	Combatant-015		Combatant-009	6	potency	d	57.600000000000001	StatusEffects	s		CritEffects	s		CritRate	s	19.30	Job	s	Sge	overheal	s	0
+0	EVT SETENC	2026-06-17T21:14:56.5810000-03:00	Combatant-015	Combatant-016
+0	EVT SWING	2026-06-17T21:14:56.5810000-03:00	4	0		5836	0	Eukrasian Prognosis II	Combatant-015		Combatant-016	6	potency	d	58.359999999999999	StatusEffects	s		CritEffects	s		CritRate	s	18.97	Job	s	Sge	overheal	s	0
+0	EVT SETENC	2026-06-17T21:14:56.5810000-03:00	Combatant-015	Combatant-005
+0	EVT SWING	2026-06-17T21:14:56.5810000-03:00	4	0		5875	0	Eukrasian Prognosis II	Combatant-015		Combatant-005	6	potency	d	58.75	StatusEffects	s		CritEffects	s		CritRate	s	18.64	Job	s	Sge	overheal	s	0
+0	EVT SETENC	2026-06-17T21:14:56.5810000-03:00	Combatant-015	YOU
+0	EVT SWING	2026-06-17T21:14:56.5810000-03:00	4	0		5649	0	Eukrasian Prognosis II	Combatant-015		YOU	6	potency	d	56.490000000000002	StatusEffects	s		CritEffects	s		CritRate	s	18.33	Job	s	Sge	overheal	s	0
+0	EVT SETENC	2026-06-17T21:14:56.5810000-03:00	Combatant-015	Combatant-017
+0	EVT SWING	2026-06-17T21:14:56.5810000-03:00	4	0		5867	0	Eukrasian Prognosis II	Combatant-015		Combatant-017	6	potency	d	58.670000000000002	StatusEffects	s		CritEffects	s		CritRate	s	18.03	Job	s	Sge	overheal	s	0
+0	EVT SWING	2026-06-17T21:14:57.6070000-03:00	1	0		0	0	Cyclonic Break	Combatant-018		Unknown	0
+0	EVT SWING	2026-06-17T21:14:57.6070000-03:00	1	0		0	0	Cyclonic Break	Combatant-018		Unknown	0
+0	EVT SWING	2026-06-17T21:14:57.6070000-03:00	1	0		0	0	Cyclonic Break	Combatant-018		Unknown	0
+0	EVT SWING	2026-06-17T21:14:57.6070000-03:00	1	0		0	0	Cyclonic Break	Combatant-018		Unknown	0
+0	EVT SWING	2026-06-17T21:14:57.6070000-03:00	1	0		0	0	Cyclonic Break	Combatant-018		Unknown	0
+0	EVT SWING	2026-06-17T21:14:57.6070000-03:00	1	0		0	0	Cyclonic Break	Combatant-018		Unknown	0
+0	EVT SWING	2026-06-17T21:14:57.6070000-03:00	1	0		0	0	Cyclonic Break	Combatant-018		Unknown	0
+81211	EVT ENDC	2026-07-04T22:50:37.8373800-03:00	1

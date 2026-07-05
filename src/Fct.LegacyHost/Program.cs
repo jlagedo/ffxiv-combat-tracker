@@ -69,6 +69,21 @@ namespace Fct.LegacyHost
                 }
             }
 
+            // Replay-satellite: play a committed FrameSession fixture up the bridge with NO plugin (the
+            // fixtures are already wire frames). Speaks the satellite handshake, then streams the frames —
+            // the full-fabric replay driver for the P2 harness (host-side gates need no game, no plugin).
+            //   --replay-frames <fixturePath> --bridge <pipe>
+            int rfi = Array.IndexOf(args, "--replay-frames");
+            if (rfi >= 0 && args.Length >= rfi + 2)
+            {
+                var framesPipe = ParseBridgeArg(args);
+                if (framesPipe != null)
+                {
+                    RunReplayFrames(args[rfi + 1], framesPipe);
+                    return;
+                }
+            }
+
             // Batch oracle over a whole log folder (months of logs), one plugin load:
             //   --mass-oracle <logFolder> <outFolder> [maxLinesPerFile]
             int mo = Array.IndexOf(args, "--mass-oracle");
@@ -196,6 +211,45 @@ namespace Fct.LegacyHost
             };
             timer.Start();
             Application.Run(pump);
+        }
+
+        // Replay-satellite (ISOLATION-PLAN P2 full-fabric driver): connect the bridge, complete the
+        // handshake, and stream a committed FrameSession fixture up the event pipe as raw wire frames.
+        // No plugin, no ACT facade, no message loop — a headless process that speaks the satellite
+        // protocol and plays recorded frames, so any host-side gate can run over the real pipe in CI
+        // without a game or the FFXIV_ACT_Plugin.
+        private static void RunReplayFrames(string fixturePath, string pipeName)
+        {
+            SatelliteLogging.Initialize();
+            _log = SatelliteLogging.Log;
+            _log.LogInformation(LogEvents.SatelliteBooting,
+                "Replay-frames: fixture={Fixture} pipe={Pipe}", fixturePath, pipeName);
+
+            ConnectBridge(pipeName);   // opens the event pipe (out) + sends READY
+            SendLine(SatelliteProtocol.PluginsEnd);   // empty roster — close the handshake
+
+            int sent = 0;
+            try
+            {
+                foreach (var line in File.ReadLines(fixturePath))
+                {
+                    if (string.IsNullOrEmpty(line) || line[0] == '#') continue;
+                    int tab = line.IndexOf('\t');
+                    if (tab <= 0) continue;
+                    SendLine(line.Substring(tab + 1));   // strip the offset prefix → the EVT wire frame
+                    sent++;
+                }
+            }
+            catch (Exception ex)
+            {
+                _log.LogError(LogEvents.SatelliteBooting, ex, "replay-frames failed after {Sent} frames", sent);
+            }
+            finally
+            {
+                _log.LogInformation(LogEvents.SatelliteBooting, "Replay-frames done: {Sent} frames", sent);
+                SatelliteLogging.Shutdown();
+                Environment.Exit(0);
+            }
         }
 
         // Boot the satellite with NO plugins loaded: a clean host ships nothing and boot-loads nothing.

@@ -13,6 +13,8 @@
   <ItemGroup>
     <ProjectReference Include="..\..\src\Fct.Engine\Fct.Engine.csproj" />
     <ProjectReference Include="..\..\src\Fct.Abstractions.Testing\Fct.Abstractions.Testing.csproj" />
+    <!-- The P2 frame-replay gate decodes committed FrameSession fixtures with the shared frame codec. -->
+    <ProjectReference Include="..\..\src\Fct.Bridge.Contracts\Fct.Bridge.Contracts.csproj" />
   </ItemGroup>
 
   <!--
@@ -25,6 +27,9 @@
     <Content Include="..\Fct.Compat.Act.Tests\fixtures\combat-slice*.oracle.tsv" Link="fixtures\%(Filename)%(Extension)" CopyToOutputDirectory="PreserveNewest" />
     <Content Include="..\Fct.Compat.Act.Tests\fixtures\combat-slice*.exportvars.tsv" Link="fixtures\%(Filename)%(Extension)" CopyToOutputDirectory="PreserveNewest" />
     <Content Include="..\Fct.Compat.Act.Tests\fixtures\combat-slice*.aggregate.tsv" Link="fixtures\%(Filename)%(Extension)" CopyToOutputDirectory="PreserveNewest" />
+    <!-- Committed frame-session fixtures (P2): the recorded bridged frame stream, replayed with NO
+         plugin to reproduce the recorded encounter totals through the host engine deterministically. -->
+    <Content Include="..\fixtures\frames\combat-slice*.frames.tsv" Link="fixtures\frames\%(Filename)%(Extension)" CopyToOutputDirectory="PreserveNewest" />
   </ItemGroup>
 
 </Project>

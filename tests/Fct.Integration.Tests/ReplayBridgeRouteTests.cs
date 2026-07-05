@@ -1,5 +1,3 @@
-using System.Diagnostics;
-using System.IO.Pipes;
 using Advanced_Combat_Tracker;
 using Fct.Abstractions;
 using Fct.Abstractions.Testing;
@@ -24,27 +22,14 @@ namespace Fct.Integration.Tests
         // reach the same sum.
         private const long YouDamageTotal = 2692084;
 
-        private static string? RepoRoot()
-        {
-            var dir = new DirectoryInfo(AppContext.BaseDirectory);
-            while (dir is not null)
-            {
-                if (File.Exists(Path.Combine(dir.FullName, "ffxiv-combat-tracker.slnx"))) return dir.FullName;
-                dir = dir.Parent;
-            }
-            return null;
-        }
-
         [SkippableFact]
         public void Host_engine_aggregates_bridged_replay_swings_to_the_satellite_total()
         {
-            var root = RepoRoot();
+            var root = ReplayBridgeHarness.RepoRoot();
             Skip.If(root is null, "repo root not found");
 
-            string config = AppContext.BaseDirectory.Contains($"{Path.DirectorySeparatorChar}Release{Path.DirectorySeparatorChar}")
-                ? "Release" : "Debug";
-            var exe = Path.Combine(root!, "src", "Fct.App", "bin", config, "net10.0-windows", "satellite", "Fct.LegacyHost.exe");
-            var slice = Path.Combine(root!, "tests", "Fct.Compat.Act.Tests", "fixtures", "combat-slice.log");
+            var exe = ReplayBridgeHarness.SatelliteExe(root!);
+            var slice = ReplayBridgeHarness.SliceLog(root!, "combat-slice");
             Skip.IfNot(File.Exists(exe), $"satellite not staged at {exe}");
             Skip.IfNot(File.Exists(slice), $"slice fixture missing at {slice}");
             Skip.IfNot(File.Exists(SatelliteRunFixture.FfxivPluginPath),
@@ -63,44 +48,10 @@ namespace Fct.Integration.Tests
                 if (you != null) youDamage += you.Damage;
             };
 
-            var pipeName = "fct-replaybridge-" + Guid.NewGuid().ToString("N");
-            using var server = new NamedPipeServerStream(
-                pipeName, PipeDirection.In, 1, PipeTransmissionMode.Byte, PipeOptions.Asynchronous);
-            var conn = server.WaitForConnectionAsync();
-
-            using var proc = Process.Start(new ProcessStartInfo
-            {
-                FileName = exe,
-                Arguments = $"--replay \"{slice}\" 100000 --bridge {pipeName}",
-                UseShellExecute = false,
-                WorkingDirectory = Path.GetDirectoryName(exe)!,
-            }) ?? throw new InvalidOperationException("failed to start satellite");
-
-            Assert.True(conn.Wait(TimeSpan.FromSeconds(20)), "satellite did not connect the bridge pipe");
-
-            // Drain the event pipe as fast as possible on a background thread so the satellite's forwarder
-            // ring never backs up (drop-oldest would corrupt the total). The satellite closes the pipe on
-            // exit, so ReadLine returns null and the drain completes.
-            var lines = new List<string>();
-            var drain = Task.Run(() =>
-            {
-                try
-                {
-                    using var reader = new StreamReader(server);
-                    string? line;
-                    while ((line = reader.ReadLine()) != null)
-                        lock (lines) lines.Add(line);
-                }
-                catch { /* satellite exited / pipe closed */ }
-            });
-
-            Assert.True(proc.WaitForExit(120_000), "satellite did not finish the replay in time");
-            drain.Wait(TimeSpan.FromSeconds(10));
-
-            // Fold the collected frames through the host engine, in wire order.
+            // Run the satellite over the slice and collect every bridged line, then fold the decoded
+            // frames through the host engine in wire order.
+            var captured = ReplayBridgeHarness.RunAndCollect(exe, slice);
             int frames = 0, swings = 0;
-            List<string> captured;
-            lock (lines) captured = new List<string>(lines);
             foreach (var line in captured)
             {
                 if (!line.StartsWith(GameEventFrame.Prefix, StringComparison.Ordinal)) continue; // READY/PLUGINS-END/LOG

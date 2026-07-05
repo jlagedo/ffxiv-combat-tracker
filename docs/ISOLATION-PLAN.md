@@ -138,17 +138,24 @@ input; divergence fails CI. ✅
 
 ### P2 — Frame-replay harness (the e2e foundation for every later phase)
 
-- [ ] `GameEventFrame` session recorder: an opt-in host-side sink that records the decoded
-      frame stream (with relative timing) to a file.
-- [ ] Committed, anonymized frame fixtures generated from `--replay` runs (a short mixed pull
-      and a full-party burst, matching the existing slice corpus).
-- [ ] Frame-replay driver, usable two ways: in-process (feeds the host bus directly, for
-      host-side tests) and as a **replay satellite** (a process that speaks the satellite
-      protocol and plays frames up the pipe, for full-fabric tests).
-- [ ] Gate: replaying a fixture reproduces its recorded encounter totals through the host
-      engine, deterministically, in CI with no plugin installed.
+- [x] `GameEventFrame` session recorder: an opt-in sink that records the decoded frame stream
+      (offset-from-start + wire) to a file. `Fct.Bridge.Contracts/FrameSessionRecorder` +
+      the `FrameSession` line codec (record/replay), reused by host, satellite, and tests.
+- [x] Committed, anonymized frame fixtures generated from `--replay` runs:
+      `tests/fixtures/frames/combat-slice{,2}.frames.tsv` (971 / 840 aggregation frames),
+      produced by the env-gated `Fct.Integration.Tests/FrameFixtureGenerator` from the
+      anonymized slice corpus.
+- [x] Frame-replay driver, usable two ways: **in-process** (decode fixture → host bus →
+      engine, `Fct.Engine.Tests/FrameReplayTests`) and as a **replay satellite** — the new
+      plugin-free `Fct.LegacyHost --replay-frames <fixture> --bridge <pipe>` mode that speaks
+      the satellite handshake and streams the wire frames up the pipe.
+- [x] Gate: replaying a fixture reproduces its recorded encounter totals through the host
+      engine, deterministically, with **no plugin installed** — in-process
+      (`FrameReplayTests`) and over the real pipe via the replay satellite
+      (`Fct.Integration.Tests/FrameReplaySatelliteTests`). YOU totals tied to the real-ACT
+      oracle aggregate baseline (three-way parity: oracle → wire-path → frame-replay).
 
-**Exit:** any consumer-side behavior can be exercised headlessly from a committed fixture.
+**Exit:** any consumer-side behavior can be exercised headlessly from a committed fixture. ✅
 
 ### P3 — Multi-satellite process fabric
 
