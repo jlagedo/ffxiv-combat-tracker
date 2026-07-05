@@ -24,20 +24,46 @@ namespace Advanced_Combat_Tracker
         public delegate void PlaySoundDelegate(string WavFilePath, int VolumePercent);
         public delegate void PlayTtsDelegate(string TtsString);
 
-        // Audio/TTS playback hooks. Audio triggers are out of scope, so these are no-op sinks —
-        // but they exist with ACT's exact delegate types so trigger plugins (e.g. Discord-Triggers)
-        // that read and override them load and route their combat events normally.
-        public PlaySoundDelegate PlaySoundMethod = (wav, vol) => { };
-        public PlayTtsDelegate PlayTtsMethod = tts => { };
+        // Audio/TTS playback hooks. These exist with ACT's exact delegate types so trigger plugins
+        // (Discord-Triggers, TTSYukkuri) that read and override them load and route normally. They must
+        // stay plain FIELDS — precompiled plugins read + restore them by ldfld/stfld (Discord-Triggers
+        // saves oldTTS then reassigns then restores). Initialized to a no-op SENTINEL (captured below):
+        // when a plugin replaces a slot, its reference differs from the sentinel, which is how the
+        // satellite detects the takeover to register a terminal host sink (TtsHijacked/SoundHijacked).
+        public PlaySoundDelegate PlaySoundMethod;
+        public PlayTtsDelegate PlayTtsMethod;
+        private readonly PlayTtsDelegate _ttsSentinel;
+        private readonly PlaySoundDelegate _soundSentinel;
 
-        // ACT's audio entry points. Callers (cactbot say/play_sound, Hojoring) invoke these
-        // methods, which route to the swappable delegate fields above. Discord-Triggers (and
-        // TTSYukkuri) install the real sink by swapping those fields, so anything calling these
-        // lands in the installed audio stack. We skip ACT's speech-correction/volume/caching
-        // bookkeeping; the no-op delegate defaults degrade to silence without a sink. Volume is
-        // fixed at 100 (ACT's PlaySound(string) default).
-        public void TTS(string SpeechText) => PlayTtsMethod?.Invoke(SpeechText);
-        public void PlaySound(string WavFilePath) => PlaySoundMethod?.Invoke(WavFilePath, 100);
+        // Host-routed service seam (P6): when the satellite installs a route, TTS/PlaySound marshal to
+        // the host audio fan-out over the bridge instead of invoking the local slots — every inter-plugin
+        // audio path crosses the host (routing invariant). The slots then serve only as the
+        // sink-registration signal a plugin toggles. Null in a dev-standalone run and in unit tests, where
+        // TTS/PlaySound route to the local slots as before (preserving the last-writer-wins behavior).
+        public static IHostServiceRoute ServiceRoute;
+
+        // ACT's audio entry points. Callers (cactbot say/play_sound, Hojoring) invoke these. With a host
+        // route installed they cross the bridge to the host's IAudioOutput; otherwise they hit the local
+        // delegate slots (silence with the sentinel default). Volume is fixed at 100 (ACT's default).
+        public void TTS(string SpeechText)
+        {
+            var route = ServiceRoute;
+            if (route != null) route.Speak(SpeechText, 100, 0, false);
+            else PlayTtsMethod?.Invoke(SpeechText);
+        }
+
+        public void PlaySound(string WavFilePath)
+        {
+            var route = ServiceRoute;
+            if (route != null) route.PlaySound(WavFilePath, 100);
+            else PlaySoundMethod?.Invoke(WavFilePath, 100);
+        }
+
+        // True once a plugin has replaced a slot with its own delegate (the ldfld/stfld hijack). The
+        // satellite polls these to register/unregister a terminal host sink for this satellite; the
+        // fields must stay plain fields, so the takeover is detected by reference, not intercepted.
+        public bool TtsHijacked => PlayTtsMethod != null && !ReferenceEquals(PlayTtsMethod, _ttsSentinel);
+        public bool SoundHijacked => PlaySoundMethod != null && !ReferenceEquals(PlaySoundMethod, _soundSentinel);
 
         // ACT exposes this as a public delegate FIELD (plugins assign their own parser).
         public DateTimeLogParser GetDateTimeFromLog;
@@ -57,6 +83,14 @@ namespace Advanced_Combat_Tracker
 
         public FormActMain()
         {
+            // Capture the no-op audio slots as sentinels so a plugin's takeover is detectable by reference
+            // (see TtsHijacked/SoundHijacked). Kept as fields because precompiled plugins bind them via
+            // ldfld/stfld.
+            _ttsSentinel = tts => { };
+            _soundSentinel = (wav, vol) => { };
+            PlayTtsMethod = _ttsSentinel;
+            PlaySoundMethod = _soundSentinel;
+
             // Off-screen + fully transparent + non-activating: invisible to the user, but a genuinely
             // shown window so Control.Visible is true. FFXIV_ACT_Plugin's ScanMemory and LogOutput
             // threads park on ACTWrapper.IsMainFormVisible() (which reads this form's Visible) before

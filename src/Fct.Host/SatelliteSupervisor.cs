@@ -66,6 +66,9 @@ namespace Fct.Host
         private readonly IGameSession? _session;   // downstream fan-out source (P4)
         private readonly INotificationHub? _notifications;
         private readonly ISatelliteNotificationText? _texts;
+        private readonly IAudioOutput? _audio;        // host-routed services shared across satellites (P6)
+        private readonly IPluginRegistry? _registry;
+        private readonly IRawLogLineEmitter? _rawLog;
         private readonly RestartPolicy _policy;
         private readonly Func<DateTimeOffset> _now;
         private readonly Func<TimeSpan, CancellationToken, Task> _delay;
@@ -82,7 +85,10 @@ namespace Fct.Host
             RestartPolicy? policy = null,
             Func<DateTimeOffset>? now = null,
             Func<TimeSpan, CancellationToken, Task>? delay = null,
-            IGameSession? session = null)
+            IGameSession? session = null,
+            IAudioOutput? audio = null,
+            IPluginRegistry? registry = null,
+            IRawLogLineEmitter? rawLog = null)
         {
             _loggerFactory = loggerFactory ?? throw new ArgumentNullException(nameof(loggerFactory));
             _log = loggerFactory.CreateLogger("Fct.Satellite.Supervisor");
@@ -90,6 +96,9 @@ namespace Fct.Host
             _session = session;
             _notifications = notifications;
             _texts = texts;
+            _audio = audio;
+            _registry = registry;
+            _rawLog = rawLog;
             _policy = policy ?? new RestartPolicy();
             _now = now ?? (() => DateTimeOffset.UtcNow);
             _delay = delay ?? ((d, ct) => Task.Delay(d, ct));
@@ -117,7 +126,8 @@ namespace Fct.Host
 
         private async Task StartOneAsync(SupervisedSatellite sat, bool isRestart, CancellationToken ct)
         {
-            var host = new SatelliteHost(_loggerFactory, _sink, _notifications, _texts, sat.Id, _session);
+            var host = new SatelliteHost(_loggerFactory, _sink, _notifications, _texts, sat.Id, _session,
+                extraArgs: "", audio: _audio, registry: _registry, rawLog: _rawLog);
             host.ProcessExited += code => OnExited(sat, code);
             sat.Host = host;
             sat.Set(isRestart ? SatelliteState.Restarting : SatelliteState.Starting);

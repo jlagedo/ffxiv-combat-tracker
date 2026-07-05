@@ -77,14 +77,28 @@ public sealed class SatelliteHost : Fct.Host.Plugins.ISatellitePluginChannel
 
     private readonly string _extraArgs;         // extra launch args (test seam: e.g. the --sink mode)
 
+    // Host-routed services (P6) — the one shared singletons every satellite fans through. Audio: a
+    // satellite's producer calls fan to registered sinks; its sink registration installs a terminal proxy
+    // (below). Registry/rawLog carry the named-callback and custom-log-line paths (later P6 slices).
+    private readonly IAudioOutput? _audio;
+    private readonly IPluginRegistry? _registry;
+    private readonly IRawLogLineEmitter? _rawLog;
+    private readonly object _sinkLock = new();
+    private IDisposable? _audioSink;            // this satellite's terminal audio sink proxy (P6)
+    private bool _sinkTts, _sinkSound;          // which slots its plugin has taken over
+
     internal SatelliteHost(ILoggerFactory loggerFactory, IGameEventSink sink,
         INotificationHub? notifications = null, ISatelliteNotificationText? texts = null,
-        string satelliteId = "ffxiv", IGameSession? session = null, string extraArgs = "")
+        string satelliteId = "ffxiv", IGameSession? session = null, string extraArgs = "",
+        IAudioOutput? audio = null, IPluginRegistry? registry = null, IRawLogLineEmitter? rawLog = null)
     {
         _loggerFactory = loggerFactory;
         _satelliteId = string.IsNullOrWhiteSpace(satelliteId) ? "ffxiv" : satelliteId;
         _session = session;
         _extraArgs = extraArgs ?? "";
+        _audio = audio;
+        _registry = registry;
+        _rawLog = rawLog;
         _log = loggerFactory.CreateLogger<SatelliteHost>();
         // Forwarded records land under a per-satellite category so N satellites are attributable in the
         // host log (Fct.Satellite.<id>); the single-satellite path keeps Fct.Satellite.ffxiv.
@@ -150,6 +164,9 @@ public sealed class SatelliteHost : Fct.Host.Plugins.ISatellitePluginChannel
                 var code = SafeExitCode(Process);
                 _log.LogWarning(LogEvents.SatelliteExited, "Satellite '{Id}' process {Pid} exited with code {ExitCode}",
                     _satelliteId, SafePid(Process), code);
+                // Release host-side service registrations for a crashed satellite so its terminal audio
+                // sink stops swallowing peers' audio (a restart re-registers). Safe for a clean exit too.
+                DisposeServiceRegistrations();
                 if (!_shuttingDown)
                 {
                     _notifications?.Publish(NotificationSeverity.Warning, _text.SourceClassicEngine,
@@ -232,6 +249,10 @@ public sealed class SatelliteHost : Fct.Host.Plugins.ISatellitePluginChannel
                 else if (line.StartsWith(SatelliteProtocol.SubscribePrefix, StringComparison.Ordinal))
                 {
                     HandleSubscribe(line);
+                }
+                else if (TryHandleServiceUpstream(line))
+                {
+                    // A host-routed service command (audio produce / sink registration) — P6.
                 }
             }
         }
@@ -362,6 +383,67 @@ public sealed class SatelliteHost : Fct.Host.Plugins.ISatellitePluginChannel
         }
     }
 
+    // Host-routed service commands from this satellite over the event pipe (P6). Point-to-point RPC that
+    // must NOT touch the game-event bus: audio a plugin produced fans to the host's shared IAudioOutput
+    // (reaching any peer satellite's registered sink); a slot takeover registers/releases this satellite's
+    // terminal sink proxy. Returns false for any non-service line so the caller falls through.
+    private bool TryHandleServiceUpstream(string line)
+    {
+        if (SatelliteProtocol.TryParseRegisterSink(line, out var regCaps)) { UpdateAudioSink(regCaps, register: true); return true; }
+        if (SatelliteProtocol.TryParseUnregisterSink(line, out var unregCaps)) { UpdateAudioSink(unregCaps, register: false); return true; }
+        if (SatelliteProtocol.TryParseSpeak(line, out var text, out var vol, out var ch, out var sync))
+        {
+            _audio?.Speak(text, new AudioOptions(vol) { Channel = (AudioChannel)ch, Synchronous = sync });
+            return true;
+        }
+        if (SatelliteProtocol.TryParsePlaySound(line, out var path, out var pvol))
+        {
+            _audio?.Play(path, pvol);
+            return true;
+        }
+        return false;
+    }
+
+    // Register or release this satellite's terminal audio-sink proxy (P6). One proxy per satellite carries
+    // both capabilities, re-registered whenever the caps change, so the single terminal registration never
+    // mis-orders against a second same-priority sink. On the host's shared IAudioOutput, priority 10 +
+    // terminal reproduces ACT's route-instead-of (G3) across the bridge: a producer in a peer satellite
+    // fans here and is relayed down to this satellite's plugin.
+    private void UpdateAudioSink(string caps, bool register)
+    {
+        if (_audio is null)
+        {
+            _log.LogWarning(LogEvents.BridgeFrameMalformed, "Audio sink registration from '{Id}' ignored: no audio output wired", _satelliteId);
+            return;
+        }
+        bool tts = caps == "tts" || caps == "both";
+        bool sound = caps == "sound" || caps == "both";
+        lock (_sinkLock)
+        {
+            if (tts) _sinkTts = register;
+            if (sound) _sinkSound = register;
+            _audioSink?.Dispose();
+            _audioSink = null;
+            if (_sinkTts || _sinkSound)
+                _audioSink = _audio.RegisterSink(new SatelliteAudioSinkProxy(_sinkTts, _sinkSound, SendCommand), priority: 10, terminal: true);
+        }
+        _log.LogInformation(LogEvents.BridgeHandshake,
+            "Satellite '{Id}' audio sink now tts={Tts} sound={Sound}", _satelliteId, _sinkTts, _sinkSound);
+    }
+
+    // Release this satellite's host-side service registrations (P6). Called on graceful shutdown AND on an
+    // unexpected process exit, so a dead satellite's terminal sink never keeps swallowing audio meant for
+    // live peers (a fresh SatelliteHost re-registers on the restarted satellite's REGISTERSINK).
+    private void DisposeServiceRegistrations()
+    {
+        lock (_sinkLock)
+        {
+            _audioSink?.Dispose();
+            _audioSink = null;
+            _sinkTts = _sinkSound = false;
+        }
+    }
+
     // Write one downstream frame to the command pipe (quiet — the high-rate fan-out must not log per frame).
     private void SendDownstream(string? wire)
     {
@@ -411,6 +493,8 @@ public sealed class SatelliteHost : Fct.Host.Plugins.ISatellitePluginChannel
                 }
                 else if (line.StartsWith(SatelliteProtocol.SubscribePrefix, StringComparison.Ordinal))
                     HandleSubscribe(line);
+                else if (TryHandleServiceUpstream(line))
+                    continue;
                 else
                     _log.LogDebug(LogEvents.BridgeFrameMalformed, "Unrecognized bridge frame after handshake: {Frame}", line);
             }
@@ -436,6 +520,7 @@ public sealed class SatelliteHost : Fct.Host.Plugins.ISatellitePluginChannel
     {
         _shuttingDown = true;
         lock (_egressLock) { _egress?.Dispose(); _egress = null; }
+        DisposeServiceRegistrations();
         var process = Process;
         if (process is null || _shutdownEvent is null) return;
         try { if (process.HasExited) return; } catch { return; }

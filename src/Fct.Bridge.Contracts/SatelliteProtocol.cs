@@ -26,8 +26,9 @@ public static class SatelliteProtocol
 {
     // Wire-protocol version (distinct from the CLR runtime version in the READY `clr` field). v2 adds
     // the satellite identity + hosted package to the handshake so the host can attribute N concurrent
-    // satellites. Bumped whenever the frame grammar changes; both ends live in this one file.
-    public const int ProtocolVersion = 2;
+    // satellites; v3 adds the host-routed service commands (audio produce/sink, P6). Bumped whenever the
+    // frame grammar changes; both ends live in this one file.
+    public const int ProtocolVersion = 3;
 
     public const string ReadyPrefix = "READY";
     public const string HwndPrefix = "HWND ";
@@ -42,6 +43,17 @@ public static class SatelliteProtocol
     // Satellite -> host: the downstream stream set this satellite's facade needs (P4). The host fans
     // only these streams down to it. Comma-separated canonical tokens (see the Stream* constants).
     public const string SubscribePrefix = "SUBSCRIBE ";
+
+    // Host-routed service commands (P6). These are point-to-point RPC, NOT game events — they carry the
+    // facade's audio/sink/callback traffic over the control channels (never the re-sequenced game-event
+    // bus). SPEAK/PLAYSND flow BOTH ways with one codec: satellite->host is a producer request the host
+    // fans to registered sinks; host->satellite is the host relaying a produced call down to a satellite
+    // whose plugin registered a terminal sink. REGISTERSINK/UNREGISTERSINK are satellite->host only.
+    // Free-text payloads (TTS text, file paths) are base64(UTF-8) so '|'/tab/newline cross losslessly.
+    public const string SpeakPrefix = "SPEAK ";              // <vol>|<channel>|<sync 0/1>|<b64 text>
+    public const string PlaySoundPrefix = "PLAYSND ";        // <vol>|<b64 filePath>
+    public const string RegisterSinkPrefix = "REGISTERSINK ";    // <tts|sound|both>
+    public const string UnregisterSinkPrefix = "UNREGISTERSINK "; // <tts|sound|both>
 
     // Canonical downstream stream tokens. The host maps them to concrete event types; unknown tokens
     // are ignored. Kept as protocol constants so both ends name the streams identically.
@@ -207,6 +219,74 @@ public static class SatelliteProtocol
         key = parts[0].Trim();
         ok = parts.Length > 1 && parts[1].Trim() == "1";
         return key.Length != 0;
+    }
+
+    // ---- host-routed service commands (P6): audio produce + sink registration ----
+
+    /// <summary>Format "SPEAK &lt;vol&gt;|&lt;channel&gt;|&lt;sync&gt;|&lt;b64 text&gt;" — a TTS request (either direction).</summary>
+    public static string FormatSpeak(string text, int volume, int channel, bool synchronous)
+        => SpeakPrefix + $"{volume}|{channel}|{(synchronous ? 1 : 0)}|{B64(text)}";
+
+    public static bool TryParseSpeak(string? line, out string text, out int volume, out int channel, out bool synchronous)
+    {
+        text = ""; volume = 100; channel = 0; synchronous = false;
+        if (line == null || !line.StartsWith(SpeakPrefix, StringComparison.Ordinal)) return false;
+        var parts = line.Substring(SpeakPrefix.Length).Split(new[] { '|' }, 4);
+        if (parts.Length < 4) return false;
+        int.TryParse(parts[0], NumberStyles.Integer, CultureInfo.InvariantCulture, out volume);
+        int.TryParse(parts[1], NumberStyles.Integer, CultureInfo.InvariantCulture, out channel);
+        synchronous = parts[2].Trim() == "1";
+        text = UnB64(parts[3]);
+        return true;
+    }
+
+    /// <summary>Format "PLAYSND &lt;vol&gt;|&lt;b64 filePath&gt;" — a sound-file request (either direction).</summary>
+    public static string FormatPlaySound(string filePath, int volume)
+        => PlaySoundPrefix + $"{volume}|{B64(filePath)}";
+
+    public static bool TryParsePlaySound(string? line, out string filePath, out int volume)
+    {
+        filePath = ""; volume = 100;
+        if (line == null || !line.StartsWith(PlaySoundPrefix, StringComparison.Ordinal)) return false;
+        var parts = line.Substring(PlaySoundPrefix.Length).Split(new[] { '|' }, 2);
+        if (parts.Length < 2) return false;
+        int.TryParse(parts[0], NumberStyles.Integer, CultureInfo.InvariantCulture, out volume);
+        filePath = UnB64(parts[1]);
+        return true;
+    }
+
+    /// <summary>Format "REGISTERSINK &lt;caps&gt;" (caps ∈ tts|sound|both) — the satellite's plugin took a slot.</summary>
+    public static string FormatRegisterSink(string caps) => RegisterSinkPrefix + Token(caps);
+
+    public static bool TryParseRegisterSink(string? line, out string caps)
+    {
+        caps = "";
+        if (line == null || !line.StartsWith(RegisterSinkPrefix, StringComparison.Ordinal)) return false;
+        caps = line.Substring(RegisterSinkPrefix.Length).Trim();
+        return caps.Length != 0;
+    }
+
+    /// <summary>Format "UNREGISTERSINK &lt;caps&gt;" — the satellite's plugin released a slot.</summary>
+    public static string FormatUnregisterSink(string caps) => UnregisterSinkPrefix + Token(caps);
+
+    public static bool TryParseUnregisterSink(string? line, out string caps)
+    {
+        caps = "";
+        if (line == null || !line.StartsWith(UnregisterSinkPrefix, StringComparison.Ordinal)) return false;
+        caps = line.Substring(UnregisterSinkPrefix.Length).Trim();
+        return caps.Length != 0;
+    }
+
+    // Loss-free field encoding for free text (TTS strings, file paths, log lines, callback args): base64
+    // over UTF-8, so '|', tab, and newline never split a command or the outer line. Empty in/empty out.
+    private static string B64(string? value)
+        => string.IsNullOrEmpty(value) ? "" : Convert.ToBase64String(System.Text.Encoding.UTF8.GetBytes(value));
+
+    private static string UnB64(string? value)
+    {
+        if (string.IsNullOrEmpty(value)) return "";
+        try { return System.Text.Encoding.UTF8.GetString(Convert.FromBase64String(value)); }
+        catch { return ""; }
     }
 
     private static string San(string? value) => (value ?? "").Replace('|', '/');

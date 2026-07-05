@@ -69,5 +69,53 @@ namespace Fct.App.Tests
         [InlineData(null)]
         public void TryParsePlugin_rejects_invalid_lines(string? line)
             => Assert.False(SatelliteProtocol.TryParsePlugin(line, out _));
+
+        // --- P6 host-routed service commands ---
+
+        [Theory]
+        [InlineData("say the pull|now, at 5%\ttab", 80, 2, true)]   // '|', tab, comma survive base64
+        [InlineData("plain text", 100, 0, false)]
+        [InlineData("", 100, 1, false)]
+        public void Speak_round_trips(string text, int volume, int channel, bool sync)
+        {
+            var line = SatelliteProtocol.FormatSpeak(text, volume, channel, sync);
+            Assert.DoesNotContain('\n', line);
+            Assert.True(SatelliteProtocol.TryParseSpeak(line, out var t, out var v, out var ch, out var s));
+            Assert.Equal(text, t);
+            Assert.Equal(volume, v);
+            Assert.Equal(channel, ch);
+            Assert.Equal(sync, s);
+        }
+
+        [Theory]
+        [InlineData(@"C:\sounds\ping|alert.wav", 55)]
+        [InlineData("relative/path.wav", 100)]
+        public void PlaySound_round_trips(string path, int volume)
+        {
+            var line = SatelliteProtocol.FormatPlaySound(path, volume);
+            Assert.True(SatelliteProtocol.TryParsePlaySound(line, out var p, out var v));
+            Assert.Equal(path, p);
+            Assert.Equal(volume, v);
+        }
+
+        [Theory]
+        [InlineData("tts")]
+        [InlineData("sound")]
+        [InlineData("both")]
+        public void RegisterSink_round_trips(string caps)
+        {
+            Assert.True(SatelliteProtocol.TryParseRegisterSink(SatelliteProtocol.FormatRegisterSink(caps), out var c));
+            Assert.Equal(caps, c);
+            Assert.True(SatelliteProtocol.TryParseUnregisterSink(SatelliteProtocol.FormatUnregisterSink(caps), out var u));
+            Assert.Equal(caps, u);
+        }
+
+        [Theory]
+        [InlineData("PLAYSND 55|zzz")]   // a PlaySound line is not a Speak/RegisterSink line
+        [InlineData("REGISTERSINK tts")]
+        [InlineData("SUBSCRIBE swings")]
+        [InlineData(null)]
+        public void Speak_parser_rejects_foreign_lines(string? line)
+            => Assert.False(SatelliteProtocol.TryParseSpeak(line, out _, out _, out _, out _));
     }
 }

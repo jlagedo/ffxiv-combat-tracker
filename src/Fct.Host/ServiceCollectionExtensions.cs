@@ -31,10 +31,14 @@ public static class ServiceCollectionExtensions
         services.AddSingleton<PluginInstaller>();
 
         // The satellite decodes live game-event frames onto the bus (piece C) and surfaces notable
-        // records as notifications.
+        // records as notifications. It also carries the host-routed service pipes (P6): audio produced in
+        // the satellite fans to the shared IAudioOutput, and a slot takeover registers a terminal sink.
         services.AddSingleton<SatelliteHost>(sp => new SatelliteHost(
             sp.GetRequiredService<ILoggerFactory>(), sp.GetRequiredService<IGameEventSink>(),
-            sp.GetRequiredService<INotificationHub>(), sp.GetService<ISatelliteNotificationText>()));
+            sp.GetRequiredService<INotificationHub>(), sp.GetService<ISatelliteNotificationText>(),
+            audio: sp.GetService<IAudioOutput>(),
+            registry: sp.GetService<IPluginRegistry>(),
+            rawLog: sp.GetService<IRawLogLineEmitter>()));
 
         // Gracefully de-init the satellite's plugins on host shutdown (persists their state).
         services.AddHostedService<SatelliteLifetime>();
@@ -49,6 +53,9 @@ public static class ServiceCollectionExtensions
         services.AddSingleton<RegistryService>();
         services.AddSingleton<IPluginRegistry>(sp => sp.GetRequiredService<RegistryService>());
         services.AddSingleton<IAudioOutput, AudioService>();
+        // The capability-gated custom-log-line write-back hatch (G4) — also the host end of the P6
+        // satellite log-line write-back, folded into a bus RawLogLine.
+        services.AddSingleton<IRawLogLineEmitter, RawLogLineEmitter>();
         services.AddSingleton<IClock, SystemClock>();
 
         // The modern encounter engine: the single source of truth for encounter calculations. It runs

@@ -122,6 +122,36 @@ namespace Fct.LegacyHost
                 }
             }
 
+            // Audio producer driver (ISOLATION-PLAN P6): connect, install the host route, and drive the ACT
+            // facade's TTS/PlaySound so the produced call marshals up the bridge to the host's IAudioOutput
+            // (which fans it to whichever peer satellite registered a sink). No plugin, no message loop.
+            //   --audio-produce [--tts <text>] [--wav <path>] --bridge <pipe>
+            int api = Array.IndexOf(args, "--audio-produce");
+            if (api >= 0)
+            {
+                var apPipe = ParseBridgeArg(args);
+                if (apPipe != null)
+                {
+                    RunAudioProduce(ParseArgValue(args, "--tts"), ParseArgValue(args, "--wav"), apPipe);
+                    return;
+                }
+            }
+
+            // Audio sink driver (ISOLATION-PLAN P6): connect, hijack the ACT PlayTts/PlaySound slots with a
+            // recording delegate (exactly as Discord-Triggers does) so the poll registers a terminal host
+            // sink, and record every audio call the host relays down the command pipe.
+            //   --audio-sink <recordPath> --bridge <pipe>
+            int asi = Array.IndexOf(args, "--audio-sink");
+            if (asi >= 0 && args.Length >= asi + 2)
+            {
+                var asPipe = ParseBridgeArg(args);
+                if (asPipe != null)
+                {
+                    RunAudioSink(args[asi + 1], asPipe);
+                    return;
+                }
+            }
+
             // Batch oracle over a whole log folder (months of logs), one plugin load:
             //   --mass-oracle <logFolder> <outFolder> [maxLinesPerFile]
             int mo = Array.IndexOf(args, "--mass-oracle");
@@ -180,6 +210,10 @@ namespace Fct.LegacyHost
             _log.LogDebug(LogEvents.FacadeCreated, "ACT facade created");
 
             _standalone = pipeName == null;
+
+            // Bridged: poll the ACT audio slots for a plugin takeover and announce it to the host (P6), so
+            // audio produced in a peer satellite routes to this satellite's registered sink.
+            if (!_standalone) StartAudioSinkPoll();
 
             // Load plugins once the message loop is running (some plugins poll via timers).
             ScheduleOnce(250, Boot);
@@ -942,6 +976,10 @@ namespace Fct.LegacyHost
                     _satelliteId, _package));
                 // The pipe is up: start forwarding log records to the host's pipeline.
                 BridgeLogSink.Sender = SendLine;
+                // Route the facade's host-routed service calls (audio; callbacks in a later slice) up the
+                // bridge (P6). Bridged only — a standalone run leaves ServiceRoute null so TTS/PlaySound
+                // hit the local delegate slots.
+                FormActMain.ServiceRoute = new BridgeServiceRoute();
                 // Wait on the host's cross-process graceful-shutdown signal (best effort).
                 StartShutdownWaiter(pipeName + "-shutdown");
                 _log.LogInformation(LogEvents.SatelliteBridgeConnected, "Bridge connected on {Pipe}", pipeName);
@@ -1036,6 +1074,24 @@ namespace Fct.LegacyHost
                     SendLine(SatelliteProtocol.FormatUnloaded(unloadKey, ok));
                 });
             }
+            // Host-relayed audio (P6): this satellite's plugin registered a terminal sink, so the host fans
+            // a peer's produced call down here. Invoke the local delegate off the command-reader thread (a
+            // synchronous TTS engine must not stall the pipe, which also carries the downstream firehose).
+            else if (SatelliteProtocol.TryParseSpeak(line, out var speakText, out _, out _, out _))
+            {
+                _log.LogDebug(LogEvents.SatelliteBooting, "[Audio] relayed TTS received");
+                var tts = ActGlobals.oFormActMain?.PlayTtsMethod;
+                if (tts != null)
+                    System.Threading.ThreadPool.QueueUserWorkItem(_ =>
+                    { try { tts(speakText); } catch (Exception ex) { _log.LogError(LogEvents.SatelliteBooting, ex, "Relayed TTS sink threw"); } });
+            }
+            else if (SatelliteProtocol.TryParsePlaySound(line, out var sndPath, out var sndVol))
+            {
+                var snd = ActGlobals.oFormActMain?.PlaySoundMethod;
+                if (snd != null)
+                    System.Threading.ThreadPool.QueueUserWorkItem(_ =>
+                    { try { snd(sndPath, sndVol); } catch (Exception ex) { _log.LogError(LogEvents.SatelliteBooting, ex, "Relayed sound sink threw"); } });
+            }
         }
 
         // Run an action on the satellite's WinForms UI thread (where plugins were Init'd).
@@ -1118,6 +1174,162 @@ namespace Fct.LegacyHost
                 _log.LogError(LogEvents.PluginDeInit, ex, "Shutdown dispatch failed");
                 Application.Exit();
             }
+        }
+
+        // Audio producer driver (ISOLATION-PLAN P6): stand up the ACT facade with the host route installed,
+        // connect the bridge, and drive TTS/PlaySound so the produced call marshals up the pipe. The host
+        // fans it to whichever peer satellite registered a sink; this process then exits.
+        private static void RunAudioProduce(string tts, string wav, string pipeName)
+        {
+            SatelliteLogging.Initialize(_satelliteId);
+            _log = SatelliteLogging.Log;
+            FacadeHost.Log = SatelliteLogging.WriteLegacy;
+            _log.LogInformation(LogEvents.SatelliteBooting, "Audio-produce: tts={Tts} wav={Wav} pipe={Pipe}", tts, wav, pipeName);
+
+            Application.EnableVisualStyles();
+            Application.SetCompatibleTextRenderingDefault(false);
+            FacadeHost.CreateAct();
+            var act = ActGlobals.oFormActMain;
+
+            try
+            {
+                _bridge = new NamedPipeClientStream(".", pipeName, PipeDirection.Out);
+                _bridge.Connect(5000);
+                _writer = new StreamWriter(_bridge) { AutoFlush = true };
+                SendLine(SatelliteProtocol.FormatReady(
+                    System.Diagnostics.Process.GetCurrentProcess().Id,
+                    Environment.Is64BitProcess, Environment.Version.ToString(), _satelliteId, _package));
+                SendLine(SatelliteProtocol.PluginsEnd);
+            }
+            catch (Exception ex)
+            {
+                _log.LogError(LogEvents.SatelliteBridgeConnectFailed, ex, "Audio-produce bridge connect failed");
+                Environment.Exit(1);
+                return;
+            }
+
+            FormActMain.ServiceRoute = new BridgeServiceRoute();
+            // Produce through the real facade path: TTS/PlaySound -> ServiceRoute -> SendLine(SPEAK/PLAYSND).
+            if (!string.IsNullOrEmpty(tts)) act.TTS(tts);
+            if (!string.IsNullOrEmpty(wav)) act.PlaySound(wav);
+
+            System.Threading.Thread.Sleep(500);   // let the writer flush before exit
+            SatelliteLogging.Shutdown();
+            Environment.Exit(0);
+        }
+
+        // Audio sink driver (ISOLATION-PLAN P6): stand up the ACT facade, hijack the PlayTts/PlaySound slots
+        // with a recording delegate (as Discord-Triggers does) so the poll registers a terminal host sink,
+        // then record every audio call the host relays down the command pipe until shutdown.
+        private static void RunAudioSink(string recordPath, string pipeName)
+        {
+            SatelliteLogging.Initialize(_satelliteId);
+            _log = SatelliteLogging.Log;
+            FacadeHost.Log = SatelliteLogging.WriteLegacy;
+            _log.LogInformation(LogEvents.SatelliteBooting, "Audio-sink: record={Record} pipe={Pipe}", recordPath, pipeName);
+
+            Application.EnableVisualStyles();
+            Application.SetCompatibleTextRenderingDefault(false);
+            FacadeHost.CreateAct();
+            var act = ActGlobals.oFormActMain;
+
+            var recWriter = new StreamWriter(recordPath, append: false) { AutoFlush = true };
+            act.PlayTtsMethod = t => { lock (recWriter) recWriter.WriteLine("TTS|" + t); };
+            act.PlaySoundMethod = (w, v) => { lock (recWriter) recWriter.WriteLine(
+                "SND|" + v.ToString(System.Globalization.CultureInfo.InvariantCulture) + "|" + w); };
+
+            try
+            {
+                _bridge = new NamedPipeClientStream(".", pipeName, PipeDirection.Out);
+                _bridge.Connect(5000);
+                _writer = new StreamWriter(_bridge) { AutoFlush = true };
+                SendLine(SatelliteProtocol.FormatReady(
+                    System.Diagnostics.Process.GetCurrentProcess().Id,
+                    Environment.Is64BitProcess, Environment.Version.ToString(), _satelliteId, _package));
+                SendLine(SatelliteProtocol.PluginsEnd);
+            }
+            catch (Exception ex)
+            {
+                _log.LogError(LogEvents.SatelliteBridgeConnectFailed, ex, "Audio-sink bridge connect failed");
+                Environment.Exit(1);
+                return;
+            }
+
+            StartAudioSinkPoll();   // detects the hijack above and sends REGISTERSINK up
+
+            try
+            {
+                var shutdown = System.Threading.EventWaitHandle.OpenExisting(pipeName + "-shutdown");
+                new System.Threading.Thread(() => { shutdown.WaitOne(); Environment.Exit(0); })
+                    { IsBackground = true, Name = "audio-sink-shutdown" }.Start();
+            }
+            catch { /* best-effort */ }
+
+            try
+            {
+                _cmdPipe = new NamedPipeClientStream(".", pipeName + "-cmd", PipeDirection.In);
+                _cmdPipe.Connect(30000);
+                using var reader = new StreamReader(_cmdPipe);
+                string line;
+                while ((line = reader.ReadLine()) != null)
+                    HandleCommand(line);   // SPEAK/PLAYSND -> invoke the local (recording) delegate
+            }
+            catch (Exception ex)
+            {
+                _log.LogError(LogEvents.SatelliteBridgeConnectFailed, ex, "Audio-sink command-pipe read failed");
+            }
+            finally
+            {
+                SatelliteLogging.Shutdown();
+                Environment.Exit(0);
+            }
+        }
+
+        // The host-routed service seam (P6): the facade calls these on FormActMain.ServiceRoute; each is
+        // marshaled up the event pipe. Installed only when bridged (a standalone run leaves ServiceRoute
+        // null so the facade's local delegate slots serve directly).
+        private sealed class BridgeServiceRoute : IHostServiceRoute
+        {
+            public void Speak(string text, int volume, int channel, bool synchronous)
+                => SendLine(SatelliteProtocol.FormatSpeak(text ?? "", volume, channel, synchronous));
+            public void PlaySound(string filePath, int volume)
+                => SendLine(SatelliteProtocol.FormatPlaySound(filePath ?? "", volume));
+        }
+
+        private static System.Threading.Timer _audioSinkPoll;
+        private static bool _ttsSinkAnnounced;
+        private static bool _soundSinkAnnounced;
+
+        // Poll the ACT audio slots for a plugin takeover — they must stay plain fields (precompiled plugins
+        // bind them by ldfld/stfld), so assignment can't be intercepted — and announce REGISTERSINK/
+        // UNREGISTERSINK as the state flips. Runs off a threadpool timer (not the WinForms pump) so it works
+        // in both the production message-loop boot and the headless audio-sink driver. Low rate: a plugin
+        // takes over a slot at enable-time, long before combat, so a ~1 s cadence is ample.
+        private static void StartAudioSinkPoll()
+        {
+            _audioSinkPoll = new System.Threading.Timer(_ =>
+            {
+                try
+                {
+                    var act = ActGlobals.oFormActMain;
+                    if (act == null) return;
+                    bool tts = act.TtsHijacked;
+                    if (tts != _ttsSinkAnnounced)
+                    {
+                        _ttsSinkAnnounced = tts;
+                        SendLine(tts ? SatelliteProtocol.FormatRegisterSink("tts") : SatelliteProtocol.FormatUnregisterSink("tts"));
+                        _log.LogInformation(LogEvents.SatelliteBooting, "[Audio] tts sink {State}", tts ? "registered" : "released");
+                    }
+                    bool snd = act.SoundHijacked;
+                    if (snd != _soundSinkAnnounced)
+                    {
+                        _soundSinkAnnounced = snd;
+                        SendLine(snd ? SatelliteProtocol.FormatRegisterSink("sound") : SatelliteProtocol.FormatUnregisterSink("sound"));
+                        _log.LogInformation(LogEvents.SatelliteBooting, "[Audio] sound sink {State}", snd ? "registered" : "released");
+                    }
+                }
+                catch { /* best-effort; the next tick retries */ }
+            }, null, 250, 1000);
         }
 
         // Single writer for the pipe, shared by the handshake/HWND lines and the forwarded LOG frames
