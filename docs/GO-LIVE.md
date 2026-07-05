@@ -55,9 +55,12 @@ Catalog-only, so the catalog path must be trustworthy and cover all five.
 
 ## Workstream B — Satellite fault safety net
 
-- **B1 — Global exception handlers in the satellite** (`Fct.LegacyHost/Program.cs`):
-  `AppDomain.CurrentDomain.UnhandledException` (log + forward, exit with distinct code),
-  WinForms `Application.ThreadException` + `Application.SetUnhandledExceptionMode(CatchException)`.
+- **B1 — [DONE] Global exception handlers in the satellite** (`Fct.LegacyHost/Program.cs`, top of
+  `Main`): WinForms `Application.ThreadException` + `SetUnhandledExceptionMode(CatchException)` log a
+  hosted plugin's UI-thread throw and keep pumping — a modal crash dialog would block the message
+  pump, and with it every hosted plugin and the bridge;
+  `AppDomain.CurrentDomain.UnhandledException` logs critical + flushes the sinks (file + host-forwarding
+  `BridgeLogSink`) before the CLR terminates.
   - **Accept:** a forced background-thread throw is logged host-side under `Fct.Satellite`; a
     UI-thread throw does not pop a modal dialog inside the embedded window.
 - **B2 — Launch timeout** on `SatelliteHost.WaitForConnectionAsync` — link to a CTS

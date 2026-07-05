@@ -38,6 +38,22 @@ public sealed class PackageResolverTests
     }
 
     [Fact]
+    public void OverlayPlugin_resolves_to_a_consumer_subscribing_the_full_set_including_packets()
+    {
+        var d = PackageResolver.Resolve("OverlayPlugin.dll", "overlay", "OverlayPlugin");
+        Assert.Equal("overlay", d.Package);
+        Assert.Equal(SatelliteRole.Consumer, d.Role);
+        // The P8-distinguishing subscription: OverlayPlugin's NetworkProcessors are the first consumer to
+        // need the raw-packet firehose.
+        Assert.Contains(SatelliteProtocol.StreamPackets, d.Subscriptions);
+        Assert.Contains(SatelliteProtocol.StreamSwings, d.Subscriptions);
+        Assert.Contains(SatelliteProtocol.StreamRawLog, d.Subscriptions);
+        Assert.Contains(SatelliteProtocol.StreamZoneParty, d.Subscriptions);
+        Assert.Contains(SatelliteProtocol.StreamCombatants, d.Subscriptions);
+        Assert.Contains(SatelliteProtocol.StreamRepository, d.Subscriptions);
+    }
+
+    [Fact]
     public void An_unknown_legacy_plugin_gets_its_own_isolated_consumer_satellite()
     {
         var d = PackageResolver.Resolve("SomeOtherPlugin.dll", "someotherplugin", "Some Other Plugin");

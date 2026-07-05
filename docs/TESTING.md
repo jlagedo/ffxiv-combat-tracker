@@ -44,6 +44,17 @@ install stays green:
   HWND tests run whenever the satellite is staged. The "plugin Started" and self-test
   assertions also need `FFXIV_ACT_Plugin.dll` installed under
   `%APPDATA%\Advanced Combat Tracker\Plugins`; they skip otherwise.
+- **OverlayPlugin satellite gates** (`Fct.Integration.Tests`, ISOLATION-PLAN P8):
+  `OverlayPacketFanoutTests` is plugin-free (a `packets`-subscribed sink satellite receives the
+  host-fanned raw-packet firehose) and runs whenever the satellite is staged.
+  `OverlayStandInPacketTests` (fanned packets raise the SDK stand-in's `NetworkReceived`) needs
+  `FFXIV_ACT_Plugin.dll` installed. `OverlaySatelliteTests` — the MiniParse WebSocket gate: the
+  real OverlayPlugin in the `overlay` consumer satellite serves `CombatData` equal to the oracle
+  `ExportVariables` baseline on `ws://127.0.0.1:10501/MiniParse` — additionally needs
+  `OverlayPlugin.dll` installed (`%APPDATA%\Advanced Combat Tracker\Plugins\OverlayPlugin\`); it
+  reuses the installed plugin's extracted CEF via a sandbox junction, binds port 10501
+  exclusively (serialized in the `satellite-p6` collection), and skips if the WS server cannot
+  come up.
 
 ## Determinism note
 

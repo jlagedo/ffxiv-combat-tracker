@@ -351,18 +351,48 @@ package; `StopAllAsync` on close).
 > reference non-shipping (resolve the single `compat\` copy via `CompatRuntime`) is a separable
 > build-graph/startup-ordering change, tracked into P9 finalization.
 
-### P8 — OverlayPlugin satellite
+### P8 — OverlayPlugin satellite ✅
 
-- [ ] OverlayPlugin + cactbot isolated: `FFXIVRepository` binds the stand-in
+The P5–P7 consumer fabric carried OverlayPlugin as-is; the only production change is the
+`PackageResolver` `overlay` arm — a `Consumer` package subscribing the full stream set
+(`swings,rawlog,packets,zoneparty,combatants,repository`; `packets` is the distinguishing
+subscription, the raw firehose OverlayPlugin's `NetworkProcessors` bind). The router spawns the
+`overlay` satellite like any other consumer package; OverlayPlugin loads unmodified against the
+parser-free facade replica, `FFXIVRepository` discovers + binds the synthetic stand-in across the
+`AssemblyResolve` boundary, and its whole CEF/Fleck stack lives and dies inside the satellite
+process. The stand-in's `ConsumerDataSubscription` counts `NetworkReceived` raises
+(`StandInVerification.Packets`, the 7th `--verify-standin` column) so the packet bind point is
+gateable headlessly. The Costura resolver exposure accepted in P5 is now **usefully consumed**:
+OverlayPlugin's `Assembly.Load("Machina.FFXIV")` (and peers) resolves from the parser's embedded
+copies through the resolver the stand-in attaches — no fallback extraction needed.
+
+- [x] OverlayPlugin + cactbot isolated: `FFXIVRepository` binds the stand-in
       (title/property/`_iocContainer` seams); MiniParse reads the local replica;
-      `NetworkProcessors` consume fanned `RawPacketReceived`; custom lines 257+ round-trip via
-      the P6 write-back; CEF lifecycle contained in the satellite.
-- [ ] Gate (e2e): against a replay session, a WebSocket client on
-      `ws://127.0.0.1:10501/MiniParse` receives `CombatData` JSON whose `encdps`/`damage`/
-      per-combatant values equal the oracle `ExportVariables` baseline; custom lines 257+
-      appear on the log-line stream; the cactbot event-source log-line handler receives lines.
+      `NetworkProcessors`' bind point (`IDataSubscription.NetworkReceived`) raises per fanned
+      `RawPacketReceived`; the custom-line write-back mechanism is the P6 `ILogOutput` pipe; CEF
+      lifecycle contained in the satellite. **Live-game scope:** end-to-end packet-decode →
+      custom-line-257 emission needs a live FFXIV process — OverlayPlugin defers `NetworkParser`
+      binding until `ProcessChanged` yields a live PID (the same limit `PacketDispatchTests`
+      documents); the fan-out to the bind point and the write-back round-trip are each gated
+      headlessly.
+- [x] Gate (e2e): `Fct.Integration.Tests/OverlaySatelliteTests` **[plugin-gated]** — the production
+      router spawns the `overlay` consumer satellite with the real, unmodified OverlayPlugin; against
+      the committed `combat-slice` frame replay, a WebSocket client on
+      `ws://127.0.0.1:10501/MiniParse` receives `CombatData` whose `Encounter.damage`/`encdps`/
+      `DURATION` and per-combatant `YOU` values equal the real-ACT oracle `ExportVariables` baseline
+      (read from `combat-slice.exportvars.tsv` at test time — single-sourced, exact string equality),
+      and a host-fanned chat line surfaces on the WS (the cactbot event-source log-line handler).
+      Companion gates: `OverlayPacketFanoutTests` (plugin-free: the host fans `RawPacketReceived`
+      down to a `packets`-subscribed sink over the real pipe) and `OverlayStandInPacketTests`
+      **[plugin-gated]** (fanned packets raise the stand-in's `NetworkReceived`, per-packet exact).
+      Test-env note: the WS gate seeds OverlayPlugin's sandbox (`AppData.Root`-resolved —
+      in DEBUG the data root sits next to the install dir, not `%LOCALAPPDATA%`) with a
+      `WSServerRunning=true` config (`Overlays:[]` present — `LoadJson` iterates it unguarded and a
+      failed load silently resets to WSServer-off defaults) and junctions the installed
+      OverlayPlugin's extracted CEF into the sandbox so no first-run download happens; it skips
+      cleanly when OverlayPlugin/the parser aren't installed.
 
-**Exit:** M1 holds with OverlayPlugin fully isolated — the deepest coupling routed.
+**Exit:** M1 holds with OverlayPlugin fully isolated — the deepest coupling routed. ✅
 
 ### P9 — Hojoring satellite, full matrix, budgets, finalization
 

@@ -34,6 +34,11 @@ namespace Fct.Parser.Legacy
         private int _logLines;
         public int LogLinesRaised => Volatile.Read(ref _logLines);
 
+        private int _packets;
+        // NetworkReceived/NetworkSent raised from fanned RawPacketReceived frames (OverlayPlugin's
+        // NetworkProcessors bind point — ISOLATION-PLAN P8). Read by the stand-in's SelfVerify.
+        public int NetworkRaised => Volatile.Read(ref _packets);
+
         public void Raise(GameEvent e)
         {
             switch (e)
@@ -61,6 +66,7 @@ namespace Fct.Parser.Legacy
                     CombatantRemoved?.Invoke(new SdkModels.Combatant { ID = cr.ActorId });
                     break;
                 case RawPacketReceived pkt:
+                    Interlocked.Increment(ref _packets);
                     if (pkt.Direction == PacketDirection.Sent) NetworkSent?.Invoke(pkt.Connection ?? "", pkt.Epoch, pkt.Bytes ?? Array.Empty<byte>());
                     else NetworkReceived?.Invoke(pkt.Connection ?? "", pkt.Epoch, pkt.Bytes ?? Array.Empty<byte>());
                     break;

@@ -38,6 +38,34 @@ namespace Fct.LegacyHost
         [STAThread]
         private static void Main(string[] args)
         {
+            // Fault containment for hosted plugins' UI-thread exceptions (e.g. a plugin's WinForms Timer
+            // tick racing its own init): route them through Application.ThreadException and log. Without
+            // this, WinForms raises its default MODAL crash dialog — a headless satellite has nobody to
+            // click it, and the modal blocks the message pump and with it every plugin and the bridge.
+            // Must be set before the first window handle is created.
+            Application.SetUnhandledExceptionMode(UnhandledExceptionMode.CatchException);
+            Application.ThreadException += (s, e) =>
+            {
+                try
+                {
+                    _log?.LogError(LogEvents.ActException, e.Exception,
+                        "Unhandled plugin UI-thread exception (pump continues)");
+                }
+                catch { }
+            };
+            // Non-UI-thread throws terminate the process (CLR default); log + flush the sinks first so
+            // the crash reaches the satellite log and the host (BridgeLogSink) before the process dies.
+            AppDomain.CurrentDomain.UnhandledException += (s, e) =>
+            {
+                try
+                {
+                    _log?.LogCritical(LogEvents.ActException, e.ExceptionObject as Exception,
+                        "Unhandled satellite exception (terminating={Terminating})", e.IsTerminating);
+                    if (e.IsTerminating) SatelliteLogging.Shutdown();
+                }
+                catch { }
+            };
+
             // The host-assigned identity this process hosts (P3): included in the READY handshake and used
             // for the per-satellite verification-log name. Defaults to "ffxiv" so a dev-standalone / parser
             // run keeps its historical s2-ffxiv.log artifact.
@@ -690,7 +718,10 @@ namespace Fct.LegacyHost
                 }
                 catch { }
             }
-            // Stand-in discovery artifact: "<found>\t<sdkBound>\t<logLines>\t<combatants>\t<title>\t<status>".
+            // Stand-in discovery artifact:
+            //   "<found>\t<sdkBound>\t<logLines>\t<combatants>\t<title>\t<status>\t<packets>".
+            // The trailing packets column (P8) is the NetworkReceived/Sent count raised from fanned
+            // RawPacketReceived frames — OverlayPlugin's NetworkProcessors bind point.
             if (_standInVerifyPath != null && _standIn != null)
             {
                 try
@@ -701,7 +732,7 @@ namespace Fct.LegacyHost
                     {
                         v.Found ? "1" : "0", v.SdkTypesBound ? "1" : "0",
                         v.LogLines.ToString(inv), v.Combatants.ToString(inv),
-                        v.Title ?? "", v.Status ?? "",
+                        v.Title ?? "", v.Status ?? "", v.Packets.ToString(inv),
                     }));
                 }
                 catch { }
@@ -852,6 +883,12 @@ namespace Fct.LegacyHost
             // The unified command-pipe reader (folds fanned frames + dispatches LOADPLUGIN/service relays)
             // runs on a background thread; the message loop pumps the consumer plugin's UI-thread timers.
             StartCommandReader(pipeName);
+
+            // Opt-in status diagnostics (FCT_CONSUMER_STATUS_POLL=1): log each loaded plugin's status label
+            // a few times so a consumer plugin's async init progress (e.g. OverlayPlugin's init phases) is
+            // observable headlessly. Self-stops; off by default so normal runs stay quiet.
+            if (Environment.GetEnvironmentVariable("FCT_CONSUMER_STATUS_POLL") == "1")
+                StartConsumerStatusPoll();
 
             _log.LogInformation(LogEvents.SatelliteBooting, "[Consumer] entering message loop");
             using (var pump = new Form { ShowInTaskbar = false, FormBorderStyle = FormBorderStyle.None,
@@ -2021,6 +2058,90 @@ namespace Fct.LegacyHost
                     _writer?.WriteLine(s);
             }
             catch { }
+        }
+
+        // Diagnostic: log every loaded plugin's status label on a self-stopping WinForms timer, so a
+        // consumer plugin's async init progress is observable in the satellite log (opt-in).
+        private static void StartConsumerStatusPoll()
+        {
+            int ticks = 0;
+            var t = new Timer { Interval = 2000 };
+            t.Tick += (s, e) =>
+            {
+                ticks++;
+                try
+                {
+                    foreach (var p in ActGlobals.oFormActMain.ActPlugins)
+                    {
+                        _log.LogInformation(LogEvents.SatelliteBooting,
+                            "[Status] '{Title}' = '{Status}'", p.lblPluginTitle?.Text, p.lblPluginStatus?.Text);
+                        // Every 5th tick, dump the plugin's own in-UI log (e.g. OverlayPlugin's ControlPanel
+                        // logBox) — the only place its internal logger surfaces in a release build.
+                        if (ticks % 5 == 0 && p.tpPluginSpace != null)
+                        {
+                            var text = FindLargestText(p.tpPluginSpace);
+                            if (!string.IsNullOrEmpty(text))
+                            {
+                                var head = text.Length > 4000 ? text.Substring(0, 4000) : text;
+                                _log.LogInformation(LogEvents.SatelliteBooting,
+                                    "[Status] '{Title}' UI log head ({Len} chars total):\n{Log}",
+                                    p.lblPluginTitle?.Text, text.Length, head);
+                                var interesting = string.Join("\n", text
+                                    .Split('\n')
+                                    .Where(l => l.IndexOf("WSServer", StringComparison.OrdinalIgnoreCase) >= 0
+                                             || l.IndexOf("LoadConfig", StringComparison.OrdinalIgnoreCase) >= 0
+                                             || l.IndexOf("InitPlugin:", StringComparison.Ordinal) >= 0));
+                                if (interesting.Length > 6000) interesting = interesting.Substring(0, 6000);
+                                _log.LogInformation(LogEvents.SatelliteBooting,
+                                    "[Status] '{Title}' UI log filtered:\n{Log}", p.lblPluginTitle?.Text, interesting);
+                                ProbeOverlayConfig(p.pluginObj);
+                            }
+                        }
+                    }
+                }
+                catch (Exception ex) { _log.LogError(LogEvents.SatelliteBooting, ex, "[Status] poll failed"); }
+                if (ticks >= 15) { t.Stop(); t.Dispose(); }
+            };
+            t.Start();
+        }
+
+        // Diagnostic: reflect OverlayPlugin's live Config (PluginLoader.pluginMain -> PluginMain.Config)
+        // and log the WSServer flags + the config file path it actually loaded.
+        private static void ProbeOverlayConfig(object pluginObj)
+        {
+            try
+            {
+                const System.Reflection.BindingFlags any =
+                    System.Reflection.BindingFlags.Public | System.Reflection.BindingFlags.NonPublic |
+                    System.Reflection.BindingFlags.Instance;
+                var main = pluginObj?.GetType().GetField("pluginMain", any)?.GetValue(pluginObj);
+                if (main == null) return;
+                var cfg = main.GetType().GetProperty("Config", any)?.GetValue(main);
+                if (cfg == null) { _log.LogInformation(LogEvents.SatelliteBooting, "[Status] overlay Config=null"); return; }
+                var t = cfg.GetType();
+                var path = t.GetField("filePath", any)?.GetValue(cfg);
+                var running = t.GetProperty("WSServerRunning", any)?.GetValue(cfg);
+                var ip = t.GetProperty("WSServerIP", any)?.GetValue(cfg);
+                var port = t.GetProperty("WSServerPort", any)?.GetValue(cfg);
+                _log.LogInformation(LogEvents.SatelliteBooting,
+                    "[Status] overlay Config: WSServerRunning={Run} IP={Ip} Port={Port} file='{File}'",
+                    running, ip, port, path);
+            }
+            catch (Exception ex) { _log.LogError(LogEvents.SatelliteBooting, ex, "[Status] overlay config probe failed"); }
+        }
+
+        // Depth-first: the longest Text of any TextBoxBase under the control tree (a plugin's log view).
+        private static string FindLargestText(System.Windows.Forms.Control root)
+        {
+            string best = "";
+            foreach (System.Windows.Forms.Control c in root.Controls)
+            {
+                if (c is System.Windows.Forms.TextBoxBase tb && (tb.Text?.Length ?? 0) > best.Length)
+                    best = tb.Text;
+                var inner = FindLargestText(c);
+                if (inner.Length > best.Length) best = inner;
+            }
+            return best;
         }
 
         // Announce a loaded plugin's embeddable window to the host:

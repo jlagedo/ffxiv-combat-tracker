@@ -34,6 +34,8 @@ namespace Fct.Parser.Legacy
         public bool SdkTypesBound { get; set; }
         public int LogLines { get; set; }
         public int Combatants { get; set; }
+        // NetworkReceived/NetworkSent raised from fanned RawPacketReceived frames (ISOLATION-PLAN P8).
+        public int Packets { get; set; }
     }
 
     // Factory kept SDK-type-free at the seam: the returned interface lets RunConsume hold the stand-in

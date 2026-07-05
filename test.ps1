@@ -28,6 +28,7 @@ try {
         "tests/Fct.Compat.Act.Tests/Fct.Compat.Act.Tests.csproj",
         "tests/Fct.App.Tests/Fct.App.Tests.csproj",
         "tests/Fct.Parser.Legacy.Tests/Fct.Parser.Legacy.Tests.csproj",
+        "tests/Fct.Engine.Tests/Fct.Engine.Tests.csproj",
         "tests/Fct.FlowTests/Fct.FlowTests.csproj",
         "tests/Fct.Compat.Shim.Tests/Fct.Compat.Shim.Tests.csproj",
         "tests/Fct.Compat.Shim.E2E.Tests/Fct.Compat.Shim.E2E.Tests.csproj"

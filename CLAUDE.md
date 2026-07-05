@@ -46,8 +46,9 @@ Design docs — **read before proposing changes:**
   duplex named pipe. The host spawns one satellite per installed package on demand:
   `Fct.Host/SatelliteRouter` maps each plugin to its package (`PackageResolver`), launches that
   package's `Fct.Host/SatelliteSupervisor`-supervised satellite with the resolved role +
-  subscriptions, and forwards its `LOADPLUGIN`; OverlayPlugin + Hojoring isolation lands in P8/P9
-  ([`docs/ISOLATION-PLAN.md`](docs/ISOLATION-PLAN.md)). `AssemblyLoadContext` isolates net10 plugins
+  subscriptions, and forwards its `LOADPLUGIN`; parser, OverlayPlugin (+ cactbot, with its whole
+  CEF/Fleck stack in-satellite), Triggernometry, and Discord-Triggers are isolated today — Hojoring
+  isolation lands in P9 ([`docs/ISOLATION-PLAN.md`](docs/ISOLATION-PLAN.md)). `AssemblyLoadContext` isolates net10 plugins
   from each other — it is **not** cross-runtime.
 - **Aggregation truth lives in the host (`Fct.Engine`).** `ModernEncounterEngine` folds the
   bridged full-fidelity `CombatSwing` + encounter-lifecycle stream through the shared

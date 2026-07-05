@@ -446,7 +446,7 @@ incremental migration (swap one call at a time, then drop the shim).
   recompiles fine, but **CefSharp is net48-only** (pinned `95.7.141`, `HtmlRenderer.csproj:45-52`), so
   OP's CEF/Fleck rendering stays in a net48 satellite — **its own**, fully isolated from the parser,
   fed by the host-routed streams through the facade's synthetic parser stand-in
-  ([`ISOLATION-PLAN.md`](ISOLATION-PLAN.md) P8). It is also itself a mini plugin-host
+  ([`ISOLATION-PLAN.md`](ISOLATION-PLAN.md) P8, shipped — the `overlay` consumer satellite). It is also itself a mini plugin-host
   (`IOverlayAddonV2.Init`, `PluginMain.cs:493-504`). The recompile path serves managed consumers; OP
   is why a satellite persists longest — consistent with overlays = unmodified OP, hosted. The managed-consumer surface for cactbot fidelity ([G1](#contract-gaps-tracked)/[G2](#contract-gaps-tracked)/[G4](#contract-gaps-tracked)) is shipped.
 

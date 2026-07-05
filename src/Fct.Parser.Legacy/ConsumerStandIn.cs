@@ -76,6 +76,7 @@ namespace Fct.Parser.Legacy
             v.SdkTypesBound = sub != null && repo != null;
             if (repo != null) v.Combatants = repo.GetCombatantList().Count;
             v.LogLines = _sub.LogLinesRaised;
+            v.Packets = _sub.NetworkRaised;
             return v;
         }
 

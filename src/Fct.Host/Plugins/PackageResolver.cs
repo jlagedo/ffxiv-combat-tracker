@@ -50,8 +50,24 @@ internal static class PackageResolver
                 SatelliteProtocol.StreamSwings,
             });
 
+        // OverlayPlugin (cactbot lives inside it) — the deepest consumer, so the full read set (P8): the
+        // encounter replica (MiniParse DPS), the log-line firehose (cactbot event source + custom-line
+        // fan-back), zone/party/player + combatants (FFXIVRepository poll surface), the repository mirror
+        // (GetCombatantList / resource dictionaries / GetCurrentFFXIVProcess), and — uniquely so far — the
+        // raw-packet firehose its NetworkProcessors bind through IDataSubscription.NetworkReceived.
+        if (Matches("overlay", assemblyFile, id, title))
+            return new PackageDescriptor("overlay", SatelliteRole.Consumer, new[]
+            {
+                SatelliteProtocol.StreamSwings,
+                SatelliteProtocol.StreamRawLog,
+                SatelliteProtocol.StreamPackets,
+                SatelliteProtocol.StreamZoneParty,
+                SatelliteProtocol.StreamCombatants,
+                SatelliteProtocol.StreamRepository,
+            });
+
         // Any other legacy plugin: isolate it in its own consumer satellite with the common read set,
-        // so an unrecognized plugin is still process-isolated (and this generalizes to P8/P9 packages).
+        // so an unrecognized plugin is still process-isolated (and this generalizes to the P9 packages).
         var package = Sanitize(!string.IsNullOrWhiteSpace(id) ? id! : StripDll(assemblyFile) ?? "legacy");
         return new PackageDescriptor(package, SatelliteRole.Consumer, new[]
         {
