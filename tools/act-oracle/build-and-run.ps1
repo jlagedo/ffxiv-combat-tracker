@@ -3,15 +3,23 @@
 # aggregate (<slice>.aggregate.tsv) and the ExportVariables string baseline
 # (<slice>.exportvars.tsv, including the encounter-level *ENCOUNTER* rows OverlayPlugin reads).
 #
-#   ./build-and-run.ps1 [-ActDir <path>] [-Swings <tsv>] [-Out <tsv>]
+# It also regenerates the plugin-in-the-loop baseline (combat-slice.plugin.exportvars.tsv) — the
+# real FFXIV_ACT_Plugin.dll's own ACT_UIMods.UpdateACTTables registrations, enumerated directly
+# (Job/ParryPct/Last10DPS/... — see docs/PIPELINE-COMPLETENESS-PLAN.md P1.1) — if a plugin DLL can
+# be found; otherwise that step is skipped with a warning so the ACT-core baselines above still
+# regenerate without it.
 #
-# With no -Swings/-Out it regenerates BOTH committed slices (combat-slice, combat-slice2).
-# Requires the real ACT install (default E:\dev\Advanced Combat Tracker). Dev-only: the baselines
-# it produces are committed, so the normal test suite needs neither this tool nor an ACT install.
+#   ./build-and-run.ps1 [-ActDir <path>] [-Swings <tsv>] [-Out <tsv>] [-PluginDll <path>]
+#
+# With no -Swings/-Out it regenerates BOTH committed slices (combat-slice, combat-slice2), and the
+# plugin baseline for combat-slice only ("one slice baseline" per the plan). Requires the real ACT
+# install (default E:\dev\Advanced Combat Tracker). Dev-only: the baselines it produces are
+# committed, so the normal test suite needs neither this tool nor an ACT install nor the plugin.
 param(
     [string]$ActDir  = $env:ACT_DIR,
     [string]$Swings,
-    [string]$Out
+    [string]$Out,
+    [string]$PluginDll = $env:FFXIV_PLUGIN_DLL
 )
 
 if (-not $ActDir) { $ActDir = "E:\dev\Advanced Combat Tracker" }
@@ -38,6 +46,24 @@ function Invoke-Slice([string]$swingsTsv, [string]$aggregateTsv) {
     Write-Host "Baselines written: $aggregateTsv ; $exportsTsv"
 }
 
+# The plugin-in-the-loop baseline: loads the real FFXIV_ACT_Plugin.dll and dumps every key its own
+# ACT_UIMods.UpdateACTTables registers (enumerated, never hardcoded) to <slice>.plugin.exportvars.tsv.
+function Invoke-PluginBaseline([string]$swingsTsv, [string]$exportsTsv) {
+    if (-not $PluginDll) {
+        $PluginDll = "E:\tmp\plugins\FFXIV_ACT_Plugin_3.0.2.3\FFXIV_ACT_Plugin.dll"
+    }
+    if (-not (Test-Path $PluginDll)) {
+        Write-Warning "FFXIV_ACT_Plugin.dll not found ($PluginDll); skipping plugin-baseline regeneration. Set -PluginDll or `$env:FFXIV_PLUGIN_DLL."
+        return
+    }
+    $env:FFXIV_PLUGIN_DLL = $PluginDll
+    $swingsTsv  = (Resolve-Path $swingsTsv).Path
+    $exportsTsv = [System.IO.Path]::GetFullPath($exportsTsv)
+    & $exe --plugin-baseline $swingsTsv $exportsTsv
+    if ($LASTEXITCODE -ne 0) { throw "plugin-baseline run failed for $swingsTsv" }
+    Write-Host "Plugin baseline written: $exportsTsv"
+}
+
 if ($Swings -or $Out) {
     if (-not $Swings) { $Swings = "$fixtures/combat-slice.oracle.tsv" }
     if (-not $Out)    { $Out    = "$fixtures/combat-slice.aggregate.tsv" }
@@ -47,4 +73,5 @@ else {
     foreach ($slice in @("combat-slice", "combat-slice2")) {
         Invoke-Slice "$fixtures/$slice.oracle.tsv" "$fixtures/$slice.aggregate.tsv"
     }
+    Invoke-PluginBaseline "$fixtures/combat-slice.oracle.tsv" "$fixtures/combat-slice.plugin.exportvars.tsv"
 }

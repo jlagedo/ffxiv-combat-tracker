@@ -1,0 +1,131 @@
+name	key	value
+Combatant-002	Job	
+Combatant-002	ParryPct	0%
+Combatant-002	BlockPct	0%
+Combatant-002	IncToHit	
+Combatant-002	OverHealPct	0%
+Combatant-002	DirectHitPct	0%
+Combatant-002	DirectHitCount	0
+Combatant-002	CritDirectHitCount	0
+Combatant-002	CritDirectHitPct	0%
+Combatant-003	Last10DPS	44239
+Combatant-003	Last30DPS	36409
+Combatant-003	Last60DPS	36409
+Combatant-003	Job	
+Combatant-003	ParryPct	0%
+Combatant-003	BlockPct	0%
+Combatant-003	IncToHit	
+Combatant-003	OverHealPct	0%
+Combatant-003	DirectHitPct	0%
+Combatant-003	DirectHitCount	0
+Combatant-003	CritDirectHitCount	0
+Combatant-003	CritDirectHitPct	0%
+Combatant-005	Last10DPS	61705
+Combatant-005	Last30DPS	42332
+Combatant-005	Last60DPS	42332
+Combatant-005	Job	
+Combatant-005	ParryPct	0%
+Combatant-005	BlockPct	0%
+Combatant-005	IncToHit	
+Combatant-005	OverHealPct	0%
+Combatant-005	DirectHitPct	0%
+Combatant-005	DirectHitCount	0
+Combatant-005	CritDirectHitCount	0
+Combatant-005	CritDirectHitPct	0%
+Combatant-007	Last10DPS	43649
+Combatant-007	Last30DPS	17051
+Combatant-007	Last60DPS	8525
+Combatant-007	Job	
+Combatant-007	ParryPct	0%
+Combatant-007	BlockPct	0%
+Combatant-007	IncToHit	
+Combatant-007	OverHealPct	0%
+Combatant-007	DirectHitPct	0%
+Combatant-007	DirectHitCount	0
+Combatant-007	CritDirectHitCount	0
+Combatant-007	CritDirectHitPct	0%
+Combatant-008	Last10DPS	59043
+Combatant-008	Last30DPS	50345
+Combatant-008	Last60DPS	50345
+Combatant-008	Job	
+Combatant-008	ParryPct	0%
+Combatant-008	BlockPct	0%
+Combatant-008	IncToHit	
+Combatant-008	OverHealPct	0%
+Combatant-008	DirectHitPct	0%
+Combatant-008	DirectHitCount	0
+Combatant-008	CritDirectHitCount	0
+Combatant-008	CritDirectHitPct	0%
+Combatant-009	Last10DPS	42142
+Combatant-009	Last30DPS	41909
+Combatant-009	Last60DPS	41909
+Combatant-009	Job	
+Combatant-009	ParryPct	0%
+Combatant-009	BlockPct	0%
+Combatant-009	IncToHit	
+Combatant-009	OverHealPct	0%
+Combatant-009	DirectHitPct	0%
+Combatant-009	DirectHitCount	0
+Combatant-009	CritDirectHitCount	0
+Combatant-009	CritDirectHitPct	0%
+Combatant-010	Last10DPS	28923
+Combatant-010	Last30DPS	30787
+Combatant-010	Last60DPS	30787
+Combatant-010	Job	
+Combatant-010	ParryPct	0%
+Combatant-010	BlockPct	0%
+Combatant-010	IncToHit	
+Combatant-010	OverHealPct	0%
+Combatant-010	DirectHitPct	0%
+Combatant-010	DirectHitCount	0
+Combatant-010	CritDirectHitCount	0
+Combatant-010	CritDirectHitPct	0%
+Combatant-011	Last10DPS	37197
+Combatant-011	Last30DPS	27003
+Combatant-011	Last60DPS	27003
+Combatant-011	Job	
+Combatant-011	ParryPct	0%
+Combatant-011	BlockPct	0%
+Combatant-011	IncToHit	
+Combatant-011	OverHealPct	0%
+Combatant-011	DirectHitPct	0%
+Combatant-011	DirectHitCount	0
+Combatant-011	CritDirectHitCount	0
+Combatant-011	CritDirectHitPct	0%
+Combatant-013	Last10DPS	62244
+Combatant-013	Last30DPS	47824
+Combatant-013	Last60DPS	47824
+Combatant-013	Job	
+Combatant-013	ParryPct	0%
+Combatant-013	BlockPct	0%
+Combatant-013	IncToHit	
+Combatant-013	OverHealPct	0%
+Combatant-013	DirectHitPct	0%
+Combatant-013	DirectHitCount	0
+Combatant-013	CritDirectHitCount	0
+Combatant-013	CritDirectHitPct	0%
+Unknown	Job	
+Unknown	ParryPct	0%
+Unknown	BlockPct	0%
+Unknown	IncToHit	
+Unknown	OverHealPct	0%
+Unknown	DirectHitPct	0%
+Unknown	DirectHitCount	0
+Unknown	CritDirectHitCount	0
+Unknown	CritDirectHitPct	0%
+YOU	Last10DPS	36837
+YOU	Last30DPS	15261
+YOU	Last60DPS	7630
+YOU	Job	
+YOU	ParryPct	0%
+YOU	BlockPct	0%
+YOU	IncToHit	
+YOU	OverHealPct	0%
+YOU	DirectHitPct	0%
+YOU	DirectHitCount	0
+YOU	CritDirectHitCount	0
+YOU	CritDirectHitPct	0%
+*ENCOUNTER*	CurrentZoneName	
+*ENCOUNTER*	Last10DPS	99081
+*ENCOUNTER*	Last30DPS	123975
+*ENCOUNTER*	Last60DPS	123975

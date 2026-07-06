@@ -23,6 +23,7 @@ internal static class ActOracle
     private static string _result = "";
     private static string _actDir =
         Environment.GetEnvironmentVariable("ACT_DIR") ?? @"E:\dev\Advanced Combat Tracker";
+    private static string _pluginDll = Environment.GetEnvironmentVariable("FFXIV_PLUGIN_DLL");
 
     private static Assembly Resolve(object sender, ResolveEventArgs e)
     {
@@ -119,6 +120,28 @@ internal static class ActOracle
         CombatantData.HealingSwingTypes = new List<int> { 4, 5, 8, 9, 1 };
     }
 
+    // Loads the real FFXIV_ACT_Plugin.dll into this AppDomain and invokes its own
+    // ACT_UIMods.UpdateACTTables registration exactly as the plugin does at startup — the real
+    // superset of what RegisterTables() hand-mirrors above, including the ExportVariables/ColumnDefs
+    // keys ACT core doesn't ship (Job, ParryPct, Last10DPS, ...). showDebug:false so the 9 debug-only
+    // MasterSwing columns are not added, matching production behavior.
+    //
+    // NAME CONSTRAINT: this method's name must contain "InitACT". UpdateACTTables ends by calling
+    // ActGlobals.oFormActMain.ValidateLists()/ValidateTableSetup(), and both guard themselves with
+    // `if (Environment.StackTrace.Contains("InitACT") && !Force) return;` (FormActMain.cs) to avoid
+    // touching real WinForms controls our uninitialized oFormActMain doesn't have. Do not rename.
+    private static void LoadPluginAndInitACT_UIMods()
+    {
+        if (string.IsNullOrEmpty(_pluginDll) || !File.Exists(_pluginDll))
+            throw new FileNotFoundException(
+                "FFXIV_ACT_Plugin.dll not found; set env FFXIV_PLUGIN_DLL to its path.", _pluginDll);
+
+        var asm = Assembly.LoadFrom(_pluginDll);
+        var uiMods = asm.GetType("FFXIV_ACT_Plugin.ACT_UIMods", throwOnError: true);
+        var m = uiMods.GetMethod("UpdateACTTables", BindingFlags.Public | BindingFlags.Static);
+        m.Invoke(null, new object[] { false });
+    }
+
     private static string F(double d) { return d.ToString("0.##", CultureInfo.InvariantCulture); }
     private static string I(long d) { return d.ToString(CultureInfo.InvariantCulture); }
 
@@ -177,7 +200,17 @@ internal static class ActOracle
         try
         {
             SetupAct();
-            if (argv[0] == "--folder")
+            if (argv[0] == "--plugin-baseline")
+            {
+                // Plugin-in-the-loop baseline: load the real FFXIV_ACT_Plugin.dll, install its own
+                // ExportVariables/ColumnDefs registrations, then dump every key it registers (never a
+                // hardcoded list) — the superset baseline ACT-core-only combat-slice.exportvars.tsv
+                // can't produce. See docs/PIPELINE-COMPLETENESS-PLAN.md P1.1.
+                LoadPluginAndInitACT_UIMods();
+                int sw = PluginBaselineAndDump(argv[1], argv[2]);
+                _result = "OK swings=" + sw;
+            }
+            else if (argv[0] == "--folder")
             {
                 // Batch: aggregate every captured plugin swing stream (*.oracle.tsv) through the real
                 // ACT engine and dump each one's ExportVariables to <base>.oracle.exports.tsv — the
@@ -210,6 +243,33 @@ internal static class ActOracle
         }
     }
 
+    // Replays one 9-col timed swing TSV into `enc` via the real EncounterData.AddCombatAction.
+    // Returns the swing count; lastSwingTime is the last replayed swing's own timestamp (DateTime.MinValue
+    // if the file had no data rows).
+    private static int ReplaySwings(string inTsv, EncounterData enc, out DateTime lastSwingTime)
+    {
+        lastSwingTime = DateTime.MinValue;
+        int n = 0;
+        foreach (var line in File.ReadLines(inTsv))
+        {
+            if (n == 0 && line.StartsWith("swingType")) { n++; continue; }
+            var c = line.Split('\t');
+            int swingType = int.Parse(c[0]);
+            bool crit = c[1] == "1";
+            long dmg = long.Parse(c[2]);
+            string special = c[3];
+            string attackType = c[4];
+            string attacker = c[5];
+            string damageType = c[6];
+            string victim = c[7];
+            DateTime time = DateTime.Parse(c[8], CultureInfo.InvariantCulture, DateTimeStyles.RoundtripKind);
+            enc.AddCombatAction(new MasterSwing(swingType, crit, special, (Dnum)dmg, time, n, attackType, attacker, damageType, victim));
+            lastSwingTime = time;
+            n++;
+        }
+        return n;
+    }
+
     // Replay one 9-col timed swing TSV through a fresh real-ACT encounter; optionally dump the
     // per-combatant aggregate (aggOut) and the full ExportVariables payload (exportsOut). Returns
     // the swing count.
@@ -221,23 +281,8 @@ internal static class ActOracle
             enc.Active = true;
             zone.ActiveEncounter = enc;
 
-            int n = 0;
-            foreach (var line in File.ReadLines(inTsv))
-            {
-                if (n == 0 && line.StartsWith("swingType")) { n++; continue; }
-                var c = line.Split('\t');
-                int swingType = int.Parse(c[0]);
-                bool crit = c[1] == "1";
-                long dmg = long.Parse(c[2]);
-                string special = c[3];
-                string attackType = c[4];
-                string attacker = c[5];
-                string damageType = c[6];
-                string victim = c[7];
-                DateTime time = DateTime.Parse(c[8], CultureInfo.InvariantCulture, DateTimeStyles.RoundtripKind);
-                enc.AddCombatAction(new MasterSwing(swingType, crit, special, (Dnum)dmg, time, n, attackType, attacker, damageType, victim));
-                n++;
-            }
+            DateTime lastSwingTime;
+            int n = ReplaySwings(inTsv, enc, out lastSwingTime);
 
             if (outTsv != null)
             using (var w = new StreamWriter(outTsv))
@@ -324,6 +369,65 @@ internal static class ActOracle
 
             return n;
         }
+    }
+
+    // Enumerates every key CombatantData.ExportVariables/EncounterData.ExportVariables actually holds
+    // — never a hardcoded key array — so a future plugin-registered key crosses into the baseline
+    // automatically. Same "name\tkey\tvalue" / *ENCOUNTER* row shape as AggregateAndDump's exportsOut,
+    // so a future consumer can parse both fixtures identically.
+    private static void DumpAllExportVariables(EncounterData enc, string outPath)
+    {
+        int skipped = 0;
+        using (var w = new StreamWriter(outPath))
+        {
+            w.WriteLine("name\tkey\tvalue");
+            foreach (var cd in enc.Items.Values)
+            {
+                foreach (var kv in CombatantData.ExportVariables)
+                {
+                    string val;
+                    try { val = kv.Value.GetExportString(cd, ""); }
+                    catch (Exception ex) { var x = ex; while (x.InnerException != null) x = x.InnerException; val = "<EX:" + x.GetType().Name + ">"; }
+                    if (val == null || val == "ERROR" || val.StartsWith("<EX:")) { skipped++; continue; }
+                    if (val.IndexOf('\n') >= 0 || val.IndexOf('\t') >= 0 || val.IndexOf('\r') >= 0) { skipped++; continue; }
+                    w.WriteLine(cd.Name + "\t" + kv.Key + "\t" + val);
+                }
+            }
+
+            var allies = enc.GetAllies();
+            foreach (var kv in EncounterData.ExportVariables)
+            {
+                string val;
+                try { val = kv.Value.GetExportString(enc, allies, ""); }
+                catch (Exception ex) { var x = ex; while (x.InnerException != null) x = x.InnerException; val = "<EX:" + x.GetType().Name + ">"; }
+                if (val == null || val == "ERROR" || val.StartsWith("<EX:")) { skipped++; continue; }
+                if (val.IndexOf('\n') >= 0 || val.IndexOf('\t') >= 0 || val.IndexOf('\r') >= 0) { skipped++; continue; }
+                w.WriteLine("*ENCOUNTER*\t" + kv.Key + "\t" + val);
+            }
+        }
+        Console.WriteLine("  (plugin-baseline: " + CombatantData.ExportVariables.Count + " combatant keys, " +
+            EncounterData.ExportVariables.Count + " encounter keys registered; " + skipped + " row(s) skipped)");
+    }
+
+    // Plugin-in-the-loop mode: replay swings through a fresh encounter with the real plugin's
+    // ExportVariables/ColumnDefs tables installed (LoadPluginAndInitACT_UIMods, called by the caller
+    // before this), then dump every registered key via enumeration. Returns the swing count.
+    private static int PluginBaselineAndDump(string inTsv, string exportsOut)
+    {
+        var zone = new ZoneData(DateTime.Now, "", true, false, false);
+        var enc = new EncounterData("YOU", "", zone);
+        enc.Active = true;
+        zone.ActiveEncounter = enc;
+
+        DateTime lastSwingTime;
+        int n = ReplaySwings(inTsv, enc, out lastSwingTime);
+        // Last10/30/60DPS formatters read FormActMain.LastKnownTime at GetExportString-call time.
+        // The public setter also restarts `estimatedTimer` (a Stopwatch field whose initializer never
+        // ran on our constructor-bypassed instance) and would NRE, so set the backing field directly.
+        typeof(FormActMain).GetField("lastKnownTime", BindingFlags.NonPublic | BindingFlags.Instance)
+            .SetValue(ActGlobals.oFormActMain, lastSwingTime);
+        DumpAllExportVariables(enc, exportsOut);
+        return n;
     }
 
     [STAThread]

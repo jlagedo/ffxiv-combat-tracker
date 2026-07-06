@@ -254,7 +254,7 @@ Each task produces a recorded verdict (fill in the checkbox line). No production
 All gates live in the suites named in [`TESTING.md`](TESTING.md); plugin-in-the-loop gates are
 `[plugin-gated]` and skip cleanly without the real plugins.
 
-- [ ] **P1.1 — Plugin-in-the-loop oracle baseline.** Extend `tools/act-oracle/ActOracle.cs`: after
+- [x] **P1.1 — Plugin-in-the-loop oracle baseline.** Extend `tools/act-oracle/ActOracle.cs`: after
       `SetupAct()`, load `FFXIV_ACT_Plugin.dll` into the same AppDomain and reflection-invoke
       `ACT_UIMods.UpdateACTTables(false)` (see §3). Then **enumerate**
       `CombatantData.ExportVariables`/`EncounterData.ExportVariables` (never hardcode the key list)
@@ -262,6 +262,29 @@ All gates live in the suites named in [`TESTING.md`](TESTING.md); plugin-in-the-
       baseline `tests/fixtures/combat-slice.plugin.exportvars.tsv` (name distinct from the ACT-core
       `combat-slice.exportvars.tsv`). *Done when:* the fixture is committed and regenerable by one
       documented command.
+      **Verdict:** ✅ DONE. New additive mode `ActOracle --plugin-baseline <swings.tsv> <out.tsv>`
+      (`tools/act-oracle/ActOracle.cs`): `LoadPluginAndInitACT_UIMods()` (name deliberately contains
+      `InitACT` — `UpdateACTTables` ends by calling `oFormActMain.ValidateLists()`/
+      `ValidateTableSetup()`, both guarded by `Environment.StackTrace.Contains("InitACT")` against
+      NREs on our constructor-bypassed `FormActMain`, confirmed by direct read of
+      `FormActMain.cs:14492-14502`/`:22292-22302`) loads `FFXIV_ACT_Plugin.dll` via
+      `Assembly.LoadFrom` + reflection and invokes `ACT_UIMods.UpdateACTTables(false)`.
+      `DumpAllExportVariables` enumerates `CombatantData.ExportVariables`/`EncounterData.ExportVariables`
+      directly (`foreach`, zero hardcoded keys) calling `GetExportString(cd,"")` /
+      `GetExportString(enc, enc.GetAllies(), "")`. One real-machine gotcha found and fixed: the public
+      `FormActMain.LastKnownTime` setter (needed by the `Last10/30/60DPS` formatters) restarts a
+      `Stopwatch` field whose initializer never ran on the uninitialized instance — set the private
+      backing field via reflection instead. Smoke-tested end-to-end against the real
+      `E:\tmp\plugins\FFXIV_ACT_Plugin_3.0.2.3\FFXIV_ACT_Plugin.dll`: produced exactly **12 combatant +
+      4 encounter keys** (Job/ParryPct/BlockPct/IncToHit/OverHealPct/DirectHitPct/DirectHitCount/
+      CritDirectHitCount/CritDirectHitPct + Last10/30/60DPS combatant-side; CurrentZoneName +
+      Last10/30/60DPS encounter-side) — an exact match to G1's gap description. Committed
+      `tests/Fct.Compat.Act.Tests/fixtures/combat-slice.plugin.exportvars.tsv` (the real fixture
+      location — the sibling ACT-core baselines live here too, not under a top-level `tests/fixtures/`
+      as this task's literal path suggested). Regenerable by the single documented command
+      `tools/act-oracle/build-and-run.ps1` (extended, additive-only — the existing 2/3-arg and
+      `--folder` code paths, `RegisterTables()`, and the two existing committed fixtures are
+      unchanged, verified by byte-diff before/after the `ReplaySwings` extraction refactor).
 - [ ] **P1.2 — ExportVariables diff gate.** New gate (extends `OverlaySatelliteTests` + a headless
       engine variant): drive the **consumer-replica / host-engine path** (`--consume` satellite or
       `ModernEncounterEngine` — **not** a bare `new FormActMain`, which never calls
