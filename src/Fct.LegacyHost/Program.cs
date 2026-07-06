@@ -882,13 +882,16 @@ namespace Fct.LegacyHost
                 catch { }
             }
             // Stand-in discovery artifact:
-            //   "<found>\t<sdkBound>\t<logLines>\t<combatants>\t<title>\t<status>\t<packets>\t<realIoc>\t<gameVersion>".
+            //   "<found>\t<sdkBound>\t<logLines>\t<combatants>\t<title>\t<status>\t<packets>\t<realIoc>\t
+            //    <gameVersion>\t<language>\t<region>\t<serverTimestampTicks>\t<isChatLogAvailable>".
             // The packets column (P8) is the NetworkReceived/Sent count raised from fanned RawPacketReceived
             // frames — OverlayPlugin's NetworkProcessors bind point. The realIoc column (P9a) is 1
             // when _iocContainer is the real Microsoft.MinIoC.Container resolving ILogFormat+ILogOutput
             // (Hojoring's attach gate). The trailing gameVersion column (PIPELINE-COMPLETENESS-PLAN P1.4/G4)
-            // is the stand-in repository's GetGameVersion() — appended purely for gate observability, never
-            // read elsewhere, so it is safe to append without moving any existing column.
+            // is the stand-in repository's GetGameVersion(); the four columns after it (P1.5/G4) are the
+            // remaining IDataRepository env scalars (GetSelectedLanguageID/GetGameRegion/
+            // GetServerTimestamp().Ticks/IsChatLogAvailable) — all appended purely for gate observability,
+            // never read elsewhere, so each append is safe without moving any existing column.
             if (_standInVerifyPath != null && _standIn != null)
             {
                 try
@@ -901,6 +904,8 @@ namespace Fct.LegacyHost
                         v.LogLines.ToString(inv), v.Combatants.ToString(inv),
                         v.Title ?? "", v.Status ?? "", v.Packets.ToString(inv),
                         v.RealIocContainer ? "1" : "0", v.GameVersion ?? "",
+                        v.Language.ToString(inv), v.Region.ToString(inv),
+                        v.ServerTimestampTicks.ToString(inv), v.IsChatLogAvailable ? "1" : "0",
                     }));
                 }
                 catch { }

@@ -94,6 +94,12 @@ namespace Fct.Parser.Legacy
             {
                 v.Combatants = repo.GetCombatantList().Count;
                 v.GameVersion = repo.GetGameVersion();
+                // PIPELINE-COMPLETENESS-PLAN P1.5/G4: read (never write) the remaining four env scalars —
+                // same "in-satellite discovery gate" observability precedent as GameVersion above.
+                v.Language = (int)repo.GetSelectedLanguageID();
+                v.Region = repo.GetGameRegion();
+                v.ServerTimestampTicks = repo.GetServerTimestamp().Ticks;
+                v.IsChatLogAvailable = repo.IsChatLogAvailable();
             }
             v.LogLines = _sub.LogLinesRaised;
             v.Packets = _sub.NetworkRaised;

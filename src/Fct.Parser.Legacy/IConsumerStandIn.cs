@@ -43,6 +43,15 @@ namespace Fct.Parser.Legacy
         // read purely for gate observability — today always the hardcoded "0.0" stub (no producer env
         // tap, no priming path carries it; P3+P4 fix this).
         public string GameVersion { get; set; } = "";
+        // PIPELINE-COMPLETENESS-PLAN P1.5/G4: the remaining four IDataRepository env scalars, appended
+        // append-only alongside GameVersion for the identical gate-observability reason. Language is the
+        // raw SDK Language enum cast to int (the SDK enum has no defined 0 member, so a plain int survives
+        // the artifact round-trip unambiguously); ServerTimestampTicks is GetServerTimestamp().Ticks (a
+        // DateTime does not serialize losslessly through a single TSV field otherwise).
+        public int Language { get; set; }
+        public byte Region { get; set; }
+        public long ServerTimestampTicks { get; set; }
+        public bool IsChatLogAvailable { get; set; }
     }
 
     // Factory kept SDK-type-free at the seam: the returned interface lets RunConsume hold the stand-in

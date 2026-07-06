@@ -459,10 +459,91 @@ All gates live in the suites named in [`TESTING.md`](TESTING.md); plugin-in-the-
         `Language`/`Region`/`ServerTimestamp`/`IsChatLogAvailable` following the identical
         append-only pattern, and reuse `LateJoinPrimingTests`' `--consume --stand-in` harness shape
         (fold state, subscribe, no live event, read `f[N]`) for a LIVE (not late-join) variant.
-- [ ] **P1.5 — Repository surface gate.** `Fct.Parser.Legacy.Tests`/`Fct.Integration.Tests`:
+- [x] **P1.5 — Repository surface gate.** `Fct.Parser.Legacy.Tests`/`Fct.Integration.Tests`:
       consumer `IDataRepository.GetGameVersion()/GetSelectedLanguageID()/GetGameRegion()/
       GetServerTimestamp()/IsChatLogAvailable()` return **forwarded** values (per P0.3's verdict),
       never the stubs. *Done when:* gate runs red.
+      **Verdict:** ✅ DONE, red as designed. Two complementary gates plus the append-only artifact
+      extension P1.4 handed off:
+      - **Artifact/struct extension (append-only, non-breaking):** `StandInVerification`
+        (`src/Fct.Parser.Legacy/IConsumerStandIn.cs`) gained four fields appended after the existing
+        `GameVersion` (index 8): `Language` (int — the SDK `Language` enum cast to int; the SDK enum
+        has no defined `0` member, so a plain int survives the TSV round-trip unambiguously), `Region`
+        (byte), `ServerTimestampTicks` (long — `DateTime` does not survive one TSV field losslessly
+        otherwise), `IsChatLogAvailable` (bool). `ConsumerStandIn.SelfVerify()` populates them by
+        reading (never writing) the four remaining `ConsumerDataRepository` members. The
+        `--verify-standin` artifact writer (`src/Fct.LegacyHost/Program.cs`, `FlushConsume`) appends
+        them as columns 9–12. Verified non-breaking: `ConsumerStandInTests` indexes `f[0..7]` and
+        `LateJoinPrimingTests` indexes `f[0..8]` positionally, neither asserts array length.
+      - **Live cross-process gate (the primary gate, constraint 2 — host pipe is source of truth):**
+        `tests/Fct.Integration.Tests/RepositorySurfaceLiveTests.cs` —
+        `Live_stand_in_repository_serves_forwarded_env_scalars_never_the_stubs` (`[SkippableFact]`,
+        requires `FFXIV_ACT_Plugin.dll` installed — skips cleanly without it, same guard as
+        `ConsumerStandInTests`/`LateJoinPrimingTests`). Reuses the `--consume --stand-in
+        --verify-standin` harness shape, deliberately as the LIVE axis complementing P1.4's late-join
+        axis: the stand-in satellite boots and subscribes to `repository` with **no** bus pre-staging
+        at all (no producer env tap exists yet — G5 — so there is nothing an env-forwarding event
+        could fold even live; that absence is the point). Asserts the three P0.3 **hard**, machine-
+        independent headless verdicts directly against the real cross-process
+        `ConsumerDataRepository`: `GetGameVersion() == ""` (red — stub returns `"0.0"`),
+        `GetServerTimestamp().Ticks == DateTime.MinValue.Ticks` (red — stub returns `DateTime.UtcNow`),
+        `IsChatLogAvailable() == true` (passes today — documented explicitly as coincidence, not
+        forwarding: the stub's unconditional `true` happens to equal P0.3's verdict; kept as an
+        assertion anyway per the plan's own framing, so a future accidental stub flip to `false` is
+        still caught). Empirically confirmed on this machine (real `FFXIV_ACT_Plugin.dll` installed):
+        artifact `[1 | 1 | 0 | 0 | FFXIV_ACT_Plugin | FFXIV_ACT_Plugin Started. | 0 | 1 | 0.0 | 1 | 0 |
+        639189777964643793 | 1]` — the gate fails on the very first assertion,
+        `Assert.Equal("", gameVersion)` → `Actual: "0.0"` (the `ServerTimestampTicks` column,
+        `639189777964643793`, independently confirms the second assertion would also fail — nowhere
+        near `DateTime.MinValue.Ticks` (`0`) — though xUnit's terminal-assert semantics mean only the
+        first failure surfaces per run, same pattern as P1.4's gates).
+      - **Language/Region — the documented compromise:** P0.3 explicitly left these two
+        *not* hard-pinned (`ParseSettings.LanguageID`/`DataCollectionSettings.RegionID` are
+        host-config-driven — whatever the installed plugin has saved on the running machine).
+        Empirically on this machine the real plugin returns `Language.English` (`1`) / region `0` —
+        **identical to the current stub's hardcoded values** — so a same-machine exact-value assertion
+        in the live cross-process gate would misleadingly *pass* today, masking the gap rather than
+        gating it (the identical coincidence already holds for `IsChatLogAvailable`). Per the plan's
+        explicit escape hatch ("mark the exact-value assertion `[plugin-gated]`/skippable while keeping
+        a non-stub structural assertion red now"), the live gate logs `LanguageRaw`/`RegionRaw` for
+        observability only (not asserted-by-value) and defers the deterministic red assertion to a
+        second, in-process, no-plugin-required gate:
+      - **Structural gate (deterministic, always runs, no satellite/plugin needed):**
+        `tests/Fct.Parser.Legacy.Tests/ConsumerDataRepositoryStubTests.cs` —
+        `ConsumerDataRepository_has_no_forwarded_backing_field_for_language_or_region_yet` asserts (via
+        reflection against the real internal `ConsumerDataRepository`, `InternalsVisibleTo` added
+        test-only to `Fct.Parser.Legacy.csproj`) that an `Apply()`-fed backing field exists for
+        `Language`/region, mirroring every other forwarded member (`_pid`/`_playerId`/`_territoryId`/
+        `_combatants`/`_resources`). Deliberately red today — neither field exists;
+        `GetSelectedLanguageID()`/`GetGameRegion()` are unconditional literal expression bodies
+        (`ConsumerDataSurface.cs` ~156-157). Confirmed failing:
+        `expected ConsumerDataRepository to hold an Apply()-fed Language backing field (P3.5) — none
+        exists yet`. A sibling documenting-only fact,
+        `ConsumerDataRepository_serves_hardcoded_env_stubs_today_documenting_G4` (green), pins today's
+        five literal stub values so an incidental future edit to the stub itself is caught first.
+      - **No regressions:** `Fct.Parser.Legacy.Tests` 10/10 run, 9 passed + this 1 new intentional red
+        (was 8/8 before). `Fct.Integration.Tests` full run: 45 tests, 36–37 passed, 6 intentional reds
+        (P1.2 `OverlaySatelliteTests` + P1.3 `LineStreamDiffTests`×2 + P1.4 `LateJoinPrimingTests`×2 +
+        this phase's new `RepositorySurfaceLiveTests`), 2 skipped (env-gated, unrelated).
+        `FourRealPackagesTests` failed on multiple runs in this session, including in isolation, with a
+        partial (nondeterministic) damage total each time — confirmed unrelated to this change: it
+        never touches `--stand-in`/`--verify-standin` (grepped), and its flakiness is already
+        documented as pre-existing/run-ordering-sensitive in the P1.2/P1.3/P1.4 verdicts above. Full
+        solution build (`dotnet build ffxiv-combat-tracker.slnx`) and the `Fct.App.csproj` stage build
+        stay green.
+      - **Handoff for P1.6:** unrelated surface (`PartyChanged`/`PartySize`) — no dependency on this
+        phase's artifact columns.
+      - **Handoff for P3:** P3.5 must (1) add `ConsumerDataRepository` backing fields for `Language`
+        and `Region` fed from `Apply()`, flipping
+        `ConsumerDataRepository_has_no_forwarded_backing_field_for_language_or_region_yet` green; (2)
+        replace the `GetGameVersion`/`GetServerTimestamp` stubs with the forwarded mirror, flipping
+        `RepositorySurfaceLiveTests`'s `GameVersion`/`ServerTimestamp` assertions green; (3) delete the
+        five stubs (`ConsumerDataSurface.cs` ~156-160) per the plan, at which point
+        `ConsumerDataRepository_serves_hardcoded_env_stubs_today_documenting_G4` must be deleted or
+        rewritten (it currently pins the stub literals and will fail once they are gone — expected,
+        not a regression). The `--verify-standin` artifact's columns 9–12
+        (`Language`/`Region`/`ServerTimestampTicks`/`IsChatLogAvailable`) are ready to observe the real
+        forwarded values once P3 lands; no further harness changes are needed on the observability side.
 - [ ] **P1.6 — Alliance party gate.** `Fct.FlowTests` `EventMappingFlowTests` + a satellite gate:
       a `PartyChanged` with `PartySize < Members.Count` must preserve **both** end-to-end (today
       `EventMappingFlowTests.cs:14-29` asserts a size derived from `Members.Count`). *Done when:*
