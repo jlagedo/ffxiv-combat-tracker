@@ -882,11 +882,13 @@ namespace Fct.LegacyHost
                 catch { }
             }
             // Stand-in discovery artifact:
-            //   "<found>\t<sdkBound>\t<logLines>\t<combatants>\t<title>\t<status>\t<packets>\t<realIoc>".
+            //   "<found>\t<sdkBound>\t<logLines>\t<combatants>\t<title>\t<status>\t<packets>\t<realIoc>\t<gameVersion>".
             // The packets column (P8) is the NetworkReceived/Sent count raised from fanned RawPacketReceived
-            // frames — OverlayPlugin's NetworkProcessors bind point. The trailing realIoc column (P9a) is 1
+            // frames — OverlayPlugin's NetworkProcessors bind point. The realIoc column (P9a) is 1
             // when _iocContainer is the real Microsoft.MinIoC.Container resolving ILogFormat+ILogOutput
-            // (Hojoring's attach gate).
+            // (Hojoring's attach gate). The trailing gameVersion column (PIPELINE-COMPLETENESS-PLAN P1.4/G4)
+            // is the stand-in repository's GetGameVersion() — appended purely for gate observability, never
+            // read elsewhere, so it is safe to append without moving any existing column.
             if (_standInVerifyPath != null && _standIn != null)
             {
                 try
@@ -898,7 +900,7 @@ namespace Fct.LegacyHost
                         v.Found ? "1" : "0", v.SdkTypesBound ? "1" : "0",
                         v.LogLines.ToString(inv), v.Combatants.ToString(inv),
                         v.Title ?? "", v.Status ?? "", v.Packets.ToString(inv),
-                        v.RealIocContainer ? "1" : "0",
+                        v.RealIocContainer ? "1" : "0", v.GameVersion ?? "",
                     }));
                 }
                 catch { }

@@ -90,7 +90,11 @@ namespace Fct.Parser.Legacy
             var sub = obj.GetType().GetProperty("DataSubscription")?.GetValue(obj) as IDataSubscription;
             var repo = obj.GetType().GetProperty("DataRepository")?.GetValue(obj) as IDataRepository;
             v.SdkTypesBound = sub != null && repo != null;
-            if (repo != null) v.Combatants = repo.GetCombatantList().Count;
+            if (repo != null)
+            {
+                v.Combatants = repo.GetCombatantList().Count;
+                v.GameVersion = repo.GetGameVersion();
+            }
             v.LogLines = _sub.LogLinesRaised;
             v.Packets = _sub.NetworkRaised;
             // Reproduce Hojoring's XIVPluginHelper.Attach() container gate: _iocContainer must be the real

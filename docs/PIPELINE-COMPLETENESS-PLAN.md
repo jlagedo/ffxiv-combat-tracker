@@ -393,11 +393,72 @@ All gates live in the suites named in [`TESTING.md`](TESTING.md); plugin-in-the-
         unchanged), 2 skipped (env-gated `DistTreeGateTests`/`FrameFixtureGenerator`, unrelated).
         `FourRealPackagesTests` passed in this run (its documented run-ordering flakiness did not
         reproduce).
-- [ ] **P1.4 — Late-join convergence gate.** Same harness as P1.3, but the consumer subscribes
+- [x] **P1.4 — Late-join convergence gate.** Same harness as P1.3, but the consumer subscribes
       **after** the slice's zone/map/player/version lines have been folded: assert it receives the
       one-shot state lines (`01/02/40/12/249/250/253`, last-seen instance each) and a
       `GameVersion`-bearing repository value from **priming alone** (no live line). *Done when:*
       gate runs red.
+      **Verdict:** ✅ DONE, red as designed — and deliberately a DIFFERENT axis from P1.3 (which
+      already proved live rawlog never crosses at all, G14). P1.4 isolates G8 specifically: even
+      where the one-shot state has already folded into host session state before a consumer exists
+      (standing in for P2's not-yet-built tap), a **late-joining** rawlog subscriber still converges
+      on none of it, because `BuildPrimeEvents` (`SatelliteHost.cs` ~388-431) has no branch for the
+      `rawlog` token at all — it primes typed zone/party/player/repository forms only, never a cached
+      one-shot `RawLogLine` (no last-line cache exists anywhere upstream; that is P4.1). Two gates,
+      both in `tests/Fct.Integration.Tests/LateJoinPrimingTests.cs`:
+      - **`Late_rawlog_subscriber_converges_on_none_of_the_one_shot_lines_from_priming_alone`**
+        (plugin-free, always runs): a real `GameEventBus`/`GameSession` + a real, running
+        `GameSnapshotAggregator` (the exact production host wiring) fold the typed zone/player/party/
+        process state, then the test folds the P0.1 one-shot line set (`01/02/12/40/249/250/253`)
+        **twice** per type (an earlier "first load" instance, then a later "relog/zone move" instance)
+        directly onto the shared bus — standing in for P2's tap, since `GameEventBus.Emit` fans only
+        to the CURRENT subscriber snapshot and has no history/replay of its own. Only THEN does a late
+        `SatelliteHost` (the real production class) subscribe, via the existing `--sink
+        <path> --subscribe rawlog,zoneparty` driver (unmodified — no new `Fct.LegacyHost` code needed
+        for this gate), so `HandleSubscribe`→`BuildPrimeEvents`→`SatelliteEgress` runs for real against
+        the already-folded snapshot. No live event follows the subscribe. The recorded wire frames are
+        decoded with the real `GameEventFrame.TryParse`. **Control** (not the gate's point, but proves
+        the harness isolates the right gap): the late joiner DOES receive a primed `ZoneChanged`
+        (`ZoneId=999, ZoneName="Kugane"`) from the existing typed-fold priming mechanism — confirming
+        this is specifically a rawlog gap, not a total priming failure. **The gate:** priming should
+        replay the LAST instance of each one-shot type in ACT emission order
+        (`253/249/250 → 01 → 02 → 40 → 12`, P4.2) — `Assert.Equal(expectedLastInstances, primedRaw)`
+        fails with `Actual: []`; zero of the 7 expected lines arrive, confirming G8 exactly (not a
+        subset, not a harness exception — the control assertions immediately above it passed).
+      - **`Late_stand_in_repository_never_converges_on_a_forwarded_GameVersion_from_priming_alone`**
+        (`[SkippableFact]`, requires `FFXIV_ACT_Plugin.dll` — skips cleanly without it): same fold,
+        then a late `--consume --stand-in --verify-standin` satellite (the real
+        `ConsumerStandIn`/`ConsumerDataRepository`) subscribes with no live event after. Per P0.3, a
+        headless real plugin serves `GetGameVersion() == ""`; the gate asserts the repository
+        converges on that forwarded value from priming alone. Deliberately red today:
+        `ConsumerDataRepository.GetGameVersion()` (`ConsumerDataSurface.cs` ~158) hardcodes `"0.0"`
+        unconditionally (G4) and no wire path forwards any env at all yet (G5/P3 not built), so the
+        assertion fails with `Actual: "0.0"`.
+      - **Test-only/harness-adjacent additions (no forwarding-behavior change):** `StandInVerification`
+        (`Fct.Parser.Legacy/IConsumerStandIn.cs`) gained one appended `GameVersion` field (index 8,
+        after the existing `RealIocContainer` at index 7 — verified non-breaking: `ConsumerStandInTests`
+        indexes `f[0..7]` positionally and never asserts array length); `ConsumerStandIn.SelfVerify()`
+        populates it by reading (never writing) `ConsumerDataRepository.GetGameVersion()`;
+        `Fct.LegacyHost/Program.cs`'s `--verify-standin` artifact writer appends the same field. Purely
+        additive observability, exactly the class's own precedent ("the in-satellite discovery gate").
+      - **No regressions:** full `Fct.Integration.Tests` run — 44 tests (42 + these 2 new), 37 passed,
+        5 failed (P1.4's 2 new intentional reds + the pre-existing P1.2 `OverlaySatelliteTests` red +
+        P1.3's 2 `LineStreamDiffTests` reds, all unchanged), 2 skipped (env-gated, unrelated).
+        `FourRealPackagesTests` passed in this run (no flake reproduced). `Fct.Parser.Legacy.Tests`
+        (8/8) and the full solution build stay green.
+      - **Narrowing:** the GameVersion assertion is asserted through the real cross-process
+        `ConsumerDataRepository` (not narrowed to an in-process host-snapshot shortcut) — chosen
+        because P1.5 is specifically "the repository surface gate" and this reuses that exact seam
+        (`StandInVerification`), so P1.5 inherits the artifact format directly. The rawlog gate
+        folds one-shot lines onto the bus directly (bypassing a real facade/tap) rather than via a
+        producer satellite process, since P1.3 already proved no tap exists to produce them live —
+        the point here is priming, not production; using the real `GameSnapshotAggregator` +
+        `SatelliteHost`/`BuildPrimeEvents`/`SatelliteEgress` keeps every OTHER link in the chain real.
+      - **Handoff for P1.5:** `StandInVerification.GameVersion` (and the `--verify-standin` artifact's
+        appended 9th column) is reusable as-is — P1.5 can extend the same struct/artifact with
+        `Language`/`Region`/`ServerTimestamp`/`IsChatLogAvailable` following the identical
+        append-only pattern, and reuse `LateJoinPrimingTests`' `--consume --stand-in` harness shape
+        (fold state, subscribe, no live event, read `f[N]`) for a LIVE (not late-join) variant.
 - [ ] **P1.5 — Repository surface gate.** `Fct.Parser.Legacy.Tests`/`Fct.Integration.Tests`:
       consumer `IDataRepository.GetGameVersion()/GetSelectedLanguageID()/GetGameRegion()/
       GetServerTimestamp()/IsChatLogAvailable()` return **forwarded** values (per P0.3's verdict),
