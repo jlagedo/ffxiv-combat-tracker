@@ -42,6 +42,24 @@ public class AudioServiceTests
     }
 
     [Fact]
+    public void Most_recent_terminal_sink_wins_among_equal_priority()
+    {
+        // Two audio-slot hijackers (Discord-Triggers then Hojoring's TTSYukkuri) both register a terminal
+        // sink at the same priority. Real ACT is last-hijacker-wins; the SECOND registration must own the
+        // chain, and the first must receive nothing.
+        var audio = NewService();
+        var first = new RecordingAudioSink("first");
+        var second = new RecordingAudioSink("second");
+        audio.RegisterSink(first, priority: 10, terminal: true);
+        audio.RegisterSink(second, priority: 10, terminal: true);
+
+        audio.Speak("hi");
+
+        Assert.Single(second.Speaks);
+        Assert.Empty(first.Speaks);
+    }
+
+    [Fact]
     public void Play_carries_volume()
     {
         var audio = NewService();

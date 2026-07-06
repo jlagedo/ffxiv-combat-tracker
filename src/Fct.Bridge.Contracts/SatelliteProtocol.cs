@@ -26,9 +26,10 @@ public static class SatelliteProtocol
 {
     // Wire-protocol version (distinct from the CLR runtime version in the READY `clr` field). v2 adds
     // the satellite identity + hosted package to the handshake so the host can attribute N concurrent
-    // satellites; v3 adds the host-routed service commands (audio produce/sink, P6). Bumped whenever the
-    // frame grammar changes; both ends live in this one file.
-    public const int ProtocolVersion = 3;
+    // satellites; v3 adds the host-routed service commands (audio produce/sink, P6); v4 adds the consumer
+    // EndCombat route-up (ENDCOMBAT, P9a). Bumped whenever the frame grammar changes; both ends live in
+    // this one file.
+    public const int ProtocolVersion = 4;
 
     public const string ReadyPrefix = "READY";
     public const string HwndPrefix = "HWND ";
@@ -54,6 +55,13 @@ public static class SatelliteProtocol
     public const string PlaySoundPrefix = "PLAYSND ";        // <vol>|<b64 filePath>
     public const string RegisterSinkPrefix = "REGISTERSINK ";    // <tts|sound|both>
     public const string UnregisterSinkPrefix = "UNREGISTERSINK "; // <tts|sound|both>
+
+    // Satellite -> host: a consumer facade's EndCombat(export) (P9a — e.g. Hojoring's wipeout end). A
+    // consumer replica must NOT end its encounter locally (that would fork it from the host engine's
+    // order); it routes the request up, the host ends the authoritative encounter, and EndCombatRequested
+    // fans back down the swings stream to every replica (incl. the origin), bus-ordered. Consumer->host
+    // only — the producer keeps its in-band CombatEndRaised path so parser EndCombat stays swing-ordered.
+    public const string EndCombatPrefix = "ENDCOMBAT ";      // <export 0/1>
 
     // Satellite -> host: a custom log line a consumer wrote back through ILogOutput.WriteLine (P6). The
     // host re-emits it as a bus RawLogLine (fresh sequence + clock), fanned to every rawlog subscriber
@@ -266,6 +274,17 @@ public static class SatelliteProtocol
         if (parts.Length < 2) return false;
         int.TryParse(parts[0], NumberStyles.Integer, CultureInfo.InvariantCulture, out volume);
         filePath = UnB64(parts[1]);
+        return true;
+    }
+
+    /// <summary>Format "ENDCOMBAT &lt;export&gt;" — a consumer facade routes its EndCombat request up (P9a).</summary>
+    public static string FormatEndCombat(bool export) => EndCombatPrefix + (export ? "1" : "0");
+
+    public static bool TryParseEndCombat(string? line, out bool export)
+    {
+        export = false;
+        if (line == null || !line.StartsWith(EndCombatPrefix, StringComparison.Ordinal)) return false;
+        export = line.Substring(EndCombatPrefix.Length).Trim() == "1";
         return true;
     }
 

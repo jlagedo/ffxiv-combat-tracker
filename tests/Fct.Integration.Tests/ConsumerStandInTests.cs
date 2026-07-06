@@ -77,6 +77,9 @@ namespace Fct.Integration.Tests
                 Assert.Equal(2, int.Parse(f[3], CultureInfo.InvariantCulture));         // GetCombatantList = the snapshot mirror
                 Assert.Equal("FFXIV_ACT_Plugin", f[4]);
                 Assert.Equal("FFXIV_ACT_Plugin Started.", f[5]);
+                // P9a: _iocContainer is the real parser Microsoft.MinIoC.Container resolving ILogFormat +
+                // ILogOutput — Hojoring's XIVPluginHelper.Attach() gate passes against the stand-in.
+                Assert.Equal("1", f[7]);
             }
             finally
             {

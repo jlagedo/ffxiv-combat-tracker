@@ -481,7 +481,27 @@ namespace Advanced_Combat_Tracker
             Log($"[ChangeZone] {zoneName}");
         }
 
+        // When set (consumer satellites, P9a), EndCombat routes UP the bridge instead of ending the local
+        // replica: the host ends the authoritative encounter and fans EndCombatRequested back down so every
+        // replica ends in one bus order. The producer + dev-standalone leave this false — the producer keeps
+        // its in-band CombatEndRaised path so parser-driven EndCombat stays ordered within the swing stream.
+        public static bool RouteEndCombatUp;
+
         public void EndCombat(bool actExport)
+        {
+            var route = ServiceRoute;
+            if (RouteEndCombatUp && route != null)
+            {
+                route.EndCombat(actExport);   // consumer: route up; the fan-back applies it (no local end)
+                return;
+            }
+            EndCombatLocal(actExport);
+        }
+
+        // The non-routing apply. Used by the producer/dev-standalone path above and by the consumer's
+        // downstream fan-back (Program.FoldConsume) so the fanned EndCombatRequested does not re-route up.
+        // Public (not an ACT member) so the satellite can call it across the assembly boundary.
+        public void EndCombatLocal(bool actExport)
         {
             _lifecycle.EndCombat(actExport);
             CombatEndRaised?.Invoke(actExport);

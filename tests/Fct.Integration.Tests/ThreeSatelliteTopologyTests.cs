@@ -115,6 +115,79 @@ namespace Fct.Integration.Tests
             }
         }
 
+        // ISOLATION-PLAN P9a: N>1 consumer plugins in ONE package satellite. Two fixtures loaded under
+        // Hojoring entry-assembly titles both resolve (via PackageResolver) to the single "hojoring"
+        // package, so the router spawns ONE satellite hosting both — the topology Hojoring's four suite
+        // plugins need (they share FFXIV.Framework singletons). Killing the satellite restarts it and the
+        // router replays BOTH loads (SatelliteStarted → ReplayPackageAsync, in original order — the ordered
+        // _packagePlugins list; each key loads once here, so the RemoveAll+Add tail-move never reorders).
+        // Plugin-free — the fixtures stand in for the suite; no Hojoring needed.
+        [SkippableFact]
+        public async Task Hojoring_package_hosts_multiple_plugins_in_one_satellite_and_replays_all_on_restart()
+        {
+            var root = ReplayBridgeHarness.RepoRoot();
+            Skip.If(root is null, "repo root not found");
+            var appDir = Path.Combine(root!, "src", "Fct.App", "bin", ReplayBridgeHarness.Config(), "net10.0-windows");
+            var exe = Path.Combine(appDir, "satellite", "Fct.LegacyHost.exe");
+            var triggerDll = ReplayBridgeHarness.FixturePluginDll(root!, "Fct.Fixtures.TriggerFixture");
+            var sinkDll = ReplayBridgeHarness.FixturePluginDll(root!, "Fct.Fixtures.SinkFixture");
+            Skip.IfNot(File.Exists(exe), $"satellite not staged at {exe}");
+            Skip.IfNot(File.Exists(triggerDll), $"trigger fixture not built at {triggerDll}");
+            Skip.IfNot(File.Exists(sinkDll), $"sink fixture not built at {sinkDll}");
+
+            var prevInstall = Environment.GetEnvironmentVariable(Fct.Logging.AppData.InstallDirEnvVar);
+            Environment.SetEnvironmentVariable(Fct.Logging.AppData.InstallDirEnvVar, appDir);
+
+            var bus = new GameEventBus();
+            var session = new GameSession(bus, new GameSnapshotProvider());
+            var supervisor = new SatelliteSupervisor(NullLoggerFactory.Instance, bus, session: session, audio: new RecordingAudioOutput());
+            var router = new SatelliteRouter(supervisor, NullLoggerFactory.Instance);
+
+            var announced = new ConcurrentDictionary<string, int>(StringComparer.OrdinalIgnoreCase);
+            router.PluginAnnounced += p => announced.AddOrUpdate(p.Key, 1, (_, n) => n + 1);
+
+            async Task<bool> WaitBothAnnounced(int minCount, int timeoutMs)
+            {
+                var deadline = Environment.TickCount64 + timeoutMs;
+                while (Environment.TickCount64 < deadline)
+                {
+                    if (announced.TryGetValue("ssp", out var a) && a >= minCount &&
+                        announced.TryGetValue("tts", out var b) && b >= minCount) return true;
+                    await Task.Delay(100);
+                }
+                return false;
+            }
+
+            try
+            {
+                // Two plugins under Hojoring titles → the one "hojoring" satellite.
+                Assert.True(await router.RequestLoadPluginAsync("ssp", triggerDll, "ACT.SpecialSpellTimer"),
+                    "SpecialSpellTimer load was not forwarded");
+                Assert.True(await router.RequestLoadPluginAsync("tts", sinkDll, "ACT.TTSYukkuri"),
+                    "TTSYukkuri load was not forwarded");
+
+                Assert.True(await WaitBothAnnounced(1, 25000), "both hojoring plugins did not announce");
+
+                var sat = Assert.Single(supervisor.Satellites);
+                Assert.Equal("hojoring", sat.Package);
+                var pid = sat.Pid;
+
+                // Kill the satellite; the supervisor restarts it and the router replays BOTH loads.
+                announced.Clear();
+                System.Diagnostics.Process.GetProcessById(pid).Kill();
+
+                Assert.True(await WaitBothAnnounced(1, 30000), "both hojoring plugins did not re-announce after restart");
+                var restarted = Assert.Single(supervisor.Satellites);
+                Assert.Equal("hojoring", restarted.Package);
+                Assert.NotEqual(pid, restarted.Pid);   // a fresh process
+            }
+            finally
+            {
+                await router.StopAllAsync(TimeSpan.FromSeconds(8));
+                Environment.SetEnvironmentVariable(Fct.Logging.AppData.InstallDirEnvVar, prevInstall);
+            }
+        }
+
         [SkippableFact]
         public async Task Uninstalling_a_packages_last_plugin_stops_and_kills_its_satellite()
         {

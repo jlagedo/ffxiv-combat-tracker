@@ -11,6 +11,10 @@ namespace Advanced_Combat_Tracker
         void Speak(string text, int volume, int channel, bool synchronous);
         void PlaySound(string filePath, int volume);
 
+        // EndCombat route-up (P9a): a consumer facade routes its EndCombat(export) request up so the host
+        // engine ends the authoritative encounter and fans EndCombatRequested back down to every replica.
+        void EndCombat(bool export);
+
         // Named callbacks (P6): register/release a per-name host proxy, and invoke (the host is the single
         // fan-out point — it fans back down to every owner, including this origin).
         void RegisterCallback(string name, bool allowDuplicate);

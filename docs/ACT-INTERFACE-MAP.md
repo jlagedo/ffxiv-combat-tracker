@@ -36,7 +36,7 @@ decisions are locked and recorded under each section's **Strategy** (look for `D
 - [x] **G‑1** ✅ `TTS(string)` / `PlaySound(string)` **methods** → route to delegate fields — §6 — BREAK
 - [x] **G‑2** ✅ `ActGlobals.oFormSpellTimers` + `FormSpellTimers` (2 events) — §7 — BREAK *(built with M4‑2)*
 - [x] **G‑3** ✅ `FormActMain.DpiScale` property → `DeviceDpi / 96f` (System-DPI-aware satellite) — §10 — MINOR
-- [ ] **VERIFY** 🟡 `BeforeLogLineRead` reflectable multicast field; exact "…Started" status string set before Trig/OP/Hojoring init — §3 / §1
+- [x] **VERIFY** ✅ `BeforeLogLineRead` reflectable multicast field — pinned plugin-free (a test reproduces Hojoring `LogBuffer.cs`'s unhook-all-and-insert-first sequence, ISOLATION-PLAN §P9a). The exact "…Started" status string is a live-run confirmation (Trig only; OP/Hojoring don't gate on it) — §3 / §1
 - [ ] **G‑4** 🟡 `TraySlider` / `ButtonLayoutEnum` inert stubs — **deferred on-demand** (build only if a bind throws) — §11
 
 **M4 — Hojoring:**
@@ -125,8 +125,11 @@ then reflect the FFXIV `pluginObj` for live data (§14).
 
 **Strategy.** All present. `Invoke`/`Handle` come free from `FormActMain : Form`. The
 load-bearing requirement is that the host populates `ActPlugins` with the FFXIV entry whose
-`pluginObj` is our `WrappedFfxivPlugin` and whose `lblPluginStatus.Text` is the exact "…Started"
-string (🟡 **VERIFY** — shared by Trig/OP/Hojoring init). `GetVersion()` returns `3.8.5.288`.
+`pluginObj` is our `WrappedFfxivPlugin`/synthetic stand-in and whose `lblPluginTitle.Text` starts
+`FFXIV_ACT_Plugin`. **Discovery keys differ by consumer:** OP matches title + `cbEnabled.Checked` +
+non-null `pluginObj`; Triggernometry additionally gates on `lblPluginStatus.Text` being the exact
+"…Started" string; **Hojoring binds by filename only** (`pluginFile.Name.Contains("FFXIV_ACT_Plugin")`
+— no status-text gate). `GetVersion()` returns `3.8.5.288`.
 
 ## 2. Producer write-path (aggregation) — ✅ DONE
 
@@ -172,7 +175,7 @@ reorder handlers (run first).
 | ✅ | `LogFilePath` / `LogFileFilter` | FFXIV | redirect ACT's active log |
 | ✅ | `TimeStampLen` / `LogPathHasCharName` / `ZoneChangeRegex` | FFXIV | configure ACT's line parsing |
 | ✅ | `GetDateTimeFromLog` (`DateTimeLogParser`) | FFXIV | plugin owns timestamp parsing (saved/restored) |
-| 🟡 | `BeforeLogLineRead` (event; **reflectable multicast field**) | FFXIV, OP, Trig, Hojo | inbound hook; OP/Hojo unhook-all-and-insert-first via reflection — **VERIFY** shape |
+| ✅ | `BeforeLogLineRead` (event; **reflectable multicast field**) | FFXIV, OP, Trig, Hojo | inbound hook; OP/Hojo unhook-all-and-insert-first via reflection — field-shape pinned plugin-free (§P9a) |
 | ✅ | `OnLogLineRead` (event) | Trig, Hojo, OP | rebroadcast parsed lines — the trigger/parse feed |
 | ✅ | `LogFileChanged` (event) | FFXIV | import-vs-live handling |
 | ✅ | `LogLineEventArgs.{logLine,originalLogLine,detectedType,detectedTime,detectedZone,companionLogName}` | FFXIV, OP, Trig, Hojo | line payload fields |
@@ -427,8 +430,8 @@ the FFXIV `pluginObj` from `ActPlugins` (§1) and reflects three members:
 | St | member | shape | consumers | why |
 |:--:|---|---|---|---|
 | ✅ | `DataRepository` (property) | `IDataRepository` (pull) | OP (~30 sites), Trig, Hojo | `GetCombatantList`, `GetCurrentPlayerID`, `GetPlayer`, `GetResourceDictionary`, `GetSelectedLanguageID`, `GetCurrentTerritoryID`, `GetCurrentFFXIVProcess`, `GetGameVersion`, `GetServerTimestamp` — party panels, target info, name→id, zone/process gating |
-| ✅ | `DataSubscription` (property) | `IDataSubscription` (11 events) | OP, Trig, Hojo | `NetworkReceived`/`NetworkSent` (raw packets — OP's ~20 decoders + `RegisterNetworkParser`), `LogLine`/`ParsedLogLine` (Trig feed), `ZoneChanged`, `ProcessChanged` (no-game liveness), `PartyListChanged`, `PrimaryPlayerChanged` |
-| ✅ | `_iocContainer` (private field, MinIoC) | `GetService`/`Resolve<T>` | OP, Hojo | resolves `ILogOutput` for OP's **custom-log round-trip** (synthetic IDs ≥ 256 — MapEffect/FateDirector/CEDirector/InCombat); Hojo also resolves `ILogFormat` |
+| ✅ | `DataSubscription` (property) | `IDataSubscription` (11 events) | OP, Trig | `NetworkReceived`/`NetworkSent` (raw packets — OP's ~20 decoders + `RegisterNetworkParser`), `LogLine`/`ParsedLogLine` (Trig feed), `ZoneChanged`, `ProcessChanged` (no-game liveness), `PartyListChanged`, `PrimaryPlayerChanged`. **Hojoring is NOT a subscriber** — `SubscribeXIVPluginEvents()` is empty; it is **pull-only** (polls `DataRepository` + derives zone/party/player changes by diff) |
+| ✅ | `_iocContainer` (private field, `Microsoft.MinIoC.Container`) | `GetService`/`Resolve<T>` | OP, Hojo | resolves `ILogOutput` for OP's **custom-log round-trip** (synthetic IDs ≥ 256 — MapEffect/FateDirector/CEDirector/InCombat); Hojo **casts it to `Microsoft.MinIoC.Container`** (a type compiled into `FFXIV_ACT_Plugin.dll`) and hard-gates attach on `Resolve<ILogFormat>()` **and** `Resolve<ILogOutput>()` non-null |
 
 **Strategy — DONE.** `WrappedFfxivPlugin` (placed in `pluginObj`) forwards the real plugin's
 `DataRepository` unchanged (every `Get*` lands on the genuine repository), substitutes
@@ -439,6 +442,21 @@ thread replacing the per-subscriber `BeginInvoke` fan-out — ~250× faster), an
 consumers still see `NetworkReceived` normally. **No gaps** against the observed consumer set.
 (Adjacent: OP also reflects the **Machina** assembly directly for region/opcodes — same discovery
 path, not part of this seam.)
+
+**Isolated-satellite seam (the synthetic stand-in).** In the split topology a parser-free consumer
+satellite serves this whole surface from the host-routed streams via `Fct.Parser.Legacy`'s synthetic
+`FFXIV_ACT_Plugin` stand-in: `DataRepository` from the repository-snapshot mirror, `DataSubscription`
+events re-raised from the fanned stream, and `_iocContainer` as a **real** `Microsoft.MinIoC.Container`
+constructed reflectively from the parser DLL (the type is compiled into `FFXIV_ACT_Plugin.dll`), with a
+write-back `ILogOutput` + a non-null `ILogFormat` registered so Hojoring's cast + `Resolve<T>` gate pass
+and OP's `GetService`→`WriteLine` round-trip works ([`ISOLATION-PLAN.md`](ISOLATION-PLAN.md) §P9a).
+
+**Hojoring → OverlayPlugin coupling (not an ACT seam).** Separately, Hojoring reflects **in-process**
+into OverlayPlugin.Core's `PluginLoader.Container` (`IEnmityMemory`/`ICombatantMemory`/`ITargetMemory`
+→ enmity list, focus/hover target IDs). In the split topology the scan finds no OverlayPlugin, `Attach()`
+fails **soft** (`IsAttached=false`, getters return `0`/empty) — identical to running Hojoring without
+OverlayPlugin installed under real ACT, a supported configuration; Sharlayan remains Hojoring's primary
+enmity/target source. **Accepted degradation, no side-channel pipe in v1** ([`ISOLATION-PLAN.md`](ISOLATION-PLAN.md) §5).
 
 ## 15. OverlayPlugin's web + extension surface — ✅ self-hosted (non-goal for us)
 

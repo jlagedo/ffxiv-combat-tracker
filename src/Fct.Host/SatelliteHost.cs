@@ -447,6 +447,15 @@ public sealed class SatelliteHost
             _rawLog?.Emit((LogMessageType)logId, logText);
             return true;
         }
+        if (SatelliteProtocol.TryParseEndCombat(line, out var endExport))
+        {
+            // Consumer EndCombat route-up (P9a): inject EndCombatRequested onto the bus (like the LOGLINE
+            // arm, not the audio arm) so the host engine ends the authoritative encounter and the swings
+            // egress fans it back down to every replica including the origin, in bus order. Timestamp is
+            // unused by the end operation (both the engine and the consumer fan-back read only Export).
+            _sink.Emit(new EndCombatRequested(_sink.NextSequence(), DateTimeOffset.Now, endExport));
+            return true;
+        }
         if (SatelliteProtocol.TryParseRegisterCb(line, out var cbName, out _)) { RegisterCallbackProxy(cbName); return true; }
         if (SatelliteProtocol.TryParseUnregisterCb(line, out var ucbName)) { UnregisterCallbackProxy(ucbName); return true; }
         if (SatelliteProtocol.TryParseInvokeCb(line, out var icbName, out var icbArg))

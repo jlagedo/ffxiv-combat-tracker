@@ -66,6 +66,25 @@ internal static class PackageResolver
                 SatelliteProtocol.StreamRepository,
             });
 
+        // ACT.Hojoring — the four-plugin suite (SpecialSpellTimer/UltraScouter/TTSYukkuri/XIVLog) shares
+        // process-wide singletons in FFXIV.Framework, so it MUST land in one satellite (ISOLATION-PLAN §2):
+        // any of the four entry assemblies (or the bare suite signal) resolves to the same "hojoring"
+        // package. A pull consumer — it takes the overlay read set MINUS packets (no RegisterNetworkParser
+        // consumer in the suite): the encounter replica + log lines + zone/party + combatants + repository.
+        if (Matches("hojoring", assemblyFile, id, title)
+            || Matches("specialspelltimer", assemblyFile, id, title)
+            || Matches("ultrascouter", assemblyFile, id, title)
+            || Matches("ttsyukkuri", assemblyFile, id, title)
+            || Matches("xivlog", assemblyFile, id, title))
+            return new PackageDescriptor("hojoring", SatelliteRole.Consumer, new[]
+            {
+                SatelliteProtocol.StreamSwings,
+                SatelliteProtocol.StreamRawLog,
+                SatelliteProtocol.StreamZoneParty,
+                SatelliteProtocol.StreamCombatants,
+                SatelliteProtocol.StreamRepository,
+            });
+
         // Any other legacy plugin: isolate it in its own consumer satellite with the common read set,
         // so an unrecognized plugin is still process-isolated (and this generalizes to the P9 packages).
         var package = Sanitize(!string.IsNullOrWhiteSpace(id) ? id! : StripDll(assemblyFile) ?? "legacy");

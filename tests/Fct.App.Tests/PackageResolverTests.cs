@@ -53,6 +53,33 @@ public sealed class PackageResolverTests
         Assert.Contains(SatelliteProtocol.StreamRepository, d.Subscriptions);
     }
 
+    [Theory]
+    [InlineData("ACT.SpecialSpellTimer.dll")]
+    [InlineData("ACT.UltraScouter.dll")]
+    [InlineData("ACT.TTSYukkuri.dll")]
+    [InlineData("ACT.XIVLog.dll")]
+    public void Every_hojoring_entry_assembly_resolves_to_the_one_hojoring_package(string assemblyFile)
+    {
+        // The four suite entry assemblies (plus the bare "hojoring" signal) MUST all land in the single
+        // "hojoring" consumer satellite — splitting them would fork FFXIV.Framework's shared singletons.
+        var d = PackageResolver.Resolve(assemblyFile, null, null);
+        Assert.Equal("hojoring", d.Package);
+        Assert.Equal(SatelliteRole.Consumer, d.Role);
+        Assert.Contains(SatelliteProtocol.StreamSwings, d.Subscriptions);
+        Assert.Contains(SatelliteProtocol.StreamRawLog, d.Subscriptions);
+        Assert.Contains(SatelliteProtocol.StreamZoneParty, d.Subscriptions);
+        Assert.Contains(SatelliteProtocol.StreamCombatants, d.Subscriptions);
+        Assert.Contains(SatelliteProtocol.StreamRepository, d.Subscriptions);
+        // The overlay set MINUS packets: no RegisterNetworkParser consumer in the suite.
+        Assert.DoesNotContain(SatelliteProtocol.StreamPackets, d.Subscriptions);
+    }
+
+    [Fact]
+    public void The_bare_hojoring_signal_resolves_to_the_hojoring_package()
+    {
+        Assert.Equal("hojoring", PackageResolver.Resolve(null, "hojoring", "ACT.Hojoring").Package);
+    }
+
     [Fact]
     public void An_unknown_legacy_plugin_gets_its_own_isolated_consumer_satellite()
     {

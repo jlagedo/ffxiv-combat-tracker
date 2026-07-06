@@ -36,6 +36,9 @@ namespace Fct.Parser.Legacy
         public int Combatants { get; set; }
         // NetworkReceived/NetworkSent raised from fanned RawPacketReceived frames (ISOLATION-PLAN P8).
         public int Packets { get; set; }
+        // _iocContainer is the real parser-embedded Microsoft.MinIoC.Container AND resolves ILogFormat +
+        // ILogOutput non-null — Hojoring's XIVPluginHelper.Attach() gate (ISOLATION-PLAN P9a).
+        public bool RealIocContainer { get; set; }
     }
 
     // Factory kept SDK-type-free at the seam: the returned interface lets RunConsume hold the stand-in

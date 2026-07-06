@@ -472,63 +472,77 @@ tested/installed version is 0.19.101 (P9d truth-up).
 
 #### P9a — Hojoring contract closure (facade/stand-in/router gaps; plugin-free unless noted)
 
-- [ ] **`hojoring` PackageResolver arm** — match the suite's entry assemblies
+- [x] **`hojoring` PackageResolver arm** — matches the suite's entry assemblies
       (`ACT.SpecialSpellTimer`, `ACT.UltraScouter`, `ACT.TTSYukkuri`, `ACT.XIVLog`, plus the
       `hojoring` signal) → package `hojoring`, `Consumer`, subscriptions
       `swings,rawlog,zoneparty,combatants,repository` (the overlay set minus `packets` — no
       `RegisterNetworkParser` consumer in the suite). **Risk closed:** without the arm the
       generic fallback sanitizes each of the four DLLs into its **own** package → four
-      satellites → `FFXIV.Framework`'s shared statics split across processes. Extend
-      `PackageResolverTests` (all four ids resolve to one `hojoring` descriptor).
-- [ ] **Four plugins, one satellite, verified end-to-end.** The role-gated `LOADPLUGIN` guard
+      satellites → `FFXIV.Framework`'s shared statics split across processes.
+      `PackageResolverTests` asserts all four entry assemblies + the bare signal resolve to one
+      `hojoring` descriptor (and `DoesNotContain(packets)`).
+- [x] **Four plugins, one satellite, verified end-to-end.** The role-gated `LOADPLUGIN` guard
       already admits N consumer plugins per process (it rejects only parser/consumer
-      cross-loads, `Program.cs:1300-1312`); verify the router path at N>1: four `LOADPLUGIN`s
-      forward to the one `hojoring` satellite, the roster aggregates four rows, and
-      `SatelliteStarted` restart-replay reloads **all four in original load order** (Hojoring's
-      in-suite init order matters — `FFXIV.Framework` singletons start on first toucher). Gate
-      with fixture plugins (two-plugin package), no Hojoring needed.
-- [ ] **Real-MinIoC stand-in container** — the P9 landmine, closed first. Today's
-      `StandInIocContainer` is a synthetic type; Hojoring's cast to `Microsoft.MinIoC.Container`
-      throws and attach never completes → the whole suite stays dead. Replace the seam's backing
-      with a **real** `Microsoft.MinIoC.Container` instance, constructed reflectively from the
-      parser's Costura-embedded assembly (the same load-parser-DLL + run-module-constructor path
-      P5 built for `FFXIV_ACT_Plugin.Common`), registering the existing `ILogOutput` write-back
-      plus a minimal `ILogFormat`. Keep OverlayPlugin's `GetService` reflection working against
-      the same object (MinIoC's `Resolve` satisfies it, or a thin subclass). **Derisk step
-      first:** sweep Hojoring's actual `ILogFormat` member usage and implement only that
-      surface; if MinIoC's generic `Resolve<T>()` can't be satisfied cross-`AssemblyResolve`
-      in a spike, fallback is registering factories via reflection over
-      `Container.Register(Type, Func<object>)` — spike before committing the design.
-      Plugin-gated (the container type lives in the parser DLL — same precondition as the P5
-      stand-in itself).
-- [ ] **`EndCombat` route-up** — a consumer facade's `EndCombat(true)` is local-only today
-      (`FormActMain.cs:484` → `_lifecycle.EndCombat`), so a Hojoring wipeout-end would fork its
-      replica from the host engine — a parity break, not a feature gap. Route it like P6 audio:
-      facade `EndCombat` → `IHostServiceRoute` → `ENDCOMBAT` control command up → host
-      lifecycle `EndCombat` → `EndCombatRequested` fans down the `swings` stream, bus-ordered,
-      to every replica **including the origin**, which applies it on the fan-back (no local
-      apply — replicas stay host-ordered; `EndCombat` is idempotent so the producer-side path
-      is unaffected). Local fallback (no service route) keeps today's behavior for
-      dev-standalone. Gate (plugin-free e2e): a consumer satellite calls `EndCombat`; host
-      engine and a **peer** replica both end the encounter; YOU totals stay three-way equal.
-- [ ] **Multi-sink audio semantics pinned** — with TTSYukkuri and Discord-Triggers both
-      registered, two `SatelliteAudioSinkProxy`s sit at priority 10/terminal, and
-      `AudioService`'s equal-priority order is registration order — first-registered wins,
-      the **opposite** of real ACT's last-hijacker-owns-the-slot. Pin **most-recent
-      registration wins among equal-priority terminal sinks** (matches ACT), unit-test it, and
-      assert the precedence in the P9c soak (Hojoring TTS lands in TTSYukkuri's sink when both
-      are registered; falls back to the other on `UNREGISTERSINK`).
-- [ ] **`BeforeLogLineRead` reflection compat gate** — Hojoring rebuilds the facade's private
-      event backing field via reflection and casts each handler to `LogLineEventDelegate`. The
-      facade's field-like event (`FormActMain.cs:243`) has the right shape; pin it with a
-      plugin-free test that reproduces `LogBuffer.cs`'s exact unhook-all-and-insert-first
-      sequence against the facade and asserts delivery order.
-- [ ] **`ACT-INTERFACE-MAP.md` corrections** from the sweep: Hojoring consumes no
-      `IDataSubscription` events (§14), discovery is filename-only (no `lblPluginStatus` gate),
-      and the Hojoring→OverlayPlugin reflection path + accepted degradation are recorded.
+      cross-loads, `Program.cs`); the router path at N>1 is gated in
+      `ThreeSatelliteTopologyTests`: two fixture plugins under Hojoring titles resolve to the one
+      `hojoring` satellite, both announce on the aggregated roster, and killing the satellite
+      restarts it and `SatelliteStarted`→`ReplayPackageAsync` replays **both** loads in original
+      order (the ordered `_packagePlugins` list). Plugin-free (fixtures stand in for the suite).
+- [x] **Real-MinIoC stand-in container** — the P9 landmine, closed. The synthetic
+      `StandInIocContainer` is replaced (in the stand-in path) by a **real**
+      `Microsoft.MinIoC.Container`. **Spike-corrected mechanism:** `Microsoft.MinIoC.Container` is
+      **compiled directly into `FFXIV_ACT_Plugin.dll`** (not a separate Costura assembly — the
+      spike proved `Assembly.Load("Microsoft.MinIoC")` fails while `parserAsm.GetType(
+      "Microsoft.MinIoC.Container")` resolves), so `MinIocStandIn.TryBuildRealContainer`
+      constructs it reflectively from the loaded parser assembly and registers `ILogOutput`
+      (write-back) + `ILogFormat` via `Register<T>(container, Func<T>)` (the only factory
+      overload — invoked with a `Func<T>` built by a generic helper). The two log services are
+      **`RealProxy`** instances over the runtime interfaces (net48-native — no compile-time
+      Logfile reference, no `DispatchProxy` package; ILogFormat's ~35 members are covered by one
+      `Invoke`); the ILogOutput proxy answers `GetType()` with the interface type so OverlayPlugin's
+      `logOutput.GetType().GetMethod("WriteLine")` reflection resolves and routes to the write-back.
+      Falls back to the synthetic container when the parser isn't loaded (OP's `GetService` path
+      still works; Hojoring is plugin-gated). Gate: `ConsumerStandInTests` asserts the stand-in's
+      `SelfVerify` `RealIocContainer` column (`_iocContainer` is the real `Microsoft.MinIoC.Container`
+      resolving `ILogFormat`+`ILogOutput`); `ConsumerProbeDiscoveryTests` confirms the OP
+      `GetService`→`WriteLine` round-trip still works. Plugin-gated.
+- [x] **`EndCombat` route-up** — a consumer facade's `EndCombat(true)` routed like P6 audio:
+      facade `EndCombat` → `IHostServiceRoute.EndCombat` → `ENDCOMBAT` control command up → host
+      injects `EndCombatRequested` on the bus → fans down the `swings` stream, bus-ordered, to
+      every replica **including the origin**, which applies it via `EndCombatLocal` on the
+      fan-back (no local apply — replicas stay host-ordered; `EncounterLifecycle.EndCombat` is
+      idempotent). **Role-gated** by a static `FormActMain.RouteEndCombatUp` flag set only on
+      consumer satellites: the producer keeps its in-band `CombatEndRaised`→`BridgeForwarder`
+      path (so parser-driven `EndCombat` stays swing-ordered), and dev-standalone keeps the local
+      path. Gates: `EndCombatRouteUpTests` (plugin-free e2e — a consumer routes `EndCombat` up,
+      the host injects it on the bus and fans it down to a peer, over the real pipe) +
+      `EndCombatRouteTests` (facade unit, both flag states). Engine-fold parity is covered by the
+      existing `Fct.Engine.Tests`/`ConsumerProjectionTests`.
+- [x] **Multi-sink audio semantics pinned** — **most-recent registration wins among
+      equal-priority terminal sinks** (matches real ACT's last-hijacker-owns-the-slot): a
+      monotonic `Seq` tie-break (`OrderByDescending(Priority).ThenByDescending(Seq)`) in both
+      `AudioService` (production) and `RecordingAudioOutput` (the testing fake the
+      integration/soak tests register the terminal proxy on). Unit-tested
+      (`AudioServiceTests.Most_recent_terminal_sink_wins_among_equal_priority`). The P9c soak
+      asserts the cross-satellite precedence (Hojoring TTS → TTSYukkuri's sink when both
+      registered; falls back on `UNREGISTERSINK`).
+- [x] **`BeforeLogLineRead` reflection compat gate** — pinned plugin-free
+      (`BeforeLogLineReadReflectionTests`): the facade's field-like `BeforeLogLineRead` event
+      exposes a backing field of the exact name; the test reproduces `LogBuffer.cs`'s exact
+      `GetField`→`GetInvocationList`→unhook-all→insert-first→re-add sequence and asserts the
+      inserted handler runs first with the originals' relative order preserved.
+- [x] **`ACT-INTERFACE-MAP.md` corrections** from the sweep, applied: Hojoring consumes no
+      `IDataSubscription` events (§14 — pull-only), discovery is filename-only (§1 — no
+      `lblPluginStatus` gate), the `_iocContainer` is the parser-embedded
+      `Microsoft.MinIoC.Container` (§14), the isolated-satellite stand-in seam is recorded (§14),
+      the `BeforeLogLineRead` VERIFY row is flipped ✅ (§3), and the Hojoring→OverlayPlugin
+      reflection path + accepted degradation are recorded (§14).
 
 **Exit P9a:** every contract gap between the P5-P8 consumer fabric and Hojoring's measured
-surface is closed and individually gated; no task below discovers a new seam.
+surface is closed and individually gated. ✅ (One sweep fact was corrected during execution:
+`Microsoft.MinIoC.Container` is compiled into `FFXIV_ACT_Plugin.dll`, not a separate
+Costura-embedded assembly — the container is built reflectively from the parser assembly and the
+log services are `RealProxy` instances; see the container task above.)
 
 #### P9b — Hojoring satellite e2e **[plugin-gated: ACT.Hojoring + FFXIV_ACT_Plugin installed]**
 

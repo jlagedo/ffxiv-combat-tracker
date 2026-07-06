@@ -222,6 +222,18 @@ namespace Fct.LegacyHost
                 }
             }
 
+            // EndCombat route-up driver (ISOLATION-PLAN P9a): a plugin-free consumer that installs the
+            // BridgeServiceRoute + RouteEndCombatUp and, after a settle, calls the facade EndCombat once —
+            // exercising the full facade -> ENDCOMBAT wire -> host bus-injection chain. The host injects
+            // EndCombatRequested onto the bus, which fans down the swings stream to every subscriber.
+            //   --emit-endcombat --bridge <pipe>
+            int eei = Array.IndexOf(args, "--emit-endcombat");
+            if (eei >= 0)
+            {
+                var eePipe = ParseBridgeArg(args);
+                if (eePipe != null) { RunEmitEndCombat(eePipe); return; }
+            }
+
             // Stand-in write-back seam (ISOLATION-PLAN P6, plugin-gated): register the synthetic stand-in,
             // then reflect its _iocContainer → GetService(ILogOutput) → WriteLine EXACTLY as OverlayPlugin's
             // FFXIVRepository does, and record the RawLogLine the host fans back — proving a consumer's
@@ -675,7 +687,9 @@ namespace Fct.LegacyHost
                     act.ChangeZone(z.ZoneName);
                     break;
                 case Fct.Abstractions.EndCombatRequested c:
-                    act.EndCombat(c.Export);
+                    // Fan-back: apply locally without re-routing up (RouteEndCombatUp is set on consumers,
+                    // so act.EndCombat would loop the request back up the bridge).
+                    act.EndCombatLocal(c.Export);
                     break;
                 case Fct.Abstractions.RawLogLine r:
                     // Re-raise the fanned raw line through ACT's Before/OnLogLineRead hooks so an
@@ -705,7 +719,9 @@ namespace Fct.LegacyHost
         private static void FlushConsume(FormActMain act, ref long youTotal, string dumpPath)
         {
             if (System.Threading.Interlocked.Exchange(ref _consumeFlushed, 1) != 0) return;
-            try { if (act.InCombat) act.EndCombat(true); } catch { }
+            // Local end — teardown closes the replica for the parity dump; it must never route up (the host
+            // may already be gone), so use EndCombatLocal regardless of RouteEndCombatUp.
+            try { if (act.InCombat) act.EndCombatLocal(true); } catch { }
             try { File.WriteAllText(dumpPath, youTotal.ToString(System.Globalization.CultureInfo.InvariantCulture)); } catch { }
             // Sibling log-line verification artifact: "<re-raised count>\t<mutation-observed count>".
             if (_logLineVerifyPath != null)
@@ -719,9 +735,11 @@ namespace Fct.LegacyHost
                 catch { }
             }
             // Stand-in discovery artifact:
-            //   "<found>\t<sdkBound>\t<logLines>\t<combatants>\t<title>\t<status>\t<packets>".
-            // The trailing packets column (P8) is the NetworkReceived/Sent count raised from fanned
-            // RawPacketReceived frames — OverlayPlugin's NetworkProcessors bind point.
+            //   "<found>\t<sdkBound>\t<logLines>\t<combatants>\t<title>\t<status>\t<packets>\t<realIoc>".
+            // The packets column (P8) is the NetworkReceived/Sent count raised from fanned RawPacketReceived
+            // frames — OverlayPlugin's NetworkProcessors bind point. The trailing realIoc column (P9a) is 1
+            // when _iocContainer is the real Microsoft.MinIoC.Container resolving ILogFormat+ILogOutput
+            // (Hojoring's attach gate).
             if (_standInVerifyPath != null && _standIn != null)
             {
                 try
@@ -733,6 +751,7 @@ namespace Fct.LegacyHost
                         v.Found ? "1" : "0", v.SdkTypesBound ? "1" : "0",
                         v.LogLines.ToString(inv), v.Combatants.ToString(inv),
                         v.Title ?? "", v.Status ?? "", v.Packets.ToString(inv),
+                        v.RealIocContainer ? "1" : "0",
                     }));
                 }
                 catch { }
@@ -873,6 +892,10 @@ namespace Fct.LegacyHost
                 Environment.Exit(1);
                 return;
             }
+            // A consumer replica routes EndCombat UP (P9a): the host ends the authoritative encounter and
+            // fans EndCombatRequested back down to every replica in one bus order. Set only here (producer +
+            // dev-standalone keep the local/in-band path).
+            FormActMain.RouteEndCombatUp = true;
             SendLine(SatelliteProtocol.PluginsEnd);                            // empty roster; plugin arrives via LOADPLUGIN
             SendLine(SatelliteProtocol.FormatSubscribe(streams.Split(',')));   // declare the downstream stream set
 
@@ -1647,6 +1670,76 @@ namespace Fct.LegacyHost
             }
         }
 
+        // EndCombat route-up driver (ISOLATION-PLAN P9a): stand up the facade with a BridgeServiceRoute and
+        // RouteEndCombatUp set (exactly a consumer satellite's config), then call the facade EndCombat once.
+        // With the flag+route set, EndCombat sends ENDCOMBAT up the bridge; the host injects EndCombatRequested
+        // onto the bus and fans it down the swings stream. Plugin-free.
+        private static void RunEmitEndCombat(string pipeName)
+        {
+            SatelliteLogging.Initialize(_satelliteId);
+            _log = SatelliteLogging.Log;
+            FacadeHost.Log = SatelliteLogging.WriteLegacy;
+            _log.LogInformation(LogEvents.SatelliteBooting, "Emit-endcombat: pipe={Pipe}", pipeName);
+
+            Application.EnableVisualStyles();
+            Application.SetCompatibleTextRenderingDefault(false);
+            FacadeHost.CreateAct();
+            var act = ActGlobals.oFormActMain;
+
+            try
+            {
+                _bridge = new NamedPipeClientStream(".", pipeName, PipeDirection.Out);
+                _bridge.Connect(5000);
+                _writer = new StreamWriter(_bridge) { AutoFlush = true };
+                SendLine(SatelliteProtocol.FormatReady(
+                    System.Diagnostics.Process.GetCurrentProcess().Id,
+                    Environment.Is64BitProcess, Environment.Version.ToString(), _satelliteId, _package));
+                SendLine(SatelliteProtocol.PluginsEnd);
+                SendLine(SatelliteProtocol.FormatSubscribe(SatelliteProtocol.StreamSwings));
+            }
+            catch (Exception ex)
+            {
+                _log.LogError(LogEvents.SatelliteBridgeConnectFailed, ex, "Emit-endcombat bridge connect failed");
+                Environment.Exit(1);
+                return;
+            }
+
+            FormActMain.ServiceRoute = new BridgeServiceRoute();
+            FormActMain.RouteEndCombatUp = true;   // a consumer replica routes EndCombat up the bridge
+            StartShutdownExit(pipeName);
+
+            // Route one EndCombat up after a settle, so both this satellite's and any peer's egress are
+            // subscribed before the request is sent.
+            new System.Threading.Thread(() =>
+            {
+                try
+                {
+                    System.Threading.Thread.Sleep(2000);
+                    act.EndCombat(true);   // flag+route set → FormatEndCombat up the bridge
+                    _log.LogInformation(LogEvents.SatelliteBooting, "Emit-endcombat: routed EndCombat up");
+                }
+                catch (Exception ex) { _log.LogError(LogEvents.SatelliteBooting, ex, "Emit-endcombat route failed"); }
+            }) { IsBackground = true, Name = "emit-endcombat-route" }.Start();
+
+            // Keep the process alive (reading the command pipe) until the host tears us down.
+            try
+            {
+                _cmdPipe = new NamedPipeClientStream(".", pipeName + "-cmd", PipeDirection.In);
+                _cmdPipe.Connect(30000);
+                using var reader = new StreamReader(_cmdPipe);
+                while (reader.ReadLine() != null) { }
+            }
+            catch (Exception ex)
+            {
+                _log.LogError(LogEvents.SatelliteBridgeConnectFailed, ex, "Emit-endcombat command-pipe read failed");
+            }
+            finally
+            {
+                SatelliteLogging.Shutdown();
+                Environment.Exit(0);
+            }
+        }
+
         // Stand-in write-back seam driver (ISOLATION-PLAN P6, plugin-gated): register the synthetic parser
         // stand-in, subscribe to rawlog, then reflect the _iocContainer → GetService(ILogOutput) → WriteLine
         // exactly as OverlayPlugin's FFXIVRepository.WriteLogLineImpl does, and record the RawLogLine the
@@ -2010,6 +2103,8 @@ namespace Fct.LegacyHost
                 => SendLine(SatelliteProtocol.FormatUnregisterCb(name ?? ""));
             public void InvokeCallback(string name, object argument)
                 => SendLine(SatelliteProtocol.FormatInvokeCb(name ?? "", argument?.ToString() ?? ""));
+            public void EndCombat(bool export)
+                => SendLine(SatelliteProtocol.FormatEndCombat(export));
         }
 
         private static System.Threading.Timer _audioSinkPoll;

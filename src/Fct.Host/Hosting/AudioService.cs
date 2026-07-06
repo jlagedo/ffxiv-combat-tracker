@@ -19,6 +19,7 @@ internal sealed class AudioService : IAudioOutput
 {
     private readonly object _gate = new();
     private readonly List<Registration> _sinks = new();
+    private int _seq;
     private readonly ILogger<AudioService> _log;
 
     public AudioService(ILogger<AudioService> log) => _log = log;
@@ -45,14 +46,18 @@ internal sealed class AudioService : IAudioOutput
     public IDisposable RegisterSink(IAudioSink sink, int priority = 0, bool terminal = false)
     {
         if (sink is null) throw new ArgumentNullException(nameof(sink));
-        var reg = new Registration(sink, priority, terminal);
-        lock (_gate) _sinks.Add(reg);
+        Registration reg;
+        lock (_gate) { reg = new Registration(sink, priority, terminal, _seq++); _sinks.Add(reg); }
         return new ActionDisposable(() => { lock (_gate) _sinks.Remove(reg); });
     }
 
+    // Higher priority first; among equal priority, MOST-RECENT registration first — so a later terminal
+    // sink (e.g. TTSYukkuri hijacking the slot after Discord-Triggers) owns the chain, matching real ACT's
+    // last-hijacker-wins delegate-swap semantics. OrderByDescending is stable, so the Seq tie-break is
+    // what inverts the otherwise first-registered-wins order.
     private Registration[] SinksByPriority()
     {
-        lock (_gate) return _sinks.OrderByDescending(r => r.Priority).ToArray();
+        lock (_gate) return _sinks.OrderByDescending(r => r.Priority).ThenByDescending(r => r.Seq).ToArray();
     }
 
     /// <summary>Observe the sink's ValueTask without blocking the producer; log a fault, never throw.</summary>
@@ -73,6 +78,7 @@ internal sealed class AudioService : IAudioOutput
         public IAudioSink Sink { get; }
         public int Priority { get; }
         public bool Terminal { get; }
-        public Registration(IAudioSink sink, int priority, bool terminal) { Sink = sink; Priority = priority; Terminal = terminal; }
+        public int Seq { get; }
+        public Registration(IAudioSink sink, int priority, bool terminal, int seq) { Sink = sink; Priority = priority; Terminal = terminal; Seq = seq; }
     }
 }
