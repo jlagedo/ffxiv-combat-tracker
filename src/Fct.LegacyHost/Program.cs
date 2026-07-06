@@ -127,6 +127,26 @@ namespace Fct.LegacyHost
                 }
             }
 
+            // From-start facade-tail replay (PIPELINE-COMPLETENESS-PLAN P1.3, TEST-ONLY driver): tail a
+            // given log path through the real ACT facade (OpenLog -> the same background tail P0.1's
+            // LineSeamCoverageTests proves delivers every line type to OnLogLineRead) and attach the REAL
+            // production BridgeForwarder so any P1.3 harness can observe over the real bridge whether
+            // today's producer forwards facade-tailed lines onto the wire. Optionally loads the real
+            // FFXIV_ACT_Plugin first (--load-parser, the [plugin-gated] variant) — this only changes
+            // whether a parser is present, exactly the existing LOADPLUGIN->OnParserLoaded wiring; it adds
+            // no new tap and fixes nothing.
+            //   --replay-tail <logPath> [--load-parser] --bridge <pipe>
+            int rti = Array.IndexOf(args, "--replay-tail");
+            if (rti >= 0 && args.Length >= rti + 2)
+            {
+                var rtPipe = ParseBridgeArg(args);
+                if (rtPipe != null)
+                {
+                    RunReplayTail(args[rti + 1], Array.IndexOf(args, "--load-parser") >= 0, rtPipe);
+                    return;
+                }
+            }
+
             // Downstream sink: a plugin-free satellite that SUBSCRIBEs to a stream set and records every
             // frame the host fans down to it — the P4 downstream-data-plane e2e subject.
             //   --sink <recordPath> --subscribe <streams> --bridge <pipe>
@@ -155,7 +175,8 @@ namespace Fct.LegacyHost
                     RunConsume(args[ci + 1], ParseArgValue(args, "--subscribe") ?? SatelliteProtocol.StreamSwings,
                         consumePipe, ParseArgValue(args, "--verify-loglines"),
                         Array.IndexOf(args, "--stand-in") >= 0, ParseArgValue(args, "--verify-standin"),
-                        Array.IndexOf(args, "--probe") >= 0, ParseArgValue(args, "--verify-latency"));
+                        Array.IndexOf(args, "--probe") >= 0, ParseArgValue(args, "--verify-latency"),
+                        ParseArgValue(args, "--verify-loglines-full"));
                     return;
                 }
             }
@@ -471,6 +492,58 @@ namespace Fct.LegacyHost
             }
         }
 
+        // From-start facade-tail replay (PIPELINE-COMPLETENESS-PLAN P1.3 gate driver, TEST-ONLY — no
+        // production behavior change): connect the bridge, stand up the ACT facade, optionally load the
+        // real FFXIV_ACT_Plugin (mirroring LoadStandalonePlugins' exact OnParserLoaded wiring, so the
+        // production BridgeForwarder attaches precisely as it would once a producer's LOADPLUGIN
+        // completes), then start the REAL file tail (OpenLog) against the given log path — the same tail
+        // LineSeamCoverageTests (P0.1) proves delivers every line type to OnLogLineRead byte-identical and
+        // in order. This driver exercises only the EXISTING facade + BridgeForwarder; it adds no new tap
+        // and fixes nothing (G14 stays exactly as it is today), so it lets the P1.3 gate observe over the
+        // real wire whether a facade-tailed line ever reaches a rawlog-subscribed consumer.
+        private static void RunReplayTail(string logPath, bool loadParser, string pipeName)
+        {
+            SatelliteLogging.Initialize(_satelliteId);
+            _log = SatelliteLogging.Log;
+            FacadeHost.Log = SatelliteLogging.WriteLegacy;
+            _log.LogInformation(LogEvents.SatelliteBooting,
+                "Replay-tail: log={Log} loadParser={LoadParser} pipe={Pipe}", logPath, loadParser, pipeName);
+
+            ConnectBridge(pipeName);   // opens the event pipe (out) + sends READY + arms the shutdown waiter
+            FacadeHost.InstallAssemblyResolver();
+            Application.EnableVisualStyles();
+            Application.SetCompatibleTextRenderingDefault(false);
+            FacadeHost.CreateAct();
+            _standalone = false;
+
+            // A hidden pump so BridgeForwarder's discovery Timer (and, if loaded, the plugin's own
+            // WinForms timers) tick; the tail itself runs on its own background thread regardless.
+            var pump = new Form { ShowInTaskbar = false, FormBorderStyle = FormBorderStyle.None,
+                                  WindowState = FormWindowState.Minimized, Visible = false };
+            _ = pump.Handle;
+
+            var act = ActGlobals.oFormActMain;
+            if (loadParser)
+            {
+                _ffxiv = FacadeHost.LoadWrappedFfxivPlugin(FacadeHost.FfxivPluginPath);
+                _plugins[_ffxiv.Key] = _ffxiv;
+                SendPlugin(_ffxiv);
+                OnParserLoaded();   // real production wiring: creates + starts the REAL BridgeForwarder
+            }
+            else
+            {
+                _forwarder = new BridgeForwarder(SendLine, _log);
+                _forwarder.Start();
+            }
+            SendLine(SatelliteProtocol.PluginsEnd);
+
+            act.LogFilePath = logPath;
+            act.OpenLog(false, false);   // real tail thread: FeedLine -> Before/OnLogLineRead
+
+            Application.Run(pump);   // ends via the shutdown waiter (ConnectBridge) -> OnShutdownCommand
+            SatelliteLogging.Shutdown();
+        }
+
         // Downstream sink (ISOLATION-PLAN P4): connect the bridge, complete the handshake, declare a
         // stream set (SUBSCRIBE), and record every frame the host fans down the command pipe. No plugin,
         // no facade, no message loop — a headless subscriber that proves the host→satellite fan-out over
@@ -548,7 +621,7 @@ namespace Fct.LegacyHost
         // the encounters the fanned lifecycle split the stream into (the parity value vs the host engine).
         private static void RunConsume(string dumpPath, string streams, string pipeName,
             string logLineVerifyPath = null, bool standIn = false, string standInVerifyPath = null, bool probe = false,
-            string latencyPath = null)
+            string latencyPath = null, string logLineFullVerifyPath = null)
         {
             OpenLatency(latencyPath);   // P9b: fold-time QPC capture for rawlog markers
             SatelliteLogging.Initialize(_satelliteId);
@@ -585,6 +658,20 @@ namespace Fct.LegacyHost
                     System.Threading.Interlocked.Increment(ref _logLineCount);
                     if (a.logLine != null && a.logLine.StartsWith(LogLineMutationMarker, StringComparison.Ordinal))
                         System.Threading.Interlocked.Increment(ref _logLineMutationObserved);
+                };
+            }
+
+            // Full-content log-line verification (PIPELINE-COMPLETENESS-PLAN P1.3): record every re-raised
+            // OnLogLineRead line's type + exact bytes, in receipt order — unlike the count-only verify
+            // above, this is a byte-diff artifact against the replayed slice. No mutation here (that
+            // marker is the sibling gate's concern), so the recorded text is exactly what crossed the wire.
+            _logLineFullVerifyPath = logLineFullVerifyPath;
+            if (logLineFullVerifyPath != null)
+            {
+                act.OnLogLineRead += (imp, a) =>
+                {
+                    var row = a.detectedType.ToString(System.Globalization.CultureInfo.InvariantCulture) + "\t" + (a.logLine ?? "");
+                    lock (_logLineFullLock) _logLineFullRecords.Add(row);
                 };
             }
 
@@ -759,6 +846,9 @@ namespace Fct.LegacyHost
         private static string _logLineVerifyPath;
         private static long _logLineCount;
         private static long _logLineMutationObserved;
+        private static string _logLineFullVerifyPath;
+        private static readonly List<string> _logLineFullRecords = new List<string>();
+        private static readonly object _logLineFullLock = new object();
         private static Fct.Parser.Legacy.IConsumerStandIn _standIn;
         private static string _standInVerifyPath;
         private static void FlushConsume(FormActMain act, ref long youTotal, string dumpPath)
@@ -776,6 +866,18 @@ namespace Fct.LegacyHost
                     File.WriteAllText(_logLineVerifyPath, string.Format(System.Globalization.CultureInfo.InvariantCulture,
                         "{0}\t{1}", System.Threading.Interlocked.Read(ref _logLineCount),
                         System.Threading.Interlocked.Read(ref _logLineMutationObserved)));
+                }
+                catch { }
+            }
+            // Full-content log-line artifact: one "<type>\t<line>" row per re-raised OnLogLineRead event,
+            // in receipt order — the byte-diff-against-the-slice input for the P1.3 gate.
+            if (_logLineFullVerifyPath != null)
+            {
+                try
+                {
+                    string[] rows;
+                    lock (_logLineFullLock) rows = _logLineFullRecords.ToArray();
+                    File.WriteAllLines(_logLineFullVerifyPath, rows);
                 }
                 catch { }
             }

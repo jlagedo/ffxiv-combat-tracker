@@ -326,12 +326,73 @@ All gates live in the suites named in [`TESTING.md`](TESTING.md); plugin-in-the-
         intentional red) and `Fct.Integration.Tests` suite (34/36 passing + the 1 intentional red;
         the 40th, `FourRealPackagesTests`, is pre-existing run-ordering flakiness — confirmed green
         in isolation, unrelated to this change) show no regressions.
-- [ ] **P1.3 — Line-stream diff gate (from-start).** New `Fct.Integration.Tests` gate: feed the
+- [x] **P1.3 — Line-stream diff gate (from-start).** New `Fct.Integration.Tests` gate: feed the
       P0.1 slice through the facade tail seam (plugin-free) → producer forwarder → wire → host →
       a `rawlog`-subscribed consumer; capture the consumer's `OnLogLineRead` lines; byte-diff
       content **and order** against the slice file. Assert the frame's `LogMessageType` is correct
       per line. Add a `[plugin-gated]` variant with the real plugin loaded (same assertion). *Done
       when:* gate runs red (rawlog is ChatLog-only today).
+      **Verdict:** ✅ DONE, red as designed — and red for a starker reason than "ChatLog-only":
+      empirically, **zero** lines cross today, of any type, whether or not the real plugin is loaded.
+      - **Gate:** `tests/Fct.Integration.Tests/LineStreamDiffTests.cs` —
+        `Plugin_free_facade_tail_lines_do_not_reach_a_rawlog_consumer_today` and
+        `Plugin_gated_facade_tail_lines_do_not_reach_a_rawlog_consumer_today` (`[SkippableFact]`,
+        the latter `Skip.IfNot(File.Exists(SatelliteRunFixture.FfxivPluginPath), …)`). Both drive the
+        same `RunGate` helper: write the P0.1 12-line slice's *target file* empty, start a REAL
+        producer satellite subprocess and a REAL consumer satellite subprocess sharing one
+        `GameEventBus`/`GameSession` (the `SatelliteHost` production class, exactly the
+        `LogWriteBackTests`/`ConsumerLogLineTests` two-satellite pattern), let the producer's tail
+        bind, append the slice bytes to the tailed file (the P0.1 cross-process trick), wait, shut
+        both down, then byte-diff the consumer's recorded `OnLogLineRead` lines (content + order)
+        against the slice and assert each arrived line's frame `LogMessageType` (leading `NN|` key,
+        per P0.2) against what did cross.
+      - **Test-only harness additions (no change to any existing tap or forwarding behavior):**
+        - `Fct.LegacyHost/Program.cs`: new CLI driver `--replay-tail <logPath> [--load-parser]
+          --bridge <pipe>` → `RunReplayTail`. Connects the bridge, stands up the ACT facade,
+          optionally loads the real `FFXIV_ACT_Plugin` (`--load-parser`, mirroring
+          `LoadStandalonePlugins`' exact `OnParserLoaded()` wiring so the real `BridgeForwarder`
+          attaches precisely as production does once a producer's `LOADPLUGIN` completes), then
+          calls `act.OpenLog` on the given path — the same tail `LineSeamCoverageTests` (P0.1)
+          proves delivers every line type to `OnLogLineRead`. Adds no new tap; exercises only the
+          existing facade + `BridgeForwarder`.
+        - `Fct.LegacyHost/Program.cs` `RunConsume`: new optional `--verify-loglines-full <path>`,
+          additive alongside the existing count-only `--verify-loglines` (unchanged, still used by
+          `ConsumerLogLineTests`). Subscribes `OnLogLineRead` (no mutation) and records one
+          `"<detectedType>\t<logLine>"` row per re-raised event, in receipt order — the byte-diff
+          input this gate needs, vs. the prior artifact's bare counts.
+      - **Empirical red result (both variants, identical):** `Assert.Equal(Slice, got)` fails with
+        `Actual: List<string> []` — **0 of 12** slice lines ever reach the consumer's
+        `OnLogLineRead`, not a subset (confirming this is a clean, deterministic assertion failure,
+        never a harness exception or a bare zero-line timeout — both runs complete in ~5–10s and
+        the verify-loglines-full artifact is always written, just empty).
+      - **Root cause, confirmed two independent ways:**
+        1. **By reading the decompile:** `BridgeForwarder`'s only line-related producer tap today is
+           the SDK `IDataSubscription.LogLine` event (`BridgeForwarder.cs` `OnLogLine`, bound only
+           once a parser is loaded via `TryBindFfxiv`/`OnParserLoaded`) — **not**
+           `FormActMain.OnLogLineRead` (the facade tail seam; that tap is P2.1). The SDK `LogLine`
+           event itself is raised **only** by `FFXIV_ACT_Plugin.Memory.DataEventProcessor.OnLogLine`
+           (`ffxiv_act_plugin.memory` decompile), which fires from the plugin's **live
+           memory-scanning** pipeline (`LogProcessor.cs`) — never from `BeforeLogLineRead`/log-file
+           replay. So a facade-tailed line can never reach the SDK tap regardless of whether the
+           plugin is loaded, absent a live game process.
+        2. **Empirically, from the plugin-gated run's own satellite log:** once the real
+           `FFXIV_ACT_Plugin` finishes its async init, it calls `ActGlobals.oFormActMain.OpenLog`
+           itself — `path=…\FFXIVLogs\Network_<pid>_<date>.log filter=Network_*.log getZone=True` —
+           reclaiming the facade's file tail onto **its own** expected log path and away from this
+           gate's slice file (`StartLogTail`'s same-path guard cancels the previous tail on a
+           different path). This is a second, independent reason the `[plugin-gated]` variant sees
+           nothing — distinct from (1), and worth remembering for whoever revisits this tail-sharing
+           behavior later.
+      - **Skip behavior:** `[plugin-gated]` skips cleanly (`Skip.IfNot`) when
+        `FFXIV_ACT_Plugin.dll` isn't installed; on the machine this was authored on it **was**
+        installed, so the variant ran for real (confirmed via the satellite log: `PluginInstantiated`
+        → `RealPluginBound` → `ForwarderBound`, i.e. the SDK tap genuinely bound) and still produced
+        the identical 0-of-12 red result.
+      - **No regressions:** full `Fct.Integration.Tests` run — 42 tests, 37 passed, 3 failed (this
+        gate's 2 intentional reds + the pre-existing P1.2 `OverlaySatelliteTests` intentional red,
+        unchanged), 2 skipped (env-gated `DistTreeGateTests`/`FrameFixtureGenerator`, unrelated).
+        `FourRealPackagesTests` passed in this run (its documented run-ordering flakiness did not
+        reproduce).
 - [ ] **P1.4 — Late-join convergence gate.** Same harness as P1.3, but the consumer subscribes
       **after** the slice's zone/map/player/version lines have been folded: assert it receives the
       one-shot state lines (`01/02/40/12/249/250/253`, last-seen instance each) and a
