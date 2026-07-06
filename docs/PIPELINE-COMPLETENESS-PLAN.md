@@ -285,13 +285,47 @@ All gates live in the suites named in [`TESTING.md`](TESTING.md); plugin-in-the-
       `tools/act-oracle/build-and-run.ps1` (extended, additive-only — the existing 2/3-arg and
       `--folder` code paths, `RegisterTables()`, and the two existing committed fixtures are
       unchanged, verified by byte-diff before/after the `ReplaySwings` extraction refactor).
-- [ ] **P1.2 — ExportVariables diff gate.** New gate (extends `OverlaySatelliteTests` + a headless
+- [x] **P1.2 — ExportVariables diff gate.** New gate (extends `OverlaySatelliteTests` + a headless
       engine variant): drive the **consumer-replica / host-engine path** (`--consume` satellite or
       `ModernEncounterEngine` — **not** a bare `new FormActMain`, which never calls
       `EngineTables.Install()`) over the slice, enumerate the full key set, diff keys **and**
       values against P1.1's fixture. Carry an explicit skip-list of keys pending P5 that must
       shrink to empty. *Done when:* gate runs red with the skip-list documenting exactly the
       missing keys.
+      **Verdict:** ✅ DONE, red as designed. Two gates, both enumerating the full
+      `CombatantData.ExportVariables`/`EncounterData.ExportVariables` key set (never a hardcoded
+      list) and diffing against P1.1's `combat-slice.plugin.exportvars.tsv`:
+      - **Headless engine variant** —
+        `Fct.Engine.Tests/OracleParityTests.ExportVariables_g1_keys_match_the_plugin_oracle_baseline_pending_P5`:
+        reuses `BuildThroughEngine` (the same `ModernEncounterEngine` production input path as the
+        ACT-core parity test) and diffs its enumerated keys/values against the plugin fixture.
+      - **Satellite variant** — `Fct.Integration.Tests/OverlaySatelliteTests` extended in place: the
+        already-collected MiniParse `CombatData` frame (OverlayPlugin's `GetCombatantList`/
+        `GetEncounterList` already enumerate the full `ExportVariables` dictionaries, confirmed by
+        reading `MiniParseEventSource.cs:321,385`) is diffed against the same plugin fixture on the
+        real `--consume` satellite path.
+      - **Skip-list mechanics:** `PendingP5Keys` (duplicated per-project, same 12 literal G1
+        combatant keys — `Job/ParryPct/BlockPct/IncToHit/OverHealPct/DirectHitPct/DirectHitCount/
+        CritDirectHitCount/CritDirectHitPct/Last10DPS/Last30DPS/Last60DPS`) is used three ways: (1)
+        any mismatch whose key is **not** in the list fails immediately (regression guard); (2) any
+        skip-listed key that stops mismatching fails (staleness guard — the list must shrink, never
+        grow stale entries); (3) the headline assertion `PendingP5Keys.Count == 0` fails
+        deliberately — empirically confirmed both gates currently fail on exactly this assertion,
+        with the error message enumerating the same 12 keys and zero unexpected/stale entries. This
+        is P5.9's exit criterion in reverse: the list reaching empty is what turns both gates green.
+      - **`*ENCOUNTER*.CurrentZoneName` excluded from strict value comparison** (both gates, key
+        registration still checked): already registered per P5.7 with the plugin's identical
+        `d.ZoneName` formula (`CombatTables.cs:220-224`), but its *value* is zone-frame provenance —
+        P1.1's oracle harness (`ActOracle.PluginBaselineAndDump`) replays swings only, hardcoding
+        `""`, while the satellite gate replays a real `combat-slice.frames.tsv` `ChangeZone` frame
+        (`"Shirogane"`). Empirically confirmed as the only satellite-side divergence before the
+        exclusion; the ACT-core diff excludes this same key for the identical reason
+        (`ExportVarsCompatTests`/`OracleParityTests` never see it — real ACT has no such key).
+      - Verified: both new tests fail today with only the documented 12-key gap (no unexpected
+        mismatches, no stale skip-list entries); the full `Fct.Engine.Tests` suite (9/10 passing, 1
+        intentional red) and `Fct.Integration.Tests` suite (34/36 passing + the 1 intentional red;
+        the 40th, `FourRealPackagesTests`, is pre-existing run-ordering flakiness — confirmed green
+        in isolation, unrelated to this change) show no regressions.
 - [ ] **P1.3 — Line-stream diff gate (from-start).** New `Fct.Integration.Tests` gate: feed the
       P0.1 slice through the facade tail seam (plugin-free) → producer forwarder → wire → host →
       a `rawlog`-subscribed consumer; capture the consumer's `OnLogLineRead` lines; byte-diff

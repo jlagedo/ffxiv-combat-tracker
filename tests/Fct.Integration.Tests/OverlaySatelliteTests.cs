@@ -50,9 +50,9 @@ namespace Fct.Integration.Tests
 
         // (name, key) -> expected export string, read straight from the committed baseline so the assertion
         // is single-sourced with ExportVarsCompatTests. name "*ENCOUNTER*" holds the encounter-level keys.
-        private static Dictionary<(string, string), string> ReadExportBaseline(string root, string slice)
+        private static Dictionary<(string, string), string> ReadExportBaseline(string root, string fixtureFileName)
         {
-            var path = Path.Combine(root, "tests", "Fct.Compat.Act.Tests", "fixtures", slice + ".exportvars.tsv");
+            var path = Path.Combine(root, "tests", "Fct.Compat.Act.Tests", "fixtures", fixtureFileName);
             var map = new Dictionary<(string, string), string>();
             foreach (var line in File.ReadLines(path))
             {
@@ -63,6 +63,18 @@ namespace Fct.Integration.Tests
             }
             return map;
         }
+
+        // PIPELINE-COMPLETENESS-PLAN P1.2 / G1: mirrors OracleParityTests.PendingP5Keys — the
+        // ExportVariables keys the real plugin registers that EngineTables.Install() does not register
+        // yet (P5). Must shrink to empty as P5 lands; the assertion below intentionally fails while this
+        // is non-empty (P5.9's exit criterion) so the gate reads red on the --consume satellite path too,
+        // not just the headless engine variant.
+        private static readonly HashSet<string> PendingP5Keys = new(StringComparer.Ordinal)
+        {
+            "Job", "ParryPct", "BlockPct", "IncToHit", "OverHealPct",
+            "DirectHitPct", "DirectHitCount", "CritDirectHitCount", "CritDirectHitPct",
+            "Last10DPS", "Last30DPS", "Last60DPS",
+        };
 
         [SkippableFact]
         public async Task OverlayPlugin_satellite_serves_MiniParse_CombatData_matching_the_oracle_baseline()
@@ -80,7 +92,7 @@ namespace Fct.Integration.Tests
             Skip.IfNot(File.Exists(SatelliteRunFixture.FfxivPluginPath),
                 $"FFXIV_ACT_Plugin not installed at {SatelliteRunFixture.FfxivPluginPath}");
 
-            var baseline = ReadExportBaseline(root!, slice);
+            var baseline = ReadExportBaseline(root!, slice + ".exportvars.tsv");
             var prevInstall = Environment.GetEnvironmentVariable(Fct.Logging.AppData.InstallDirEnvVar);
             Environment.SetEnvironmentVariable(Fct.Logging.AppData.InstallDirEnvVar, appDir);
             var prevPoll = Environment.GetEnvironmentVariable("FCT_CONSUMER_STATUS_POLL");
@@ -173,6 +185,45 @@ namespace Fct.Integration.Tests
 
                 // The cactbot event-source log-line path: our host-fanned chat line surfaced on the WS.
                 Assert.Contains(chatLines, l => l.Contains(marker));
+
+                // PIPELINE-COMPLETENESS-PLAN P1.2: full G1 ExportVariables diff on the SAME frame, against
+                // the plugin-in-the-loop oracle baseline (P1.1). MiniParse's GetCombatantList/GetEncounterList
+                // enumerate the whole CombatantData/EncounterData.ExportVariables dictionaries (mirrors the
+                // enumeration idiom above), so `frame` already carries every key our engine has registered —
+                // widening the assertion to the full key set (instead of the 5 cherry-picked above) surfaces
+                // the G1 gap on the real --consume satellite path, not just the headless engine variant.
+                var pluginBaseline = ReadExportBaseline(root!, slice + ".plugin.exportvars.tsv");
+                var pluginMismatches = new List<(string Key, string Detail)>();
+                foreach (var ((name, key), want) in pluginBaseline)
+                {
+                    var values = name == "*ENCOUNTER*" ? frame.Encounter
+                        : frame.Combatant.TryGetValue(name, out var v) ? v : null;
+                    if (values is null) { pluginMismatches.Add((key, $"{name}: combatant missing from CombatData")); continue; }
+                    if (!values.TryGetValue(key, out var got))
+                        { pluginMismatches.Add((key, $"{name}.{key}: key not present in CombatData")); continue; }
+                    // CurrentZoneName (P5.7) is already registered with the plugin's identical d.ZoneName
+                    // formula (CombatTables.cs:220-224) — its VALUE is zone-frame provenance, not a swing-
+                    // stream fact: the P1.1 oracle harness replays swings only (no zone frame, bakes in
+                    // ""), while this satellite replays a real ChangeZone frame from the corpus. Excluded
+                    // from strict comparison for the same reason the ACT-core diff excludes this key.
+                    if (name == "*ENCOUNTER*" && key == "CurrentZoneName") continue;
+                    if (got != want) pluginMismatches.Add((key, $"{name}.{key}: got='{got}' oracle='{want}'"));
+                }
+
+                var pluginUnexpected = pluginMismatches.Where(m => !PendingP5Keys.Contains(m.Key)).ToList();
+                Assert.True(pluginUnexpected.Count == 0,
+                    $"{pluginUnexpected.Count} plugin ExportVariable string(s) diverge outside the documented P5 skip-list:\n  " +
+                    string.Join("\n  ", pluginUnexpected.Select(m => m.Detail).Take(25)));
+
+                var pluginStillMissing = pluginMismatches.Select(m => m.Key).ToHashSet(StringComparer.Ordinal);
+                var pluginStale = PendingP5Keys.Where(k => !pluginStillMissing.Contains(k)).ToList();
+                Assert.True(pluginStale.Count == 0,
+                    $"skip-listed key(s) no longer diverge on the satellite path — remove from PendingP5Keys: {string.Join(", ", pluginStale)}");
+
+                // P5.9's exit criterion, reproduced on the real --consume satellite path.
+                Assert.True(PendingP5Keys.Count == 0,
+                    "P1.2 pending P5 registration of " + PendingP5Keys.Count + " ExportVariables key(s): " +
+                    string.Join(", ", PendingP5Keys.OrderBy(k => k, StringComparer.Ordinal)));
             }
             finally
             {

@@ -27,6 +27,17 @@ namespace Fct.Engine.Tests
     {
         private static readonly IReadOnlyDictionary<string, object> NoTags = new Dictionary<string, object>();
 
+        // PIPELINE-COMPLETENESS-PLAN P1.2 / G1: ExportVariables keys the real FFXIV_ACT_Plugin registers
+        // (Job/Parry/Block/IncToHit/OverHeal/DirectHit*/CritDirectHit*/Last{10,30,60}DPS) that
+        // EngineTables.Install() does not register yet — ported by P5. Must shrink to empty as P5 lands;
+        // P5.9's exit criterion is this set reaching empty (P1.2 fully green).
+        private static readonly HashSet<string> PendingP5Keys = new(StringComparer.Ordinal)
+        {
+            "Job", "ParryPct", "BlockPct", "IncToHit", "OverHealPct",
+            "DirectHitPct", "DirectHitCount", "CritDirectHitCount", "CritDirectHitPct",
+            "Last10DPS", "Last30DPS", "Last60DPS",
+        };
+
         private readonly ITestOutputHelper _out;
         public OracleParityTests(ITestOutputHelper output) => _out = output;
 
@@ -116,6 +127,74 @@ namespace Fct.Engine.Tests
             Assert.True(mismatches.Count == 0,
                 $"{mismatches.Count} ExportVariable string(s) diverge from real ACT via the host engine:\n  " +
                 string.Join("\n  ", mismatches.Take(25)));
+        }
+
+        // PIPELINE-COMPLETENESS-PLAN P1.2: the same production input path (BuildThroughEngine), diffed
+        // against the plugin-in-the-loop oracle baseline (P1.1, tools/act-oracle --plugin-baseline)
+        // instead of the ACT-core baseline above. Keys P5 hasn't ported yet are documented in
+        // PendingP5Keys rather than left as an opaque mass-diff; the final assertion intentionally fails
+        // while that list is non-empty so the gate reads red until P5 completes the registration.
+        [Fact]
+        public void ExportVariables_g1_keys_match_the_plugin_oracle_baseline_pending_P5()
+        {
+            Thread.CurrentThread.CurrentCulture = CultureInfo.InvariantCulture;
+
+            const string slice = "combat-slice";
+            var enc = BuildThroughEngine(slice);
+            var mismatches = new List<(string Key, string Detail)>();
+            int checked_ = 0;
+
+            foreach (var line in File.ReadLines(Fixture(slice + ".plugin.exportvars.tsv")))
+            {
+                if (line.StartsWith("name\tkey", StringComparison.Ordinal)) continue;
+                if (line.Length == 0) continue;
+                var c = line.Split('\t');
+                string name = c[0], key = c[1], want = c.Length > 2 ? c[2] : "";
+                string got;
+                if (name == "*ENCOUNTER*")
+                {
+                    if (!EncounterData.ExportVariables.TryGetValue(key, out var encFmt))
+                        { mismatches.Add((key, $"*ENCOUNTER*.{key}: key not registered in ours")); continue; }
+                    try { got = encFmt.GetExportString(enc, enc.GetAllies(), ""); }
+                    catch (Exception ex) { mismatches.Add((key, $"*ENCOUNTER*.{key}: THREW {ex.GetType().Name}: {ex.Message}")); continue; }
+                }
+                else
+                {
+                    var cd = enc.GetCombatant(name);
+                    if (cd == null) { mismatches.Add((key, $"{name}: combatant missing in ours")); continue; }
+                    if (!CombatantData.ExportVariables.TryGetValue(key, out var fmt))
+                        { mismatches.Add((key, $"{name}.{key}: key not registered in ours")); continue; }
+                    try { got = fmt.GetExportString(cd, ""); }
+                    catch (Exception ex) { mismatches.Add((key, $"{name}.{key}: THREW {ex.GetType().Name}: {ex.Message}")); continue; }
+                }
+                checked_++;
+                // CurrentZoneName (P5.7) is already registered with the plugin's identical d.ZoneName
+                // formula (CombatTables.cs:220-224) — its VALUE is zone-frame provenance, not a swing-
+                // stream fact, so it's excluded from strict comparison here for the same reason the
+                // ACT-core diff excludes it: the P1.1 oracle harness replays swings only (no zone frame),
+                // baking in "", while a real replay's zone comes from whatever ChangeZone it was fed.
+                if (name == "*ENCOUNTER*" && key == "CurrentZoneName") continue;
+                if (got != want) mismatches.Add((key, $"{name}.{key}: ours='{got}' oracle='{want}'"));
+            }
+
+            _out.WriteLine($"checked {checked_} plugin export-variable strings through ModernEncounterEngine");
+
+            // Anything diverging outside the documented skip-list is a regression, not pending P5 work.
+            var unexpected = mismatches.Where(m => !PendingP5Keys.Contains(m.Key)).ToList();
+            Assert.True(unexpected.Count == 0,
+                $"{unexpected.Count} plugin ExportVariable string(s) diverge outside the documented P5 skip-list:\n  " +
+                string.Join("\n  ", unexpected.Select(m => m.Detail).Take(25)));
+
+            // A skip-listed key that no longer diverges is stale — the list must shrink, not just grow stale entries.
+            var stillMissing = mismatches.Select(m => m.Key).ToHashSet(StringComparer.Ordinal);
+            var stale = PendingP5Keys.Where(k => !stillMissing.Contains(k)).ToList();
+            Assert.True(stale.Count == 0,
+                $"skip-listed key(s) no longer diverge from the oracle — remove from PendingP5Keys: {string.Join(", ", stale)}");
+
+            // P5.9's exit criterion: green only once every G1 key is registered and matches (empty skip-list).
+            Assert.True(PendingP5Keys.Count == 0,
+                "P1.2 pending P5 registration of " + PendingP5Keys.Count + " ExportVariables key(s): " +
+                string.Join(", ", PendingP5Keys.OrderBy(k => k, StringComparer.Ordinal)));
         }
 
         // The EncounterProjector face the UI/replica read must carry the same oracle numbers: the
