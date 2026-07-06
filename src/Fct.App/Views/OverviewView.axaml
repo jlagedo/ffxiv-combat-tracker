@@ -49,16 +49,12 @@
                         <TextBlock Text="{x:Static lang:Resources.Nav_Plugins}" Classes="h2"/>
                         <Border Classes="rule" Width="52" HorizontalAlignment="Left"/>
 
-                        <Grid ColumnDefinitions="*,*,*">
+                        <Grid ColumnDefinitions="*,*">
                             <StackPanel Grid.Column="0" Spacing="3">
-                                <TextBlock Text="{Binding Shell.LegacyLoadedCount}" Classes="h1" FontSize="30"/>
-                                <TextBlock Text="{x:Static lang:Resources.Label_ClassicChip}" Classes="meta" FontSize="11"/>
+                                <TextBlock Text="{Binding Shell.TotalLoadedCount}" Classes="h1" FontSize="30"/>
+                                <TextBlock Text="{x:Static lang:Resources.Label_PluginsChip}" Classes="meta" FontSize="11"/>
                             </StackPanel>
                             <StackPanel Grid.Column="1" Spacing="3">
-                                <TextBlock Text="{Binding Shell.ModernLoadedCount}" Classes="h1" FontSize="30"/>
-                                <TextBlock Text="{x:Static lang:Resources.Label_ModernChip}" Classes="meta" FontSize="11"/>
-                            </StackPanel>
-                            <StackPanel Grid.Column="2" Spacing="3">
                                 <TextBlock Text="{Binding Shell.FaultCount}" Classes="h1" FontSize="30"
                                            Foreground="{StaticResource WarnBrush}"/>
                                 <TextBlock Text="{x:Static lang:Resources.Label_IssuesChip}" Classes="meta" FontSize="11"/>

@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Collections.ObjectModel;
+using System.Collections.Specialized;
 using System.Linq;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
@@ -24,6 +25,11 @@ public sealed partial class MainViewModel : ObservableObject
     // the net10 plugin registry. Kept apart because they are two different runtimes.
     public ObservableCollection<PluginViewModel> LegacyPlugins { get; } = new();
     public ObservableCollection<PluginViewModel> ModernPlugins { get; } = new();
+
+    // The single roster the UI binds to: a live mirror of the two feeds, legacy rows first then
+    // modern. The feeds stay the sources of truth (satellite events / registry); WireMergedRoster
+    // reflects their changes here so one list shows every plugin, distinguished only by a per-row tag.
+    public ObservableCollection<PluginViewModel> Plugins { get; } = new();
 
     // Transient corner controls contributed by native plugins via IUiHost.AddCornerControl.
     public ObservableCollection<CornerControlViewModel> CornerControls { get; } = new();
@@ -63,6 +69,7 @@ public sealed partial class MainViewModel : ObservableObject
             ContractVersion = "1.0", Description = "Reference modern plugin for the app.",
             Status = PluginStatus.Loaded,
         });
+        WireMergedRoster();
 
         OverviewPage = new OverviewViewModel(this);
         PluginsPage = new PluginsViewModel(this);
@@ -90,6 +97,7 @@ public sealed partial class MainViewModel : ObservableObject
 
         foreach (var info in registry.LoadedPlugins)
             ModernPlugins.Add(BuildModernRow(info));
+        WireMergedRoster();
 
         OverviewPage = new OverviewViewModel(this);
         PluginsPage = new PluginsViewModel(this);
@@ -149,6 +157,46 @@ public sealed partial class MainViewModel : ObservableObject
     {
         if (_dispatcher is null || _dispatcher.CheckAccess()) action();
         else _dispatcher.Post(action);
+    }
+
+    // Mirror both feeds into the single Plugins collection (legacy rows first, then modern) and keep
+    // it live. Incremental — never a clear-and-rebuild — so the bound SelectedPlugin is never
+    // transiently dropped by the ListBox mid-reconcile.
+    private void WireMergedRoster()
+    {
+        Plugins.Clear();
+        foreach (var p in LegacyPlugins) Plugins.Add(p);
+        foreach (var p in ModernPlugins) Plugins.Add(p);
+
+        LegacyPlugins.CollectionChanged += (_, e) => MirrorChange(e, legacy: true);
+        ModernPlugins.CollectionChanged += (_, e) => MirrorChange(e, legacy: false);
+    }
+
+    // Reflect one feed change into Plugins. Legacy rows occupy the front, so a legacy change maps at
+    // the same index; a modern change is offset past the legacy segment (LegacyPlugins.Count already
+    // reflects the in-progress change).
+    private void MirrorChange(NotifyCollectionChangedEventArgs e, bool legacy)
+    {
+        int offset = legacy ? 0 : LegacyPlugins.Count;
+        switch (e.Action)
+        {
+            case NotifyCollectionChangedAction.Add:
+                Plugins.Insert(offset + e.NewStartingIndex, (PluginViewModel)e.NewItems![0]!);
+                break;
+            case NotifyCollectionChangedAction.Remove:
+                Plugins.RemoveAt(offset + e.OldStartingIndex);
+                break;
+            case NotifyCollectionChangedAction.Replace:
+                Plugins[offset + e.OldStartingIndex] = (PluginViewModel)e.NewItems![0]!;
+                break;
+            case NotifyCollectionChangedAction.Reset:
+                // Only the legacy feed resets (Clear() in SetOnline/SetIdle). Drop its whole segment;
+                // the modern segment is the tail of length ModernPlugins.Count.
+                for (int i = Plugins.Count - ModernPlugins.Count; i > 0; i--)
+                    Plugins.RemoveAt(0);
+                break;
+        }
+        OnPropertyChanged(nameof(HasPlugins));
     }
 
     // ---- native plugin UI contributions (work item 9) ----
@@ -283,6 +331,7 @@ public sealed partial class MainViewModel : ObservableObject
 
     public bool HasModernPlugins => ModernPlugins.Count > 0;
     public bool HasLegacyPlugins => LegacyPlugins.Count > 0;
+    public bool HasPlugins => Plugins.Count > 0;
 
     public void SetStarting()
     {
@@ -462,6 +511,7 @@ public sealed partial class MainViewModel : ObservableObject
         OnPropertyChanged(nameof(LoadedSummary));
         OnPropertyChanged(nameof(HasLegacyPlugins));
         OnPropertyChanged(nameof(HasModernPlugins));
+        OnPropertyChanged(nameof(HasPlugins));
     }
 
     private static PluginViewModel DemoLegacy(string key, PluginStatus status)

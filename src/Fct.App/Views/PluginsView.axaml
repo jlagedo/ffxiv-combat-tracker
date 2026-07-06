@@ -14,7 +14,7 @@
         <!-- One roster row, shared by the legacy and modern lists. -->
         <DataTemplate x:Key="RailItem" x:DataType="vm:PluginViewModel">
             <Border Classes="railcard">
-                <Grid ColumnDefinitions="Auto,Auto,*">
+                <Grid ColumnDefinitions="Auto,Auto,*,Auto">
                     <Rectangle Grid.Column="0" Classes="railbar" Width="3" Height="26"
                                Fill="{StaticResource FrostBrush}" RadiusX="2" RadiusY="2"
                                VerticalAlignment="Center" Margin="0,0,11,0"/>
@@ -32,6 +32,12 @@
                         <TextBlock Text="{Binding StatusLabel}" FontFamily="{StaticResource MonoFont}" FontSize="10"
                                    Foreground="{Binding Status, Converter={StaticResource StatusToBrush}}"/>
                     </StackPanel>
+                    <Border Grid.Column="3" IsVisible="{Binding IsLegacy}" VerticalAlignment="Center"
+                            Background="{StaticResource RimeBrush}" CornerRadius="5" Padding="7,3" Margin="8,0,0,0">
+                        <TextBlock Text="{x:Static lang:Resources.Label_Legacy}"
+                                   FontFamily="{StaticResource MonoFont}" FontSize="9.5"
+                                   Foreground="{StaticResource FrostBrush}"/>
+                    </Border>
                 </Grid>
             </Border>
         </DataTemplate>
@@ -78,35 +84,17 @@
 
             <GridSplitter Grid.Column="1" Classes="pane" ResizeDirection="Columns"/>
 
-            <!-- ===== Grouped roster ===== -->
+            <!-- ===== Unified roster ===== -->
             <Border Grid.Column="0" Classes="card rise2" Padding="0" MinWidth="210" MaxWidth="360">
                 <ScrollViewer HorizontalScrollBarVisibility="Disabled" Padding="10,12">
                     <StackPanel Spacing="6">
-                        <Grid Margin="6,0,6,2">
-                            <TextBlock Text="{x:Static lang:Resources.Eyebrow_Classic}" Classes="eyebrow"/>
-                            <TextBlock Text="{Binding Shell.LegacyLoadedCount}" Classes="meta" FontSize="11"
-                                       Foreground="{StaticResource FrostBrush}" HorizontalAlignment="Right"/>
-                        </Grid>
-                        <ListBox Classes="rail" ItemsSource="{Binding Shell.LegacyPlugins}"
+                        <ListBox Classes="rail" ItemsSource="{Binding Shell.Plugins}"
                                  ItemTemplate="{StaticResource RailItem}"
                                  SelectedItem="{Binding Shell.SelectedPlugin, Mode=TwoWay}"
-                                 AutomationProperties.AutomationId="plugin.rail.legacy"
-                                 AutomationProperties.Name="{x:Static lang:Resources.A11y_ClassicPluginsList}"/>
-                        <TextBlock Text="{x:Static lang:Resources.Plugins_NoClassicLoaded}" Classes="meta" FontSize="11" Margin="8,2,0,4"
-                                   IsVisible="{Binding !Shell.HasLegacyPlugins}"/>
-
-                        <Grid Margin="6,12,6,2">
-                            <TextBlock Text="{x:Static lang:Resources.Eyebrow_Modern}" Classes="eyebrow"/>
-                            <TextBlock Text="{Binding Shell.ModernLoadedCount}" Classes="meta" FontSize="11"
-                                       Foreground="{StaticResource FrostBrush}" HorizontalAlignment="Right"/>
-                        </Grid>
-                        <ListBox Classes="rail" ItemsSource="{Binding Shell.ModernPlugins}"
-                                 ItemTemplate="{StaticResource RailItem}"
-                                 SelectedItem="{Binding Shell.SelectedPlugin, Mode=TwoWay}"
-                                 AutomationProperties.AutomationId="plugin.rail.modern"
-                                 AutomationProperties.Name="{x:Static lang:Resources.A11y_ModernPluginsList}"/>
-                        <TextBlock Text="{x:Static lang:Resources.Plugins_NoModernInstalled}" Classes="meta" FontSize="11" Margin="8,2,0,0"
-                                   IsVisible="{Binding !Shell.HasModernPlugins}"/>
+                                 AutomationProperties.AutomationId="plugin.rail"
+                                 AutomationProperties.Name="{x:Static lang:Resources.A11y_PluginsList}"/>
+                        <TextBlock Text="{x:Static lang:Resources.Plugins_NoneLoaded}" Classes="meta" FontSize="11" Margin="8,2,0,4"
+                                   IsVisible="{Binding !Shell.HasPlugins}"/>
                     </StackPanel>
                 </ScrollViewer>
             </Border>
@@ -144,8 +132,9 @@
                                     <TextBlock Text="{Binding Shell.SelectedPlugin.Role}" Classes="meta" FontSize="11"/>
                                 </StackPanel>
                                 <StackPanel Grid.Column="2" Orientation="Horizontal" Spacing="10" VerticalAlignment="Center">
-                                    <Border Background="{StaticResource RimeBrush}" CornerRadius="6" Padding="10,5">
-                                        <TextBlock Text="{Binding Shell.SelectedPlugin.Runtime}"
+                                    <Border Background="{StaticResource RimeBrush}" CornerRadius="6" Padding="10,5"
+                                            IsVisible="{Binding Shell.SelectedPlugin.IsLegacy}">
+                                        <TextBlock Text="{x:Static lang:Resources.Label_Legacy}"
                                                    FontFamily="{StaticResource MonoFont}" FontSize="11"
                                                    Foreground="{StaticResource FrostBrush}"/>
                                     </Border>

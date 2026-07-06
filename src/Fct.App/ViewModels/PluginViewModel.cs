@@ -78,9 +78,6 @@ public sealed partial class PluginViewModel : ObservableObject
     public bool ShowLegacyPlaceholder => IsLegacy && !HasNativeConfig && !IsMissing;
     public bool HasStatusText => !string.IsNullOrWhiteSpace(SatelliteStatusText);
 
-    // Kind badge shown in the config bay header.
-    public string Runtime => Kind == PluginKind.Legacy ? Resources.Label_ClassicRuntime : Resources.Label_ModernRuntime;
-
     public string StatusLabel => Status switch
     {
         PluginStatus.Loading => Resources.Status_Starting,

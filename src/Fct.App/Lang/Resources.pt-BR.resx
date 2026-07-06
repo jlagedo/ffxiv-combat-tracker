@@ -16,11 +16,9 @@
   <!-- General labels -->
   <data name="Label_App" xml:space="preserve"><value>App</value></data>
   <data name="Label_ClassicEngine" xml:space="preserve"><value>Motor clássico</value></data>
-  <data name="Label_ClassicChip" xml:space="preserve"><value>clássico</value></data>
-  <data name="Label_ModernChip" xml:space="preserve"><value>moderno</value></data>
+  <data name="Label_PluginsChip" xml:space="preserve"><value>plugins</value></data>
   <data name="Label_IssuesChip" xml:space="preserve"><value>problemas</value></data>
-  <data name="Label_ClassicRuntime" xml:space="preserve"><value>Clássico</value></data>
-  <data name="Label_ModernRuntime" xml:space="preserve"><value>Moderno</value></data>
+  <data name="Label_Legacy" xml:space="preserve"><value>Legado</value></data>
   <data name="Label_Identity" xml:space="preserve"><value>Identidade</value></data>
   <data name="Label_Version" xml:space="preserve"><value>Versão</value></data>
   <data name="Label_Contract" xml:space="preserve"><value>Contrato</value></data>
@@ -39,8 +37,6 @@
   <!-- All-caps section eyebrows -->
   <data name="Eyebrow_Host" xml:space="preserve"><value>HOST</value></data>
   <data name="Eyebrow_Plugins" xml:space="preserve"><value>PLUGINS</value></data>
-  <data name="Eyebrow_Classic" xml:space="preserve"><value>CLÁSSICO</value></data>
-  <data name="Eyebrow_Modern" xml:space="preserve"><value>MODERNO</value></data>
 
   <!-- Actions / buttons -->
   <data name="Action_RestartClassicEngine" xml:space="preserve"><value>Reiniciar motor clássico</value></data>
@@ -62,8 +58,7 @@
   <data name="A11y_Close" xml:space="preserve"><value>Fechar</value></data>
   <data name="A11y_CloseNotifications" xml:space="preserve"><value>Fechar notificações</value></data>
   <data name="A11y_DismissNotification" xml:space="preserve"><value>Descartar notificação</value></data>
-  <data name="A11y_ClassicPluginsList" xml:space="preserve"><value>Plugins clássicos</value></data>
-  <data name="A11y_ModernPluginsList" xml:space="preserve"><value>Plugins modernos</value></data>
+  <data name="A11y_PluginsList" xml:space="preserve"><value>Lista de plugins</value></data>
 
   <!-- Status bar / connection state -->
   <data name="Status_AppRunning" xml:space="preserve"><value>App em execução</value></data>
@@ -121,8 +116,7 @@
   <!-- Plugins page -->
   <data name="Plugins_Subtitle" xml:space="preserve"><value>Plugins clássicos são os plugins do ACT que você já usa; plugins modernos são feitos para este app. Selecione um para configurá-lo.</value></data>
   <data name="Plugins_EngineDownTitle" xml:space="preserve"><value>O motor clássico não está em execução</value></data>
-  <data name="Plugins_NoClassicLoaded" xml:space="preserve"><value>Nenhum plugin clássico carregado.</value></data>
-  <data name="Plugins_NoModernInstalled" xml:space="preserve"><value>Nenhum plugin moderno instalado.</value></data>
+  <data name="Plugins_NoneLoaded" xml:space="preserve"><value>Nenhum plugin carregado ainda.</value></data>
   <data name="Plugins_SelectPluginTitle" xml:space="preserve"><value>Selecione um plugin</value></data>
   <data name="Plugins_SelectPluginBody" xml:space="preserve"><value>Escolha um plugin à esquerda para configurá-lo ou ver os detalhes.</value></data>
   <data name="Plugins_ConfigLoadingBody" xml:space="preserve"><value>A configuração carrega quando o motor clássico está em execução</value></data>

@@ -20,11 +20,9 @@ public static class Resources
     // ---- General labels ----
     public static string Label_App => Get(nameof(Label_App));
     public static string Label_ClassicEngine => Get(nameof(Label_ClassicEngine));
-    public static string Label_ClassicChip => Get(nameof(Label_ClassicChip));
-    public static string Label_ModernChip => Get(nameof(Label_ModernChip));
+    public static string Label_PluginsChip => Get(nameof(Label_PluginsChip));
     public static string Label_IssuesChip => Get(nameof(Label_IssuesChip));
-    public static string Label_ClassicRuntime => Get(nameof(Label_ClassicRuntime));
-    public static string Label_ModernRuntime => Get(nameof(Label_ModernRuntime));
+    public static string Label_Legacy => Get(nameof(Label_Legacy));
     public static string Label_Identity => Get(nameof(Label_Identity));
     public static string Label_Version => Get(nameof(Label_Version));
     public static string Label_Contract => Get(nameof(Label_Contract));
@@ -66,8 +64,7 @@ public static class Resources
     public static string A11y_Close => Get(nameof(A11y_Close));
     public static string A11y_CloseNotifications => Get(nameof(A11y_CloseNotifications));
     public static string A11y_DismissNotification => Get(nameof(A11y_DismissNotification));
-    public static string A11y_ClassicPluginsList => Get(nameof(A11y_ClassicPluginsList));
-    public static string A11y_ModernPluginsList => Get(nameof(A11y_ModernPluginsList));
+    public static string A11y_PluginsList => Get(nameof(A11y_PluginsList));
 
     // ---- Status bar / connection state ----
     public static string Status_AppRunning => Get(nameof(Status_AppRunning));
@@ -125,8 +122,7 @@ public static class Resources
     // ---- Plugins page ----
     public static string Plugins_Subtitle => Get(nameof(Plugins_Subtitle));
     public static string Plugins_EngineDownTitle => Get(nameof(Plugins_EngineDownTitle));
-    public static string Plugins_NoClassicLoaded => Get(nameof(Plugins_NoClassicLoaded));
-    public static string Plugins_NoModernInstalled => Get(nameof(Plugins_NoModernInstalled));
+    public static string Plugins_NoneLoaded => Get(nameof(Plugins_NoneLoaded));
     public static string Plugins_SelectPluginTitle => Get(nameof(Plugins_SelectPluginTitle));
     public static string Plugins_SelectPluginBody => Get(nameof(Plugins_SelectPluginBody));
     public static string Plugins_ConfigLoadingBody => Get(nameof(Plugins_ConfigLoadingBody));
