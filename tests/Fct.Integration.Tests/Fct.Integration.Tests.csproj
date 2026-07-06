@@ -21,6 +21,11 @@
     <!-- The wire-path e2e (ReplayBridgeRouteTests) decodes the bridged GameEventFrames and folds them
          through the real host engine, asserting parity with the satellite's own captured totals. -->
     <ProjectReference Include="..\..\src\Fct.Engine\Fct.Engine.csproj" />
+    <!-- Fct.Engine's Fct.Aggregation reference is compile-only (single-identity: the runtime copy is
+         staged under compat\ and resolved by CompatRuntime). The in-proc engine-fold tests
+         (ReplayBridgeRouteTests / FrameReplayTests) JIT engine types without running
+         CompatRuntime.Enable, so they need the aggregation binary copied next-to-test. -->
+    <ProjectReference Include="..\..\src\Fct.Aggregation\Fct.Aggregation.csproj" />
     <ProjectReference Include="..\..\src\Fct.Abstractions.Testing\Fct.Abstractions.Testing.csproj" />
     <!-- The P3 multi-satellite gate drives the internal SatelliteSupervisor (InternalsVisibleTo). -->
     <ProjectReference Include="..\..\src\Fct.Host\Fct.Host.csproj" />

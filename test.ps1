@@ -5,15 +5,22 @@
 #   ./test.ps1 -Configuration Release
 #   ./test.ps1 -Unit           # skip the satellite integration tests (fast, no process launch)
 #   ./test.ps1 -Filter "Dnum"  # pass a --filter expression through to dotnet test
+#   ./test.ps1 -Dist           # also publish dist\<mode> and run the P9c dist-tree e2e gate
 #
 # Integration tests need the net48 satellite staged, so Fct.App is built first. Tests that
 # need the real FFXIV plugin / a Network log skip automatically when those are absent.
+#
+# -Dist opt-in: publishes the distributable tree (`dotnet run --project build -- <mode>`) and arms
+# DistTreeGateTests via FCT_DIST_MODE so the shipped dist\<mode> tree is exercised end-to-end. The
+# gate self-skips when FCT_DIST_MODE is unset, so a normal run never touches dist\.
 
 [CmdletBinding()]
 param(
     [string]$Configuration = "Debug",
     [switch]$Unit,
-    [string]$Filter
+    [string]$Filter,
+    [switch]$Dist,
+    [string]$DistMode
 )
 
 $ErrorActionPreference = "Stop"
@@ -23,6 +30,15 @@ try {
     Write-Host "==> Staging satellite (build Fct.App, $Configuration)" -ForegroundColor Cyan
     dotnet build "src/Fct.App/Fct.App.csproj" -c $Configuration --nologo
     if ($LASTEXITCODE -ne 0) { throw "satellite build failed" }
+
+    if ($Dist) {
+        if (-not $DistMode) { $DistMode = $Configuration.ToLowerInvariant() }
+        Write-Host "==> Publishing dist tree (dotnet run --project build -- $DistMode)" -ForegroundColor Cyan
+        dotnet run --project build -- $DistMode
+        if ($LASTEXITCODE -ne 0) { throw "dist publish failed" }
+        $env:FCT_DIST_MODE = $DistMode   # arms DistTreeGateTests (Fct.Integration.Tests)
+        Write-Host "==> Dist gate armed: FCT_DIST_MODE=$DistMode" -ForegroundColor Cyan
+    }
 
     $projects = @(
         "tests/Fct.Compat.Act.Tests/Fct.Compat.Act.Tests.csproj",

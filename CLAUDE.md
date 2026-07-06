@@ -158,7 +158,7 @@ are mapped in [`docs/ACT-INTERFACE-MAP.md`](docs/ACT-INTERFACE-MAP.md).
 ## Real binaries & the ACT facade
 
 - **Real binaries:** FFXIV_ACT_Plugin.dll loads from `%APPDATA%\Advanced Combat Tracker\Plugins\`;
-  the ACT install + OverlayPlugin 0.16.5 live at `E:\dev\Advanced Combat Tracker\`. Nothing is bundled
+  the ACT install + OverlayPlugin 0.19.101 live at `E:\dev\Advanced Combat Tracker\`. Nothing is bundled
   and nothing is boot-loaded: the satellite starts empty and loads a real plugin **in place** only when
   the user installs it through the catalog (host `LOADPLUGIN` command). A dev standalone run
   (`Fct.LegacyHost.exe` with no `--bridge`) auto-loads FFXIV_ACT_Plugin + OverlayPlugin for convenience.

@@ -1,10 +1,12 @@
 # GO-LIVE — v1 Remediation Plan
 
-Working punch-list to take FFXIV Combat Tracker to a functional v1 that runs the five
-target legacy plugins drop-in and loads native plugins through a full lifecycle. v1 ships on
-the **isolated topology** — one satellite per plugin package, every inter-plugin path
-host-routed; the build-out phases and e2e gates live in [`ISOLATION-PLAN.md`](ISOLATION-PLAN.md). This is a
-**tracking document**, not a facts doc — it records outstanding work, owners, and acceptance
+Working punch-list to take FFXIV Combat Tracker to a functional v1 that runs the shipped four
+target legacy packages (FFXIV_ACT_Plugin, OverlayPlugin/cactbot, Triggernometry,
+ACT-Discord-Triggers) drop-in and loads native plugins through a full lifecycle; the fifth package,
+ACT.Hojoring, follows in P10 on the same completed fabric ([`ISOLATION-PLAN.md`](ISOLATION-PLAN.md)
+§P10). v1 ships on the **isolated topology** — one satellite per plugin package, every inter-plugin
+path host-routed; the build-out phases and e2e gates live in [`ISOLATION-PLAN.md`](ISOLATION-PLAN.md).
+This is a **tracking document**, not a facts doc — it records outstanding work, owners, and acceptance
 bars, and is retired once v1 ships.
 
 ## v1 scope decisions (locked)
@@ -13,8 +15,9 @@ bars, and is retired once v1 ships.
   ACT Plugins folder and no scan of any folder next to the exe. The host bundles no plugins; the
   catalog is the single source of truth for what is installed/enabled.
 - **Satellite crash resilience:** auto-restart on unexpected exit **and** safe manual restart.
-- **Verification bar:** all five plugins (FFXIV_ACT_Plugin, OverlayPlugin/cactbot,
-  Triggernometry, ACT-Discord-Triggers, ACT.Hojoring) proven working live before ship.
+- **Verification bar:** the four shipped packages (FFXIV_ACT_Plugin, OverlayPlugin/cactbot,
+  Triggernometry, ACT-Discord-Triggers) proven working live before ship; ACT.Hojoring's live
+  acceptance is P10a (ISOLATION-PLAN §P10a), on the same fabric after v1.
 
 ## Current state (baseline)
 
@@ -23,26 +26,29 @@ bars, and is retired once v1 ships.
 - Recompile-shim lifecycle: complete except WinForms `TabPage` embedding (slice D8) — deferred.
 - Legacy satellite lifecycle: load/init/deinit/hot-reload all implemented; the satellite boot-loads
   **nothing** — every legacy plugin (parser included) arrives on demand via the host `LOADPLUGIN`
-  command and loads **in place**. End-to-end verification of all five is still pending (A1).
+  command and loads **in place**. Live end-to-end verification of the four shipped packages is
+  pending (A1); Hojoring is P10a.
 - Logging: release-ready, coherent host↔satellite, one EventId taxonomy, no stray console writes.
 - Host-crash → orphaned satellite: solved via Windows Job Object (`JOB_OBJECT_LIMIT_KILL_ON_JOB_CLOSE`).
 - Codebase is clean of incompleteness markers (no TODO/FIXME/NotImplementedException in `src/`).
 
 ---
 
-## Workstream A — Legacy plugin catalog: complete + verify all five
+## Workstream A — Legacy plugin catalog: complete + verify the shipped four
 
-Catalog-only, so the catalog path must be trustworthy and cover all five.
+Catalog-only, so the catalog path must be trustworthy and cover the four shipped packages
+(Hojoring's live verification is P10a).
 
-- **A1 — Verify the pipeline against the real 3 DLLs.** Run Triggernometry, ACT-Discord-Triggers,
-  and Hojoring through `PluginInstaller.InstallAsync` → `PluginClassifier.Classify` →
-  `SatelliteRouter.RequestLoadPluginAsync` (per-package satellite) → satellite `FacadeHost.LoadPlugin`
-  end-to-end on a machine with the real ACT
+- **A1 — Verify the pipeline against the real DLLs.** Run Triggernometry and ACT-Discord-Triggers
+  (OverlayPlugin has its own P8 gate) through `PluginInstaller.InstallAsync` →
+  `PluginClassifier.Classify` → `SatelliteRouter.RequestLoadPluginAsync` (per-package satellite) →
+  satellite `FacadeHost.LoadPlugin` end-to-end on a machine with the real ACT
   install. Fix bugs in `Fct.Host/Plugins/PluginClassifier.cs`, `Fct.LegacyHost/FacadeHost.cs`,
   `Fct.LegacyHost/Program.cs` as they surface.
-  - **Accept:** each of the five loads, `InitPlugin` runs, its WinForms config tab embeds via
+  - **Accept:** each shipped package loads, `InitPlugin` runs, its WinForms config tab embeds via
     `EmbeddedSatelliteView`, and it produces expected behavior (OverlayPlugin overlays render,
-    Triggernometry fires a test trigger, Discord-Triggers hooks TTS, Hojoring spell timers appear).
+    Triggernometry fires a test trigger, Discord-Triggers hooks TTS). Hojoring's equivalent
+    load/attach/route + spell-timer acceptance is P10a (ISOLATION-PLAN §P10a).
 - **A2 — Persist per-plugin enabled/disabled state.** Add `Enabled` to `PluginRegistryStore.cs`
   (+ migration), honor it in `PluginLifetime.cs`, expose a toggle in `PluginsView` + VM.
   - **Accept:** disabling survives restart and the plugin does not load; re-enabling loads it
@@ -120,9 +126,11 @@ parallel as hardening.
 
 ## Out of scope for v1 (deferred)
 
-Shim UI embedding (slice D8), system tray / minimize-to-tray, auto-update / update-check, lossy
-typed bridge events (BNpc id / statuses / degraded `ActionEffect` — the log-line firehose covers
-the five plugins), settings schema migration/versioning, in-app language switcher.
+ACT.Hojoring isolation + live acceptance (P10 — its facade/stand-in/router contract gaps are already
+closed and gated in P9a; it stands up on the completed fabric after v1), shim UI embedding (slice D8),
+system tray / minimize-to-tray, auto-update / update-check, lossy typed bridge events (BNpc id /
+statuses / degraded `ActionEffect` — the log-line firehose covers the target plugins), settings schema
+migration/versioning, in-app language switcher.
 
 ## Open questions
 

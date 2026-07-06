@@ -68,6 +68,14 @@ install stays green:
   router, driven by the looped corpus, and asserts OverlayPlugin's MiniParse `CombatData` equals
   the oracle `ExportVariables` baseline on the terminal encounter (needs all four plugins
   installed; skips otherwise). `FCT_SOAK_ITERATIONS` overrides N for a longer soak.
+- **Dist-tree e2e gate** (`Fct.Integration.Tests`, ISOLATION-PLAN P9c): `DistTreeGateTests` proves the
+  *staged* `dist\<mode>\` tree runs the topology and holds parity, not just that its files exist. Opt-in
+  via `FCT_DIST_MODE` (`dist\` is git-ignored, published by `dotnet run --project build -- <mode>`);
+  points `FCT_INSTALL_DIR` at the dist tree so `SatelliteHost` resolves
+  `dist\<mode>\satellite\Fct.LegacyHost.exe`, spawns a plugin-free `--consume` replica, fans one pass of
+  the committed `FrameCorpus` down to it, and asserts its YOU total equals the real-ACT oracle baseline
+  (oracle → host engine → consumer replica, from the shipped tree). Skips cleanly when `FCT_DIST_MODE`
+  is unset or the tree is absent; wired behind `test.ps1 -Dist` (publish + arm in one invocation).
 
 ## Determinism note
 

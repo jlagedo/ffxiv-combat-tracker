@@ -345,11 +345,10 @@ package; `StopAllAsync` on close).
 
 **Exit:** three real plugins run isolated in production topology; M0/M2/M3 hold multi-process. ✅
 
-> **Known follow-up (pre-existing, from the P1 note):** `Fct.App`'s `deps.json` still lists
-> `Fct.Aggregation` (via `Fct.Engine`'s `ProjectReference`) *and* it is staged under `compat\` — two
-> identities (`Fct.App.Tests/StaticGraphTests` red for `Fct.Aggregation`). Making `Fct.Engine`'s
-> reference non-shipping (resolve the single `compat\` copy via `CompatRuntime`) is a separable
-> build-graph/startup-ordering change, tracked into P9c finalization.
+> **Follow-up (pre-existing, from the P1 note) — closed in P9c:** `Fct.App`'s `deps.json` no longer
+> lists `Fct.Aggregation`; `Fct.Engine`'s reference is compile-only and non-transitive
+> (`Private="false" PrivateAssets="all"`), and the single `compat\` copy resolves via `CompatRuntime`.
+> `Fct.App.Tests/StaticGraphTests`' `Fct.Aggregation` row is green.
 
 ### P8 — OverlayPlugin satellite ✅
 
@@ -397,12 +396,11 @@ copies through the resolver the stand-in attaches — no fallback extraction nee
 ### P9 — Isolation completion: soak, budgets, finalization (Hojoring deferred to P10)
 
 Split into three gated sub-phases: **P9a** (complete) closed the contract gaps the Hojoring
-source sweep found, **P9b** is the four-satellite soak with the budget harness (parser +
+source sweep found, **P9b** (complete) is the four-satellite soak with the budget harness (parser +
 OverlayPlugin + Triggernometry + Discord-Triggers — the packages isolated through P8), **P9c**
-is finalization (single-identity fix, dist gate, doc truth-up). P9b and P9c-single-identity are
-independent and can start in parallel. Standing the real Hojoring suite up is **deferred to
-P10**, which builds on the completed P9 fabric — its contract gaps are already closed and gated
-(P9a).
+(complete) is finalization (single-identity fix, dist gate, doc truth-up). Standing the real
+Hojoring suite up is **deferred to P10**, which builds on the completed P9 fabric — its contract
+gaps are already closed and gated (P9a).
 
 **What the Hojoring source sweep established** (`E:\dev\ACT.Hojoring`, read-only; drove P9a and
 drives the P10 tasks):
@@ -468,9 +466,9 @@ The Hojoring and OverlayPlugin sweep/interface facts were read from source trees
 Two notes the matrix surfaces: (a) **Discord-Triggers is deliberately out of P9 scope** — its
 native port is in progress separately (the `feature/net10-native-migration` branch); P9 pins
 the installed 2.0.2.0, which the P6/P7 audio gates already cover, and it participates in the
-P9b soak at that version. No P9 task touches it. (b) **Stale doc fact** — `CLAUDE.md` still
-says "OverlayPlugin 0.16.5" for the `E:\dev\Advanced Combat Tracker` install; the
-tested/installed version is 0.19.101 (P9c truth-up).
+P9b soak at that version. No P9 task touches it. (b) **Doc fact corrected in P9c** — `CLAUDE.md`'s
+`E:\dev\Advanced Combat Tracker` install line now reads "OverlayPlugin 0.19.101", the
+tested/installed version.
 
 #### P9a — Hojoring contract closure (facade/stand-in/router gaps; plugin-free unless noted)
 
@@ -599,35 +597,38 @@ latency, and memory all have asserted numbers. ✅
 
 #### P9c — Finalization: single identity, dist gate, doc truth-up
 
-- [ ] **`Fct.Aggregation` single identity (the P1/P7 carried note, closed):** make
-      `Fct.Engine`'s `Fct.Aggregation` `ProjectReference` compile-only
-      (`Private="false" ExcludeAssets="runtime"`), so it leaves `Fct.App`'s deps.json and
-      next-to-exe output; at runtime the default ALC misses and `CompatRuntime`'s `Resolving`
-      hook serves the single `compat\` copy. Ordering is the risk: `CompatRuntime.Enable` must
-      run before any `Fct.Engine` type touching `Fct.Aggregation` JITs — verify by launching
-      the app (a startup log line proving the compat-dir resolve fired), and add direct
-      `Fct.Aggregation` references to test projects that execute engine code without
-      `CompatRuntime`. `StaticGraphTests`' `Fct.Aggregation` case goes green. **Fallback if
-      single-file resolve order proves brittle:** invert — ship `Fct.Aggregation` next-to-exe
-      as the one copy, drop it from the `compat\` staging, and let the shim bind the app-dir
-      identity via the default ALC (still one identity; `StaticGraphTests` updated to assert
-      the chosen location). Either way the invariant is **one loaded identity**, asserted.
-- [ ] **Dist-tree e2e gate:** an env-gated integration test (skips unless `dist\<mode>` exists)
-      sets `FCT_INSTALL_DIR` to the dist tree and drives the production router from it — the
-      staged `satellite\Fct.LegacyHost.exe` spawns per-package, `compat\` resolves, a corpus
-      replay holds parity. `build/` already stages the satellite once (single publish into
-      `dist\<mode>\satellite\`) — the gate proves the *staged* tree runs the topology, which
-      today is only file-existence-checked. Wire as an opt-in `test.ps1` stage after
-      `dotnet run --project build`.
-- [ ] **Doc truth-up to the shipped topology:** `GO-LIVE.md` (A1 state + retire-on-ship),
-      `TESTING.md` (P9 suites: four-package soak tiers, budgets, dist gate), `CLAUDE.md`
-      ("Hojoring isolation lands in P9" → deferred to P10; project-map rows; the stale
-      "OverlayPlugin 0.16.5" fact → 0.19.101 per the version matrix), and this document's
-      checkboxes/§5.
-- [ ] Gate: full `test.ps1` green including both soak tiers (plugin-gated tier on a
-      plugin-equipped machine); the dist gate green after a fresh `dotnet run --project build`.
+- [x] **`Fct.Aggregation` single identity (the P1/P7 carried note, closed):** `Fct.Engine`'s
+      `Fct.Aggregation` `ProjectReference` is compile-only and non-transitive
+      (`Private="false" PrivateAssets="all"`), so it leaves `Fct.App`'s deps.json and next-to-exe
+      output; at runtime the default ALC misses and `CompatRuntime`'s `Resolving` hook serves the
+      single `compat\` copy. **Mechanism-corrected:** the note's originally-prescribed
+      `ExcludeAssets="runtime"` did **not** cut the transitive runtime dependency (the aggregation
+      DLL still surfaced next-to-exe as a `type: reference` swept from `Fct.Engine`'s copy-local
+      output); `PrivateAssets="all"` cuts the asset-graph edge to consumers and `Private="false"`
+      stops the copy-local into `Fct.Engine`'s own bin. Engine-executing test projects that JIT
+      engine code without `CompatRuntime` (`Fct.Engine.Tests`, `Fct.Integration.Tests`) carry a
+      direct `Fct.Aggregation` reference. Ordering verified by launching the app: the startup log
+      shows `Compat runtime enabled …` then `Resolving Fct.Aggregation from compat runtime` before
+      the engine subscribes, healthy start, no `FileNotFoundException`. `StaticGraphTests`'
+      `Fct.Aggregation` case is green (all four rows). The single identity holds in the `dist\`
+      tree too (no next-to-exe copy; only `compat\`).
+- [x] **Dist-tree e2e gate:** `Fct.Integration.Tests/DistTreeGateTests` — opt-in via `FCT_DIST_MODE`
+      (skips unless set + `dist\<mode>` staged), points `FCT_INSTALL_DIR` at the dist tree so
+      `SatelliteHost` resolves `dist\<mode>\satellite\Fct.LegacyHost.exe`, spawns a plugin-free
+      `--consume` replica, fans one pass of the committed `FrameCorpus` down to it, and asserts its
+      YOU total equals the real-ACT oracle baseline (oracle → host engine → consumer replica, from
+      the *staged* tree — which `build/` today only file-existence-checks). Wired as the opt-in
+      `test.ps1 -Dist` stage (publish via `dotnet run --project build -- <mode>` + arm
+      `FCT_DIST_MODE`, one invocation).
+- [x] **Doc truth-up to the shipped topology:** `GO-LIVE.md` (five→four ship-gate + A1 accept-bar,
+      Hojoring→P10a, deferred list), `TESTING.md` (dist-gate bullet; four-package soak tiers +
+      budgets already present), `CLAUDE.md` (the stale "OverlayPlugin 0.16.5" fact → 0.19.101 per
+      the version matrix; the Hojoring-deferred-to-P10 project-map line was already correct), and
+      this document's checkboxes/§5.
+- [x] Gate: full `test.ps1` green (plugin-gated tiers skip cleanly without the real plugins); the
+      dist gate green after a fresh `dotnet run --project build`.
 
-**Exit P9 — isolation complete for the shipped set:** four of the five target packages
+**Exit P9 — isolation complete for the shipped set:** ✅ four of the five target packages
 (parser, OverlayPlugin, Triggernometry, Discord-Triggers) run isolated in the production
 topology; every inter-plugin path is host-routed, parity-gated, and budget-tested. Hojoring
 support is deferred to P10 with its contract gaps already closed and gated (P9a).
@@ -698,9 +699,9 @@ parity-gated, and budget-tested; the tracker's remaining checkboxes are all abov
   features back, the v2 shape is a routed capability (OverlayPlugin satellite publishes, host
   fans) — out of P9 scope, recorded in [`PLUGIN-API.md`](PLUGIN-API.md)'s inventory.
 - **Repository snapshot rate (P5).** *Resolved:* `BridgeForwarder` emits `RepositorySnapshot` at a
-  250 ms cadence (`RepositorySnapshotIntervalMs`); the drop-oldest ring absorbs any burst. Re-pin
-  against measured poll intervals and assert it in the soaks — the OverlayPlugin half in P9b,
-  the Hojoring half in P10b (tracked as tasks there).
+  250 ms cadence (`RepositorySnapshotIntervalMs`); the drop-oldest ring absorbs any burst. The
+  OverlayPlugin half is re-pinned and asserted (P9b `RepositoryCadenceTests`: lossless fan, median
+  inter-arrival ≈ 250 ms); the Hojoring half re-pins in the P10b soak (tracked there).
 - **`ProcessChanged`/process-handle semantics in consumer satellites (P5).** *Resolved:* the parser
   satellite forwards `GameProcessChanged` (PID); consumers materialize `GetCurrentFFXIVProcess` locally
   via `Process.GetProcessById`. Anything reading game memory through the handle (none of the tested

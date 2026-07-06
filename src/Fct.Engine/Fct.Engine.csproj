@@ -22,7 +22,17 @@
 
   <ItemGroup>
     <ProjectReference Include="..\Fct.Abstractions\Fct.Abstractions.csproj" />
-    <ProjectReference Include="..\Fct.Aggregation\Fct.Aggregation.csproj" />
+    <!--
+      Compile-only, non-transitive: Fct.Aggregation must NOT ship next-to-exe or land in a downstream
+      deps.json. The single runtime identity is the staged compat\ copy, resolved by CompatRuntime's
+      default-ALC Resolving hook. PrivateAssets="all" cuts the asset-graph edge so it does not flow to
+      Fct.Host/Fct.App; Private="false" stops the copy-local into this project's own bin (otherwise
+      Fct.App sweeps it up as a loose file from the transitive project output). Fct.Engine consumes the
+      aggregation types internally; nothing downstream binds them. Test projects that JIT engine code
+      without CompatRuntime add their own direct Fct.Aggregation reference.
+    -->
+    <ProjectReference Include="..\Fct.Aggregation\Fct.Aggregation.csproj"
+                      Private="false" PrivateAssets="all" />
   </ItemGroup>
 
   <ItemGroup>
