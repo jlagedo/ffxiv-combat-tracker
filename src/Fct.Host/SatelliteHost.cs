@@ -58,6 +58,14 @@ public sealed class SatelliteHost
     /// <summary>The host-assigned identity this satellite hosts (P3). "ffxiv" for the single-satellite path.</summary>
     public string SatelliteId => _satelliteId;
 
+    /// <summary>The downstream fan-out counters (P4 <see cref="SatelliteEgress"/>) for this satellite, or
+    /// null before it has SUBSCRIBEd. The P9b soak reads <c>Dropped</c> (zero steady-state budget) and
+    /// <c>Sent</c> off directly-constructed hosts.</summary>
+    internal (long Sent, long Dropped)? EgressCounters
+    {
+        get { lock (_egressLock) return _egress is null ? null : (_egress.Sent, _egress.Dropped); }
+    }
+
     /// <summary>Raised when the satellite process exits UNEXPECTEDLY (not during a requested shutdown),
     /// carrying the exit code. The <see cref="SatelliteSupervisor"/> uses it to drive restart/quarantine.</summary>
     public event Action<int>? ProcessExited;

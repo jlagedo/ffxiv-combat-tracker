@@ -55,6 +55,19 @@ install stays green:
   reuses the installed plugin's extracted CEF via a sandbox junction, binds port 10501
   exclusively (serialized in the `satellite-p6` collection), and skips if the WS server cannot
   come up.
+- **Four-satellite soak + budgets** (`Fct.Integration.Tests`, ISOLATION-PLAN P9b), two tiers.
+  Plugin-free tier (runs whenever the satellite is staged): `FourSatelliteSoakTests` fans the
+  looped `FrameCorpus` (`combat-slice{,2}` × N) down to four satellites (two `--consume` replicas
+  + two `--sink`) and asserts **N× oracle YOU parity**, **zero steady-state egress drops**
+  (`SatelliteHost.EgressCounters`), host→fold **latency p99** (QPC `FCT_MARK:` rawlog markers via
+  `--verify-latency`, recorded + generous ceiling), and per-satellite **working set**;
+  `AudioSinkPrecedenceTests` pins cross-satellite most-recent-sink-wins + `UNREGISTERSINK`
+  fallback; `RepositoryCadenceTests` asserts the `repository` stream fans losslessly at the pinned
+  250 ms cadence. Full tier **[plugin-gated]**: `FourRealPackagesTests` spawns the real parser +
+  OverlayPlugin + Triggernometry + Discord-Triggers as **four distinct pids** under the production
+  router, driven by the looped corpus, and asserts OverlayPlugin's MiniParse `CombatData` equals
+  the oracle `ExportVariables` baseline on the terminal encounter (needs all four plugins
+  installed; skips otherwise). `FCT_SOAK_ITERATIONS` overrides N for a longer soak.
 
 ## Determinism note
 

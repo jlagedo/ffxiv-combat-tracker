@@ -136,7 +136,8 @@ namespace Fct.LegacyHost
                 var sinkPipe = ParseBridgeArg(args);
                 if (sinkPipe != null)
                 {
-                    RunSink(args[si + 1], ParseArgValue(args, "--subscribe") ?? SatelliteProtocol.StreamSwings, sinkPipe);
+                    RunSink(args[si + 1], ParseArgValue(args, "--subscribe") ?? SatelliteProtocol.StreamSwings, sinkPipe,
+                        ParseArgValue(args, "--verify-latency"));
                     return;
                 }
             }
@@ -154,7 +155,7 @@ namespace Fct.LegacyHost
                     RunConsume(args[ci + 1], ParseArgValue(args, "--subscribe") ?? SatelliteProtocol.StreamSwings,
                         consumePipe, ParseArgValue(args, "--verify-loglines"),
                         Array.IndexOf(args, "--stand-in") >= 0, ParseArgValue(args, "--verify-standin"),
-                        Array.IndexOf(args, "--probe") >= 0);
+                        Array.IndexOf(args, "--probe") >= 0, ParseArgValue(args, "--verify-latency"));
                     return;
                 }
             }
@@ -474,8 +475,9 @@ namespace Fct.LegacyHost
         // stream set (SUBSCRIBE), and record every frame the host fans down the command pipe. No plugin,
         // no facade, no message loop — a headless subscriber that proves the host→satellite fan-out over
         // the real pipe. Exits when the host signals shutdown or closes the pipe.
-        private static void RunSink(string recordPath, string streams, string pipeName)
+        private static void RunSink(string recordPath, string streams, string pipeName, string latencyPath = null)
         {
+            OpenLatency(latencyPath);   // P9b: record-time QPC capture for rawlog markers
             SatelliteLogging.Initialize(_satelliteId);
             _log = SatelliteLogging.Log;
             _log.LogInformation(LogEvents.SatelliteBooting,
@@ -521,6 +523,7 @@ namespace Fct.LegacyHost
                     if (line.StartsWith(GameEventFrame.Prefix, StringComparison.Ordinal))
                     {
                         record.WriteLine(line);
+                        RecordMarker(line);   // P9b: stamp record-time QPC for latency markers (no-op otherwise)
                         recorded++;
                     }
                 }
@@ -532,6 +535,7 @@ namespace Fct.LegacyHost
             }
             finally
             {
+                CloseLatency();   // P9b: flush + close the latency artifact
                 SatelliteLogging.Shutdown();
                 Environment.Exit(0);
             }
@@ -543,8 +547,10 @@ namespace Fct.LegacyHost
         // read ActiveZone.ActiveEncounter + ExportVariables. On shutdown, dump the YOU total summed across
         // the encounters the fanned lifecycle split the stream into (the parity value vs the host engine).
         private static void RunConsume(string dumpPath, string streams, string pipeName,
-            string logLineVerifyPath = null, bool standIn = false, string standInVerifyPath = null, bool probe = false)
+            string logLineVerifyPath = null, bool standIn = false, string standInVerifyPath = null, bool probe = false,
+            string latencyPath = null)
         {
+            OpenLatency(latencyPath);   // P9b: fold-time QPC capture for rawlog markers
             SatelliteLogging.Initialize(_satelliteId);
             _log = SatelliteLogging.Log;
             FacadeHost.Log = SatelliteLogging.WriteLegacy;
@@ -692,6 +698,7 @@ namespace Fct.LegacyHost
                     act.EndCombatLocal(c.Export);
                     break;
                 case Fct.Abstractions.RawLogLine r:
+                    RecordMarker(r.Line);   // P9b: stamp fold-time QPC for latency markers (no-op otherwise)
                     // Re-raise the fanned raw line through ACT's Before/OnLogLineRead hooks so an
                     // unmodified consumer (Trig/cactbot regex) reads it exactly as under real ACT. The
                     // SAME LogLineEventArgs instance flows through both hooks, so a Before-handler edit
@@ -711,6 +718,44 @@ namespace Fct.LegacyHost
         // YOU damage is counted. Idempotent via the file existence + a one-shot guard.
         private static int _consumeFlushed;
         private const string LogLineMutationMarker = "MUT|";
+
+        // P9b latency harness: markers ride the rawlog stream as sentinel RawLogLines ("FCT_MARK:<id>").
+        // On fold/record we stamp the QPC clock (Stopwatch.GetTimestamp() — machine-wide, cross-process
+        // comparable) and append "<id>\t<qpc>" to the --verify-latency artifact; the driving test stamps
+        // QPC at bus.Emit and joins on <id> to compute host-egress→satellite-fold p99. The engine ignores
+        // these chat-log lines, so they never perturb the parity YOU total.
+        private const string LatencyMarkerPrefix = "FCT_MARK:";
+        private static StreamWriter _latencyWriter;
+        private static readonly object _latencyLock = new object();
+
+        private static void OpenLatency(string path)
+        {
+            if (string.IsNullOrEmpty(path)) return;
+            try { _latencyWriter = new StreamWriter(path, append: false) { AutoFlush = true }; } catch { }
+        }
+
+        // Stamp a fold-time QPC for a marker line ("FCT_MARK:<id>"), if this is one. Cheap substring gate
+        // first so non-marker traffic pays nothing.
+        private static void RecordMarker(string line)
+        {
+            if (_latencyWriter == null || line == null) return;
+            int at = line.IndexOf(LatencyMarkerPrefix, StringComparison.Ordinal);
+            if (at < 0) return;
+            long qpc = System.Diagnostics.Stopwatch.GetTimestamp();
+            // The consume path passes the decoded RawLogLine.Line ("FCT_MARK:<id>" exactly); the sink path
+            // passes the whole wire line, so trailing tab-separated fields (and the '\' escape char) follow
+            // the id — cut at the first of either so the id is clean in both cases.
+            string rest = line.Substring(at + LatencyMarkerPrefix.Length);
+            int end = rest.IndexOfAny(new[] { '\t', '\\' });
+            string id = end >= 0 ? rest.Substring(0, end) : rest;
+            lock (_latencyLock) { try { _latencyWriter.WriteLine(id + "\t" + qpc.ToString(System.Globalization.CultureInfo.InvariantCulture)); } catch { } }
+        }
+
+        private static void CloseLatency()
+        {
+            lock (_latencyLock) { try { _latencyWriter?.Dispose(); } catch { } _latencyWriter = null; }
+        }
+
         private static string _logLineVerifyPath;
         private static long _logLineCount;
         private static long _logLineMutationObserved;
@@ -756,6 +801,7 @@ namespace Fct.LegacyHost
                 }
                 catch { }
             }
+            CloseLatency();   // P9b: flush + close the latency artifact
         }
 
         // Probe discovery variant (ISOLATION-PLAN P5 M4): host the real, unmodified Fct.StreamProbe as an

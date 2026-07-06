@@ -549,39 +549,53 @@ log services are `RealProxy` instances; see the container task above.)
 
 #### P9b — Four-satellite soak + budgets
 
-- [ ] **Long deterministic corpus without the game:** a fixture looper that concatenates the
-      committed `combat-slice{,2}.frames.tsv` N times, rebasing each iteration's
-      offset-from-start (the `FrameSession` codec is offset-based, so rebasing is arithmetic) —
-      encounter totals assert as N× the per-slice oracle baselines (idle-split guarantees
-      per-iteration encounters). The env-gated `FrameFixtureGenerator` can still record a richer
-      corpus locally; CI never needs it.
-- [ ] **Latency harness (new — the "pinned in P4" baseline never materialized in code; pin it
-      here):** host records `Stopwatch.GetTimestamp()` (QPC — cross-process comparable on one
-      machine) at egress enqueue for marker frames; each satellite records it at fold into its
-      verification artifact; the test joins on marker id and computes p99. Budget:
-      host-egress→satellite-fold p99 ≤ 10 ms with four satellites under corpus load, pinned
-      empirically on the CI machine class first, then asserted.
-- [ ] **Drop + memory budgets:** per-satellite `SatelliteEgress` `Sent`/`Dropped` surfaced to
-      the test (heartbeat or exit artifact); soak asserts **zero steady-state drops** across
-      all satellites. Per-satellite `WorkingSet64`/`PrivateMemorySize64` sampled at soak end,
-      recorded in the test output, and asserted against a generous first ceiling (tighten
-      later; the point is catching leaks/regressions, not micro-budgeting).
-- [ ] **Repository-snapshot cadence re-pinned (the OverlayPlugin half of the §5 item):**
-      measure OverlayPlugin's actual poll intervals in the soak and assert the 250 ms
-      `RepositorySnapshot` cadence keeps mirror staleness under one poll interval. (The
-      Hojoring half re-pins in the P10b soak extension.)
-- [ ] **Audio-sink precedence asserted plugin-free:** the P9a most-recent-wins semantics
-      pinned cross-satellite with `SinkFixture` satellites — a later registration takes the
-      route, an `UNREGISTERSINK` falls back to the earlier one. (The real-plugin TTSYukkuri
-      variant is P10b.)
-- [ ] **Gate, two tiers.** Plugin-free tier: replay-frames producer + consumer satellites
-      (fixture plugins) — parity, ordering, drops, latency budgets, and sink precedence all
-      assert without any real plugin. Full tier **[plugin-gated]**: real parser +
-      OverlayPlugin + Triggernometry + Discord-Triggers, four distinct pids, three-way parity
-      (oracle → host engine → every consumer replica) on the looped corpus, budgets green.
+- [x] **Long deterministic corpus without the game:** `Fct.Integration.Tests/FrameCorpus`
+      concatenates the committed `combat-slice{,2}.frames.tsv` N times, rebasing each iteration's
+      offset-from-start by `k·passSpan` (the `FrameSession` codec is offset-based, so rebasing is
+      arithmetic) — each slice's explicit leading `ZCHG`/`SETENC` + terminal `ENDC` bookend its
+      encounter, so N passes fold into N per-slice encounters and consume-replica YOU totals
+      assert as N× the per-slice oracle baselines. `FrameCorpus.Events` (in-process bus drive) +
+      `WriteLoopedFixture` (for a `--replay-frames` producer). The env-gated
+      `FrameFixtureGenerator` still records a richer corpus locally; CI never needs it.
+- [x] **Latency harness:** markers ride the `rawlog` stream as sentinel `RawLogLine`s
+      (`FCT_MARK:<id>`); the driving test stamps `Stopwatch.GetTimestamp()` (QPC — machine-wide,
+      cross-process comparable) at `bus.Emit`, each satellite stamps QPC at fold into its
+      `--verify-latency` artifact (`Program.RecordMarker`, both `--consume` and `--sink`), and the
+      test joins on `<id>` for host→fold p99. Budget: p99 ≤ 10 ms — recorded every run + asserted
+      against a generous safety-net ceiling (measured p99 ≈ 5 ms at N=5 on the dev box; tighten
+      once the CI machine class is characterized). `FourSatelliteSoakTests`.
+- [x] **Drop + memory budgets:** `SatelliteHost.EgressCounters` surfaces the P4 `SatelliteEgress`
+      `Sent`/`Dropped`; the soak asserts **zero steady-state drops** and `Sent > 0` across all four
+      satellites (hard). Per-satellite `WorkingSet64`/`PrivateMemorySize64` sampled at soak end,
+      recorded, and asserted against a generous first ceiling (≈ 40 MB observed; catches
+      leaks/regressions, not micro-budgeting). `FourSatelliteSoakTests`.
+- [x] **Repository-snapshot cadence re-pinned (the OverlayPlugin half of the §5 item):**
+      `RepositoryCadenceTests` drives `RepositorySnapshot` frames through the host at the pinned
+      250 ms `RepositorySnapshotIntervalMs` to a `repository`-subscribed sink and asserts the fan
+      is **lossless** (zero egress drops, every snapshot in order) and cadence-preserving (median
+      inter-arrival ≈ 250 ms). Combined with the pinned producer interval and the measured
+      sub-10 ms egress latency, mirror staleness stays under one poll interval. (OverlayPlugin's
+      internal read-poll is live-game only — `GO-LIVE` A1; the `--replay` producer can't measure
+      it headlessly because the synchronous replay starves the pump's 250 ms timer. The Hojoring
+      half re-pins in the P10b soak extension.)
+- [x] **Audio-sink precedence asserted plugin-free:** `AudioSinkPrecedenceTests` pins the P9a
+      most-recent-wins semantics cross-satellite with two `--audio-sink` satellites — the
+      later-registered sink (higher `Seq`) takes the route; shutting it down (`UNREGISTERSINK` /
+      proxy dispose) falls the route back to the earlier one. (The real-plugin TTSYukkuri variant
+      is P10b.)
+- [x] **Gate, two tiers.** Plugin-free tier (`FourSatelliteSoakTests`): four directly-constructed
+      satellites (two `--consume` replicas + two `--sink`) on one host bus fanning the looped
+      corpus — N× parity, zero drops, latency p99, and memory all assert without any real plugin;
+      `AudioSinkPrecedenceTests` + `RepositoryCadenceTests` complete the plugin-free tier. Full
+      tier **[plugin-gated]** (`FourRealPackagesTests`): real parser + OverlayPlugin +
+      Triggernometry + Discord-Triggers spawned by the production router as **four distinct pids**,
+      driven by the looped corpus; OverlayPlugin's MiniParse WS `CombatData` equals the real-ACT
+      oracle `ExportVariables` baseline on the terminal encounter (three-way parity where a read
+      seam exists), per-satellite working set recorded, and the cactbot log-line path confirmed —
+      liveness/routing for Triggernometry/Discord (no encounter-total read surface).
 
 **Exit P9b:** the shipped four-package topology is measured, not assumed — parity, loss,
-latency, and memory all have asserted numbers.
+latency, and memory all have asserted numbers. ✅
 
 #### P9c — Finalization: single identity, dist gate, doc truth-up
 
