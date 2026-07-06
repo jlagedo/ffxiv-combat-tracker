@@ -48,7 +48,7 @@ Design docs — **read before proposing changes:**
   package's `Fct.Host/SatelliteSupervisor`-supervised satellite with the resolved role +
   subscriptions, and forwards its `LOADPLUGIN`; parser, OverlayPlugin (+ cactbot, with its whole
   CEF/Fleck stack in-satellite), Triggernometry, and Discord-Triggers are isolated today — Hojoring
-  isolation lands in P9 ([`docs/ISOLATION-PLAN.md`](docs/ISOLATION-PLAN.md)). `AssemblyLoadContext` isolates net10 plugins
+  isolation is deferred to P10 ([`docs/ISOLATION-PLAN.md`](docs/ISOLATION-PLAN.md)). `AssemblyLoadContext` isolates net10 plugins
   from each other — it is **not** cross-runtime.
 - **Aggregation truth lives in the host (`Fct.Engine`).** `ModernEncounterEngine` folds the
   bridged full-fidelity `CombatSwing` + encounter-lifecycle stream through the shared

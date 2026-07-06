@@ -349,7 +349,7 @@ package; `StopAllAsync` on close).
 > `Fct.Aggregation` (via `Fct.Engine`'s `ProjectReference`) *and* it is staged under `compat\` — two
 > identities (`Fct.App.Tests/StaticGraphTests` red for `Fct.Aggregation`). Making `Fct.Engine`'s
 > reference non-shipping (resolve the single `compat\` copy via `CompatRuntime`) is a separable
-> build-graph/startup-ordering change, tracked into P9 finalization.
+> build-graph/startup-ordering change, tracked into P9c finalization.
 
 ### P8 — OverlayPlugin satellite ✅
 
@@ -394,16 +394,18 @@ copies through the resolver the stand-in attaches — no fallback extraction nee
 
 **Exit:** M1 holds with OverlayPlugin fully isolated — the deepest coupling routed. ✅
 
-### P9 — Hojoring satellite, full matrix, budgets, finalization
+### P9 — Isolation completion: soak, budgets, finalization (Hojoring deferred to P10)
 
-Split into four gated sub-phases: **P9a** closes the contract gaps the Hojoring source sweep
-found (plugin-free where possible), **P9b** stands the real suite up in its satellite
-(plugin-gated), **P9c** is the five-satellite soak with the budget harness, **P9d** is
-finalization (single-identity fix, dist gate, doc truth-up). P9a and P9d-single-identity are
-independent and can start in parallel; P9b needs P9a; P9c needs P9b for its plugin-gated tier.
+Split into three gated sub-phases: **P9a** (complete) closed the contract gaps the Hojoring
+source sweep found, **P9b** is the four-satellite soak with the budget harness (parser +
+OverlayPlugin + Triggernometry + Discord-Triggers — the packages isolated through P8), **P9c**
+is finalization (single-identity fix, dist gate, doc truth-up). P9b and P9c-single-identity are
+independent and can start in parallel. Standing the real Hojoring suite up is **deferred to
+P10**, which builds on the completed P9 fabric — its contract gaps are already closed and gated
+(P9a).
 
-**What the Hojoring source sweep established** (`E:\dev\ACT.Hojoring`, read-only; drives every
-task below):
+**What the Hojoring source sweep established** (`E:\dev\ACT.Hojoring`, read-only; drove P9a and
+drives the P10 tasks):
 
 - **Suite shape — confirms the §2 one-satellite decision.** Four `IActPluginV1` entry points
   (`ACT.SpecialSpellTimer`, `ACT.UltraScouter`, `ACT.TTSYukkuri`, `ACT.XIVLog`) over
@@ -449,7 +451,7 @@ task below):
   behavior — verify, don't fix). The updater/splash touch the network at init — the e2e
   sandbox must configure them off.
 
-**Version matrix — pinned for P9.** Release binaries are staged at `E:\tmp\plugins`; the
+**Version matrix — pinned for P9/P10.** Release binaries are staged at `E:\tmp\plugins`; the
 `E:\dev` reference source trees are checked against them so every sweep fact above maps to the
 exact binary under test:
 
@@ -458,17 +460,17 @@ exact binary under test:
 | FFXIV_ACT_Plugin | 3.0.2.3 | 3.0.2.3 | (decompile, no tag) | ✅ |
 | OverlayPlugin | 0.19.101 (+ cactbot 0.37.3) | 0.19.101 | `v0.19.101` | ✅ |
 | Triggernometry | 1.2.0.7 | 1.2.0.7 | `v1.2.0.7`+1 commit | ✅ |
-| ACT.Hojoring | v11.0.8 | **not installed** | `v11.0.8` | ✅ source==release; **install from staging is the P9b precondition** |
+| ACT.Hojoring | v11.0.8 | **not installed** | `v11.0.8` | ✅ source==release; **install from staging is the P10a precondition** |
 | ACT-Discord-Triggers | **none staged** | 2.0.2.0 (pinned for P9) | `v2.1.2`+7, on `feature/net10-native-migration` | pinned — port owned outside this plan |
 
 The Hojoring and OverlayPlugin sweep/interface facts were read from source trees whose tags
-**exactly match** the staged releases — the evidence is valid for the binaries P9 ships against.
+**exactly match** the staged releases — the evidence is valid for the binaries P9/P10 ship against.
 Two notes the matrix surfaces: (a) **Discord-Triggers is deliberately out of P9 scope** — its
 native port is in progress separately (the `feature/net10-native-migration` branch); P9 pins
 the installed 2.0.2.0, which the P6/P7 audio gates already cover, and it participates in the
-P9c soak at that version. No P9 task touches it. (b) **Stale doc fact** — `CLAUDE.md` still
+P9b soak at that version. No P9 task touches it. (b) **Stale doc fact** — `CLAUDE.md` still
 says "OverlayPlugin 0.16.5" for the `E:\dev\Advanced Combat Tracker` install; the
-tested/installed version is 0.19.101 (P9d truth-up).
+tested/installed version is 0.19.101 (P9c truth-up).
 
 #### P9a — Hojoring contract closure (facade/stand-in/router gaps; plugin-free unless noted)
 
@@ -523,9 +525,10 @@ tested/installed version is 0.19.101 (P9d truth-up).
       monotonic `Seq` tie-break (`OrderByDescending(Priority).ThenByDescending(Seq)`) in both
       `AudioService` (production) and `RecordingAudioOutput` (the testing fake the
       integration/soak tests register the terminal proxy on). Unit-tested
-      (`AudioServiceTests.Most_recent_terminal_sink_wins_among_equal_priority`). The P9c soak
-      asserts the cross-satellite precedence (Hojoring TTS → TTSYukkuri's sink when both
-      registered; falls back on `UNREGISTERSINK`).
+      (`AudioServiceTests.Most_recent_terminal_sink_wins_among_equal_priority`). The P9b soak
+      pins the cross-satellite precedence plugin-free (`SinkFixture` satellites); the real-plugin
+      variant (Hojoring TTS → TTSYukkuri's sink when both registered; falls back on
+      `UNREGISTERSINK`) is asserted in the P10b soak extension.
 - [x] **`BeforeLogLineRead` reflection compat gate** — pinned plugin-free
       (`BeforeLogLineReadReflectionTests`): the facade's field-like `BeforeLogLineRead` event
       exposes a backing field of the exact name; the test reproduces `LogBuffer.cs`'s exact
@@ -544,32 +547,7 @@ surface is closed and individually gated. ✅ (One sweep fact was corrected duri
 Costura-embedded assembly — the container is built reflectively from the parser assembly and the
 log services are `RealProxy` instances; see the container task above.)
 
-#### P9b — Hojoring satellite e2e **[plugin-gated: ACT.Hojoring + FFXIV_ACT_Plugin installed]**
-
-- [ ] **Precondition:** install ACT.Hojoring v11.0.8 from the staged release
-      (`E:\tmp\plugins\ACT.Hojoring-v11.0.8`) into the ACT plugins dir — the version the
-      sweep facts and the `E:\dev\ACT.Hojoring` tag (`v11.0.8`) correspond to.
-      (Discord-Triggers stays at the installed 2.0.2.0 — out of P9 scope per the matrix.)
-- [ ] The production router spawns the `hojoring` satellite; the four real, unmodified suite
-      plugins load in it; `XIVPluginHelper` attach **completes** (the P9a container makes the
-      `ILogFormat`/`ILogOutput` resolves succeed) — observable headlessly via the roster status
-      labels + Hojoring's own logs; the satellite survives a full `combat-slice` frame replay
-      with zero satellite faults.
-- [ ] TTSYukkuri's slot takeover is detected by the audio-sink poll and `REGISTERSINK` reaches
-      the host; a facade `TTS()` from a peer satellite routes down into TTSYukkuri's sink
-      (the P6 pipe, now with the real plugin).
-- [ ] Test sandbox: Hojoring config/data roots seeded into an isolated sandbox (the
-      `OverlaySatelliteTests` pattern), updater/splash/network-touching features configured
-      off, resource-path fallbacks observed (not fixed) — the suite must come up headless
-      without network.
-- [ ] **Live-game scope recorded:** Sharlayan reads, WPF overlay rendering, and spell-timer
-      display need a live FFXIV process/desktop session — they are `GO-LIVE.md` A1 manual
-      acceptance, not CI. CI proves load/attach/route; A1 proves pixels.
-
-**Exit P9b:** M1 holds for the whole suite — four unmodified Hojoring plugins run isolated,
-discovered, attached, and routed, with the audio hijack a working cross-satellite capability.
-
-#### P9c — Five-satellite soak + budgets
+#### P9b — Four-satellite soak + budgets
 
 - [ ] **Long deterministic corpus without the game:** a fixture looper that concatenates the
       committed `combat-slice{,2}.frames.tsv` N times, rebasing each iteration's
@@ -581,27 +559,31 @@ discovered, attached, and routed, with the audio hijack a working cross-satellit
       here):** host records `Stopwatch.GetTimestamp()` (QPC — cross-process comparable on one
       machine) at egress enqueue for marker frames; each satellite records it at fold into its
       verification artifact; the test joins on marker id and computes p99. Budget:
-      host-egress→satellite-fold p99 ≤ 10 ms with five satellites under corpus load, pinned
+      host-egress→satellite-fold p99 ≤ 10 ms with four satellites under corpus load, pinned
       empirically on the CI machine class first, then asserted.
 - [ ] **Drop + memory budgets:** per-satellite `SatelliteEgress` `Sent`/`Dropped` surfaced to
       the test (heartbeat or exit artifact); soak asserts **zero steady-state drops** across
       all satellites. Per-satellite `WorkingSet64`/`PrivateMemorySize64` sampled at soak end,
       recorded in the test output, and asserted against a generous first ceiling (tighten
       later; the point is catching leaks/regressions, not micro-budgeting).
-- [ ] **Repository-snapshot cadence re-pinned (closes the §5 item):** measure
-      OverlayPlugin's/Hojoring's actual poll intervals in the soak and assert the 250 ms
-      `RepositorySnapshot` cadence keeps mirror staleness under one poll interval.
-- [ ] **Gate, two tiers.** Plugin-free tier: replay-frames producer + four consumer satellites
-      (fixture plugins) — parity, ordering, drops, latency budgets all assert without any real
-      plugin. Full tier **[plugin-gated]**: real parser + OverlayPlugin + Triggernometry +
-      Discord-Triggers + Hojoring, five distinct pids, three-way parity (oracle → host engine →
-      every consumer replica) on the looped corpus, budgets green, audio-sink precedence
-      (P9a) observed.
+- [ ] **Repository-snapshot cadence re-pinned (the OverlayPlugin half of the §5 item):**
+      measure OverlayPlugin's actual poll intervals in the soak and assert the 250 ms
+      `RepositorySnapshot` cadence keeps mirror staleness under one poll interval. (The
+      Hojoring half re-pins in the P10b soak extension.)
+- [ ] **Audio-sink precedence asserted plugin-free:** the P9a most-recent-wins semantics
+      pinned cross-satellite with `SinkFixture` satellites — a later registration takes the
+      route, an `UNREGISTERSINK` falls back to the earlier one. (The real-plugin TTSYukkuri
+      variant is P10b.)
+- [ ] **Gate, two tiers.** Plugin-free tier: replay-frames producer + consumer satellites
+      (fixture plugins) — parity, ordering, drops, latency budgets, and sink precedence all
+      assert without any real plugin. Full tier **[plugin-gated]**: real parser +
+      OverlayPlugin + Triggernometry + Discord-Triggers, four distinct pids, three-way parity
+      (oracle → host engine → every consumer replica) on the looped corpus, budgets green.
 
-**Exit P9c:** the shipped topology is measured, not assumed — parity, loss, latency, and
-memory all have asserted numbers.
+**Exit P9b:** the shipped four-package topology is measured, not assumed — parity, loss,
+latency, and memory all have asserted numbers.
 
-#### P9d — Finalization: single identity, dist gate, doc truth-up
+#### P9c — Finalization: single identity, dist gate, doc truth-up
 
 - [ ] **`Fct.Aggregation` single identity (the P1/P7 carried note, closed):** make
       `Fct.Engine`'s `Fct.Aggregation` `ProjectReference` compile-only
@@ -624,12 +606,65 @@ memory all have asserted numbers.
       today is only file-existence-checked. Wire as an opt-in `test.ps1` stage after
       `dotnet run --project build`.
 - [ ] **Doc truth-up to the shipped topology:** `GO-LIVE.md` (A1 state + retire-on-ship),
-      `TESTING.md` (P9 suites: soak tiers, budgets, dist gate), `CLAUDE.md` ("Hojoring
-      isolation lands in P9" → present-tense isolated; project-map rows; the stale
-      "OverlayPlugin 0.16.5" fact → 0.19.101 per the P9 version matrix), and this document's
+      `TESTING.md` (P9 suites: four-package soak tiers, budgets, dist gate), `CLAUDE.md`
+      ("Hojoring isolation lands in P9" → deferred to P10; project-map rows; the stale
+      "OverlayPlugin 0.16.5" fact → 0.19.101 per the version matrix), and this document's
       checkboxes/§5.
 - [ ] Gate: full `test.ps1` green including both soak tiers (plugin-gated tier on a
       plugin-equipped machine); the dist gate green after a fresh `dotnet run --project build`.
+
+**Exit P9 — isolation complete for the shipped set:** four of the five target packages
+(parser, OverlayPlugin, Triggernometry, Discord-Triggers) run isolated in the production
+topology; every inter-plugin path is host-routed, parity-gated, and budget-tested. Hojoring
+support is deferred to P10 with its contract gaps already closed and gated (P9a).
+
+### P10 — Hojoring satellite (deferred)
+
+Picks Hojoring back up on the completed P9 fabric. The source-sweep facts and version matrix
+above (§P9) are the evidence base; the facade/stand-in/router gaps are already closed (P9a).
+P10a stands the real suite up in its satellite; P10b extends the P9b soak to the full
+five-package matrix.
+
+#### P10a — Hojoring satellite e2e **[plugin-gated: ACT.Hojoring + FFXIV_ACT_Plugin installed]**
+
+- [ ] **Precondition:** install ACT.Hojoring v11.0.8 from the staged release
+      (`E:\tmp\plugins\ACT.Hojoring-v11.0.8`) into the ACT plugins dir — the version the
+      sweep facts and the `E:\dev\ACT.Hojoring` tag (`v11.0.8`) correspond to.
+      (Discord-Triggers stays at the installed 2.0.2.0 — out of scope per the matrix.)
+- [ ] The production router spawns the `hojoring` satellite; the four real, unmodified suite
+      plugins load in it; `XIVPluginHelper` attach **completes** (the P9a container makes the
+      `ILogFormat`/`ILogOutput` resolves succeed) — observable headlessly via the roster status
+      labels + Hojoring's own logs; the satellite survives a full `combat-slice` frame replay
+      with zero satellite faults.
+- [ ] TTSYukkuri's slot takeover is detected by the audio-sink poll and `REGISTERSINK` reaches
+      the host; a facade `TTS()` from a peer satellite routes down into TTSYukkuri's sink
+      (the P6 pipe, now with the real plugin).
+- [ ] Test sandbox: Hojoring config/data roots seeded into an isolated sandbox (the
+      `OverlaySatelliteTests` pattern), updater/splash/network-touching features configured
+      off, resource-path fallbacks observed (not fixed) — the suite must come up headless
+      without network.
+- [ ] **Live-game scope recorded:** Sharlayan reads, WPF overlay rendering, and spell-timer
+      display need a live FFXIV process/desktop session — they are `GO-LIVE.md` A1 manual
+      acceptance, not CI. CI proves load/attach/route; A1 proves pixels.
+
+**Exit P10a:** M1 holds for the whole suite — four unmodified Hojoring plugins run isolated,
+discovered, attached, and routed, with the audio hijack a working cross-satellite capability.
+
+#### P10b — Five-satellite soak extension + truth-up
+
+- [ ] Extend the P9b full tier to five satellites: real parser + OverlayPlugin + Triggernometry
+      + Discord-Triggers + Hojoring, five distinct pids, three-way parity (oracle → host engine
+      → every consumer replica, incl. the Hojoring replica) on the looped corpus; drop, latency,
+      and memory budgets re-asserted at N=5.
+- [ ] Audio-sink precedence with the real plugins (the P9a semantics, real-plugin variant):
+      Hojoring TTS routes to TTSYukkuri's sink when both TTSYukkuri and Discord-Triggers have
+      registered (most-recent-wins); falls back on `UNREGISTERSINK`.
+- [ ] Repository-snapshot cadence re-pinned for Hojoring (completes the §5 item): measure the
+      suite's actual poll intervals in the soak and assert the 250 ms `RepositorySnapshot`
+      cadence keeps mirror staleness under one poll interval.
+- [ ] Doc truth-up: `CLAUDE.md` "Hojoring isolation is deferred to P10" → present-tense
+      isolated; `TESTING.md`/`GO-LIVE.md` extended to the five-package matrix; this document's
+      checkboxes.
 
 **Exit:** the five target plugins run isolated; every inter-plugin path is host-routed,
 parity-gated, and budget-tested; the tracker's remaining checkboxes are all above this line.
@@ -650,8 +685,8 @@ parity-gated, and budget-tested; the tracker's remaining checkboxes are all abov
   fans) — out of P9 scope, recorded in [`PLUGIN-API.md`](PLUGIN-API.md)'s inventory.
 - **Repository snapshot rate (P5).** *Resolved:* `BridgeForwarder` emits `RepositorySnapshot` at a
   250 ms cadence (`RepositorySnapshotIntervalMs`); the drop-oldest ring absorbs any burst. Re-pin
-  against measured OverlayPlugin/Hojoring poll intervals and assert it in the P9c soak (tracked
-  as a P9c task).
+  against measured poll intervals and assert it in the soaks — the OverlayPlugin half in P9b,
+  the Hojoring half in P10b (tracked as tasks there).
 - **`ProcessChanged`/process-handle semantics in consumer satellites (P5).** *Resolved:* the parser
   satellite forwards `GameProcessChanged` (PID); consumers materialize `GetCurrentFFXIVProcess` locally
   via `Process.GetProcessById`. Anything reading game memory through the handle (none of the tested
