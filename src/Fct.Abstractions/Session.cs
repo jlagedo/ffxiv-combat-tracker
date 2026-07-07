@@ -86,6 +86,20 @@ namespace Fct.Abstractions
         /// materialize <c>GetCurrentFFXIVProcess()</c> locally). Null when no game process is reported.
         /// </summary>
         public int? ProcessId { get; init; }
+
+        /// <summary>
+        /// Forwarded server/client clock offset (<c>GetServerTimestamp() - DateTime.UtcNow</c> at the
+        /// producer). <see cref="TimeSpan.Zero"/> when the producer has no live memory-scanned server
+        /// time (see docs/PIPELINE-COMPLETENESS-PLAN.md P0.3/P3.3). Defaulted for source compatibility;
+        /// not yet forwarded or folded anywhere.
+        /// </summary>
+        public TimeSpan ServerClockOffset { get; init; }
+
+        /// <summary>
+        /// Forwarded <c>IDataRepository.IsChatLogAvailable()</c>. Defaulted for source compatibility;
+        /// not yet forwarded or folded anywhere (see docs/PIPELINE-COMPLETENESS-PLAN.md P3).
+        /// </summary>
+        public bool IsChatLogAvailable { get; init; }
     }
 
     /// <summary>Resource categories for id→name lookups.</summary>

@@ -154,4 +154,15 @@ namespace Fct.Abstractions
     /// </summary>
     public sealed record GameProcessChanged(long Sequence, DateTimeOffset Timestamp, int Pid)
         : GameEvent(Sequence, Timestamp);
+
+    /// <summary>
+    /// One-shot environment state (the SDK's <c>GetGameVersion</c>/<c>GetSelectedLanguageID</c>/
+    /// <c>GetGameRegion</c>/<c>GetServerTimestamp</c>/<c>IsChatLogAvailable</c>), forwarded so a consumer
+    /// satellite mirrors the parser's environment without a live game process. <see cref="GameVersion"/>
+    /// is <c>""</c> for an unknown version, never a placeholder; <see cref="ServerClockOffset"/> is
+    /// <see cref="TimeSpan.Zero"/> when the producer has no live memory-scanned server time (see
+    /// docs/PIPELINE-COMPLETENESS-PLAN.md P0.3/P3.3). Not yet produced or folded anywhere (see P3).
+    /// </summary>
+    public sealed record SessionStateChanged(long Sequence, DateTimeOffset Timestamp, string GameVersion, GameLanguage Language, GameRegion Region, TimeSpan ServerClockOffset, bool IsChatLogAvailable)
+        : GameEvent(Sequence, Timestamp);
 }

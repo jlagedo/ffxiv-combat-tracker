@@ -705,13 +705,34 @@ The G14 headline fix. No wire-codec change (the `RAW` frame already carries type
 
 ### P3 — Session state: one additive frame ☐
 
-- [ ] **P3.1 — Abstractions.** In `src/Fct.Abstractions/Events.cs`: add
+- [x] **P3.1 — Abstractions.** In `src/Fct.Abstractions/Events.cs`: add
       `sealed record SessionStateChanged(long Sequence, DateTimeOffset Timestamp, string GameVersion,
       GameLanguage Language, GameRegion Region, TimeSpan ServerClockOffset, bool IsChatLogAvailable)
       : GameEvent(Sequence, Timestamp)`. In `Session.cs`: `PartyChanged` gains
       `int PartySize` (`Events.cs:112`); `PartySnapshot` gains `int Size` (`Session.cs:64`);
       `GameClient` gains `TimeSpan ServerClockOffset` + `bool IsChatLogAvailable` init properties
       (`Session.cs:76`). *Done when:* solution builds (all constructors updated).
+      **Verdict:** ✅ DONE. `PartyChanged.PartySize`/`PartySnapshot.Size` were already added inert by
+      P1.6 — untouched here. Added: `src/Fct.Abstractions/Events.cs` — `SessionStateChanged(long
+      Sequence, DateTimeOffset Timestamp, string GameVersion, GameLanguage Language, GameRegion
+      Region, TimeSpan ServerClockOffset, bool IsChatLogAvailable) : GameEvent(Sequence, Timestamp)`,
+      appended after `GameProcessChanged`, exactly the plan's signature (not yet produced or folded
+      anywhere). `src/Fct.Abstractions/Session.cs` — `GameClient` (record with existing 5 positional
+      params + the pre-existing `ProcessId` init property) gained two more init properties,
+      `TimeSpan ServerClockOffset { get; init; }` and `bool IsChatLogAvailable { get; init; }`, same
+      pattern as `ProcessId` — every existing 5-arg positional `new GameClient(...)` call site
+      (`GameSnapshotAggregator.cs:173`, `GameSnapshotProvider.cs:36`,
+      `Fct.Abstractions.Testing/GameStateFakes.cs:17`, `Fct.Compat.Shim.Tests/DataRepositoryTests.cs:102,113`)
+      keeps compiling unmodified — grepped and confirmed none of them break. Whole-solution build
+      (`dotnet build ffxiv-combat-tracker.slnx`) clean, 0 warnings/errors. No call site needed
+      updating (pure additive init properties + a brand-new unreferenced record). P1.4/P1.5/P1.6
+      gates confirmed still red, unchanged: `Fct.Engine.Tests.OracleParityTests` (4/5, same 12-key
+      message), `Fct.Integration.Tests` `OverlaySatelliteTests`/`LateJoinPrimingTests`×2/
+      `RepositorySurfaceLiveTests` (4 failed, same assertions/messages),
+      `Fct.Parser.Legacy.Tests.ConsumerDataRepositoryStubTests` (1/2, same message),
+      `Fct.App.Tests.GameSnapshotAggregatorTests` (172/173, same 8-vs-0 assertion),
+      `Fct.FlowTests` (21/22, same 8-vs-24 assertion) — every red is byte-identical to its P1.x
+      verdict, no flip, no new red.
 - [ ] **P3.2 — Codec.** In `src/Fct.Bridge.Contracts/GameEventFrame.cs`: add `TagState = "STATE"`
       encoding `key=value` fields (`ver=`, `lang=`, `region=`, `clockoffms=`, `chat=`) with the
       existing `Enc`/`Dec` escaping; the decoder iterates pairs, ignores unknown keys, defaults
