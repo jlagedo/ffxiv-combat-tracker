@@ -2071,10 +2071,19 @@ the completeness authority.
         failed** — every previously-red P1.2 gate (headless + satellite) is now green and no other suite
         regressed; the previously-documented `FourRealPackagesTests`/`SatelliteSupervisorTests`/
         `ReplayRouteTests` run-ordering flakes did not reproduce in this run.
-- [ ] **P5.7 — `CurrentZoneName`:** already registered encounter-level (`CombatTables.cs:224`,
+- [x] **P5.7 — `CurrentZoneName`:** already registered encounter-level (`CombatTables.cs:224`,
       `d.ZoneName`; `ACT_UIMods.cs:1802` registers the identical body). Verify it appears in the
       P1.1 baseline's key set; no code change if the existing registration matches, otherwise move
       it into the `EngineTables` block.
+      **Verdict:** ✅ CONFIRMED, no code change. `CurrentZoneName` appears in the P1.1 oracle baseline
+      key set (`combat-slice.plugin.exportvars.tsv`: `*ENCOUNTER*\tCurrentZoneName\t` — empty value,
+      the swings-only oracle carries no zone). Registered at `CombatTables.cs:224` via
+      `E("CurrentZoneName", (d, a, e) => d.ZoneName)`, matching the decompile's body
+      (`ACT_UIMods.cs:1796-1806`, guarded by `!ContainsKey`). Since `EngineTables.Install()` calls
+      `CombatTables.Setup()` first, the key is present for the engine; both P1.2 gates check its
+      registration and exclude its value for provenance (per the P1.2 verdict), and both are green.
+      Existing registration matches → left in place (§3 "Do NOT edit CombatTables.cs" also forbids
+      moving it).
 - [ ] **P5.8 — Modern-API assertion.** `EncounterProjector` (`:55-69`) iterates the registered
       formatters, so the keys appear in `EncounterSnapshot/CombatantMetrics.ExportVariables`
       automatically once `EngineTables.Install()` registers them (`ModernEncounterEngine.cs:47`).
