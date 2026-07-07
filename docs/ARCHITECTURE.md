@@ -164,99 +164,19 @@ runtime. The IPC layer serializes those records across.
 
 ### Project map (target)
 
-```
-Fct.Abstractions   net48;net10  the SDK. IPlugin, IGameSession (IGameEventStream push +
-                                IGameSnapshot pull), IEncounterService, IAudioOutput,
-                                IPluginRegistry, IRawPacketSource (opt-in raw hatch),
-                                domain records. Semver'd, additive-only. NO opcodes/packets/Machina.
-
-Fct.Abstractions.UI net10       Avalonia UI contribution surfaces (IUiContributor /
-                                IUiHost) + the semantic UI token contract
-                                (FctTokens/FctStyleClasses/FctMetrics); referenced by
-                                UI-contributing net10 plugins and by Fct.App itself
-                                (the shell implements IUiHost).
-
-Fct.Abstractions.Testing net10  in-memory fakes of every plugin-contract interface + the
-                                ShimStub seam; backs the headless flow tests.
-
-Fct.Bridge.Contracts net48;net10 shared bridge wire contract: SatelliteProtocol
-                                (handshake/command line protocol) + GameEventFrame
-                                (typed-event wire codec). One impl on both ends.
-
-Fct.Logging.Contracts net48;net10 shared logging contract: LogEvents/LogCategories
-                                EventId taxonomy, LogPaths, BridgeLogRecord wire record.
-
-Fct.Host           net10        the net10 host runtime (headless class library): the
-                                IPluginHost services + typed bus (Channels), the
-                                ALC-per-plugin loader + manifest/contract-version gate,
-                                CompatRuntime (the default-ALC resolver for the staged
-                                compat\ legacy package), and the IPC bridge client
-                                (SatelliteHost/SatelliteLifetime/ProcessJob; wire contracts
-                                in Fct.Bridge.Contracts/Fct.Logging.Contracts). Registered
-                                via AddFctHostServices; InternalsVisibleTo Fct.App +
-                                Fct.App.Tests + Fct.Compat.Shim.E2E.Tests. See §4a.
-
-Fct.App            net10        the Avalonia shell + composition root (one exe): control
-                                panel + shell (MVVM), localization, Serilog bootstrap, and
-                                the Generic Host wiring that binds Fct.Host to the UI (the
-                                IUiDispatcher, the reflective LegacyPluginHostFactory, and
-                                localized ISatelliteNotificationText it supplies). Enables
-                                CompatRuntime and stages the legacy compat package under
-                                compat\ (no static Fct.Compat.Shim reference — no ACT-
-                                impersonation identity in its deps.json). See §4a.
-
-Fct.Engine         net10        the modern host-side ACT engine — the single source of truth
-                                for encounter calculations: ModernEncounterEngine folds the
-                                bridged CombatSwing/lifecycle feed through the shared
-                                Fct.Aggregation graph; EngineEncounterService projects it as
-                                IEncounterService (+ EncounterProjector → EncounterSnapshot).
-
-Fct.LegacyHost     net48        the satellite: ACT facade host + IActPluginV1 loader, one
-                                real plugin package per process (parser, OverlayPlugin,
-                                Triggernometry, Discord-Triggers, Hojoring → five processes);
-                                satellite end of the bridge — taps what its plugin produces,
-                                projects what the host fans in (incl. the engine replica +
-                                synthetic parser stand-in for consumer packages).
-
-Fct.Parser.Legacy  net48        wraps the real FFXIV_ACT_Plugin (DataRepository +
-                                RingBufferDataSubscription / IRawPacketSource). The sole parser
-                                (never reimplemented by us); this net48 wrapper is retired once the
-                                owner ships a net10 build.
-                                Its WrappedFfxivPlugin implements the facade's IActPluginV1 /
-                                IActPluginAlias, so it references Fct.Compat.Act (see note below).
-
-Fct.Aggregation    net48;net10  the ACT aggregation engine (namespace Advanced_Combat_Tracker):
-                                EncounterData/CombatantData/AttackType/MasterSwing/Dnum +
-                                ExportVariables/ColumnDefs + EncounterLifecycle (the runtime-
-                                neutral encounter state machine) + EngineTables. One strong-named
-                                identity referenced by the host engine (Fct.Engine) and both
-                                facades (Fct.Compat.Act net48, Fct.Compat.Shim.ActFacade net10),
-                                so the authority and every replica run the identical binary.
-
-Fct.Compat.Act     net48        the ACT facade: impersonation identity ("Advanced Combat
-                                Tracker") + WinForms host shims (FormActMain, ActGlobals,
-                                SettingsSerializer, FormSpellTimers, TraySlider,
-                                FormImportProgress, IActPluginV1). Type-forwards the aggregation
-                                engine types to Fct.Aggregation — no engine code compiled in.
-                                Lives in LegacyHost.
-
-Fct.Compat.Shim    net10-win    the net10 in-process legacy path (distinct from the net48
-                                Fct.Compat.Act drop-in): the recompile-shim adapter runtime that
-                                hosts a recompiled legacy plugin as LegacyPluginHost : IPlugin and
-                                re-projects the ACT/SDK programming model onto IPluginHost. Staged
-                                under compat\, resolved into the default ALC by CompatRuntime.
-
-Fct.Compat.Shim.ActFacade net10-win  assembly "Advanced Combat Tracker": the net10 counterpart of
-                                Fct.Compat.Act (POCO ActGlobals/FormActMain), forwarding onto
-                                IPluginHost. References Fct.Aggregation for the engine.
-
-Fct.Compat.Shim.SdkFacade net10  assembly "FFXIV_ACT_Plugin.Common": re-declares the SDK surface
-                                (IDataSubscription/IDataRepository + Combatant/Player/...) a
-                                recompiled plugin binds to; the shim adapters map it onto the host.
-
-Fct.StreamProbe    net48        dev-only diagnostic plugin; taps the parser's swing/raw-packet
-                                stream for inspection. Not bundled or loaded by the shipped app.
-```
+The full per-project map — every assembly, its TFM, and its role — lives in
+[`CLAUDE.md`](../CLAUDE.md) ("Project map"), the single canonical source; it is **not** duplicated
+here. At a glance the layers are: the multi-targeted **contracts** (`Fct.Abstractions` SDK,
+`Fct.Bridge.Contracts`, `Fct.Logging.Contracts`) that compile identically on both sides of the
+bridge; the **net10 host** — `Fct.Host` (headless runtime: `IPluginHost` services, typed bus,
+ALC-per-plugin loader, IPC bridge client) and `Fct.App` (Avalonia shell + composition root), with
+`Fct.Engine` as the aggregation authority; the shared **engine binary** `Fct.Aggregation` (one
+strong-named `net48;net10` identity run identically by the authority and every replica); the
+**net48 satellite** leg — `Fct.LegacyHost` (one unmodified plugin package per process),
+`Fct.Parser.Legacy` (wraps the real FFXIV_ACT_Plugin), and the `Fct.Compat.Act` ACT facade; and
+the **net10 in-process legacy path** — `Fct.Compat.Shim` plus its `ActFacade`/`SdkFacade` for
+recompiled plugins. `Fct.Abstractions.UI`/`.Testing` and the dev-only `Fct.StreamProbe` round it
+out.
 
 The net48↔net10 IPC bridge (named pipe + wire protocol) is **not its own project**: the
 host end lives in `Fct.Host` (loaded by the `Fct.App` process), the satellite end in
@@ -345,12 +265,11 @@ Reproduce faithfully (signatures verified against `E:\dev\ACT-decompiled`):
 - **State:** `CurrentZone`, `InCombat`, `LastEstimatedTime`/`LastKnownTime`,
   `CustomTriggers`.
 - **Identity:** facade assemblies named/strong-named as `Advanced Combat Tracker` /
-  `FFXIV_ACT_Plugin.Common` so the unmodified DLLs bind. The aggregation engine itself is one
-  strong-named assembly (`Fct.Aggregation`, net48;net10) shared by both facades; the net48
-  `Advanced Combat Tracker` facade **type-forwards** the engine's `Advanced_Combat_Tracker.*` types so
-  precompiled plugins' assembly-qualified references still resolve to that identity. ACT-core flags a
-  plugin reads via `ldsfld` (`ActGlobals.charName`, …) stay real static fields on the facade; the
-  engine reads them through accessors the facade wires at init.
+  `FFXIV_ACT_Plugin.Common` so the unmodified DLLs bind. The aggregation engine is one strong-named
+  `Fct.Aggregation` (net48;net10) shared by both facades. The type-forward that projects the
+  engine's `Advanced_Combat_Tracker.*` types into the facade identity, and the accessor wiring for
+  the `ldsfld` ACT-core flags (`ActGlobals.charName`, …), are detailed in
+  [`DATA-FLOW.md`](DATA-FLOW.md) §3.1.
 
 ---
 
@@ -420,23 +339,23 @@ through the `Fct.Compat.Act` facade) — held to the real ACT binary corpus-wide
   ([`ISOLATION-PLAN.md`](ISOLATION-PLAN.md) P4/P9). Co-location is **not** the escape hatch;
   the budget is met by the bounded-ring design, not by moving consumers next to the producer.
 
+Open hot-path risks and the concurrency backlog — the drop-oldest lanes, single-writer pipe
+discipline, and per-subscription pumps reviewed end-to-end — are tracked in
+[`HOTPATH-ANALYSIS.md`](HOTPATH-ANALYSIS.md).
+
 ---
 
 ## 10. Migration ladder + sequencing
 
-**Per plugin (opt-in, incremental) — the three stops of the North Star's 1 → 2 → 3 path:**
-1. **Drop-in (legacy)** — unmodified DLL runs via the ACT/FFXIV/Overlay surfaces in its own net48
-   satellite. *v1 success test.* Optionally the author adds a `Fct.Abstractions` integration for
-   typed access while still shipping the ACT entrypoint on the satellite.
-2. **Recompile (net10 legacy)** — author recompiles the source onto net10, keeps the ACT/WinForms
-   programming model via the compat shim (`Fct.Compat.Shim` + its facades), and hops **in-process**
-   into the net10 host — no satellite, no UI rewrite.
-3. **Native (fully ported)** — drops the ACT entrypoint and migrates the UI to Avalonia; ships as a
-   first-class net10 plugin on the typed API.
+**Per plugin (opt-in, incremental).** Each plugin travels the North Star's three-stop 1 → 2 → 3 path
+— **drop-in (legacy)** in its own net48 satellite, **recompile (net10 legacy)** in-process on the
+compat shim, **native (fully ported)** on the typed API — defined in
+[`NORTH-STAR.md`](NORTH-STAR.md) ("The three plugin patterns").
 
-Reaching the in-process net10 host (stop 2) does **not** require a full port — the compat shim carries
-the legacy programming model in-process so an author can leave the satellite without rewriting their
-UI, then move to stop 3 when they choose.
+The architecturally load-bearing point here: reaching the in-process net10 host (stop 2) does
+**not** require a full port — the compat shim (`Fct.Compat.Shim` + its facades) carries the legacy
+ACT/WinForms programming model in-process, so an author can leave the satellite without rewriting
+their UI, then move to stop 3 when they choose.
 
 **Process sequencing:** the host is the center of gravity from day one — it owns the
 aggregation truth and routes every stream; the satellites are per-package compat shells
@@ -487,25 +406,19 @@ path host-routed. The build order and per-phase e2e gates that get there are
 
 ## 12. Load-bearing compat seams
 
-The seams that make the unmodified drop-in work. Each is reproduced by the facade **inside
-every satellite that needs it**, backed by the host-routed streams — the seam's *shape* is
-legacy, its *data* always crosses through the host:
+The seams that make the unmodified drop-in work — each reproduced by the facade **inside every
+satellite that needs it**, its *shape* legacy but its *data* always crossing through the host.
+Every upstream coupling (MasterSwing boundary, `FFXIVRepository` reflection shape, log-line events,
+repository polls, raw packets, TTS, named callbacks) and the exact host pipe it routes through is
+tabulated in [`DATA-FLOW.md`](DATA-FLOW.md) §8 — the canonical seam→pipe map. The seams that carry
+architectural weight beyond that routing:
 
-1. **MasterSwing boundary.** The **plugin** builds the `MasterSwing`s (`Parse.dll`, via
-   `AddCombatAction`) and feeds the parser satellite's facade, which forwards them to the host
-   engine — the aggregation truth. Consumer satellites replay the same routed swings through
-   the replica for synchronous reads. We host the plugin and reproduce only ACT — never
-   porting plugin logic ([`DATA-FLOW.md`](DATA-FLOW.md) §3.2).
-2. **`FFXIVRepository` reflection shape.** OverlayPlugin discovers the parser by reflecting
-   `ActGlobals.oFormActMain.ActPlugins` and the instance's `DataSubscription`/`DataRepository`
-   properties. In its own satellite it binds the facade's **synthetic parser stand-in** —
-   same reflected shape, data served from the host streams ([`DATA-FLOW.md`](DATA-FLOW.md) §4.1).
-3. **Assembly identity.** The facades carry the legacy strong-name identities the five plugins
+1. **Assembly identity.** The facades carry the legacy strong-name identities the five plugins
    compile against, supplied via `AppDomain.AssemblyResolve`
    ([`ACT-INTERFACE-MAP.md`](ACT-INTERFACE-MAP.md) §17).
-4. **`ActGlobals` surface bound.** We reproduce the *measured* subset the five plugins use; the full
+2. **`ActGlobals` surface bound.** We reproduce the *measured* subset the five plugins use; the full
    member-by-member map is [`ACT-INTERFACE-MAP.md`](ACT-INTERFACE-MAP.md).
-5. **Native deps in collectible ALCs.** Machina sockets, Deucalion injection, and CEF make a parser
+3. **Native deps in collectible ALCs.** Machina sockets, Deucalion injection, and CEF make a parser
    swap a *stop → unload → reload*, not a live hot-reload.
 
 ---

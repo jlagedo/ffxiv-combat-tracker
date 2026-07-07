@@ -67,7 +67,7 @@ namespace Fct.Parser.Legacy
         {
             _repo.Apply(evt);
             _sub.Raise(evt);
-            // PIPELINE-COMPLETENESS-PLAN P3.6/G6: the forwarded region also reaches Machina's own
+            // The forwarded region also reaches Machina's own
             // OpcodeManager (best-effort, non-blocking — KR/CN only, gates nothing). Re-attempted on
             // every SessionStateChanged (bind-time + relog/patch re-emits, P3.3) since Machina.FFXIV may
             // not be loaded in this satellite's AppDomain yet the first time this fires.
@@ -100,7 +100,7 @@ namespace Fct.Parser.Legacy
             {
                 v.Combatants = repo.GetCombatantList().Count;
                 v.GameVersion = repo.GetGameVersion();
-                // PIPELINE-COMPLETENESS-PLAN P1.5/G4: read (never write) the remaining four env scalars —
+                // G4: read (never write) the remaining four env scalars —
                 // same "in-satellite discovery gate" observability precedent as GameVersion above.
                 v.Language = (int)repo.GetSelectedLanguageID();
                 v.Region = repo.GetGameRegion();

@@ -6,14 +6,14 @@ using Xunit;
 
 namespace Fct.Parser.Legacy.Tests
 {
-    // PIPELINE-COMPLETENESS-PLAN P1.5 (repository surface gate) — the in-process, no-satellite-required
+    // Repository surface gate — the in-process, no-satellite-required
     // half of the gate. Asserts directly against the real internal ConsumerDataRepository
     // (ConsumerDataSurface.cs ~93-179, InternalsVisibleTo granted to this project for exactly this
     // purpose) rather than the cross-process --stand-in path Fct.Integration.Tests exercises — no
     // satellite process, no real FFXIV_ACT_Plugin.dll install required, always runs.
     public sealed class ConsumerDataRepositoryStubTests
     {
-        // PIPELINE-COMPLETENESS-PLAN P3.5: the five G4 stubs are deleted. This test used to document
+        // The five G4 stubs are deleted. This test used to document
         // their hardcoded literal values (ConsumerDataSurface.cs ~156-160); it is REWRITTEN (not
         // deleted, per the P3.5 handoff) to document today's replacement — the forwarded-mirror
         // defaults a ConsumerDataRepository serves before any SessionStateChanged has ever been

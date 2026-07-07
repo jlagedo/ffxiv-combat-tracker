@@ -64,8 +64,7 @@ namespace Fct.Abstractions
     /// The party/alliance roster at snapshot time. <paramref name="Size"/> mirrors
     /// <see cref="PartyChanged.PartySize"/> (the SDK's 8-person party size, distinct from an
     /// alliance's up-to-24 <see cref="Members"/>). Defaulted for source compatibility with existing
-    /// call sites; not yet folded from <see cref="PartyChanged"/> anywhere (see
-    /// docs/PIPELINE-COMPLETENESS-PLAN.md P1.6/P3).
+    /// call sites; not yet folded from <see cref="PartyChanged"/> anywhere.
     /// </summary>
     public sealed record PartySnapshot(IReadOnlyList<Actor> Members, PartyMembership Composition, int Size = 0);
 
@@ -90,14 +89,14 @@ namespace Fct.Abstractions
         /// <summary>
         /// Forwarded server/client clock offset (<c>GetServerTimestamp() - DateTime.UtcNow</c> at the
         /// producer). <see cref="TimeSpan.Zero"/> when the producer has no live memory-scanned server
-        /// time (see docs/PIPELINE-COMPLETENESS-PLAN.md P0.3/P3.3). Defaulted for source compatibility;
+        /// time. Defaulted for source compatibility;
         /// not yet forwarded or folded anywhere.
         /// </summary>
         public TimeSpan ServerClockOffset { get; init; }
 
         /// <summary>
         /// Forwarded <c>IDataRepository.IsChatLogAvailable()</c>. Defaulted for source compatibility;
-        /// not yet forwarded or folded anywhere (see docs/PIPELINE-COMPLETENESS-PLAN.md P3).
+        /// not yet forwarded or folded anywhere.
         /// </summary>
         public bool IsChatLogAvailable { get; init; }
     }

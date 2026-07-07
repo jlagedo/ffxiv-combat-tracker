@@ -79,7 +79,7 @@ namespace Fct.LegacyHost
                 act.EncounterSetRaised += OnEncounterSet;
                 act.ZoneChangeRaised += OnZoneChange;
                 act.CombatEndRaised += OnCombatEnd;
-                // The verbatim line stream (PIPELINE-COMPLETENESS-PLAN P2, G14): the facade's log-tail
+                // The verbatim line stream (G14): the facade's log-tail
                 // seam is the sole RawLogLine source — the same tap real ACT consumers (cactbot,
                 // Triggernometry) bind, downstream of the plugin's own log writes, so every line type
                 // crosses regardless of whether a parser is loaded.
@@ -146,7 +146,7 @@ namespace Fct.LegacyHost
 
         // The game process id — forwarded so a consumer satellite materializes GetCurrentFFXIVProcess()
         // locally (Process.GetProcessById). A null process (game closed) forwards pid 0.
-        // Version/region can also change on relog/patch (PIPELINE-COMPLETENESS-PLAN P3.3), so the
+        // Version/region can also change on relog/patch, so the
         // one-shot env state is re-emitted alongside the pid.
         private void OnProcessChanged(System.Diagnostics.Process process)
         {
@@ -171,7 +171,7 @@ namespace Fct.LegacyHost
             // suffix, ConsumerDataSurface.MapResource). ItemList is omitted — the target consumers don't
             // read it and it is large enough to bloat a single wire line.
             //
-            // PIPELINE-COMPLETENESS-PLAN P3.6: forward the SELECTED language's Buff/Skill list, not a
+            // Forward the SELECTED language's Buff/Skill list, not a
             // hard-coded *_EN — those are the only two tables the SDK's ResourceType enum actually
             // exposes per-locale (BuffList_EN/FR/DE/JP/KR, SkillList_EN/FR/DE/JP/KR; confirmed against
             // both the SDK facade, FFXIV_ACT_Plugin.Common/DataRepository.cs, and the real decompile,
@@ -319,7 +319,7 @@ namespace Fct.LegacyHost
 
         // ---- SDK / ACT handlers → GameEvent projection (no parsing) ---------------------------------
 
-        // The verbatim line stream (PIPELINE-COMPLETENESS-PLAN P2.1, G14): the facade's log-tail seam
+        // The verbatim line stream (G14): the facade's log-tail seam
         // (FormActMain.FeedLine -> Before/OnLogLineRead) is the sole RawLogLine source — every line the
         // plugin writes to Network_*.log crosses here, byte-for-byte, whether or not a parser is loaded.
         // Import/oracle replays (isImport == true) are not the live stream and are ignored.

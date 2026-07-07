@@ -127,7 +127,7 @@ namespace Fct.LegacyHost
                 }
             }
 
-            // From-start facade-tail replay (PIPELINE-COMPLETENESS-PLAN P1.3, TEST-ONLY driver): tail a
+            // From-start facade-tail replay (TEST-ONLY driver): tail a
             // given log path through the real ACT facade (OpenLog -> the same background tail P0.1's
             // LineSeamCoverageTests proves delivers every line type to OnLogLineRead) and attach the REAL
             // production BridgeForwarder so any P1.3 harness can observe over the real bridge whether
@@ -350,7 +350,7 @@ namespace Fct.LegacyHost
                 return;
             }
 
-            // Corpus-scale plugin-in-the-loop parity (PIPELINE-COMPLETENESS-PLAN P5.9): same swings,
+            // Corpus-scale plugin-in-the-loop parity: same swings,
             // full enumerated ExportVariables key set (never a hardcoded list) -> <name>.engine.full.exports.tsv,
             // diffed by MassCompare against tools/act-oracle's --plugin-baseline-folder output.
             //   --mass-engine-exports-full <oracleFolder>
@@ -503,7 +503,7 @@ namespace Fct.LegacyHost
             }
         }
 
-        // From-start facade-tail replay (PIPELINE-COMPLETENESS-PLAN P1.3 gate driver, TEST-ONLY — no
+        // From-start facade-tail replay (gate driver, TEST-ONLY — no
         // production behavior change): connect the bridge, stand up the ACT facade, optionally load the
         // real FFXIV_ACT_Plugin (mirroring LoadStandalonePlugins' exact OnParserLoaded wiring, so the
         // production BridgeForwarder attaches precisely as it would once a producer's LOADPLUGIN
@@ -672,7 +672,7 @@ namespace Fct.LegacyHost
                 };
             }
 
-            // Full-content log-line verification (PIPELINE-COMPLETENESS-PLAN P1.3): record every re-raised
+            // Full-content log-line verification: record every re-raised
             // OnLogLineRead line's type + exact bytes, in receipt order — unlike the count-only verify
             // above, this is a byte-diff artifact against the replayed slice. No mutation here (that
             // marker is the sibling gate's concern), so the recorded text is exactly what crossed the wire.
@@ -898,8 +898,8 @@ namespace Fct.LegacyHost
             // The packets column (P8) is the NetworkReceived/Sent count raised from fanned RawPacketReceived
             // frames — OverlayPlugin's NetworkProcessors bind point. The realIoc column (P9a) is 1
             // when _iocContainer is the real Microsoft.MinIoC.Container resolving ILogFormat+ILogOutput
-            // (Hojoring's attach gate). The trailing gameVersion column (PIPELINE-COMPLETENESS-PLAN P1.4/G4)
-            // is the stand-in repository's GetGameVersion(); the four columns after it (P1.5/G4) are the
+            // (Hojoring's attach gate). The trailing gameVersion column (G4)
+            // is the stand-in repository's GetGameVersion(); the four columns after it (G4) are the
             // remaining IDataRepository env scalars (GetSelectedLanguageID/GetGameRegion/
             // GetServerTimestamp().Ticks/IsChatLogAvailable) — all appended purely for gate observability,
             // never read elsewhere, so each append is safe without moving any existing column.

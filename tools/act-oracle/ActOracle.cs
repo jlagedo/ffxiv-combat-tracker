@@ -205,14 +205,14 @@ internal static class ActOracle
                 // Plugin-in-the-loop baseline: load the real FFXIV_ACT_Plugin.dll, install its own
                 // ExportVariables/ColumnDefs registrations, then dump every key it registers (never a
                 // hardcoded list) — the superset baseline ACT-core-only combat-slice.exportvars.tsv
-                // can't produce. See docs/PIPELINE-COMPLETENESS-PLAN.md P1.1.
+                // can't produce.
                 LoadPluginAndInitACT_UIMods();
                 int sw = PluginBaselineAndDump(argv[1], argv[2]);
                 _result = "OK swings=" + sw;
             }
             else if (argv[0] == "--plugin-baseline-folder")
             {
-                // Corpus-scale plugin-in-the-loop baseline (PIPELINE-COMPLETENESS-PLAN P5.9): load the
+                // Corpus-scale plugin-in-the-loop baseline: load the
                 // real FFXIV_ACT_Plugin.dll ONCE (its ExportVariables/ColumnDefs registrations are
                 // static, process-wide), then replay every already-captured plugin swing stream
                 // (<name>.oracle.tsv, produced by the satellite's --mass-oracle) through a fresh

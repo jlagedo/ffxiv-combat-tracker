@@ -15,7 +15,7 @@ using Xunit.Abstractions;
 
 namespace Fct.Integration.Tests
 {
-    // PIPELINE-COMPLETENESS-PLAN P1.3 (from-start line-stream diff gate): feed the P0.1 corpus slice
+    // From-start line-stream diff gate: feed the P0.1 corpus slice
     // through the REAL facade tail seam (FormActMain.OpenLog -> the background tail LineSeamCoverageTests
     // proves delivers every line type to OnLogLineRead byte-identical and in order) on a producer
     // satellite, through the REAL production BridgeForwarder, over the REAL bridge wire, into the REAL

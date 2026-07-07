@@ -102,7 +102,7 @@ namespace Fct.Parser.Legacy
         private uint _playerId;
         private uint _territoryId;
 
-        // The one-shot environment mirror (G4/G5, PIPELINE-COMPLETENESS-PLAN P3.5), fed only by a
+        // The one-shot environment mirror (G4/G5), fed only by a
         // forwarded SessionStateChanged crossing the `repository` stream — never a satellite-local
         // re-derivation (constraint 2). Before the first Apply(), these hold the SDK's own "not yet
         // known" values: GameVersion "" (never a placeholder, §3), Language/Region the SDK's unnamed
@@ -179,7 +179,7 @@ namespace Fct.Parser.Legacy
         public byte GetGameRegion() => _region;
         public string GetGameVersion() => _gameVersion;
 
-        // Offset-corrected server-clock approximation (PIPELINE-COMPLETENESS-PLAN §3/§7): the real
+        // Offset-corrected server-clock approximation: the real
         // plugin's GetServerTimestamp() is only ever populated by a live memory scan (DateTime.MinValue
         // headless, P0.3), so the consumer instead serves a usable clock for custom-line timestamps —
         // UtcNow plus the producer's forwarded ServerClockOffset (Zero when the producer has no live

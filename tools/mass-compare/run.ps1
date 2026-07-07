@@ -21,8 +21,8 @@
   Outputs go to -OutFolder (default tmp\mass-compare, gitignored). They contain real combatant
   names and are not committed.
 
-  PIPELINE-COMPLETENESS-PLAN P5.9 extends this with a second, completeness-oriented diff run
-  alongside the ACT-core percentage diff above: the SAME captured <name>.oracle.tsv swings are also
+  A second, completeness-oriented diff run extends this alongside the ACT-core percentage diff
+  above: the SAME captured <name>.oracle.tsv swings are also
   aggregated through (a) the plugin-in-the-loop oracle (tools/act-oracle --plugin-baseline-folder —
   the real FFXIV_ACT_Plugin.dll's own ACT_UIMods.UpdateACTTables registrations, full enumerated
   ExportVariables) and (b) our engine's full enumerated ExportVariables (--mass-engine-exports-full,

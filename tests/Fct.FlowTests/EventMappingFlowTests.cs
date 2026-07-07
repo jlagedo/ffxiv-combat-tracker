@@ -35,7 +35,7 @@ namespace Fct.FlowTests
         // partySize) reports partySize (the player's 8-person party) DISTINCT from the up-to-24
         // visible alliance roster. GREEN as of P3.5: ShimStub's PartyChanged handler (ShimStub.cs)
         // re-raises p.PartySize instead of deriving it from Members.Count. Method name kept
-        // (_PendingP3 suffix) — it is the exact gate PIPELINE-COMPLETENESS-PLAN.md names as flipped.
+        // (_PendingP3 suffix) — it is the exact gate now flipped.
         [Fact]
         public void A5b_AllianceGathering_PartySizeDistinctFromMemberCount_PendingP3()
         {

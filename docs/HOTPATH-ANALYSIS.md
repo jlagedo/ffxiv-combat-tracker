@@ -25,11 +25,14 @@ net48 ACT engine path (in-satellite):
 
 ## Design properties that hold today (preserve these)
 
-- **Bounded-everything.** Every thread crossing uses a bounded queue with drop-oldest and a
-  dropped counter; no unbounded growth anywhere on the hot path.
-- **Producers never block.** SDK/ACT callbacks only enqueue; pipe and handler I/O happen on
-  dedicated drainer threads (`RingBufferDataSubscription._dispatch`, `BridgeForwarder._writer`,
-  one pump per bus subscription).
+The bounded-everything / never-block-the-producer / single-writer-pipe / drop-oldest design of the
+event path is described in [`ARCHITECTURE.md`](ARCHITECTURE.md) §9 (IPC bridge) — that is the
+invariant set every finding below must preserve. The concrete code sites that realize it, which the
+findings reference:
+
+- **Producers never block; drainer threads own I/O.** SDK/ACT callbacks only enqueue; pipe and
+  handler I/O happen on dedicated threads (`RingBufferDataSubscription._dispatch`,
+  `BridgeForwarder._writer`, one pump per bus subscription).
 - **Single-writer pipe discipline.** All satellite→host lines go through one locked writer
   (`Program.SendLine`), so frames never interleave; the host reads with a single pump.
 - **One ordering authority.** The host re-stamps `Sequence` from its own sink

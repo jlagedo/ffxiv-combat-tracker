@@ -6,10 +6,10 @@ using Xunit;
 
 namespace Fct.Engine.Tests
 {
-    // PIPELINE-COMPLETENESS-PLAN P5.5: no ExportVariables/oracle gate covers these — they are
+    // No ExportVariables/oracle gate covers these — they are
     // MasterSwing-level raw columns (StatusDuration + the plugin's showDebug-gated diagnostic set),
-    // read only via MasterSwing.GetColumnByName. This is the focused registration-correctness check
-    // the plan's P5.5 bullet calls out as optional-but-valuable. EngineTables.Install() is idempotent
+    // read only via MasterSwing.GetColumnByName. This is a focused registration-correctness check,
+    // optional-but-valuable. EngineTables.Install() is idempotent
     // and already invoked by every other test in this project (ModernEncounterEngine's constructor),
     // so calling it directly here adds no new static-state risk.
     public sealed class MasterSwingColumnDefsTests

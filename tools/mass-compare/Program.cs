@@ -12,7 +12,7 @@ using System.Text;
 //
 //   MassCompare <folder>
 //
-// PIPELINE-COMPLETENESS-PLAN P5.9 mode: diff our engine's FULL enumerated ExportVariables key set
+// Completeness mode: diff our engine's FULL enumerated ExportVariables key set
 // (<name>.engine.full.exports.tsv, --mass-engine-exports-full) against the plugin-in-the-loop oracle
 // baseline (<name>.plugin.exports.tsv, tools/act-oracle --plugin-baseline-folder) — the corpus-scale
 // sibling of Fct.Engine.Tests/OracleParityTests.ExportVariables_g1_keys_match_the_plugin_oracle_baseline_pending_P5
@@ -130,7 +130,7 @@ static int ExportsDiff(string folder)
     return totalExact == totalPairs ? 0 : 1;
 }
 
-// PIPELINE-COMPLETENESS-PLAN P5.9: corpus-scale completeness diff. The plugin-in-the-loop oracle
+// Corpus-scale completeness diff. The plugin-in-the-loop oracle
 // (<name>.plugin.exports.tsv — the FULL enumerated CombatantData/EncounterData.ExportVariables key
 // set the real FFXIV_ACT_Plugin registers, tools/act-oracle --plugin-baseline-folder) is the
 // completeness AUTHORITY: every key/value it carries must be reachable, and equal, through our

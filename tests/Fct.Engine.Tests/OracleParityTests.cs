@@ -27,7 +27,7 @@ namespace Fct.Engine.Tests
     {
         private static readonly IReadOnlyDictionary<string, object> NoTags = new Dictionary<string, object>();
 
-        // PIPELINE-COMPLETENESS-PLAN P1.2 / G1: ExportVariables keys the real FFXIV_ACT_Plugin registers
+        // G1: ExportVariables keys the real FFXIV_ACT_Plugin registers
         // that EngineTables.Install() did not register yet, pending P5's port. Empty since P5.6
         // (Last10/30/60DPS, the final G1 keys) — P5.9's exit criterion (this set reaching empty,
         // P1.2 fully green) is met; kept as an empty set so a future registration regression still
@@ -133,7 +133,7 @@ namespace Fct.Engine.Tests
                 string.Join("\n  ", mismatches.Take(25)));
         }
 
-        // PIPELINE-COMPLETENESS-PLAN P1.2: the same production input path (BuildThroughEngine), diffed
+        // The same production input path (BuildThroughEngine), diffed
         // against the plugin-in-the-loop oracle baseline (P1.1, tools/act-oracle --plugin-baseline)
         // instead of the ACT-core baseline above. Keys P5 hasn't ported yet are documented in
         // PendingP5Keys rather than left as an opaque mass-diff; the final assertion intentionally fails
@@ -201,7 +201,7 @@ namespace Fct.Engine.Tests
                 string.Join(", ", PendingP5Keys.OrderBy(k => k, StringComparer.Ordinal)));
         }
 
-        // PIPELINE-COMPLETENESS-PLAN P5.8: a native net10 plugin never touches EncounterData/
+        // A native net10 plugin never touches EncounterData/
         // CombatantData (the Advanced_Combat_Tracker aggregation types) — it reads the projected
         // EncounterSnapshot/CombatantMetrics off IEncounterService. This proves the registered
         // ACT_UIMods keys (P5.1-P5.7) are reachable from THAT surface, not just the aggregation

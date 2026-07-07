@@ -14,7 +14,7 @@ using Xunit.Abstractions;
 
 namespace Fct.Integration.Tests
 {
-    // PIPELINE-COMPLETENESS-PLAN P1.4 (late-join convergence gate): the P1.3 gate proved a facade-tailed
+    // Late-join convergence gate: the P1.3 gate proved a facade-tailed
     // line never reaches a rawlog consumer LIVE, today (G14 — no producer tap; that is P2's fix). This
     // gate is deliberately a DIFFERENT axis: it proves that even where the one-shot state (zone/map/
     // player/version/settings/process/stats) HAS already folded into host session state before a
@@ -206,7 +206,7 @@ namespace Fct.Integration.Tests
                 // priming branch has a live pid to seed, same as a real late join would see.
                 bus.Emit(new ZoneChanged(0, DateTimeOffset.UtcNow, 999, "Kugane"));
                 bus.Emit(new GameProcessChanged(0, DateTimeOffset.UtcNow, 22244));
-                // PIPELINE-COMPLETENESS-PLAN P3.5 note: SessionStateChanged now exists and folds into the
+                // SessionStateChanged now exists and folds into the
                 // aggregator's snapshot (P3.4's GameSnapshotAggregator.OnEvent), so fold a REAL,
                 // distinctive GameVersion here (never "" or "0.0" — a value no default could coincide
                 // with) BEFORE the consumer subscribes. This keeps the gate honest: since P3.5 deleted

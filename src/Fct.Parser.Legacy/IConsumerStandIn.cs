@@ -39,11 +39,11 @@ namespace Fct.Parser.Legacy
         // _iocContainer is the real parser-embedded Microsoft.MinIoC.Container AND resolves ILogFormat +
         // ILogOutput non-null — Hojoring's XIVPluginHelper.Attach() gate (ISOLATION-PLAN P9a).
         public bool RealIocContainer { get; set; }
-        // PIPELINE-COMPLETENESS-PLAN P1.4/G4: the stand-in's ConsumerDataRepository.GetGameVersion(),
+        // G4: the stand-in's ConsumerDataRepository.GetGameVersion(),
         // read purely for gate observability — today always the hardcoded "0.0" stub (no producer env
         // tap, no priming path carries it; P3+P4 fix this).
         public string GameVersion { get; set; } = "";
-        // PIPELINE-COMPLETENESS-PLAN P1.5/G4: the remaining four IDataRepository env scalars, appended
+        // G4: the remaining four IDataRepository env scalars, appended
         // append-only alongside GameVersion for the identical gate-observability reason. Language is the
         // raw SDK Language enum cast to int (the SDK enum has no defined 0 member, so a plain int survives
         // the artifact round-trip unambiguously); ServerTimestampTicks is GetServerTimestamp().Ticks (a

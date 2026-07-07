@@ -113,7 +113,7 @@ namespace Fct.Abstractions
     /// <c>PartyListChanged(partyList, partySize)</c> second argument — in alliance content it is the
     /// player's 8-person party size, distinct from (and smaller than) <see cref="Members"/>'s up-to-24
     /// visible roster. Defaulted for source compatibility with existing call sites; not yet forwarded
-    /// or folded anywhere (see docs/PIPELINE-COMPLETENESS-PLAN.md P1.6/P3).
+    /// or folded anywhere.
     /// </summary>
     public sealed record PartyChanged(long Sequence, DateTimeOffset Timestamp, IReadOnlyList<uint> Members, int PartySize = 0)
         : GameEvent(Sequence, Timestamp);
@@ -160,8 +160,8 @@ namespace Fct.Abstractions
     /// <c>GetGameRegion</c>/<c>GetServerTimestamp</c>/<c>IsChatLogAvailable</c>), forwarded so a consumer
     /// satellite mirrors the parser's environment without a live game process. <see cref="GameVersion"/>
     /// is <c>""</c> for an unknown version, never a placeholder; <see cref="ServerClockOffset"/> is
-    /// <see cref="TimeSpan.Zero"/> when the producer has no live memory-scanned server time (see
-    /// docs/PIPELINE-COMPLETENESS-PLAN.md P0.3/P3.3). Not yet produced or folded anywhere (see P3).
+    /// <see cref="TimeSpan.Zero"/> when the producer has no live memory-scanned server time. Not yet
+    /// produced or folded anywhere.
     /// </summary>
     public sealed record SessionStateChanged(long Sequence, DateTimeOffset Timestamp, string GameVersion, GameLanguage Language, GameRegion Region, TimeSpan ServerClockOffset, bool IsChatLogAvailable)
         : GameEvent(Sequence, Timestamp);

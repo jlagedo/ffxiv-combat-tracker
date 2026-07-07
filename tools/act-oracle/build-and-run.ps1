@@ -5,7 +5,7 @@
 #
 # It also regenerates the plugin-in-the-loop baseline (combat-slice.plugin.exportvars.tsv) — the
 # real FFXIV_ACT_Plugin.dll's own ACT_UIMods.UpdateACTTables registrations, enumerated directly
-# (Job/ParryPct/Last10DPS/... — see docs/PIPELINE-COMPLETENESS-PLAN.md P1.1) — if a plugin DLL can
+# (Job/ParryPct/Last10DPS/...) — if a plugin DLL can
 # be found; otherwise that step is skipped with a warning so the ACT-core baselines above still
 # regenerate without it.
 #

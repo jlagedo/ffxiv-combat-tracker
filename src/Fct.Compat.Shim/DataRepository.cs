@@ -41,7 +41,7 @@ public sealed class DataRepository : IDataRepository
 
     public string GetGameVersion() => Snapshot().Client.Version;
 
-    // Offset-corrected server-clock approximation (PIPELINE-COMPLETENESS-PLAN §3/§7): the real
+    // Offset-corrected server-clock approximation: the real
     // plugin's GetServerTimestamp() is only ever populated by a live memory scan (DateTime.MinValue
     // headless, P0.3), so the consumer instead serves a usable clock for custom-line timestamps — the
     // host clock plus the parser's forwarded ServerClockOffset (Zero when the parser has no live

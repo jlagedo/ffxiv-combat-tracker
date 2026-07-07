@@ -96,7 +96,7 @@ namespace Fct.LegacyHost
             return n;
         }
 
-        // Corpus-scale plugin-in-the-loop parity (PIPELINE-COMPLETENESS-PLAN P5.9): same replay as
+        // Corpus-scale plugin-in-the-loop parity: same replay as
         // Run/AggregateAndDump above (OUR Fct.Compat.Act engine, EngineTables.Install() already
         // registers the ported ACT_UIMods/G1 keys), but dumps the FULL enumerated
         // CombatantData/EncounterData.ExportVariables key set — never the hardcoded ACT-core-only

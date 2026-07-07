@@ -5,7 +5,7 @@ using Xunit;
 
 namespace Fct.Integration.Tests
 {
-    // PIPELINE-COMPLETENESS-PLAN P3.3 done-when [plugin-gated]: boot a REAL producer satellite through
+    // Done-when [plugin-gated]: boot a REAL producer satellite through
     // the production catalog path (empty boot -> LOADPLUGIN, exactly SatelliteRunFixture's shape) and
     // observe, over the REAL bridge event pipe, that BridgeForwarder's new producer taps land — a STATE
     // frame (SessionStateChanged, from EmitInitialRepositoryState once the real FFXIV_ACT_Plugin's SDK

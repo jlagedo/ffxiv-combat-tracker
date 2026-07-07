@@ -64,7 +64,7 @@ namespace Fct.Integration.Tests
             return map;
         }
 
-        // PIPELINE-COMPLETENESS-PLAN P1.2 / G1: mirrors OracleParityTests.PendingP5Keys — empty since
+        // G1: mirrors OracleParityTests.PendingP5Keys — empty since
         // P5.6 (Last10/30/60DPS, the final G1 keys). Kept as an empty set so a future registration
         // regression on the --consume satellite path still fails loudly here.
         private static readonly HashSet<string> PendingP5Keys = new(StringComparer.Ordinal);
@@ -179,7 +179,7 @@ namespace Fct.Integration.Tests
                 // The cactbot event-source log-line path: our host-fanned chat line surfaced on the WS.
                 Assert.Contains(chatLines, l => l.Contains(marker));
 
-                // PIPELINE-COMPLETENESS-PLAN P1.2: full G1 ExportVariables diff on the SAME frame, against
+                // Full G1 ExportVariables diff on the SAME frame, against
                 // the plugin-in-the-loop oracle baseline (P1.1). MiniParse's GetCombatantList/GetEncounterList
                 // enumerate the whole CombatantData/EncounterData.ExportVariables dictionaries (mirrors the
                 // enumeration idiom above), so `frame` already carries every key our engine has registered —

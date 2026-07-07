@@ -100,7 +100,7 @@ namespace Fct.Parser.Legacy.Tests
             .Select(l => GameEventFrame.TryParse(l, out var e) ? e : null)
             .Where(e => e != null).ToList()!;
 
-        // PIPELINE-COMPLETENESS-PLAN P3.3 / G5: EmitInitialRepositoryState builds and forwards ONE
+        // EmitInitialRepositoryState builds and forwards ONE
         // SessionStateChanged from the SDK repository, mapped through BridgeForwarder's
         // Language/Region enum maps — never the ConsumerDataRepository stubs (those are a P3.5 concern
         // on the OTHER end of the pipe; this test is the producer/origin side).
@@ -159,7 +159,7 @@ namespace Fct.Parser.Legacy.Tests
             Assert.Equal(TimeSpan.Zero, state.ServerClockOffset);
         }
 
-        // PIPELINE-COMPLETENESS-PLAN P3.6: EmitInitialRepositoryState must forward the SDK's SELECTED
+        // EmitInitialRepositoryState must forward the SDK's SELECTED
         // language's Buff/Skill resource dictionaries, not a hard-coded *_EN, wherever the SDK exposes a
         // locale variant at all (only BuffList/SkillList have one — WorldList/ZoneList do not, see
         // BridgeForwarder.EmitInitialRepositoryState's comment).

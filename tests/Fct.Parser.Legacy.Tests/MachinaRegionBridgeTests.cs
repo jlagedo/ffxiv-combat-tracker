@@ -5,7 +5,7 @@ using Xunit;
 
 namespace Fct.Parser.Legacy.Tests
 {
-    // PIPELINE-COMPLETENESS-PLAN P3.6/G6 — MachinaRegionBridge reflectively pushes the forwarded region
+    // MachinaRegionBridge reflectively pushes the forwarded region
     // into Machina.FFXIV's own OpcodeManager singleton (the seam OverlayPlugin's FFXIVRepository reads
     // region from, NOT IDataRepository.GetGameRegion() — see MachinaRegionBridge.cs's header comment).
     // Machina.FFXIV.dll is not referenced by any project in this solution (it lives only inside whatever

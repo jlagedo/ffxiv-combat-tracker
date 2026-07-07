@@ -18,9 +18,10 @@ migrate them onto a typed modern API. **It is not a new ACT and not a replacemen
 point is to carry the community's existing plugins forward, not to compete with the tools they
 rely on.
 
-Concretely, this is an **FFXIV-only** experiment: a two-process host that loads the real
-FFXIV_ACT_Plugin + OverlayPlugin (and the wider ecosystem) unmodified, with the network/opcode
-parser kept as a swappable, independently-released component.
+Concretely, this is an **FFXIV-only** experiment: a .NET 10 host that runs the real
+FFXIV_ACT_Plugin + OverlayPlugin (and the wider ecosystem) unmodified — each legacy plugin
+package in its own isolated satellite process — with the network/opcode parser kept as a
+swappable, independently-released component.
 
 The authoritative design lives in [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md). The map of
 how data flows through the real upstream stack — and the compat seams this project must
@@ -29,16 +30,18 @@ reproduce — is in [`docs/DATA-FLOW.md`](docs/DATA-FLOW.md).
 ## The idea in one breath
 
 Today's stack is three independently-evolved layers glued together by a stringly-typed,
-pipe-delimited log line. This project explores collapsing that into two cooperating
-processes:
+pipe-delimited log line. This project explores splitting that across a modern host and a set
+of isolated satellite processes:
 
-- **A real .NET Framework 4.8 satellite** (`Fct.LegacyHost`) that hosts the legacy plugins
-  **unmodified** behind a from-scratch ACT engine facade. The target set is five:
+- **A .NET 10 host** (`Fct.App`, Avalonia) that owns all calculations and routing: it runs the
+  authoritative ACT aggregation engine (`Fct.Engine`/`Fct.Aggregation`), runs new typed plugins
+  in isolated load contexts, and routes combat data over the IPC bridge. The engine — not any
+  legacy binary — is the single source of truth for encounters/DPS/`ExportVariables`.
+- **Real .NET Framework 4.8 satellites** (`Fct.LegacyHost`) that host the legacy plugins
+  **unmodified**, **one satellite process per plugin package**, each behind its own private ACT
+  facade. The two CLRs cannot share a process, so the OS process boundary *is* both the runtime
+  boundary and the isolation boundary; only typed data crosses. The target set is five:
   FFXIV_ACT_Plugin, OverlayPlugin/cactbot, Triggernometry, ACT-Discord-Triggers, ACT.Hojoring.
-- **A .NET 10 host** (`Fct.App`, Avalonia) that launches and embeds the satellite, runs new
-  typed plugins in isolated load contexts, and receives combat data over the IPC bridge. The
-  two CLRs cannot share a process, so the OS process boundary *is* the runtime boundary; only
-  data crosses.
 
 Two hard directives gate every decision:
 
@@ -55,31 +58,35 @@ untouched. One opt-in escape hatch (`IRawPacketSource`) exposes raw packets for 
 
 This is a prototype; the table below reflects what exists in the tree, not a finished system.
 
+This lists the load-bearing projects only; the full project map lives in
+[`CLAUDE.md`](CLAUDE.md) and [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md).
+
 | Project | TFM | Role |
 |---|---|---|
-| `Fct.App` | net10 | Avalonia control panel + shell (MVVM); launches and embeds the satellite; owns the IPC bridge client. |
-| `Fct.LegacyHost` | net48 | from-scratch ACT engine; hosts the real plugins; satellite end of the bridge. |
-| `Fct.Compat.Act` | net48 | the ACT facade surface — `EncounterData`/`CombatantData` aggregation reproducing real ACT's binary output bit-for-bit on captured combat. |
+| `Fct.App` | net10 | Avalonia control panel + shell (MVVM) + composition root; binds the host runtime to the UI. |
+| `Fct.Host` | net10 | the .NET 10 host runtime: `IPluginHost` services, the ALC plugin loader, and the IPC bridge client that spawns/routes one satellite per plugin package. |
+| `Fct.Aggregation` | net48;net10 | **the ACT aggregation engine** (`EncounterData`/`CombatantData`/`MasterSwing` + `ExportVariables`) — one strong-named binary shared by the host authority and every facade replica. |
+| `Fct.Engine` | net10 | the host-side ACT engine — the single source of truth for encounter calculations, folding the bridged swing + lifecycle stream through `Fct.Aggregation`. |
+| `Fct.LegacyHost` | net48 | the satellite: ACT facade host + `IActPluginV1` loader, one real plugin package per process; the net48 end of the bridge. |
+| `Fct.Compat.Act` | net48 | the net48 ACT facade surface (host shims + fake `Advanced Combat Tracker` identity); fronts a parity-gated `Fct.Aggregation` replica for legacy synchronous reads. |
 | `Fct.Parser.Legacy` | net48 | wraps the real FFXIV_ACT_Plugin (the sole parser); ring-buffered single-dispatch `IDataSubscription`/`IRawPacketSource`. |
 | `Fct.Abstractions` | net48;net10 | the forward, typed plugin SDK — contracts + domain records shared across the bridge. No opcodes. |
-| `Fct.Abstractions.UI` | net10 | Avalonia UI contribution surfaces for net10 plugins. |
-| `Fct.StreamProbe` | net48 | dev-only diagnostic plugin; taps the parser's swing/raw-packet stream. Not bundled or loaded by the shipped app. |
 
 Plus `tools/mass-compare/` — a corpus-scale differential harness holding our ACT engine to the real
 ACT binary, both fed the same plugin-produced swings, on recorded logs.
 
 ## Status
 
-An exploratory prototype: the two-process host loads the real plugins and the forward typed
-contract is in place, but large parts are unfinished or stubbed and everything is subject to
-change. See [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md) §11 for the milestone map and
+An exploratory prototype: the host loads the real plugins in per-package satellites and the
+forward typed contract is in place, but large parts are unfinished or stubbed and everything is
+subject to change. See [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md) §11 for the milestone map and
 [`docs/PLUGIN-API.md`](docs/PLUGIN-API.md) for the forward surface + remaining work.
 
 ## Validation — ACT-engine output parity
 
 The one hard, measurable claim this prototype makes: **our from-scratch ACT aggregation engine
-(`Fct.Compat.Act`) reproduces the real ACT binary's output bit-for-bit** (no ACT code is
-copied), given the same plugin-produced swings. "Output" means `ExportVariables` — the exact per-combatant and
+(`Fct.Aggregation`, authoritative in the net10 `Fct.Engine`) reproduces the real ACT binary's
+output bit-for-bit** (no ACT code is copied), given the same plugin-produced swings. "Output" means `ExportVariables` — the exact per-combatant and
 per-encounter dictionaries OverlayPlugin builds and cactbot/overlays read.
 
 ### How the test works (`tools/mass-compare`)

@@ -10,7 +10,7 @@ using Xunit.Abstractions;
 
 namespace Fct.Compat.Act.Tests
 {
-    // P0.1 (PIPELINE-COMPLETENESS-PLAN) line-seam coverage derisk: prove the facade's file tail
+    // Line-seam coverage derisk: prove the facade's file tail
     // (OpenLog -> StartLogTail -> TailLoop -> FeedLine -> OnLogLineRead) delivers EVERY line type
     // byte-identical and in order, with no per-type filtering. Plugin-free: the tail fires the ACT
     // hooks on whatever complete lines it reads. This is the from-start line-stream diff (P1.3) in

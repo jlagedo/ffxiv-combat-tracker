@@ -26,7 +26,7 @@ namespace Fct.Bridge
     // CombatSwing (every MasterSwing field + Tags) and the encounter-lifecycle requests
     // (SetEncounterRequested, ZoneChangeRequested, EndCombatRequested). SessionStateChanged carries the
     // one-shot environment state (version/language/region/clock/chat-log) as one additive STATE frame
-    // of key=value pairs (§3 of docs/PIPELINE-COMPLETENESS-PLAN.md) — a new state field is a new key an
+    // of key=value pairs — a new state field is a new key an
     // old decoder ignores, never a new tag. The plugin is the sole parser, so events that exist only as
     // parsed log-line fields (StatusApplied/Removed, Cast*, DeathOccurred, HpUpdated) are not
     // synthesized here — consumers reach them through the RawLogLine firehose. ToWire returns null for
@@ -601,8 +601,8 @@ namespace Fct.Bridge
         // ---- SessionStateChanged — one additive STATE frame carrying all one-shot env state, as
         // tab-delimited "key=value" fields (each value run through Enc/Dec). The decoder iterates
         // whatever pairs are present, ignores unknown keys, and defaults any missing key — so a future
-        // state field is a new key an old decoder skips and old recorded fixtures still round-trip
-        // (docs/PIPELINE-COMPLETENESS-PLAN.md §3). ----
+        // state field is a new key an old decoder skips and old recorded fixtures still round-trip.
+        // ----
 
         private static string EncodeState(SessionStateChanged e)
         {

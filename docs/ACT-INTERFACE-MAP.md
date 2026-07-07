@@ -24,35 +24,6 @@ Companion docs:
 |:--:|---|
 | ✅ | **DONE** — implemented + functional |
 | 🟡 | **STUB / VERIFY** — present but inert *by design*, or present but untested on the live path |
-| ❌ | **GAP** — missing; must build for the four-plugin target |
-| ⬜ | **M4** — Hojoring-only batch; not yet built |
-
-## Status board — remaining work (the trackable checklist)
-
-This execution round covers **the four-plugin target *and* the M4 Hojoring batch**. Per-gap
-decisions are locked and recorded under each section's **Strategy** (look for `Decision:`).
-
-**Four-plugin target:**
-- [x] **G‑1** ✅ `TTS(string)` / `PlaySound(string)` **methods** → route to delegate fields — §6 — BREAK
-- [x] **G‑2** ✅ `ActGlobals.oFormSpellTimers` + `FormSpellTimers` (2 events) — §7 — BREAK *(built with M4‑2)*
-- [x] **G‑3** ✅ `FormActMain.DpiScale` property → `DeviceDpi / 96f` (System-DPI-aware satellite) — §10 — MINOR
-- [x] **VERIFY** ✅ `BeforeLogLineRead` reflectable multicast field — pinned plugin-free (a test reproduces Hojoring `LogBuffer.cs`'s unhook-all-and-insert-first sequence, ISOLATION-PLAN §P9a). The exact "…Started" status string is a live-run confirmation (Trig only; OP/Hojoring don't gate on it) — §3 / §1
-- [ ] **G‑4** 🟡 `TraySlider` / `ButtonLayoutEnum` inert stubs — **deferred on-demand** (build only if a bind throws) — §11
-
-**M4 — Hojoring:**
-- [x] **M4‑1** ✅ Hojoring audio — closed by **G‑1** (same methods) — §6
-- [x] **M4‑2** ✅ `FormSpellTimers` (**functional storage, inert engine**) + `TimerData`/`TimerFrame`/`SpellTimer` — §7
-- [x] **M4‑3** ✅ real `CornerControlAdd`/`CornerControlRemove` methods — §10
-- [x] **M4‑4** ✅ `Form` lifecycle members `WindowState`/`CanFocus`/`IsHandleCreated`/`IsDisposed` — inherited from `Form`, no code — §10
-
-**Done — no action (checked = implemented):**
-- [x] §1 Lifecycle, identity & discovery · [x] §2 Producer write-path · [x] §3 Inbound log seam *(pending VERIFY)*
-- [x] §4 Consumer read-path · [x] §5 Combat-state events · [x] §8 Custom-trigger import · [x] §9 Encounter export
-- [x] §11 Self-update (inert stubs) · [x] §12 Logging · [x] §13 Cross-cutting shape · [x] §14 FFXIV SDK seam · [x] §15 OverlayPlugin web (non-goal)
-
-> **Net:** all binding gaps are implemented (`Fct.Compat.Act`): `TTS`/`PlaySound`, `DpiScale`,
-> `CornerControlAdd`/`Remove` on `FormActMain`; `ActGlobals.oFormSpellTimers` + `FormSpellTimers`
-> with the timer model family. G‑4 is deferred on-demand; VERIFY is runtime-only (live run).
 
 ## Guiding principles (these decide how much of each interface we build)
 
@@ -79,9 +50,8 @@ Each plugin source tree was swept for references into the `Advanced_Combat_Track
 symbols that merely *look* like ACT members but are the plugin's own types were excluded. ACT
 signatures verified against the decompile at `E:\dev\ACT-decompiled\Advanced_Combat_Tracker\`.
 
-All five plugins are in scope. FFXIV_ACT_Plugin, OverlayPlugin, Triggernometry and Discord-Triggers
-are the original build target; **ACT.Hojoring** is the heaviest — its extra surface (chiefly the
-full spell-timer subsystem) is the not-yet-built batch tracked as **M4**.
+All five plugins are in scope. **ACT.Hojoring** is the heaviest consumer; its extra surface is
+chiefly the full spell-timer subsystem (§7).
 
 ## Plugins at a glance
 
@@ -193,27 +163,22 @@ reorder handlers (run first).
 | ✅ | `ReadThreadLock`, `.Visible` | FFXIV | gate the log-writer thread startup |
 | 🟡 | `GenerateAttackTypeGraph` / `FindControl<Button>` / `ActCommands(string)` | FFXIV | graph generator / Clear-button hook / `/echo` — STUB (UI/diagnostic) |
 
-**Strategy.** Present + fired via `FireBeforeLogLineRead`/`FireLogLineRead`. 🟡 **VERIFY** the
-`BeforeLogLineRead` reflectable multicast-field shape (discoverable via
-`GetField("BeforeLogLineRead", NonPublic|Instance|Public|Static)` and reassignable). The three
-graph/clear/echo members are inert stubs by design.
+**Strategy.** Present + fired via `FireBeforeLogLineRead`/`FireLogLineRead`. `BeforeLogLineRead` is
+declared as a **field-like event** (`FormActMain.cs:130`), which the C# compiler backs with a private
+field named exactly `BeforeLogLineRead` — precisely what OP (`LogParseOverlay.cs:33`) and Hojoring
+(`LogBuffer.cs:102`) reflect with `GetField("BeforeLogLineRead", NonPublic|Instance|GetField)` and
+reassign; the invocation-list handlers are `LogLineEventDelegate`, and both call sites are wrapped in
+try/catch. The reflectable-multicast-field shape is satisfied by construction; confirming it with the
+real plugins loaded is a live-run check only. The three graph/clear/echo members are inert stubs by
+design.
 
-> **Decision (VERIFY — no code change):** `BeforeLogLineRead` is declared as a **field-like event**
-> (`FormActMain.cs:130`), which the C# compiler backs with a private field named exactly
-> `BeforeLogLineRead` — precisely what OP (`LogParseOverlay.cs:33`) and Hojoring
-> (`LogBuffer.cs:102`) reflect with `GetField(..., NonPublic|Instance|GetField)`, and the
-> invocation-list handlers are already `LogLineEventDelegate`. Both call sites are wrapped in
-> try/catch. So the shape is satisfied by construction; this item is **runtime confirmation only**
-> (real plugins loaded) and is the one remaining check before §3 flips fully ✅. The "…Started"
-> status-string check (§1) is confirmed on the same live run.
->
-> **Status string pinned:** Triggernometry (`ProxyPlugin.cs:444-446`) gates FFXIV-plugin discovery on
-> `ActPluginData.lblPluginStatus.Text` equalling (case-insensitive) **`"FFXIV Plugin Started."`** or
-> **`"FFXIV_ACT_Plugin Started."`**. OP does **not** check status text (only `lblPluginTitle.Text`
-> `StartsWith("FFXIV_ACT_Plugin")` + `cbEnabled.Checked` + non-null `pluginObj` —
-> `FFXIVRepository.cs:91-95`). The **real** plugin's `InitPlugin` sets the text to
-> `"FFXIV_ACT_Plugin Started."` (`FacadeHost.cs:89`) and our facade never overwrites it, so this is
-> **no new work** — purely a live-run confirmation that the real plugin reaches that string.
+**Status string.** Triggernometry (`ProxyPlugin.cs:444-446`) gates FFXIV-plugin discovery on
+`ActPluginData.lblPluginStatus.Text` equalling (case-insensitive) **`"FFXIV Plugin Started."`** or
+**`"FFXIV_ACT_Plugin Started."`**. OP does **not** check status text (only `lblPluginTitle.Text`
+`StartsWith("FFXIV_ACT_Plugin")` + `cbEnabled.Checked` + non-null `pluginObj` —
+`FFXIVRepository.cs:91-95`). The **real** plugin's `InitPlugin` sets the text to
+`"FFXIV_ACT_Plugin Started."` (`FacadeHost.cs:89`) and the facade never overwrites it, so no facade
+work is required — only a live-run confirmation that the real plugin reaches that string.
 
 ## 4. Consumer read-path (MiniParse / cactbot CombatData) — ✅ DONE
 
@@ -262,7 +227,7 @@ Discord-Triggers once it's the installed sink.** That is the "official audio sta
 | ✅ | `PlayTtsMethod` / `PlaySoundMethod` (public mutable delegate fields) | Trig, Disc, Hojo | the swappable sink; Disc/TTSYukkuri save→swap→restore |
 | ✅ | `PlayTtsDelegate`(`void(string)`) / `PlaySoundDelegate`(`void(string,int)`) (types) | Disc | field types / handler signatures |
 
-**Strategy (G‑1, BREAK).** Add the two methods routing to the delegate fields:
+**Strategy.** The two methods route to the delegate fields, with `PlaySound`'s volume arg fixed at `100`:
 
 ```csharp
 public void TTS(string SpeechText)        => PlayTtsMethod?.Invoke(SpeechText);
@@ -270,14 +235,9 @@ public void PlaySound(string WavFilePath) => PlaySoundMethod?.Invoke(WavFilePath
 ```
 
 Minimal is correct — we skip ACT's speech-correction list, volume sliders, and TTS-to-WAV caching
-(ACT-options state we don't reproduce). Keep the delegate fields' **no-op defaults** (already
-present) so audio degrades to silence without Discord-Triggers rather than throwing. This one fix
-closes G‑1 **and** Hojoring's audio (M4‑1).
+(ACT-options state we don't reproduce). The delegate fields keep **no-op defaults** so audio degrades
+to silence without Discord-Triggers rather than throwing. The same methods carry Hojoring's audio.
 
-> **Decision:** add the two methods exactly as above (route to the existing delegate fields, no
-> bookkeeping). `PlaySound`'s volume arg is fixed at `100`. Verified by a unit test that swaps a
-> delegate and asserts invocation, and that the default no-op does not throw.
->
 > **Known interaction (not a facade gap):** `PlayTtsMethod`/`PlaySoundMethod` are a **single** delegate
 > slot. Both Discord-Triggers **and** Hojoring's TTSYukkuri save→swap→restore it
 > (`PluginCore.cs:174-184`), so when both are enabled it is last-writer-wins (real-ACT behavior). "ACT-
@@ -307,26 +267,21 @@ casts it to `Control`). Verified surface to reproduce from the decompile:
   `TimerValue/RemoveValue/WarningValue/OnlyMasterTicks/Tooltip/Panel1Display/Panel2Display/WarningSoundData/RestrictToMe/AbsoluteTiming/RestrictToCategory`),
   plus minimal `TimerFrame` (`.SpellTimers`) and `SpellTimer` — ported as plain data types.
 
-> **Decision (functional storage, inert engine):**
-> - **G‑2:** `ActGlobals.oFormSpellTimers` is a **non-null** `FormSpellTimers`; the two events bind
->   but are **never fired**, so OP's optional SpellTimer overlay shows nothing instead of NRE‑ing.
-> - **M4‑2:** `TimerDefs` is a **real** `SortedDictionary<string,TimerData>` keyed by
->   `TimerData.Key` — `AddEditTimerDef`→enumerate→`RemoveTimerDef` round-trips correctly
->   (Hojoring's `ClearNormalSpellTimer` filters `TimerDefs` by KVP `Key.StartsWith(prefix)`).
->   `RebuildSpellTreeView` no-ops; `NotifySpell` is inert (does **not** raise `OnSpellTimerNotify`).
->   `TimerData` is ported with a literal default category (the facade has no `ActGlobals.Trans`).
-> - **Out of scope (principle 1):** ACT's timer-matching/tick engine. Lost behavior: Hojoring timers
->   mirrored into OP's `SpellTimerOverlay` (off by default; Hojoring's own overlay still shows them).
-> - **Model set trimmed:** `TimerMod` and `TimelineEvent` have **no consumer** — neither Hojoring nor
->   ACT's `TimerData` references them — so they are **not** ported. Only `TimerData` (full-ish),
->   minimal `TimerFrame` (the `OnSpellTimerNotify` payload type), and minimal `SpellTimer`
->   (`TimerFrame.SpellTimers` element) are built. `SpellTimer`/`TimerFrame` members reached only inside
->   the never-fired event handler can stay minimal — the types must exist (correct namespace + name) so
->   OP's prebuilt metadata resolves, but the unreached reads never execute.
-> - **`NotifySpell`:** ship both the 5‑arg (Hojoring's only call) and 6‑arg overloads for shape
->   completeness; both inert.
-> - Verified by a round-trip unit test (add → `TimerDefs` enumerate by key prefix → remove) and that
->   both events `+=` bind without throwing.
+**Functional storage, inert engine.** `ActGlobals.oFormSpellTimers` is a **non-null**
+`FormSpellTimers`; its two events bind but are **never fired**, so OP's optional SpellTimer overlay
+shows nothing instead of NRE‑ing. `TimerDefs` is a **real** `SortedDictionary<string,TimerData>` keyed
+by `TimerData.Key` — `AddEditTimerDef`→enumerate→`RemoveTimerDef` round-trips correctly (Hojoring's
+`ClearNormalSpellTimer` filters `TimerDefs` by KVP `Key.StartsWith(prefix)`). `RebuildSpellTreeView`
+no-ops; `NotifySpell` is inert (does **not** raise `OnSpellTimerNotify`) and ships both the 5‑arg
+(Hojoring's only call) and 6‑arg overloads for shape completeness. `TimerData` is ported with a literal
+default category (the facade has no `ActGlobals.Trans`). ACT's timer-matching/tick engine is **out of
+scope** (principle 1); the lost behavior is Hojoring timers mirrored into OP's `SpellTimerOverlay` (off
+by default; Hojoring's own overlay still shows them). `TimerMod` and `TimelineEvent` have **no
+consumer** — neither Hojoring nor ACT's `TimerData` references them — so they are **not** ported. Only
+`TimerData` (full-ish), minimal `TimerFrame` (the `OnSpellTimerNotify` payload type), and minimal
+`SpellTimer` (`TimerFrame.SpellTimers` element) are built; the `SpellTimer`/`TimerFrame` members reached
+only inside the never-fired event handler stay minimal — the types must exist (correct namespace + name)
+so OP's prebuilt metadata resolves, but the unreached reads never execute.
 
 ## 8. Custom-trigger import — ✅ DONE
 
@@ -365,23 +320,15 @@ needs.
 | 🟡 | private `tc1` (TabControl) | Trig | `LocateTab` selects Trig's tab — OMITTED (reflected, guarded) |
 | ✅ | `WindowState` (settable) / `CanFocus` / `IsHandleCreated` / `IsDisposed` (`Form`) | Hojo | UI marshal + lifecycle guards — **M4‑4** (inherited from `Form`) |
 
-**Strategy.** ✅ **G‑3:** `DpiScale` → `DeviceDpi / 96f` — the satellite is System-DPI-aware
+**Strategy.** `DpiScale` → `DeviceDpi / 96f` — the satellite is System-DPI-aware
 (`app.manifest <dpiAware>true`), matching real ACT's `pDpiSize.Width / 96`; OP multiplies its
-config-tab layout by it. 🟡 `NotificationAdd`
-stub + Trig-reflected `tc1` stay omitted (guarded). ✅ **M4‑3:** real `CornerControlAdd/Remove`
-track the control in a private `List<Control>`. ✅ **M4‑4:** settable `WindowState` +
-`CanFocus`/`IsHandleCreated`/`IsDisposed` inherited from `Form` (handle force-realized at
-`FacadeHost.cs:105`).
-
-> **Decision:**
-> - **G‑3:** `public float DpiScale => DeviceDpi / 96f;` on `FormActMain` (System-DPI-aware satellite).
-> - **M4‑3:** `CornerControlAdd(Control)` / `CornerControlRemove(Control)` are real methods that
->   add/remove into a private tracked `List<Control>` (no host chrome to host it in) — Hojoring calls
->   them unguarded, so they must exist and not throw on add-then-remove.
-> - **M4‑4:** `CanFocus`, `IsHandleCreated`, `IsDisposed`, and settable `WindowState` come from
->   `Form` — **inherited, no code**. The form's handle is force-realized at
->   `FacadeHost.cs:105` (`_ = act.Handle`), so `IsHandleCreated == true` and `oFormActMain.Invoke(…)`
->   (§1) works despite the form never being shown. Add an override only if the headless form misreports.
+config-tab layout by it. The `NotificationAdd`
+stub + Trig-reflected `tc1` stay omitted (guarded). `CornerControlAdd/Remove` are real methods that
+track the control in a private `List<Control>` — Hojoring calls them unguarded, so they must exist and
+not throw on add-then-remove. Settable `WindowState` +
+`CanFocus`/`IsHandleCreated`/`IsDisposed` inherited from `Form`. The form's handle is force-realized at
+`FacadeHost.cs:105` (`_ = act.Handle`), so `IsHandleCreated == true` and `oFormActMain.Invoke(…)` (§1)
+works despite the form never being shown.
 
 ## 11. Self-update plumbing — ✅ STUB by design
 
@@ -395,16 +342,11 @@ via `TraySlider`). All out of scope (principle 4).
 
 **Strategy.** `PluginGetRemoteVersion`→`"0.0.0.0"`, `PluginDownload`→null, `GetAutomaticUpdatesAllowed`→false,
 `RestartACT` no-op, `UpdateCheckClicked` never fired. The download/install members
-(`PluginDownloadMem`/`UnZip`/`TraySlider`) are **not built** — the plugins' update flow bails at the
-version check before reaching them.
-
-> **Decision (G‑4 — deferred on-demand):** do **not** pre-build `TraySlider`/`ButtonLayoutEnum`/
-> `PluginDownloadData`/`PluginDownloadMem`/`UnZip` stubs. The FFXIV updater
-> (`ACT_PluginUpdate.cs:45-49`) and Triggernometry's both compare `local < PluginGetRemoteVersion(...)`
-> first; with `PluginGetRemoteVersion` → `"0.0.0.0"` that is always false, so the `TraySlider` toast
-> and the `PluginDownloadMem`→`UnZip` path are never reached. `PluginDownloadMem` would also require
-> `PluginDownloadData`. Add these only if a real consumer bind throws on a live run; until then this
-> stays 🟡 by design.
+(`TraySlider`/`ButtonLayoutEnum`/`PluginDownloadData`/`PluginDownloadMem`/`UnZip`) are **not built**:
+the FFXIV updater (`ACT_PluginUpdate.cs:45-49`) and Triggernometry's both compare
+`local < PluginGetRemoteVersion(...)` first, which — with `PluginGetRemoteVersion` → `"0.0.0.0"` — is
+always false, so the `TraySlider` toast and the `PluginDownloadMem`→`UnZip` path are never reached.
+These stay unbuilt unless a real consumer bind throws on a live run.
 
 ## 12. Error / diagnostic logging — ✅ DONE
 

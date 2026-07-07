@@ -9,7 +9,7 @@ using Xunit.Abstractions;
 
 namespace Fct.Integration.Tests
 {
-    // PIPELINE-COMPLETENESS-PLAN P1.5 (repository surface gate) — the LIVE axis, complementing P1.4's
+    // Repository surface gate — the LIVE axis, complementing P1.4's
     // late-join axis (LateJoinPrimingTests.Late_stand_in_repository_never_converges_on_a_forwarded_
     // GameVersion_from_priming_alone). P1.4 proved a LATE-joining stand-in repository never converges on
     // a forwarded GameVersion from priming alone (state folded onto the bus BEFORE the consumer
@@ -28,7 +28,7 @@ namespace Fct.Integration.Tests
     // same whether or not a producer ever forwards state — asserted here directly.
     // GetServerTimestamp() is ⚠️ RECONCILED at P3.5 (see the inline comment below): the consumer serves
     // an offset-corrected approximation (UtcNow + ServerClockOffset), not P0.3's raw real-plugin verdict
-    // (DateTime.MinValue) — asserted here as "close to now", per docs/PIPELINE-COMPLETENESS-PLAN.md §3/§7.
+    // (DateTime.MinValue) — asserted here as "close to now".
     // GetSelectedLanguageID()/GetGameRegion() are explicitly NOT pinned by P0.3 (host-config-driven: they
     // depend on whatever ParseSettings.LanguageID/DataCollectionSettings.RegionID the installed
     // FFXIV_ACT_Plugin has saved on THIS machine), so asserting an exact value here would be a
@@ -101,18 +101,18 @@ namespace Fct.Integration.Tests
                 // default. Either way, "" is exactly P0.3's hard headless verdict for a live producer too.
                 Assert.Equal("", gameVersion);
 
-                // ⚠️ RECONCILED (PIPELINE-COMPLETENESS-PLAN P3.5, per §3/§7's offset-corrected server-clock
+                // ⚠️ RECONCILED (per the offset-corrected server-clock
                 // decision): this assertion originally pinned P0.3's RAW headless verdict for the real
                 // plugin's own GetServerTimestamp() — DateTime.MinValue (no live memory scan). But the
-                // plan's SHIPPED CONSUMER DESIGN is not a passthrough of that raw value: P3.5's
+                // SHIPPED CONSUMER DESIGN is not a passthrough of that raw value: P3.5's
                 // ConsumerDataRepository.GetServerTimestamp() deliberately serves an offset-corrected
                 // server-clock APPROXIMATION for custom-line timestamps — UtcNow + the forwarded
                 // ServerClockOffset (Zero when no producer has forwarded a live server time, exactly the
                 // case here: this test's stand-in boots with no producer/bus pre-staging at all). Serving
-                // MinValue would defeat the whole point of the projection (§7: "acceptable for
+                // MinValue would defeat the whole point of the projection ("acceptable for
                 // custom-line timestamps"), so the gate is reconciled to assert the DESIGN — the served
                 // timestamp is within a generous tolerance of "now" — rather than the old raw-passthrough
-                // expectation. See docs/PIPELINE-COMPLETENESS-PLAN.md P3.5 verdict for the full citation.
+                // expectation.
                 var servedTicks = long.Parse(serverTimestampTicks, CultureInfo.InvariantCulture);
                 var served = new DateTime(servedTicks, DateTimeKind.Utc);
                 Assert.True((DateTime.UtcNow - served) < TimeSpan.FromMinutes(1),

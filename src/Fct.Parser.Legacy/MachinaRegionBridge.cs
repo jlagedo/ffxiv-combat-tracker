@@ -5,7 +5,7 @@ using Fct.Abstractions;
 
 namespace Fct.Parser.Legacy
 {
-    // PIPELINE-COMPLETENESS-PLAN P3.6/G6 — OverlayPlugin's FFXIVRepository reads the client's FFXIV
+    // OverlayPlugin's FFXIVRepository reads the client's FFXIV
     // region from Machina's own singleton (FFXIVRepository.GetMachinaRegion(),
     // Assembly.Load("Machina.FFXIV") -> Machina.FFXIV.Headers.Opcodes.OpcodeManager.Instance.GameRegion,
     // reflection), NEVER from IDataRepository.GetGameRegion() (confirmed against

@@ -20,7 +20,7 @@
     <RootNamespace>Fct.Parser.Legacy</RootNamespace>
   </PropertyGroup>
 
-  <!-- PIPELINE-COMPLETENESS-PLAN P1.5: lets Fct.Parser.Legacy.Tests assert directly against the internal
+  <!-- Lets Fct.Parser.Legacy.Tests assert directly against the internal
        ConsumerDataRepository (documenting the G4 stub gap) without a real satellite/plugin process. -->
   <ItemGroup>
     <InternalsVisibleTo Include="Fct.Parser.Legacy.Tests" />
