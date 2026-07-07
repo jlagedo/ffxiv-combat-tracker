@@ -20,13 +20,17 @@ namespace Fct.Bridge
     // therefore yields records with Sequence == 0.
     //
     // The events the satellite SDK/ACT hub structurally exposes are representable here (RawLogLine,
-    // ZoneChanged, PartyChanged, PrimaryPlayerChanged, CombatantAdded/Removed, ActionEffect, and the
-    // RawPacketReceived firehose — raw bytes, never decoded on this side), plus the full-fidelity
-    // aggregation feed the modern engine consumes: CombatSwing (every MasterSwing field + Tags) and the
-    // encounter-lifecycle requests (SetEncounterRequested, ZoneChangeRequested, EndCombatRequested). The
-    // plugin is the sole parser, so events that exist only as parsed log-line fields (StatusApplied/
-    // Removed, Cast*, DeathOccurred, HpUpdated) are not synthesized here — consumers reach them through
-    // the RawLogLine firehose. ToWire returns null for any unsupported record.
+    // ZoneChanged, PartyChanged (with a fourth PartySize field), PrimaryPlayerChanged,
+    // CombatantAdded/Removed, ActionEffect, and the RawPacketReceived firehose — raw bytes, never
+    // decoded on this side), plus the full-fidelity aggregation feed the modern engine consumes:
+    // CombatSwing (every MasterSwing field + Tags) and the encounter-lifecycle requests
+    // (SetEncounterRequested, ZoneChangeRequested, EndCombatRequested). SessionStateChanged carries the
+    // one-shot environment state (version/language/region/clock/chat-log) as one additive STATE frame
+    // of key=value pairs (§3 of docs/PIPELINE-COMPLETENESS-PLAN.md) — a new state field is a new key an
+    // old decoder ignores, never a new tag. The plugin is the sole parser, so events that exist only as
+    // parsed log-line fields (StatusApplied/Removed, Cast*, DeathOccurred, HpUpdated) are not
+    // synthesized here — consumers reach them through the RawLogLine firehose. ToWire returns null for
+    // any unsupported record.
     public static class GameEventFrame
     {
         public const string Prefix = "EVT ";
@@ -46,6 +50,7 @@ namespace Fct.Bridge
         private const string TagRepo = "REPO";
         private const string TagResource = "RSRC";
         private const string TagPid = "PID";
+        private const string TagState = "STATE";
 
         private static readonly CultureInfo Inv = CultureInfo.InvariantCulture;
 
@@ -67,7 +72,8 @@ namespace Fct.Bridge
 
                 case PartyChanged e:
                     return Head(TagParty, e.Timestamp)
-                        + '\t' + JoinIds(e.Members);
+                        + '\t' + JoinIds(e.Members)
+                        + '\t' + e.PartySize.ToString(Inv);
 
                 case PrimaryPlayerChanged e:
                     return Head(TagPrimary, e.Timestamp)
@@ -106,6 +112,9 @@ namespace Fct.Bridge
 
                 case GameProcessChanged e:
                     return Head(TagPid, e.Timestamp) + '\t' + e.Pid.ToString(Inv);
+
+                case SessionStateChanged e:
+                    return Head(TagState, e.Timestamp) + '\t' + EncodeState(e);
 
                 case RawPacketReceived e:
                     // Bytes are base64 — the tab/backslash escaping (Enc) cannot carry arbitrary binary.
@@ -146,7 +155,11 @@ namespace Fct.Bridge
                     return true;
 
                 case TagParty:
-                    evt = new PartyChanged(0, ts, ParseIds(f.Length >= 3 ? f[2] : ""));
+                    var members = ParseIds(f.Length >= 3 ? f[2] : "");
+                    // PartySize is a fourth, additive field (P3.2) — old recorded frames that predate
+                    // it (or a malformed value) fall back to the member-list count.
+                    var partySize = f.Length >= 4 && TryI(f[3], out var ps) ? ps : members.Count;
+                    evt = new PartyChanged(0, ts, members, partySize);
                     return true;
 
                 case TagPrimary:
@@ -196,6 +209,10 @@ namespace Fct.Bridge
 
                 case TagPacket:
                     return TryDecodePacket(ts, f, out evt);
+
+                case TagState:
+                    evt = DecodeState(ts, f);
+                    return true;
 
                 default:
                     return false;
@@ -579,6 +596,65 @@ namespace Fct.Bridge
             }
             evt = new ResourceDictionaryForwarded(0, ts, (ResourceKind)kind, d);
             return true;
+        }
+
+        // ---- SessionStateChanged — one additive STATE frame carrying all one-shot env state, as
+        // tab-delimited "key=value" fields (each value run through Enc/Dec). The decoder iterates
+        // whatever pairs are present, ignores unknown keys, and defaults any missing key — so a future
+        // state field is a new key an old decoder skips and old recorded fixtures still round-trip
+        // (docs/PIPELINE-COMPLETENESS-PLAN.md §3). ----
+
+        private static string EncodeState(SessionStateChanged e)
+        {
+            var sb = new StringBuilder(96);
+            sb.Append("ver=").Append(Enc(e.GameVersion));
+            sb.Append('\t').Append("lang=").Append(((int)e.Language).ToString(Inv));
+            sb.Append('\t').Append("region=").Append(((int)e.Region).ToString(Inv));
+            sb.Append('\t').Append("clockoffms=")
+                .Append(((long)e.ServerClockOffset.TotalMilliseconds).ToString(Inv));
+            sb.Append('\t').Append("chat=").Append(e.IsChatLogAvailable ? '1' : '0');
+            return sb.ToString();
+        }
+
+        private static GameEvent DecodeState(DateTimeOffset ts, string[] f)
+        {
+            // Defaults per §3: unknown version is "", never a placeholder; language/region Unknown;
+            // a missing/garbage clock offset is zero (never a multi-year garbage span, per P0.3).
+            var version = "";
+            var language = GameLanguage.Unknown;
+            var region = GameRegion.Unknown;
+            var offset = TimeSpan.Zero;
+            var chat = false;
+
+            for (int i = 2; i < f.Length; i++)
+            {
+                var eq = f[i].IndexOf('=');
+                if (eq < 0) continue;
+                var key = f[i].Substring(0, eq);
+                var raw = Dec(f[i].Substring(eq + 1));
+                switch (key)
+                {
+                    case "ver": version = raw; break;
+                    case "lang":
+                        if (int.TryParse(raw, NumberStyles.Integer, Inv, out var langVal))
+                            language = (GameLanguage)langVal;
+                        break;
+                    case "region":
+                        if (int.TryParse(raw, NumberStyles.Integer, Inv, out var regionVal))
+                            region = (GameRegion)regionVal;
+                        break;
+                    case "clockoffms":
+                        if (long.TryParse(raw, NumberStyles.Integer, Inv, out var ms))
+                            offset = TimeSpan.FromMilliseconds(ms);
+                        break;
+                    case "chat":
+                        chat = raw == "1" || raw.Equals("true", StringComparison.OrdinalIgnoreCase);
+                        break;
+                    default: break; // unknown key — ignored (forward-compat)
+                }
+            }
+
+            return new SessionStateChanged(0, ts, version, language, region, offset, chat);
         }
 
         // ---- Primitives ----------------------------------------------------------------------

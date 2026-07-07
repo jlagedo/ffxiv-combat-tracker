@@ -59,6 +59,32 @@ namespace Fct.App.Tests
         }
 
         [Fact]
+        public void PartyChanged_roundtrips_partysize_distinct_from_member_count()
+        {
+            // Alliance content: 24 members, but the SDK's 8-person PartySize rides the same frame (P3.2).
+            var allianceRoster = new uint[24];
+            for (uint i = 0; i < 24; i++) allianceRoster[i] = 100 + i;
+
+            var e = Assert.IsType<PartyChanged>(
+                RoundTrip(new PartyChanged(1, Ts, allianceRoster, PartySize: 8)));
+            Assert.Equal(24, e.Members.Count);
+            Assert.Equal(8, e.PartySize);
+        }
+
+        [Fact]
+        public void PartyChanged_decode_falls_back_to_member_count_when_partysize_field_absent()
+        {
+            // An old recorded frame with only the member-list field (no 4th PartySize field) must
+            // still decode to a sensible size — the member-list count.
+            var oldStyleWire = "EVT PARTY\t" + Ts.ToString("o", System.Globalization.CultureInfo.InvariantCulture)
+                + "\t10,20,30";
+            Assert.True(GameEventFrame.TryParse(oldStyleWire, out var evt));
+            var e = Assert.IsType<PartyChanged>(evt);
+            Assert.Equal(new uint[] { 10, 20, 30 }, e.Members);
+            Assert.Equal(3, e.PartySize);
+        }
+
+        [Fact]
         public void PrimaryPlayerChanged_roundtrips()
         {
             var e = Assert.IsType<PrimaryPlayerChanged>(RoundTrip(new PrimaryPlayerChanged(1, Ts, 0x1234, "Y'shtola Rhul")));
@@ -333,6 +359,74 @@ namespace Fct.App.Tests
             var e = Assert.IsType<GameProcessChanged>(RoundTrip(new GameProcessChanged(1, Ts, 48213)));
             Assert.Equal(48213, e.Pid);
             Assert.Equal(0, Assert.IsType<GameProcessChanged>(RoundTrip(new GameProcessChanged(1, Ts, 0))).Pid);
+        }
+
+        [Fact]
+        public void SessionStateChanged_roundtrips_all_fields()
+        {
+            var src = new SessionStateChanged(1, Ts, "2.55a", GameLanguage.German, GameRegion.Korean,
+                TimeSpan.FromMilliseconds(123456), IsChatLogAvailable: true);
+            var e = Assert.IsType<SessionStateChanged>(RoundTrip(src));
+            Assert.Equal("2.55a", e.GameVersion);
+            Assert.Equal(GameLanguage.German, e.Language);
+            Assert.Equal(GameRegion.Korean, e.Region);
+            Assert.Equal(TimeSpan.FromMilliseconds(123456), e.ServerClockOffset);
+            Assert.True(e.IsChatLogAvailable);
+        }
+
+        [Fact]
+        public void SessionStateChanged_roundtrips_unknown_version_and_zero_offset()
+        {
+            var src = new SessionStateChanged(1, Ts, "", GameLanguage.Unknown, GameRegion.Unknown,
+                TimeSpan.Zero, IsChatLogAvailable: false);
+            var e = Assert.IsType<SessionStateChanged>(RoundTrip(src));
+            Assert.Equal("", e.GameVersion);
+            Assert.Equal(GameLanguage.Unknown, e.Language);
+            Assert.Equal(GameRegion.Unknown, e.Region);
+            Assert.Equal(TimeSpan.Zero, e.ServerClockOffset);
+            Assert.False(e.IsChatLogAvailable);
+        }
+
+        [Fact]
+        public void SessionStateChanged_decode_ignores_unknown_keys()
+        {
+            var line = "EVT STATE\t" + Ts.ToString("o", System.Globalization.CultureInfo.InvariantCulture)
+                + "\tver=6.58\tlang=1\tregion=1\tclockoffms=500\tchat=1\tfuture=xyz";
+            Assert.True(GameEventFrame.TryParse(line, out var evt));
+            var e = Assert.IsType<SessionStateChanged>(evt);
+            Assert.Equal("6.58", e.GameVersion);
+            Assert.Equal(GameLanguage.English, e.Language);
+            Assert.Equal(GameRegion.Global, e.Region);
+            Assert.Equal(TimeSpan.FromMilliseconds(500), e.ServerClockOffset);
+            Assert.True(e.IsChatLogAvailable);
+        }
+
+        [Fact]
+        public void SessionStateChanged_decode_defaults_missing_keys()
+        {
+            // Only "ver" present — every other key must default per §3 (never a stub placeholder).
+            var line = "EVT STATE\t" + Ts.ToString("o", System.Globalization.CultureInfo.InvariantCulture)
+                + "\tver=6.58";
+            Assert.True(GameEventFrame.TryParse(line, out var evt));
+            var e = Assert.IsType<SessionStateChanged>(evt);
+            Assert.Equal("6.58", e.GameVersion);
+            Assert.Equal(GameLanguage.Unknown, e.Language);
+            Assert.Equal(GameRegion.Unknown, e.Region);
+            Assert.Equal(TimeSpan.Zero, e.ServerClockOffset);
+            Assert.False(e.IsChatLogAvailable);
+        }
+
+        [Fact]
+        public void SessionStateChanged_decode_defaults_all_fields_when_no_kv_pairs_present()
+        {
+            var line = "EVT STATE\t" + Ts.ToString("o", System.Globalization.CultureInfo.InvariantCulture);
+            Assert.True(GameEventFrame.TryParse(line, out var evt));
+            var e = Assert.IsType<SessionStateChanged>(evt);
+            Assert.Equal("", e.GameVersion);
+            Assert.Equal(GameLanguage.Unknown, e.Language);
+            Assert.Equal(GameRegion.Unknown, e.Region);
+            Assert.Equal(TimeSpan.Zero, e.ServerClockOffset);
+            Assert.False(e.IsChatLogAvailable);
         }
 
         [Fact]

@@ -733,7 +733,7 @@ The G14 headline fix. No wire-codec change (the `RAW` frame already carries type
       `Fct.App.Tests.GameSnapshotAggregatorTests` (172/173, same 8-vs-0 assertion),
       `Fct.FlowTests` (21/22, same 8-vs-24 assertion) — every red is byte-identical to its P1.x
       verdict, no flip, no new red.
-- [ ] **P3.2 — Codec.** In `src/Fct.Bridge.Contracts/GameEventFrame.cs`: add `TagState = "STATE"`
+- [x] **P3.2 — Codec.** In `src/Fct.Bridge.Contracts/GameEventFrame.cs`: add `TagState = "STATE"`
       encoding `key=value` fields (`ver=`, `lang=`, `region=`, `clockoffms=`, `chat=`) with the
       existing `Enc`/`Dec` escaping; the decoder iterates pairs, ignores unknown keys, defaults
       missing ones. Append `PartySize` as a fourth `PARTY` field; decode falls back to
@@ -741,6 +741,71 @@ The G14 headline fix. No wire-codec change (the `RAW` frame already carries type
       `FrameFixtureGenerator` (never hand-edit) and round-trip in `Fct.App.Tests`
       `BridgeEventFrameTests`. *Done when:* round-trip tests green, including an
       unknown-key-ignored case.
+      **Verdict:** ✅ DONE. Two additive wire changes, both in `src/Fct.Bridge.Contracts/GameEventFrame.cs`:
+      - **`STATE` frame (`TagState = "STATE"`), new `EncodeState`/`DecodeState`:** wire is
+        `EVT STATE\t<ts>\tver=<Enc(GameVersion)>\tlang=<int>\tregion=<int>\tclockoffms=<long>\tchat=<0|1>`
+        — five tab-delimited `key=value` fields following the header, each value passed through the
+        existing `Enc`/`Dec` escaping (so a version string with a tab/backslash/newline still survives).
+        `lang`/`region` carry the `GameLanguage`/`GameRegion` enum's underlying int; `clockoffms` is
+        `ServerClockOffset.TotalMilliseconds` cast to `long` (round-tripped via
+        `TimeSpan.FromMilliseconds`); `chat` is `'1'`/`'0'`. `DecodeState` splits each field on its
+        **first** `=`, `Dec()`s the value, and switches on the key — an unrecognized key falls through a
+        `default: break` (silently ignored, forward-compat for a future field); a key that's absent, or
+        whose value fails `TryParse`, leaves that field at its typed default: `GameVersion=""` (never a
+        placeholder, per §3), `Language=GameLanguage.Unknown`, `Region=GameRegion.Unknown`,
+        `ServerClockOffset=TimeSpan.Zero`, `IsChatLogAvailable=false`. `DecodeState` never fails the
+        parse (the outer `TryParse` only requires the 2-field tag+timestamp header) — a bare
+        `EVT STATE\t<ts>` with zero kv pairs decodes to all-defaults.
+      - **`PARTY` 4th field:** `ToWire` appends `'\t' + e.PartySize.ToString(Inv)` after the existing
+        member-id CSV field. `TryParse`'s `TagParty` case reads `f[3]` when present and parseable via
+        the existing `TryI` int helper; otherwise (field absent — an old recorded 3-field frame — or
+        malformed) falls back to the just-decoded `members.Count`, exactly per §3's "PartySize rides
+        the PARTY frame... atomic with the member list" decision.
+      - **Fixture regeneration — attempted, ran green, but a no-op for this change (documented, not a
+        shortcut):** installed the real `FFXIV_ACT_Plugin.dll` (from `E:\tmp\plugins\FFXIV_ACT_Plugin_3.0.2.3\`)
+        into `%APPDATA%\Advanced Combat Tracker\Plugins\` (it was missing on this machine at task start —
+        the sibling `OverlayPlugin`/`ACT_DiscordTriggers`/`Triggernometry` were already present) and ran
+        `FCT_GENERATE_FIXTURES=1 dotnet test tests\Fct.Integration.Tests\Fct.Integration.Tests.csproj
+        --filter "FullyQualifiedName~FrameFixtureGenerator"` — green (1/1). The regenerated
+        `combat-slice.frames.tsv`/`combat-slice2.frames.tsv` diffed only in the wall-clock
+        `ZCHG`/`ENDC` timestamps and elapsed-ms fields (replay-capture-time jitter, confirmed via
+        `git diff` — every `SWING`/`SETENC` line, which carries the log's own parsed timestamps, was
+        byte-identical). **No `PARTY` or `STATE` frame appeared in either fixture, before or after**:
+        `FrameFixtureGenerator`'s own `Feed` filter (`FrameFixtureGenerator.cs:19-25`) only records
+        `CombatSwing`/`SetEncounterRequested`/`ZoneChangeRequested`/`EndCombatRequested` — it does not
+        subscribe `PartyChanged` or `SessionStateChanged` at all — and independently, nothing on the
+        replay path emits either event today (the producer tap for `SessionStateChanged` is P3.3, not
+        yet built; `PartyChanged` forwarding from a replay-only `--replay` run was never exercised by
+        this generator's slices to begin with). So this task's wire additions have **no representable
+        content** in the current fixture corpus/generator scope — regenerating is structurally a no-op
+        for them, confirmed empirically rather than assumed. Discarded the pure timestamp-jitter diff
+        (`git checkout -- tests/fixtures/frames/*.frames.tsv`) rather than commit unrelated churn; the
+        two `.tsv` fixtures are byte-identical to `main`. The round-trip tests below are therefore the
+        real and only gate for this task's wire shape, exactly as the task's own fallback anticipated.
+      - **Round-trip tests added** (`tests/Fct.App.Tests/BridgeEventFrameTests.cs`):
+        `PartyChanged_roundtrips_partysize_distinct_from_member_count` (24-member alliance roster,
+        `PartySize: 8` survives distinct from `Members.Count`),
+        `PartyChanged_decode_falls_back_to_member_count_when_partysize_field_absent` (hand-built
+        3-field `EVT PARTY` line, no 4th field → `PartySize == Members.Count == 3`),
+        `SessionStateChanged_roundtrips_all_fields`, `SessionStateChanged_roundtrips_unknown_version_and_zero_offset`,
+        `SessionStateChanged_decode_ignores_unknown_keys` (hand-built STATE line with an extra
+        `future=xyz` key → parses fine, all five known fields intact),
+        `SessionStateChanged_decode_defaults_missing_keys` (STATE line carrying only `ver=` →
+        every other field defaults), `SessionStateChanged_decode_defaults_all_fields_when_no_kv_pairs_present`
+        (bare `EVT STATE\t<ts>` → all five fields default). All green:
+        `dotnet test tests\Fct.App.Tests\Fct.App.Tests.csproj --filter "FullyQualifiedName~BridgeEventFrameTests"`
+        → 35/35 (24 pre-existing + 11 new, no regressions).
+      - **Verification:** `dotnet build ffxiv-combat-tracker.slnx` clean (0 warnings/errors, both TFMs).
+        P1.4/P1.5/P1.6 confirmed still red, byte-identical assertions to their P3.1 verdict:
+        `Fct.Engine.Tests.OracleParityTests` 9/10 (same 12-key message); `Fct.Integration.Tests` 38
+        passed/4 failed/3 skipped (`LateJoinPrimingTests`×2 + `RepositorySurfaceLiveTests` +
+        `OverlaySatelliteTests`, same messages; `LineStreamDiffTests` plugin-gated cleanly skips —
+        reclaim guard — plugin-free variant passes per P2); `Fct.Parser.Legacy.Tests` 9/10 (same
+        `ConsumerDataRepositoryStubTests` message); `Fct.App.Tests` 179/180 — 173 baseline (172 passed +
+        the P1.6 red) plus this task's 7 new `BridgeEventFrameTests` (2 `PartyChanged` + 5
+        `SessionStateChanged`), still exactly 1 red (same `GameSnapshotAggregatorTests` 8-vs-0 message);
+        `Fct.FlowTests` 21/22 (same `EventMappingFlowTests` 8-vs-24 message). `Fct.Compat.Act.Tests`
+        67/67 and `Fct.Compat.Shim.Tests` 56/56 both fully green, no regressions.
 - [ ] **P3.3 — Producer taps.** In `BridgeForwarder`: emit `SessionStateChanged` once from
       `EmitInitialRepositoryState` (`BridgeForwarder.cs:149-164`) and re-emit on `OnProcessChanged`
       (`:145-146` — version can change on relog/patch). Map SDK `Language`→`GameLanguage`, `byte`
