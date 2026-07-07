@@ -46,9 +46,21 @@ Catalog-only, so the catalog path must be trustworthy and cover the four shipped
   install. Fix bugs in `Fct.Host/Plugins/PluginClassifier.cs`, `Fct.LegacyHost/FacadeHost.cs`,
   `Fct.LegacyHost/Program.cs` as they surface.
   - **Accept:** each shipped package loads, `InitPlugin` runs, its WinForms config tab embeds via
-    `EmbeddedSatelliteView`, and it produces expected behavior (OverlayPlugin overlays render,
-    Triggernometry fires a test trigger, Discord-Triggers hooks TTS). Hojoring's equivalent
-    load/attach/route + spell-timer acceptance is P10a (ISOLATION-PLAN §P10a).
+    `EmbeddedSatelliteView`, and it produces expected behavior — concretely, verify:
+    - **Job-icon correctness:** OverlayPlugin/cactbot render the correct per-combatant job icon
+      for every party member (not the "Limit Break" placeholder), driven by the engine's `Job`
+      `ExportVariable`.
+    - **Zone display:** OverlayPlugin/cactbot show the correct current zone name (not blank) on
+      login and after a zone change, driven by the primed `01`/`ChangeZone` rawlog line.
+    - **Map-dependent overlay features:** map-keyed overlay features (radar/position overlays)
+      receive map data for the current zone, driven by the primed `40`/`ChangeMap` rawlog line.
+    - **A custom-line-driven feature:** e.g. cactbot's raidboss "Countdown" trigger (netlog line
+      `268`/`Countdown`, `NetRegexes.countdown()`) announces a party member's in-game
+      `/countdown` as a synchronized pull timer — proving the verbatim line stream carries
+      FFXIV custom lines (257–274), not just `ChatLog`.
+    - Triggernometry fires a test trigger, Discord-Triggers hooks TTS.
+
+    Hojoring's equivalent load/attach/route + spell-timer acceptance is P10a (ISOLATION-PLAN §P10a).
 - **A2 — Persist per-plugin enabled/disabled state.** Add `Enabled` to `PluginRegistryStore.cs`
   (+ migration), honor it in `PluginLifetime.cs`, expose a toggle in `PluginsView` + VM.
   - **Accept:** disabling survives restart and the plugin does not load; re-enabling loads it

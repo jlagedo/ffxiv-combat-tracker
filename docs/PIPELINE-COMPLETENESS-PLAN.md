@@ -2238,8 +2238,19 @@ the completeness authority.
       rows for `Fct.Engine.Tests`/`Fct.FlowTests`/`Fct.Integration.Tests` point at the new sections.
       Present-tense throughout — all named tests/fixtures verified to exist and to be green (or
       pass/skip by construction for `[plugin-gated]`) as described.
-- [ ] **P6.4** `GO-LIVE.md` A1: name job-icon correctness, zone display, map-dependent overlay
+- [x] **P6.4** `GO-LIVE.md` A1: name job-icon correctness, zone display, map-dependent overlay
       features, and one custom-line-driven feature explicitly.
+      **Verdict:** ✅ DONE. A1's **Accept** bullet is expanded into five concrete checks: job-icon
+      correctness (per-combatant job icon, not the "Limit Break" placeholder, driven by the
+      engine's `Job` `ExportVariable`); zone display (correct zone name, not blank, driven by the
+      primed `01`/`ChangeZone` rawlog line); map-dependent overlay features (map-keyed
+      radar/position overlays driven by the primed `40`/`ChangeMap` rawlog line); one concrete
+      custom-line-driven feature — cactbot's raidboss "Countdown" trigger (netlog line
+      `268`/`Countdown`, `NetRegexes.countdown()`, confirmed live in the installed
+      `E:\tmp\plugins\cactbot\cactbot\ui\common\raidboss_data.bundle.js` `'Test Countdown'`
+      trigger) announcing a party member's in-game `/countdown` as a synchronized pull timer,
+      proving the verbatim line stream carries FFXIV custom lines 257–274 (not just `ChatLog`);
+      plus the existing Triggernometry/Discord-Triggers checks, unchanged.
 - [ ] **P6.5** Postmortem: mark fixed, link this plan.
 
 ## 6. Deferred (post-v1) — kept for the record, do not build for the four-plugin ship
