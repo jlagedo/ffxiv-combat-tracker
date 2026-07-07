@@ -83,9 +83,16 @@ namespace Fct.Integration.Tests
             // "typed zone/player fold" convergence mechanism the plan calls out as already existing.
             var aggregator = new GameSnapshotAggregator(bus, provider, NullLogger<GameSnapshotAggregator>.Instance);
             await aggregator.StartAsync(CancellationToken.None);
+            // P4.1's last-line cache, wired onto the SAME bus exactly as production DI wires it
+            // (ServiceCollectionExtensions.cs) — this test constructs GameEventBus/GameSession/
+            // SatelliteHost directly rather than through AddFctHostServices, so it must wire this
+            // sibling singleton itself for BuildPrimeEvents (P4.2) to have anything to read.
+            var lastLineCache = new LastLineCache(bus, NullLogger<LastLineCache>.Instance);
+            await lastLineCache.StartAsync(CancellationToken.None);
 
             var consumer = new SatelliteHost(NullLoggerFactory.Instance, bus, null, null, "late-consumer", session,
-                $"--sink \"{recordPath}\" --subscribe {SatelliteProtocol.StreamRawLog},{SatelliteProtocol.StreamZoneParty}");
+                $"--sink \"{recordPath}\" --subscribe {SatelliteProtocol.StreamRawLog},{SatelliteProtocol.StreamZoneParty}",
+                lastLineCache: lastLineCache);
 
             try
             {
@@ -135,17 +142,23 @@ namespace Fct.Integration.Tests
                 Assert.Equal(999u, primedZone!.ZoneId);
                 Assert.Equal("Kugane", primedZone.ZoneName);
 
-                // THE GATE (deliberately red): priming should replay the LAST instance of each one-shot
-                // type, in ACT emission order (253/249/250 -> 01 -> 02 -> 40 -> 12) — this is what P4
-                // makes true. Today BuildPrimeEvents has no "rawlog" branch at all, so primedRaw is
-                // empty regardless of what happened on the bus before the subscriber joined.
-                var expected = LastOneShot.Select(kv => (Type: (int)kv.Type, Line: kv.Line)).ToList();
+                // THE GATE: priming replays the LAST instance of each one-shot type, in ACT emission
+                // order (253/249/250 -> 01 -> 02 -> 40 -> 12) — P4.1's OneShotLineTypes.EmissionOrder is
+                // the single canonical declaration of that order (LastLineCache.Snapshot() returns
+                // entries in it, no re-sorting), so the expected order here is projected from THAT list
+                // rather than duplicated as a second hand-ordered literal (this array's own declaration
+                // order — ChangeMap before Territory/ChangePrimaryPlayer — does not match it).
+                var lastByType = LastOneShot.ToDictionary(kv => kv.Type, kv => kv.Line);
+                var expected = OneShotLineTypes.EmissionOrder
+                    .Select(t => (Type: (int)t, Line: lastByType[t]))
+                    .ToList();
                 Assert.Equal(expected, primedRaw);
             }
             finally
             {
                 await consumer.ShutdownAsync(TimeSpan.FromSeconds(3));
                 await aggregator.StopAsync(CancellationToken.None);
+                await lastLineCache.StopAsync(CancellationToken.None);
                 Environment.SetEnvironmentVariable(Fct.Logging.AppData.InstallDirEnvVar, prevInstall);
                 try { File.Delete(recordPath); } catch { }
             }
@@ -176,11 +189,16 @@ namespace Fct.Integration.Tests
             var session = new GameSession(bus, provider);
             var aggregator = new GameSnapshotAggregator(bus, provider, NullLogger<GameSnapshotAggregator>.Instance);
             await aggregator.StartAsync(CancellationToken.None);
+            // Same production-mirroring wiring as the rawlog gate above — this subscriber's stream set
+            // includes rawlog too, so BuildPrimeEvents needs the same sibling singleton wired.
+            var lastLineCache = new LastLineCache(bus, NullLogger<LastLineCache>.Instance);
+            await lastLineCache.StartAsync(CancellationToken.None);
 
             var streams = string.Join(",", SatelliteProtocol.StreamSwings, SatelliteProtocol.StreamRawLog,
                 SatelliteProtocol.StreamCombatants, SatelliteProtocol.StreamRepository);
             var consumer = new SatelliteHost(NullLoggerFactory.Instance, bus, null, null, "late-standin-consumer", session,
-                $"--consume \"{dump}\" --subscribe {streams} --stand-in --verify-standin \"{verify}\"");
+                $"--consume \"{dump}\" --subscribe {streams} --stand-in --verify-standin \"{verify}\"",
+                lastLineCache: lastLineCache);
 
             try
             {
@@ -227,6 +245,7 @@ namespace Fct.Integration.Tests
             {
                 await consumer.ShutdownAsync(TimeSpan.FromSeconds(3));
                 await aggregator.StopAsync(CancellationToken.None);
+                await lastLineCache.StopAsync(CancellationToken.None);
                 Environment.SetEnvironmentVariable(Fct.Logging.AppData.InstallDirEnvVar, prevInstall);
                 try { File.Delete(dump); } catch { }
                 try { File.Delete(verify); } catch { }

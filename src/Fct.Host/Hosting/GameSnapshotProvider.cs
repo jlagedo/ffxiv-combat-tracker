@@ -33,7 +33,13 @@ internal sealed class GameSnapshotProvider
         public PartySnapshot Party { get; } = new PartySnapshot(Array.Empty<Actor>(), PartyMembership.None);
         public ZoneRef Zone => default;
         public IResourceCatalog Resources { get; } = EmptyResourceCatalog.Instance;
-        public GameClient Client { get; } = new GameClient("0.0", GameRegion.Unknown, GameLanguage.Unknown, false, false);
+        // Version "" (never a "0.0" placeholder, plan §3); IsChatLogAvailable true — both mirror
+        // ConsumerDataSurface's own pre-Apply() defaults (the real plugin's headless values, P0.3). An
+        // unfolded snapshot means "unknown", not a fabricated stub; this surfaces directly now that
+        // P4.2's repository priming reads this default for a subscriber that joins before any producer
+        // env tap has ever folded a real SessionStateChanged.
+        public GameClient Client { get; } =
+            new GameClient("", GameRegion.Unknown, GameLanguage.Unknown, false, false) { IsChatLogAvailable = true };
 
         public Actor? Find(uint actorId) => null;
     }

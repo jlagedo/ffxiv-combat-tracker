@@ -403,6 +403,7 @@ public sealed class SatelliteHost
             bool zoneParty = Array.IndexOf(tokens, SatelliteProtocol.StreamZoneParty) >= 0;
             bool combatants = Array.IndexOf(tokens, SatelliteProtocol.StreamCombatants) >= 0;
             bool repository = Array.IndexOf(tokens, SatelliteProtocol.StreamRepository) >= 0;
+            bool rawlog = Array.IndexOf(tokens, SatelliteProtocol.StreamRawLog) >= 0;
 
             if (zoneParty)
             {
@@ -411,17 +412,21 @@ public sealed class SatelliteHost
                     events.Add(new PrimaryPlayerChanged(0, now, me.Id, me.Name));
                 var members = new List<uint>();
                 foreach (var m in snap.Party.Members) members.Add(m.Id);
-                events.Add(new PartyChanged(0, now, members));
+                events.Add(new PartyChanged(0, now, members, snap.Party.Size));
             }
             if (combatants)
                 foreach (var a in snap.Actors)
                     events.Add(new CombatantAdded(0, now, a));
             if (repository)
             {
-                // The repository combatant list refreshes on the next live snapshot; the PID and resource
-                // dictionaries are one-shot upstream, so seed them here for a late subscriber to converge.
+                // The repository combatant list refreshes on the next live snapshot; the PID, env, and
+                // resource dictionaries are one-shot upstream, so seed them here for a late subscriber to
+                // converge (SessionStateChanged: G8/P4.2 — a late joiner otherwise never sees the env
+                // state the aggregator already folded before it subscribed).
                 if (snap.Client.ProcessId is int pid && pid != 0)
                     events.Add(new GameProcessChanged(0, now, pid));
+                events.Add(new SessionStateChanged(0, now, snap.Client.Version, snap.Client.Language,
+                    snap.Client.Region, snap.Client.ServerClockOffset, snap.Client.IsChatLogAvailable));
                 events.Add(new RepositorySnapshot(0, now, snap.Actors));
                 foreach (ResourceKind kind in Enum.GetValues(typeof(ResourceKind)))
                 {
@@ -430,12 +435,52 @@ public sealed class SatelliteHost
                         events.Add(new ResourceDictionaryForwarded(0, now, kind, entries));
                 }
             }
+            if (rawlog)
+                events.AddRange(BuildRawLogPrimeLines(snap, now));
         }
         catch (Exception ex)
         {
             _log.LogWarning(LogEvents.BridgeFrameMalformed, ex, "Snapshot priming for '{Id}' failed", _satelliteId);
         }
         return events;
+    }
+
+    // The rawlog priming set: a pure function of the last-line cache (P4.1) + the typed snapshot, no
+    // hand-listed per-field entries beyond this stream→surface mapping. Iterates the one-shot set in ACT
+    // emission order (253/249/250 -> 01 -> 02 -> 40 -> 12); for each type it replays the cached verbatim
+    // line when one has ever been observed, and falls back to synthesizing only the two types the typed
+    // snapshot can reconstruct (01 Territory from snap.Zone, 02 ChangePrimaryPlayer from snap.Player) —
+    // strictly the fresh-boot case (no cached line exists anywhere yet). The remaining one-shot types
+    // (version/settings/process/map/stats) have no typed-snapshot equivalent and simply stay absent until
+    // the real line has crossed at least once.
+    private IEnumerable<RawLogLine> BuildRawLogPrimeLines(IGameSnapshot snap, DateTimeOffset now)
+    {
+        var cached = new Dictionary<LogMessageType, RawLogLine>();
+        if (_lastLineCache?.Snapshot() is { } snapshot)
+            foreach (var line in snapshot) cached[line.Type] = line;
+
+        foreach (var type in OneShotLineTypes.EmissionOrder)
+        {
+            if (cached.TryGetValue(type, out var cachedLine))
+            {
+                yield return cachedLine;
+                continue;
+            }
+            if (type == LogMessageType.Territory && snap.Zone.Id != 0)
+                yield return SynthesizeRawLogLine(type, now, snap.Zone.Id.ToString("X"), snap.Zone.Name);
+            else if (type == LogMessageType.ChangePrimaryPlayer && snap.Player is { } me)
+                yield return SynthesizeRawLogLine(type, now, me.Id.ToString("X"), me.Name);
+        }
+    }
+
+    // A synthesized fallback line follows the real wire shape ("NN|timestamp|field1|field2|hash") so a
+    // regex-based consumer (Triggernometry/cactbot) still matches it, but carries a fixed placeholder
+    // hash: the real hash is the plugin's own per-line checksum, never decoded or reproduced per plan §3,
+    // and no v1 consumer validates it (P0.1-P0.5).
+    private static RawLogLine SynthesizeRawLogLine(LogMessageType type, DateTimeOffset now, string field1, string field2)
+    {
+        var line = $"{(int)type:D2}|{now:o}|{field1}|{field2}|0000000000000000";
+        return new RawLogLine(0, now, type, line, line);
     }
 
     // Host-routed service commands from this satellite over the event pipe (P6). Point-to-point RPC that

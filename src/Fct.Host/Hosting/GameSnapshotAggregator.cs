@@ -45,11 +45,14 @@ internal sealed class GameSnapshotAggregator : IHostedService
     private int _partySize;
     private readonly Dictionary<ResourceKind, IReadOnlyDictionary<uint, string>> _resources = new();
     private int _pid;
-    private string _clientVersion = "0.0";
+    private string _clientVersion = "";   // "" until a SessionStateChanged folds — never a "0.0" placeholder (§3)
     private GameRegion _clientRegion = GameRegion.Unknown;
     private GameLanguage _clientLanguage = GameLanguage.Unknown;
     private TimeSpan _serverClockOffset = TimeSpan.Zero;
-    private bool _isChatLogAvailable;
+    // true until a SessionStateChanged folds — mirrors ConsumerDataSurface's own pre-Apply() default
+    // (the real plugin's headless value, P0.3), so a repository subscriber primed before any producer
+    // env tap has run (P4.2) converges on the SAME "not yet known" value the mirror already defaults to.
+    private bool _isChatLogAvailable = true;
 
     private IDisposable? _subscription;
 
@@ -183,7 +186,7 @@ internal sealed class ImmutableGameSnapshot : IGameSnapshot
     private readonly GameClient _client;
 
     private static readonly GameClient DefaultClient =
-        new("0.0", GameRegion.Unknown, GameLanguage.Unknown, IsRunning: true, IsForeground: false);
+        new("", GameRegion.Unknown, GameLanguage.Unknown, IsRunning: true, IsForeground: false) { IsChatLogAvailable = true };
 
     public ImmutableGameSnapshot(IReadOnlyList<Actor> actors, Actor? player, ZoneRef zone, PartySnapshot party)
         : this(actors, player, zone, party, EmptyResourceCatalog.Instance, DefaultClient)

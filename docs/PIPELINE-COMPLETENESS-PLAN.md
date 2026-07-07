@@ -1339,7 +1339,7 @@ The G14 headline fix. No wire-codec change (the `RAW` frame already carries type
         fresh-boot fallback **only** when `Snapshot()` has no entry for `Territory`/`ChangePrimaryPlayer`
         (an unobserved type is simply absent from the returned list — trivial to detect by scanning for
         `l.Type == LogMessageType.Territory` / `.ChangePrimaryPlayer`).
-- [ ] **P4.2 — Prime from the snapshot + cache.** `BuildPrimeEvents`
+- [x] **P4.2 — Prime from the snapshot + cache.** `BuildPrimeEvents`
       (`SatelliteHost.cs:388-431`): when the subscriber takes `rawlog` (currently excluded from
       priming), replay the cached lines in ACT emission order (`253/249/250 → 01 → 02 → 40 → 12`)
       ahead of live fan-out (they ride the `SatelliteEgress` prime list, `SatelliteHost.cs:378-379`).
@@ -1349,6 +1349,97 @@ The G14 headline fix. No wire-codec change (the `RAW` frame already carries type
       late joiner never sees it otherwise). `zoneParty` priming carries `PartySnapshot.Size` on the
       primed `PartyChanged`. *Done when:* priming is a pure function of snapshot + cache — no
       hand-listed per-field entries beyond the stream→surface mapping.
+      **Verdict:** ✅ DONE. `SatelliteHost.cs` `BuildPrimeEvents`/`HandleSubscribe` (unchanged
+      signature/call site):
+      - **`rawlog` branch (new):** a `bool rawlog = tokens contains StreamRawLog` gate calls a new
+        `BuildRawLogPrimeLines(snap, now)` that iterates `OneShotLineTypes.EmissionOrder` (P4.1's one
+        canonical order literal — not re-declared here) and, per type, yields the cached
+        `_lastLineCache?.Snapshot()` entry verbatim when one exists, else — **only** for `Territory`
+        (01) and `ChangePrimaryPlayer` (02), the two types a typed snapshot can reconstruct —
+        synthesizes a fallback line via a new `SynthesizeRawLogLine(type, now, field1, field2)`
+        matching the real wire shape (`"NN|o-timestamp|field1|field2|hash"`, confirmed against real
+        corpus lines in `tests/fixtures/FFXIVLogs/*.log`: zone id is hex, actor id is hex) with a fixed
+        placeholder hash (the real hash is the plugin's own per-line checksum, never decoded per §3,
+        and no v1 consumer validates it — P0.1-P0.5). The remaining one-shot types
+        (version/settings/process/map/stats) have no typed-snapshot equivalent and simply stay absent
+        until a real line has crossed at least once — no hand-listed per-field entries, purely
+        `EmissionOrder` + cache + the two synthesizable types.
+      - **`repository` branch (extended):** now also emits one `SessionStateChanged(0, now,
+        snap.Client.Version, snap.Client.Language, snap.Client.Region, snap.Client.ServerClockOffset,
+        snap.Client.IsChatLogAvailable)` alongside the existing `GameProcessChanged`/
+        `RepositorySnapshot`/`ResourceDictionaryForwarded` priming, so a late `repository` subscriber
+        converges on the env state the aggregator already folded (G8) instead of never seeing it.
+      - **`zoneParty` branch (one-line change):** the primed `PartyChanged` now carries
+        `snap.Party.Size` (previously hardcoded to the 2-arg ctor's `PartySize = 0` default) — P3.4
+        already folds `PartySize` into `PartySnapshot.Size`, this just threads it through priming too.
+      - **A real regression found and fixed during verification (not scope creep — a direct
+        consequence of always emitting the new `repository`-branch `SessionStateChanged`):**
+        `GameSnapshotProvider.EmptySnapshot.Client` and `GameSnapshotAggregator`'s pre-fold working
+        state (`_clientVersion`, the unused `DefaultClient`) hardcoded stale bootstrap defaults —
+        `GameVersion = "0.0"` (violates §3's "never a placeholder" rule) and
+        `IsChatLogAvailable = false` (contradicts `ConsumerDataSurface`'s own pre-`Apply()` default of
+        `true`, the real plugin's headless value per P0.3). Before this task nothing ever read
+        `snap.Client` into a priming frame, so the inconsistency was dormant; P4.2's unconditional
+        `repository`-branch prime surfaced it immediately as a live regression in
+        `RepositorySurfaceLiveTests` (a repository subscriber with **no** producer ever having run
+        primed `GameVersion="0.0"`/`IsChatLogAvailable=false` over the consumer's own correct
+        `""`/`true` defaults). Fixed at the source: both defaults now read `GameVersion=""`,
+        `IsChatLogAvailable=true`, matching `ConsumerDataSurface`'s own "not yet known" convention
+        exactly — so priming a never-folded snapshot is now a no-op in effect (it reproduces the same
+        defaults the mirror already has), and priming a *really* folded one (the P1.4 late-join case)
+        still converges on the real value. No other project reads these two defaults by value (grepped
+        `"0.0"` across `src/`/`tests/`; the one hit that pins `"0.0"` literally,
+        `Fct.Compat.Shim.Tests/DataRepositoryTests.cs`, asserts against an unrelated hand-authored
+        `Fct.Abstractions.Testing` fake, not `Fct.Host`'s snapshot classes).
+      - **Harness wiring (`tests/Fct.Integration.Tests/LateJoinPrimingTests.cs`):** both P1.4 gates
+        construct `GameEventBus`/`GameSession`/`SatelliteHost` directly (not through
+        `AddFctHostServices`), so each now also constructs a `LastLineCache(bus,
+        NullLogger<LastLineCache>.Instance)`, starts it before folding any state, and passes it as the
+        new `lastLineCache:` named argument to `SatelliteHost(...)` — mirroring
+        `ServiceCollectionExtensions`'s production wiring exactly. Both `finally` blocks call
+        `lastLineCache.StopAsync(...)` alongside the existing `aggregator.StopAsync(...)`.
+      - **A pre-existing test-order bug fixed in the same file:** the gate's `expected` list was
+        `LastOneShot.Select(...)` — the array literal's own **declaration** order (Version, Settings,
+        Process, **ChangeMap**, **Territory**, **ChangePrimaryPlayer**, PlayerStats), which contradicts
+        both its own adjacent comment ("ACT emission order... 253/249/250 -> 01 -> 02 -> 40 -> 12") and
+        P4.1's canonical `OneShotLineTypes.EmissionOrder` (Territory/ChangePrimaryPlayer **before**
+        ChangeMap). `BuildRawLogPrimeLines` correctly emits `EmissionOrder`, so asserting against the
+        array's declaration order would have failed on element order alone even with correct content.
+        Fixed by projecting `expected` from `OneShotLineTypes.EmissionOrder` itself (`lastByType =
+        LastOneShot.ToDictionary(...)`, then `OneShotLineTypes.EmissionOrder.Select(t => (Type,
+        lastByType[t]))`) — the single canonical order declaration is reused, not duplicated as a
+        second hand-ordered literal, and the assertion still requires exactly the 7 LAST-instance lines
+        (still `Actual: []` before this task's fix, still fails if `BuildPrimeEvents`'s `rawlog` branch
+        is reverted/removed).
+      - **Empirical — both P1.4 gates GREEN:**
+        `dotnet test tests\Fct.Integration.Tests\Fct.Integration.Tests.csproj --filter
+        "FullyQualifiedName~LateJoinPrimingTests"` → `Total tests: 2, Passed: 2`.
+        `Late_rawlog_subscriber_converges_on_none_of_the_one_shot_lines_from_priming_alone`: `primed
+        RawLogLine count: 7 of 7 expected`. `Late_stand_in_repository_never_converges_on_a_forwarded_
+        GameVersion_from_priming_alone`: stand-in verify artifact's GameVersion column reads
+        `9.9.9.9-primed-not-forwarded` (the distinctive value folded before subscribe) — not `""` and
+        not `"0.0"`, proving convergence came from priming, not a default/coincidence.
+      - **Gate stays meaningful:** the rawlog gate still asserts exact byte-identical content **and**
+        order for all 7 one-shot lines (would go back to `Actual: []` if the `rawlog` branch were
+        reverted); the repository gate still asserts the DISTINCTIVE `"9.9.9.9-primed-not-forwarded"`
+        value (per the P1.4/P3.5 reconciliation — a value no default, stub, or the "0.0"→"" bootstrap
+        fix above could coincidentally produce), so it would go back to failing (reading the mirror's
+        own `""` default) if the `repository` branch's `SessionStateChanged` emission were reverted.
+      - **No regressions.** Full solution build (`dotnet build ffxiv-combat-tracker.slnx`) and the
+        `Fct.App.csproj` stage build both clean, 0 warnings/errors. `Fct.App.Tests` 183/183.
+        `Fct.Integration.Tests`: 46 total, 42 passed, 1 failed (`OverlaySatelliteTests`, the pre-existing
+        intentional P1.2 12-key red, unchanged message), 3 skipped (`DistTreeGateTests`/
+        `FrameFixtureGenerator`, env-gated; `LineStreamDiffTests` plugin-gated variant, the pre-existing
+        P1.3 reclaim-race skip) — `RepositorySurfaceLiveTests` back to green after the default-value
+        fix above, `FourRealPackagesTests` passed (no flake this run). `Fct.Engine.Tests` 9/10 (1
+        intentional `OracleParityTests` P1.2 red, unchanged 12-key message). `Fct.FlowTests` 22/22.
+        `Fct.Parser.Legacy.Tests` 26/26. `Fct.Compat.Shim.Tests` 56/56.
+      - **Handoff for P4.3:** the gate is empirically green now (see above) — P4.3 is bookkeeping: flip
+        its checkbox and fold this verdict's empirical evidence into its own entry (no further code
+        change expected). **Handoff for P5:** the only remaining red in the whole suite is P1.2's
+        12-key `ExportVariables` gap (`OracleParityTests`/`OverlaySatelliteTests`), exactly as scoped.
+- [ ] **P4.3 — Gate flip.** P1.4 green: a late joiner converges on zone/map/player/stats/version
+      lines and env values from priming alone.
 - [ ] **P4.3 — Gate flip.** P1.4 green: a late joiner converges on zone/map/player/stats/version
       lines and env values from priming alone.
 
