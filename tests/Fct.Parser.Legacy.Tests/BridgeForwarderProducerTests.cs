@@ -159,6 +159,45 @@ namespace Fct.Parser.Legacy.Tests
             Assert.Equal(TimeSpan.Zero, state.ServerClockOffset);
         }
 
+        // PIPELINE-COMPLETENESS-PLAN P3.6: EmitInitialRepositoryState must forward the SDK's SELECTED
+        // language's Buff/Skill resource dictionaries, not a hard-coded *_EN, wherever the SDK exposes a
+        // locale variant at all (only BuffList/SkillList have one — WorldList/ZoneList do not, see
+        // BridgeForwarder.EmitInitialRepositoryState's comment).
+        [Fact]
+        public void EmitInitialRepositoryState_forwards_the_selected_languages_buff_and_skill_lists()
+        {
+            var captured = new ConcurrentQueue<string>();
+            using var fwd = new BridgeForwarder(s => captured.Enqueue(s), NullLogger.Instance);
+            var sub = new FakeDataSubscription();
+            var repo = new FakeDataRepository { Language = Language.Japanese };
+            // JP-specific tables — proves the producer requested the locale variant, not *_EN.
+            repo.Resources[ResourceType.BuffList_JP] = new Dictionary<uint, string> { [10] = "スタン" };
+            repo.Resources[ResourceType.SkillList_JP] = new Dictionary<uint, string> { [20] = "ヘビースイング" };
+            // EN tables present too, deliberately with DIFFERENT values, so a wrong (EN) request would be
+            // caught by value, not just by which ResourceType key was populated.
+            repo.Resources[ResourceType.BuffList_EN] = new Dictionary<uint, string> { [10] = "Stun" };
+            repo.Resources[ResourceType.SkillList_EN] = new Dictionary<uint, string> { [20] = "Heavy Swing" };
+            repo.Resources[ResourceType.ZoneList_EN] = new Dictionary<uint, string> { [1] = "Limsa Lominsa" };
+            repo.Resources[ResourceType.WorldList_EN] = new Dictionary<uint, string> { [2] = "Gilgamesh" };
+
+            fwd.BindForTest(sub, repo);
+
+            Assert.True(WaitFor(() => Decode(captured).OfType<ResourceDictionaryForwarded>().Count() >= 4),
+                "expected buff/skill/zone/world dictionaries to all forward");
+
+            var decoded = Decode(captured).OfType<ResourceDictionaryForwarded>().ToList();
+            var buffs = decoded.Single(r => r.Kind == ResourceKind.Status);
+            Assert.Equal("スタン", buffs.Entries[10]);            // JP, never the EN "Stun"
+            var skills = decoded.Single(r => r.Kind == ResourceKind.Action);
+            Assert.Equal("ヘビースイング", skills.Entries[20]);   // JP, never the EN "Heavy Swing"
+            // World/Zone have NO locale variant in the SDK's ResourceType enum at all — *_EN stays the
+            // only request, the SDK's own ceiling rather than a shortcut.
+            var zones = decoded.Single(r => r.Kind == ResourceKind.Zone);
+            Assert.Equal("Limsa Lominsa", zones.Entries[1]);
+            var worlds = decoded.Single(r => r.Kind == ResourceKind.World);
+            Assert.Equal("Gilgamesh", worlds.Entries[2]);
+        }
+
         // Version/region can change on relog/patch (P3.3) — OnProcessChanged must re-emit the current
         // SessionStateChanged, not just the one-shot bind-time snapshot.
         [Fact]

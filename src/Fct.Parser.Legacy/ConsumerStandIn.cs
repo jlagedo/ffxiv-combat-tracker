@@ -67,6 +67,12 @@ namespace Fct.Parser.Legacy
         {
             _repo.Apply(evt);
             _sub.Raise(evt);
+            // PIPELINE-COMPLETENESS-PLAN P3.6/G6: the forwarded region also reaches Machina's own
+            // OpcodeManager (best-effort, non-blocking — KR/CN only, gates nothing). Re-attempted on
+            // every SessionStateChanged (bind-time + relog/patch re-emits, P3.3) since Machina.FFXIV may
+            // not be loaded in this satellite's AppDomain yet the first time this fires.
+            if (evt is SessionStateChanged state)
+                MachinaRegionBridge.TrySetRegion(state.Region, _log);
         }
 
         public StandInVerification SelfVerify()

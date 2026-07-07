@@ -167,13 +167,47 @@ namespace Fct.LegacyHost
 
             Enqueue(BuildSessionState());
 
-            // The combat-relevant tables (EN; the host catalog is locale-neutral). ItemList is omitted —
-            // the target consumers don't read it and it is large enough to bloat a single wire line.
-            ForwardResource(ResourceType.SkillList_EN, ResourceKind.Action);
-            ForwardResource(ResourceType.BuffList_EN, ResourceKind.Status);
+            // The combat-relevant tables (the host catalog is locale-neutral — ForwardResource drops the
+            // suffix, ConsumerDataSurface.MapResource). ItemList is omitted — the target consumers don't
+            // read it and it is large enough to bloat a single wire line.
+            //
+            // PIPELINE-COMPLETENESS-PLAN P3.6: forward the SELECTED language's Buff/Skill list, not a
+            // hard-coded *_EN — those are the only two tables the SDK's ResourceType enum actually
+            // exposes per-locale (BuffList_EN/FR/DE/JP/KR, SkillList_EN/FR/DE/JP/KR; confirmed against
+            // both the SDK facade, FFXIV_ACT_Plugin.Common/DataRepository.cs, and the real decompile,
+            // ffxiv_act_plugin.common/FFXIV_ACT_Plugin.Common/ResourceType.cs — identical 15-member
+            // enum). World/Zone/Territory/Item/Mount lists have NO locale variant in the SDK at all
+            // (only an "_EN" member exists) — forwarding *_EN for those is the SDK's own ceiling, not a
+            // shortcut; there is no "selected language" version to forward instead.
+            var language = Language.English;
+            try { if (_repo != null) language = _repo.GetSelectedLanguageID(); } catch { }
+            ForwardResource(SkillListFor(language), ResourceKind.Action);
+            ForwardResource(BuffListFor(language), ResourceKind.Status);
             ForwardResource(ResourceType.ZoneList_EN, ResourceKind.Zone);
             ForwardResource(ResourceType.WorldList_EN, ResourceKind.World);
         }
+
+        // SDK Language -> the locale-specific ResourceType member, where the SDK defines one. Chinese
+        // and TraditionalChinese have no dedicated Buff/Skill table in the SDK's ResourceType enum (no
+        // _CN/_TC member exists at all) — EN is the closest available table, the same fallback the SDK
+        // itself leaves callers to make.
+        private static ResourceType BuffListFor(Language lang) => lang switch
+        {
+            Language.French => ResourceType.BuffList_FR,
+            Language.German => ResourceType.BuffList_DE,
+            Language.Japanese => ResourceType.BuffList_JP,
+            Language.Korean => ResourceType.BuffList_KR,
+            _ => ResourceType.BuffList_EN,
+        };
+
+        private static ResourceType SkillListFor(Language lang) => lang switch
+        {
+            Language.French => ResourceType.SkillList_FR,
+            Language.German => ResourceType.SkillList_DE,
+            Language.Japanese => ResourceType.SkillList_JP,
+            Language.Korean => ResourceType.SkillList_KR,
+            _ => ResourceType.SkillList_EN,
+        };
 
         // The one-shot environment state (G5/P3.3): version/language/region/server-clock-offset/chat-log
         // availability, built from the SDK repository so a consumer satellite mirrors the parser's

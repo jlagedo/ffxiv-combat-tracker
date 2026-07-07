@@ -1143,12 +1143,118 @@ The G14 headline fix. No wire-codec change (the `RAW` frame already carries type
         change is anticipated for P4 itself — `Apply(SessionStateChanged)` already exists and will fire
         correctly the moment a primed `SessionStateChanged` frame reaches the satellite; P4's work is
         entirely on the host-side priming/`BuildPrimeEvents` side.
-- [ ] **P3.6 — Machina region (KR/CN only, non-blocking).** In the consumer stand-in bring-up:
+- [x] **P3.6 — Machina region (KR/CN only, non-blocking).** In the consumer stand-in bring-up:
       reflectively call `Machina.FFXIV.Headers.Opcodes.OpcodeManager.Instance.SetRegion(region)`
       from the forwarded region. Default `Global` is already correct for the primary audience —
       implement, but it gates nothing. Where the SDK exposes them, forward the **selected
       language's** resource dictionaries instead of hard-coded `*_EN`
       (`EmitInitialRepositoryState`, `:160-163`).
+      **Verdict:** ✅ DONE. Gates nothing — no P1 gate moved (by design, this is a KR/CN-only,
+      non-blocking feature; confirmed empirically below).
+      - **Machina target, confirmed against real sources (new `src/Fct.Parser.Legacy/MachinaRegionBridge.cs`,
+        internal, no Machina.FFXIV reference of any kind — pure reflection):** `Assembly.GetAssemblies()`
+        finds the assembly named `Machina.FFXIV` (if loaded in this process at all — it never is in the
+        headless consumer stand-in unless OverlayPlugin's own Machina-based packet capture has spun up in
+        that same satellite), then reflects `Machina.FFXIV.Headers.Opcodes.OpcodeManager.Instance`
+        (public static property) and invokes its `public void SetRegion(Machina.FFXIV.GameRegion region)`
+        (instance method, one `Machina.FFXIV.GameRegion`-typed parameter). **Evidence:** (1) OverlayPlugin's
+        own read side, `E:\dev\OverlayPlugin\OverlayPlugin.Core\Integration\FFXIVRepository.cs:384-403`
+        (`GetMachinaRegion()`) — `Assembly.Load("Machina.FFXIV")` →
+        `GetType("Machina.FFXIV.Headers.Opcodes.OpcodeManager")` → `.Instance` →
+        `.GetProperty("GameRegion").GetValue(...)` — confirms OverlayPlugin reads region from Machina's
+        singleton, never `IDataRepository.GetGameRegion()` (G6). (2) Machina's own source,
+        `E:\dev\ffxiv\act\machina\Machina.FFXIV\Headers\Opcodes\OpcodeManager.cs:69-78` — the write side,
+        `public void SetRegion(GameRegion region)`, with its own internal fallback to `GameRegion.Global`
+        when the region key isn't in its loaded opcode-table dictionary. (3) Machina's `GameRegion` enum,
+        `E:\dev\ffxiv\act\machina\Machina.FFXIV\GameRegion.cs:18-23` — `Global=1, Chinese=2, Korean=3` (this
+        checked-out source tree lacks `TraditionalChinese`); reflection-loaded the actual **shipped**
+        `Machina.FFXIV.dll` from a real installed IINACT plugin
+        (`C:\Users\João Amaro\AppData\Roaming\XIVLauncher\installedPlugins\IINACT\2.10.3.2\Machina.FFXIV.dll`)
+        via `Assembly.LoadFrom` + reflection and confirmed the **real, current** `GameRegion` enum has all
+        four members (`Global,Chinese,Korean,TraditionalChinese`) and `SetRegion`'s signature is exactly
+        `Void SetRegion(Machina.FFXIV.GameRegion)` — the name-based (never numeric-cast) mapping in
+        `MachinaRegionBridge.ToMachinaRegionName` is deliberately robust to either shape (an older Machina
+        missing `TraditionalChinese` is caught by `Enum.GetNames(regionType).Contains(name)` and no-ops
+        that one region rather than throwing an `ArgumentException` out of `Enum.Parse`).
+      - **Mapping (`MachinaRegionBridge.ToMachinaRegionName(GameRegion) : string`):** `Global→"Global"`,
+        `Chinese→"Chinese"`, `Korean→"Korean"`, `TraditionalChinese→"TraditionalChinese"`, `Unknown→null`
+        (Machina's own enum has no member numbered 0 — `null` is the signal `TrySetRegion` uses to leave
+        Machina's own default/last-set region alone rather than guess). By name, not a numeric cast —
+        `Fct.Abstractions.GameRegion` and `Machina.FFXIV.GameRegion` are different types with different
+        member sets (no shared identity to cast between).
+      - **Non-blocking guard:** `MachinaRegionBridge.TrySetRegion(GameRegion, Action<string> log)` wraps
+        every reflection step (assembly lookup, `GetType`, `GetProperty`/`GetMethod`, `Enum.Parse`,
+        `MethodInfo.Invoke`) in one `try/catch (Exception)` that logs and returns — never rethrows.
+        Short-circuits to a no-op (no reflection attempted at all) when: the mapped name is `null`
+        (`Unknown`), the `Machina.FFXIV` assembly isn't in `AppDomain.CurrentDomain.GetAssemblies()`, either
+        reflected type is missing, or the target enum doesn't define the mapped member name.
+      - **Bring-up hook:** `ConsumerStandIn.Fold(GameEvent evt)` (`src/Fct.Parser.Legacy/ConsumerStandIn.cs`)
+        — after the existing `_repo.Apply(evt)` + `_sub.Raise(evt)`, a new
+        `if (evt is SessionStateChanged state) MachinaRegionBridge.TrySetRegion(state.Region, _log);`.
+        `Fold` is the actual per-frame bring-up path a consumer stand-in runs (constraint 2 — driven by the
+        forwarded `SessionStateChanged` crossing the `repository` stream, never a local scan), and it
+        re-attempts on every re-emitted `SessionStateChanged` (bind-time + `OnProcessChanged` relog/patch
+        re-emits, P3.3) — deliberately, since `Machina.FFXIV` may not be loaded in this satellite's
+        AppDomain the first time a `SessionStateChanged` folds (it loads only once OverlayPlugin's own
+        Machina-based packet capture spins up in that same process, independent of the parser).
+      - **Language resource dictionaries — FORWARDED where the SDK exposes a locale variant, `*_EN`
+        elsewhere is the SDK's own ceiling, not a shortcut (proven, not assumed):** the SDK's
+        `ResourceType` enum (`src/Fct.Compat.Shim.SdkFacade/DataRepository.cs:22-39`, confirmed byte-
+        identical in member set and order against the real decompile,
+        `E:\dev\FFXIV_ACT_Plugin\ffxiv_act_plugin\decompiled\ffxiv_act_plugin.common\FFXIV_ACT_Plugin.Common\ResourceType.cs`)
+        defines a per-locale variant for exactly **two** tables — `BuffList_{EN,FR,DE,JP,KR}` and
+        `SkillList_{EN,FR,DE,JP,KR}` (no `_CN`/`_TC` member for either) — and **no** locale variant at all
+        for `WorldList_EN`/`ZoneList_EN`/`TerritoryList_EN`/`ItemList_EN`/`MountList_EN` (each has exactly
+        one, EN-suffixed, member — there is no "selected language" version of these tables to forward
+        instead). `BridgeForwarder.EmitInitialRepositoryState`
+        (`src/Fct.LegacyHost/BridgeForwarder.cs`) now reads `_repo.GetSelectedLanguageID()` and requests
+        `SkillListFor(language)`/`BuffListFor(language)` (two new private mapping methods — French→`_FR`,
+        German→`_DE`, Japanese→`_JP`, Korean→`_KR`, everything else including Chinese/TraditionalChinese
+        (no dedicated table exists) falls back to `_EN`, the closest available table) instead of the
+        hard-coded `ResourceType.SkillList_EN`/`BuffList_EN` literals; `ZoneList_EN`/`WorldList_EN` stay
+        exactly as before (unchanged — no code path exists to select otherwise).
+      - **Safety test (mandatory done-when):**
+        `tests/Fct.Parser.Legacy.Tests/MachinaRegionBridgeTests.cs`,
+        `TrySetRegion_never_throws_when_Machina_is_absent_from_the_process` (`[Theory]`, all 5
+        `GameRegion` values including non-Global `Korean`/`Chinese`/`TraditionalChinese`) plus
+        `TrySetRegion_never_throws_with_a_null_logger` — both run in the normal headless test process
+        (`Fct.Parser.Legacy.Tests` takes no dependency on `Machina.FFXIV`, so this is genuinely the
+        "Machina absent" case, not simulated) and assert `Record.Exception(...)` is `null`. Green.
+      - **Reflection-target-resolution test (the task's "if you can" ask):**
+        `ToMachinaRegionName_maps_every_forwarded_region_to_its_exact_Machina_member_name` (`[Theory]`,
+        `Global/Chinese/Korean/TraditionalChinese` → their exact Machina member-name strings) +
+        `ToMachinaRegionName_maps_Unknown_to_null_so_Machinas_own_default_region_is_left_alone` — asserts
+        the exact name-resolution table `TrySetRegion` uses to pick its `SetRegion` argument, made
+        `internal` (not `private`) specifically so this is assertable without needing a live
+        `Machina.FFXIV` in the test process. All 6 new tests green:
+        `dotnet test tests\Fct.Parser.Legacy.Tests\Fct.Parser.Legacy.Tests.csproj --filter
+        "FullyQualifiedName~MachinaRegionBridgeTests"` → 6/6.
+      - **Resource-dictionary-forwarding test:**
+        `tests/Fct.Parser.Legacy.Tests/BridgeForwarderProducerTests.cs`
+        `EmitInitialRepositoryState_forwards_the_selected_languages_buff_and_skill_lists` — a
+        `FakeDataRepository` with `Language = Language.Japanese` and BOTH JP and (deliberately
+        different-valued) EN entries populated for all four tables; asserts the forwarded `Status`/
+        `Action` dictionaries carry the JP values (never the EN ones) and the forwarded `Zone`/`World`
+        dictionaries still carry the (only available) EN values. Green.
+      - **No regressions — full build + suite run:** `dotnet build ffxiv-combat-tracker.slnx` clean (0
+        warnings/errors, both TFMs); `dotnet build src\Fct.App\Fct.App.csproj` clean (stages the net48
+        satellite + compat runtime). `Fct.Parser.Legacy.Tests` **26/26** (was 14/14 — +12 new: 11
+        `MachinaRegionBridgeTests` cases (two `[Theory]`s × 5/4 + two `[Fact]`s) + 1
+        `BridgeForwarderProducerTests` resource-dictionary-language addition). `Fct.Compat.Shim.Tests`
+        **56/56** unchanged (no shim code touched this task — region reaches Machina only via the net48
+        consumer stand-in, not the net10 shim). `Fct.App.Tests` **181/181** unchanged. `Fct.FlowTests`
+        **22/22** unchanged.
+        `Fct.Engine.Tests` **9/10**, same P1.2 12-key message, unchanged. `Fct.Integration.Tests` full run:
+        **46 tests, 37 passed, 4 failed, 5 skipped** — the two `LateJoinPrimingTests` (P1.4, unchanged
+        messages), `OverlaySatelliteTests` (P1.2, unchanged 12-key message), and the known
+        `FourRealPackagesTests` run-ordering flake reproducing this run (documented pre-existing since
+        P1.2/P1.3) — identical failure set to the P3.5 baseline, no new red, no flip. **P1.4 stays red,
+        P1.2 stays red, exactly as this task's boundary requires — this phase gates nothing.**
+      - **Handoff for P3.7:** confirm P1.5 green (`RepositorySurfaceLiveTests`,
+        `ConsumerDataRepositoryStubTests`) and P1.6 green (`EventMappingFlowTests.A5b`,
+        `GameSnapshotAggregatorTests`'s alliance-size test) — both already flipped by P3.5, unaffected by
+        this task. P3.6 itself has no gate of its own to flip (G6 was never gated — plan §7 states it
+        explicitly). P1.4/P1.2 remain the only reds in scope and are P4/P5's jobs respectively.
 - [ ] **P3.7 — Gate flips.** P1.5 green (forwarded env) and P1.6 green (alliance size preserved
       end-to-end). Prime-path convergence for this state lands in P4.
 
