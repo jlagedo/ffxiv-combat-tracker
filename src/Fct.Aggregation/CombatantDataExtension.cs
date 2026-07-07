@@ -23,9 +23,14 @@ namespace Advanced_Combat_Tracker
     // static/global on this class.
     public static class CombatantDataExtension
     {
-        // ACT_UIMods.OneOrInt(int): guards a divide-by-zero denominator (e.g. BlockParryCount(),
-        // Items.Count) by substituting 1 for a 0 count; every other value passes through unchanged.
-        private static int OneOrInt(int data) => data == 0 ? 1 : data;
+        // ACT_UIMods.OneOrInt(int)/(long): guards a divide-by-zero denominator (e.g.
+        // BlockParryCount(), DirectHeal(), Items.Count) by substituting 1 for a 0 count; every other
+        // value passes through unchanged. internal (not private, unlike the decompile's ACT_UIMods
+        // — there both the math and the registration lambdas live in one class; here EngineTables.cs
+        // is a separate class in the same assembly that calls these from its ParryPct/BlockPct/
+        // OverHealPct ColumnDef registrations, per the P5.1 handoff).
+        internal static int OneOrInt(int data) => data == 0 ? 1 : data;
+        internal static long OneOrInt(long data) => data == 0L ? 1L : data;
 
         // The combatant's job abbreviation ("War"/"Pld"/...): the first non-blank "Job" swing tag
         // found scanning AllOut's attack-type buckets in order, each bucket's first swing only.

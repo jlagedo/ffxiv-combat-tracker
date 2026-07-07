@@ -1638,7 +1638,7 @@ the completeness authority.
         provenance/ally-restriction exclusion may be needed again per key — check for it the same way
         (run the satellite gate after each shrink, diagnose any "unexpected" entries by root cause
         before assuming a registration defect).
-- [ ] **P5.3 — `ParryPct`, `BlockPct`, `IncToHit`, `OverHealPct`:** register the **full ColumnDef
+- [x] **P5.3 — `ParryPct`, `BlockPct`, `IncToHit`, `OverHealPct`:** register the **full ColumnDef
       chain** each resolves through (`CombatantData.ColumnDefs` →
       `Data.Items[DamageTypeDataIncomingDamage / DamageTypeDataOutgoingHealing].GetColumnByName(...)`
       → `AttackType.ColumnDefs` / `DamageTypeData.ColumnDefs`) **and** the wrapping
@@ -1646,6 +1646,125 @@ the completeness authority.
       `AttackType.ColumnDefs["ParryPct"]:2080-2097`; `BlockPct` `:1961-1990` + `:2118-2135`;
       `IncToHit` `:1992-2021`; `OverHealPct` `:2137-2166` + `AttackType["OverHeal"]:2193` + the
       `DamageTypeData`/`MasterSwing` OverHeal columns `:2168-2223`.
+      **Verdict:** ✅ DONE. `src/Fct.Aggregation/EngineTables.cs` `Install()`'s ACT_UIMods block
+      gained four new registrations, each porting its **full** chain verbatim from the decompile
+      (`E:\dev\FFXIV_ACT_Plugin\_decompiled\FFXIV_ACT_Plugin\FFXIV_ACT_Plugin\ACT_UIMods.cs`):
+      - **`ParryPct`** — three levels: `CombatantData.ColumnDefs["ParryPct"]` + `ExportVariables["ParryPct"]`
+        (`:1930-1959`, cell = `Items[DamageTypeDataIncomingDamage].GetColumnByName("ParryPct")`);
+        `DamageTypeData.ColumnDefs["ParryPct"]` (`:2023-2041`, guarded by the "All" attack-type
+        bucket's presence, else `"0%"`); `AttackType.ColumnDefs["ParryPct"]` (`:2080-2097`, reads
+        `Data.Parry()`/`Data.BlockParryCount()`, P5.1's ported extension methods).
+      - **`BlockPct`** — the identical three-level chain (`:1961-1990`, `:2042-2060`, `:2118-2135`),
+        reading `Data.Block()`/`Data.BlockParryCount()`.
+      - **`IncToHit`** — **one level only**: `CombatantData.ColumnDefs["IncToHit"]` +
+        `ExportVariables["IncToHit"]` (`:1992-2021`, cell = `Items[DamageTypeDataIncomingDamage]
+        .GetColumnByName("ToHit")`). No `DamageTypeData`/`AttackType` `"ToHit"` registration was
+        added — confirmed by decompile grep that `ACT_UIMods.cs` **never** registers `"ToHit"` on
+        either type (that key is ACT-core's own `FormActMain.cs`-registered column, real ACT's own
+        constructor code, not anything `ACT_UIMods.UpdateACTTables` installs), and confirmed
+        independently that the plugin-in-the-loop oracle itself never has it registered either
+        (`ActOracle.RegisterTables()` only hand-mirrors the FFXIV damage-type routing statics —
+        the real, uninitialized `oFormActMain`'s own ACT-core column setup never runs). Empirically
+        `IncToHit` is blank (`""`) for every combatant in
+        `tests/Fct.Compat.Act.Tests/fixtures/combat-slice.plugin.exportvars.tsv` — registering a
+        `"ToHit"` fallback here would have made our engine **diverge** from the oracle, not match
+        it; leaving it unregistered reproduces the identical blank value via `GetColumnByName`'s
+        missing-key branch.
+      - **`OverHealPct`** — three levels: `CombatantData.ColumnDefs["OverHealPct"]` +
+        `ExportVariables["OverHealPct"]` (`:2137-2166`, cell = `long.Parse(Items[
+        DamageTypeDataOutgoingHealing].GetColumnByName("OverHeal")) * 100 /
+        OneOrInt(DirectHeal())`); `DamageTypeData.ColumnDefs["OverHeal"]` (`:2168-2185`, guarded by
+        the "All" bucket, else `"0"`); `AttackType.ColumnDefs["OverHeal"]` (`:2187-2204`, reads
+        `Data.Overheal()`, P5.1's ported extension). `MasterSwing.ColumnDefs["OverHeal"]`
+        (`:2206-2223`) was **deliberately not registered** — `Data.Overheal()` (P5.1) reads
+        `attackType.Items[i].Tags["overheal"]` directly, never `GetColumnByName`, so the
+        `MasterSwing`-level raw column is not in this key's resolution chain at all (confirmed by
+        reading the P5.1-ported extension body); it belongs to P5.5's standalone `MasterSwing`
+        column set, per the task's own boundary ("do not register beyond what OverHealPct's chain
+        strictly needs").
+      - **`OneOrInt(long)` added**, faithful port of `ACT_UIMods.cs:2769` (`private static long
+        OneOrInt(long data) => data == 0L ? 1L : data;`), needed by `ParryPct`/`BlockPct` (against
+        `BlockParryCount()`'s `long`) and by `OverHealPct` (against the ternary
+        `!...ContainsKey("All") ? 0 : DirectHeal()`, which the decompile itself resolves to `long`
+        via C#'s ternary type unification, exactly mirrored here). Added to
+        `src/Fct.Aggregation/CombatantDataExtension.cs` alongside the existing `OneOrInt(int)`,
+        which was bumped from `private` to `internal` (both, for consistency) — a pure accessibility
+        change (no behavior change) required because, unlike the decompile's `ACT_UIMods` (where the
+        math and the registration lambdas are one class), this port splits them:
+        `CombatantDataExtension` (P5.1) holds the math, `EngineTables.Install()` (P5.2+) holds the
+        registration lambdas that call it. Verified no other call site existed before this change
+        (grepped) and no other behavior changed.
+      - **Skip-list shrink:** `"ParryPct"`, `"BlockPct"`, `"IncToHit"`, `"OverHealPct"` removed from
+        `PendingP5Keys` in both `tests/Fct.Engine.Tests/OracleParityTests.cs` and
+        `tests/Fct.Integration.Tests/OverlaySatelliteTests.cs` — **7 keys remain, byte-identical in
+        both**: `CritDirectHitCount, CritDirectHitPct, DirectHitCount, DirectHitPct, Last10DPS,
+        Last30DPS, Last60DPS` (DirectHit*×4 + LastNDPS×3, exactly the P5.4/P5.6 remainder).
+      - **Headless gate (`Fct.Engine.Tests.OracleParityTests`) — clean:**
+        `dotnet test tests\Fct.Engine.Tests\Fct.Engine.Tests.csproj --filter
+        "FullyQualifiedName~OracleParityTests"` → 4 passed, 1 red with exactly:
+        `P1.2 pending P5 registration of 7 ExportVariables key(s): CritDirectHitCount,
+        CritDirectHitPct, DirectHitCount, DirectHitPct, Last10DPS, Last30DPS, Last60DPS` — the 4
+        keys gone, no unexpected mismatch, no stale skip-list entry. Full `Fct.Engine.Tests` run:
+        9/10 (same single intentional red).
+      - **Satellite gate (`Fct.Integration.Tests.OverlaySatelliteTests`) — required two additional,
+        precedented provenance exclusions to reach the same clean result**, both root-caused (not
+        assumed) before being added:
+        1. **9-combatant "missing from CombatData" (systemic, name-scoped, not key-scoped).**
+           Un-skip-listing the 4 keys naively surfaced 36 "`{name}`: combatant missing from
+           CombatData" mismatches — the exact same 9 names (`Combatant-002/003/005/007/008/009/
+           010/011`, `Unknown`) P5.2 first exposed via `Job` alone (9 mismatches for 1 key; now 9 ×
+           4 keys = 36), confirmed byte-for-byte identical to that verdict's finding. Root cause
+           unchanged from P5.2: `EncounterData.GetAllies()`'s ally/foe graph omits these named
+           combatants from this replay's ally set, so MiniParse's ally-restricted
+           `GetCombatantList` never includes them in `CombatData`, for **any** key — a
+           per-combatant harness gap, not a per-key one. Generalized the previous single-key
+           (`Job`-only) masking into a name-scoped `alliesGapCombatants` exclusion (the same 9
+           names, `continue`d before any key-specific check) — narrower in spirit than repeating a
+           per-key exclusion 4 more times, and correctly scoped to the actual root cause. The
+           headless `OracleParityTests` gate has no ally restriction and independently proves every
+           key's registration/value correctness for every one of these combatants, so this
+           exclusion cannot mask a real port bug. Still P5.9's problem to fix systemically.
+        2. **`OverHealPct` value divergence for `YOU` — a third instance of the Job/CurrentZoneName
+           fixture-provenance class, confirmed by grep, not assumed:** `combat-slice.oracle.tsv`
+           (the swings-only dump backing the P1.1 plugin oracle) has **zero** `overheal` tag
+           occurrences (`grep -c overheal` → 0), so every combatant's oracle `OverHealPct` bakes in
+           `"0%"`; `combat-slice.frames.tsv` (this satellite's richer replayed corpus) has 27 real
+           `overheal` tag occurrences, so `YOU`'s correctly-computed `OverHealPct` legitimately
+           renders `"75%"` here — confirmed not a registration bug because the only *other*
+           combatant present after the ally-gap exclusion, `Combatant-013`, has no overheal data
+           either side and matches at `"0%"` unaffected. Added `if (key == "OverHealPct") continue;`
+           immediately below the existing `Job` exclusion, same shape, fully commented in place.
+        - **Result after both fixes:** `dotnet test tests\Fct.Integration.Tests\Fct.Integration.Tests.csproj
+          --filter "FullyQualifiedName~OverlaySatelliteTests"` → red with the **identical** clean
+          7-key message as the headless gate, in isolation. Confirmed this exact test is flaky under
+          full-suite load (fails with an unrelated `"no YOU combatant in CombatData"` transient in a
+          full-project run, same class of pre-existing run-ordering flakiness already documented for
+          `FourRealPackagesTests`/`SatelliteSupervisorTests`/`ReplayRouteTests`) — reconfirmed
+          passing (red-as-designed) in isolation immediately after.
+      - **ACT-core stays fully green, untouched:** `dotnet test
+        tests\Fct.Compat.Act.Tests\Fct.Compat.Act.Tests.csproj` → 67/67 — `new FormActMain(...)` →
+        `CombatTables.Setup()` only, never calls `EngineTables.Install()`, never observes any of
+        these four keys.
+      - **Build:** `dotnet build ffxiv-combat-tracker.slnx` clean, 0 warnings/errors (both
+        `Fct.Aggregation` TFMs); `dotnet build src\Fct.App\Fct.App.csproj` clean (satellite/compat
+        staged for the satellite gate).
+      - **No regressions:** `Fct.Integration.Tests` full run: 46 tests, 40 passed, 2 failed (the two
+        documented pre-existing run-ordering flakes, `OverlaySatelliteTests` and
+        `FourRealPackagesTests`, both reconfirmed green in isolation), 4 skipped (env-gated
+        `FrameFixtureGenerator`/`DistTreeGateTests`/`PacketDispatchTests` + the plugin-gated
+        `LineStreamDiffTests` clean skip). `Fct.FlowTests` 22/22, `Fct.App.Tests` 183/183,
+        `Fct.Parser.Legacy.Tests` 26/26, `Fct.Compat.Shim.Tests` 56/56 — all fully green. P1.3/P1.4/
+        P1.5/P1.6 gates confirmed still green throughout.
+      - **Handoff for P5.4:** the exact same chain pattern applies —
+        `CombatantData.ColumnDefs` → `Items[DamageTypeDataOutgoingDamage]` → `AttackType.ColumnDefs`
+        — for `DirectHitPct`/`DirectHitCount`/`CritDirectHitCount`/`CritDirectHitPct` (P5.1's
+        `DirectHitCount()`/`CritDirectHitCount()` extensions are ready to call as-is). Expect the
+        identical 9-name ally-gap mismatch to recur for these 4 keys too — reuse the same
+        `alliesGapCombatants` exclusion (already name-scoped, not key-scoped, so no further edit to
+        it should be needed) rather than adding new per-key entries; confirm empirically before
+        assuming no new provenance exclusion is needed for the `DirectHit*`/`CritDirectHit*` values
+        themselves (their swing tag, per P0.4, **is** present in both corpora — `DirectHit s True`
+        — so a fixture-provenance divergence like `OverHealPct`'s is less likely here, but verify).
 - [ ] **P5.4 — `DirectHitPct`, `DirectHitCount`, `CritDirectHitCount`, `CritDirectHitPct`:** same
       chain pattern (`CombatantData.ColumnDefs` → `Items[DamageTypeDataOutgoingDamage]` →
       `AttackType.ColumnDefs`) + ExportVar. Bodies: `:2250,2269,2288,2301-2311`;

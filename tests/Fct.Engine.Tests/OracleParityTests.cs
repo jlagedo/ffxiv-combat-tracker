@@ -33,7 +33,6 @@ namespace Fct.Engine.Tests
         // P5.9's exit criterion is this set reaching empty (P1.2 fully green).
         private static readonly HashSet<string> PendingP5Keys = new(StringComparer.Ordinal)
         {
-            "ParryPct", "BlockPct", "IncToHit", "OverHealPct",
             "DirectHitPct", "DirectHitCount", "CritDirectHitCount", "CritDirectHitPct",
             "Last10DPS", "Last30DPS", "Last60DPS",
         };
