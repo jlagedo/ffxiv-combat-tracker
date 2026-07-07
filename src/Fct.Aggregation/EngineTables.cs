@@ -1,3 +1,4 @@
+using System;
 using System.Collections.Generic;
 using System.Drawing;
 using DamageTypeDef = Advanced_Combat_Tracker.CombatantData.DamageTypeDef;
@@ -20,6 +21,24 @@ namespace Advanced_Combat_Tracker
             _installed = true;
 
             CombatTables.Setup();
+
+            // ACT_UIMods keys — the FFXIV plugin's own ExportVariables/ColumnDefs additions on top of
+            // ACT-core (CombatTables.Setup() above), ported from ACT_UIMods.cs. CombatTables.Setup()'s
+            // ACT-core parity fixtures never call Install(), so they never see these keys and stay
+            // bit-for-bit green (do not add here to CombatTables.cs — see the plan's locked decision).
+
+            // Job (ACT_UIMods.cs:1899-1928): ColumnDefs["Job"] cell/sort read CombatantDataExtension.Job()
+            // directly; ExportVariables["Job"] is the real formatter's indirection — it calls
+            // GetColumnByName("Job"), which resolves back through the ColumnDef above, so a direct
+            // GetColumnByName("Job") caller (e.g. a future ColumnDef body) also works.
+            CombatantData.ColumnDefs["Job"] = new CombatantData.ColumnDef(
+                "Job", true, "VARCHAR(8)", "Job",
+                (CombatantData.StringDataCallback)(d => d.Job()),
+                (CombatantData.StringDataCallback)(d => d.Job()),
+                (Left, Right) => string.Compare(Left.Job(), Right.Job(), StringComparison.OrdinalIgnoreCase));
+            CombatantData.ExportVariables["Job"] = new CombatantData.TextExportFormatter(
+                "Job", "Job Name", "Player's Job",
+                (CombatantData.ExportStringDataCallback)((d, extraFormat) => d.GetColumnByName("Job")));
 
             DamageTypeDef Out(string l, int ally) => new DamageTypeDef(l, ally, Color.Orange);
 

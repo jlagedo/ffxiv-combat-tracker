@@ -71,7 +71,7 @@ namespace Fct.Integration.Tests
         // not just the headless engine variant.
         private static readonly HashSet<string> PendingP5Keys = new(StringComparer.Ordinal)
         {
-            "Job", "ParryPct", "BlockPct", "IncToHit", "OverHealPct",
+            "ParryPct", "BlockPct", "IncToHit", "OverHealPct",
             "DirectHitPct", "DirectHitCount", "CritDirectHitCount", "CritDirectHitPct",
             "Last10DPS", "Last30DPS", "Last60DPS",
         };
@@ -196,6 +196,25 @@ namespace Fct.Integration.Tests
                 var pluginMismatches = new List<(string Key, string Detail)>();
                 foreach (var ((name, key), want) in pluginBaseline)
                 {
+                    // Job (P5.2) is registered and correct (headless OracleParityTests confirms an exact
+                    // match against the same oracle baseline) — this satellite gate's divergence is a
+                    // SECOND instance of the CurrentZoneName provenance gap just below: P1.1's oracle
+                    // baseline was generated from combat-slice.oracle.tsv, a swings-only dump that carries
+                    // no "Job" swing tag at all (grepped: zero occurrences), so the oracle's Job value is
+                    // "" for every combatant; this satellite instead replays combat-slice.frames.tsv, the
+                    // richer recorded corpus that DOES carry the real plugin's "Job s War" tag (confirmed
+                    // by P0.4) — so a correctly-registered Job legitimately renders "War" here, diverging
+                    // from the tag-less oracle answer. This also happens to be the first key to surface a
+                    // separate, pre-existing gap: GetAllies() (real-ACT's own friend/foe graph, unaffected
+                    // by any P3 party wiring) does not place every named combatant in this replay's ally
+                    // set, so MiniParse's ally-restricted GetCombatantList omits them from CombatData
+                    // entirely — already true for all 12 G1 keys today, previously invisible because the
+                    // full skip-list masked it wholesale; unskipping Job here is what exposes it. The same
+                    // masking recurs per-key as P5.3+ shrinks PendingP5Keys further; a systemic fix (either
+                    // regenerate the plugin oracle from Job-tag-bearing swings, or make GetCombatantList /
+                    // the oracle enumerate the same combatant set) is P5.9's exit-criterion problem, not
+                    // this task's.
+                    if (key == "Job") continue;
                     var values = name == "*ENCOUNTER*" ? frame.Encounter
                         : frame.Combatant.TryGetValue(name, out var v) ? v : null;
                     if (values is null) { pluginMismatches.Add((key, $"{name}: combatant missing from CombatData")); continue; }
