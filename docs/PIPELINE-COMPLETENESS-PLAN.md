@@ -623,26 +623,85 @@ All gates live in the suites named in [`TESTING.md`](TESTING.md); plugin-in-the-
         for the *wrong* reason. P3.5 must update `A5_TypedZonePartyEvents_ReachMappedConsumer`'s
         `new PartyChanged(2, Flow.T0, ...)` call to add `PartySize: 3` alongside the wiring change).
 
-### P2 — The verbatim line stream: one tap ☐
+### P2 — The verbatim line stream: one tap ☑
 
 The G14 headline fix. No wire-codec change (the `RAW` frame already carries type + line + original
 — `GameEventFrame.cs:57-61`), so **no frame-fixture regeneration** in this phase.
 
-- [ ] **P2.1 — Add the facade-seam tap.** In `BridgeForwarder.Start()` (`BridgeForwarder.cs:71-93`),
+- [x] **P2.1 — Add the facade-seam tap.** In `BridgeForwarder.Start()` (`BridgeForwarder.cs:71-93`),
       alongside the existing ACT-hub taps: subscribe `act.OnLogLineRead`; in the handler, ignore
       `isImport == true` (oracle/import replays are not the live stream), then
       `Enqueue(new RawLogLine(0, ts, type, args.logLine, args.logLine))` where `ts` is
       `args.detectedTime` (the line's own parsed timestamp — never `DateTimeOffset.Now`) and `type`
       per P0.2's verdict. Unsubscribe in `UnsubscribeActEvents()` (`BridgeForwarder.cs:412-420`).
       *Done when:* a satellite replay shows non-chat `RAW` frames at the host with correct types.
-- [ ] **P2.2 — Remove the SDK `LogLine` tap.** Delete the subscription (`BridgeForwarder.cs:130`),
+      **Verdict:** ✅ DONE. `src/Fct.LegacyHost/BridgeForwarder.cs`: `Start()` adds
+      `act.OnLogLineRead += OnLogLineRead;` alongside the existing ACT-hub taps (`:71-93`); new handler
+      `OnLogLineRead(bool isImport, LogLineEventArgs args)` ignores `isImport`/null args, then
+      `Enqueue(new RawLogLine(0, ts, ParseLineType(line), line, line))` where `line = args.logLine ?? ""`
+      and `ts = args.detectedTime > DateTime.MinValue ? new DateTimeOffset(args.detectedTime) :
+      DateTimeOffset.Now` (the line's own parsed timestamp, mirroring the existing
+      `OnBeforeCombatAction`/`OnEncounterSet` fallback shape — never a bare `DateTimeOffset.Now` when a
+      real timestamp exists). New sibling helper `ParseLineType(string raw)` (private static, next to the
+      handler): `int.TryParse` of the substring before the first `|`, cast to `LogMessageType`, default
+      (`ChatLog = 0`) on empty/malformed input — never reads `args.detectedType` (always 0 on the facade
+      path per P0.2). `UnsubscribeActEvents()` (`:412-420`) gained
+      `try { act.OnLogLineRead -= OnLogLineRead; } catch { }`.
+- [x] **P2.2 — Remove the SDK `LogLine` tap.** Delete the subscription (`BridgeForwarder.cs:130`),
       the `OnLogLine` handler (`:215-216`), and the unsubscribe (`:399`). The consumer-side SDK
       `LogLine` re-raise (`ConsumerDataSurface.cs:46-51`) stays as-is per P0.5 (no target consumer
       binds it; its `seconds` now derives from the line-accurate frame timestamp). *Done when:*
       build green; no `RawLogLine` is produced from the SDK tap anywhere.
-- [ ] **P2.3 — Gate flip.** P1.3 green, both variants: every slice line arrives at the consumer's
+      **Verdict:** ✅ DONE. `src/Fct.LegacyHost/BridgeForwarder.cs`: removed `sub.LogLine += OnLogLine;`
+      from `SubscribeSdk` (was `:130`), the `OnLogLine(uint eventType, uint seconds, string line)` handler
+      (was `:215-216`), and `_sub.LogLine -= OnLogLine;` from `Dispose()` (was `:399`). Grepped
+      `BridgeForwarder.cs` post-edit: zero references to `OnLogLine`/SDK `LogLine` remain; the only
+      `RawLogLine` construction left in the file is P2.1's facade-seam tap. `ConsumerDataSurface.cs`
+      untouched, per the licensing verdict (P0.5).
+- [x] **P2.3 — Gate flip.** P1.3 green, both variants: every slice line arrives at the consumer's
       `OnLogLineRead` byte-identical, in order, with correct `LogMessageType` — this is what real
       ACT delivers, reproduced by construction.
+      **Verdict:** ✅ DONE — empirically green. Command:
+      `dotnet test tests\Fct.Integration.Tests\Fct.Integration.Tests.csproj --filter "FullyQualifiedName~LineStreamDiffTests"`.
+      - **Plugin-free variant** (`Plugin_free_facade_tail_lines_do_not_reach_a_rawlog_consumer_today`):
+        **PASS**. All 12 slice lines arrive at the consumer's `OnLogLineRead` byte-identical, in order,
+        each with the correct `LogMessageType` — `Assert.Equal(Slice, got)` now passes where it
+        previously asserted against an empty `Actual`.
+      - **Plugin-gated variant** (`Plugin_gated_facade_tail_lines_do_not_reach_a_rawlog_consumer_today`):
+        **clean SKIP**, not a false green. Empirically, once the real `FFXIV_ACT_Plugin` finishes its
+        async init it calls `ActGlobals.oFormActMain.OpenLog` itself against its own live
+        `Network_<pid>_<date>.log` path; `StartLogTail`'s same-path guard cancels the gate's tail on the
+        injected slice file and re-tails the plugin's own log — exactly the P1.3 verdict's documented
+        "root cause 2". Observed directly: the consumer received 36 real (non-fixture) lines — the
+        plugin's own init/debug/territory/combatant lines from a live game process on this machine, not
+        the 12-line fixture — proving the P2.1 tap itself forwards verbatim lines correctly (real content
+        crossed byte-for-byte) while making this specific gate's byte-diff assertion an environment race
+        this task does not control (whether a live game wins the tail before the injected slice is fed).
+        `tests/Fct.Integration.Tests/LineStreamDiffTests.cs` gained a documented reclaim-detection guard
+        immediately before the headline `Assert.Equal(Slice, got)`: when `loadParser` is true and
+        `got.Count > 0` but `got` does not start with `Slice` (content diverges from the fixture),
+        `Skip.If(true, "...")` fires with the reclaim explained; a `got.Count == 0` result (no reclaim,
+        tap genuinely not forwarding) still falls through to the hard assertion and fails as a real
+        regression. This is the task's licensed fallback ("plugin-gated green or clean-skip if the plugin
+        path reclaims the tail... keep it a clean skip rather than a false green").
+      - **Regression check:** full `Fct.Integration.Tests` run — 45 tests, 35 passed (was 34; the
+        plugin-free `LineStreamDiffTests` flip), 5 skipped (the 4 pre-existing env-gated skips +
+        this phase's new plugin-gated clean skip, was 4), 5 failed (the pre-existing P1.2
+        `OverlaySatelliteTests` + P1.4 `LateJoinPrimingTests`×2 + P1.5 `RepositorySurfaceLiveTests` +
+        the known `FourRealPackagesTests` load-sensitive flake — was 7, now 5 with `LineStreamDiffTests`'s
+        two former reds removed). `OverlaySatelliteTests`/`FourRealPackagesTests` fail on this machine on
+        an `Encounter.damage` mismatch (`got='741240'` vs the oracle baseline) rather than the documented
+        P1.2 key-set skip-list assertion; confirmed via `git stash` (reverting both P2 edits and re-running
+        the identical two tests) that this exact mismatch — same `got`/`want` values — reproduces
+        byte-for-byte on pre-P2 `main`, so it is pre-existing environmental contamination (a live game
+        process on this dev machine feeding the plugin's memory-scan pipeline during the replay,
+        unrelated to the log-line tap), not a P2 regression.
+      - **Full-suite confirmation (no other regressions):** `dotnet build ffxiv-combat-tracker.slnx`
+        clean (0 warnings/errors); `Fct.Compat.Act.Tests` 67/67 (incl. P0.1 `LineSeamCoverageTests`);
+        `ConsumerLogLineTests`/`LogWriteBackTests`/`ThreeSatelliteTopologyTests`-filtered run 7/7;
+        `Fct.Parser.Legacy.Tests` 9/10 (unchanged P1.5 red); `Fct.App.Tests` 172/173 (unchanged P1.6
+        red); `Fct.FlowTests` 21/22 (unchanged P1.6 red); `Fct.Engine.Tests` 9/10 (unchanged P1.2 red,
+        same 12-key skip-list message as before); `Fct.Compat.Shim.Tests` 56/56.
 
 ### P3 — Session state: one additive frame ☐
 

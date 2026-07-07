@@ -79,6 +79,11 @@ namespace Fct.LegacyHost
                 act.EncounterSetRaised += OnEncounterSet;
                 act.ZoneChangeRaised += OnZoneChange;
                 act.CombatEndRaised += OnCombatEnd;
+                // The verbatim line stream (PIPELINE-COMPLETENESS-PLAN P2, G14): the facade's log-tail
+                // seam is the sole RawLogLine source — the same tap real ACT consumers (cactbot,
+                // Triggernometry) bind, downstream of the plugin's own log writes, so every line type
+                // crosses regardless of whether a parser is loaded.
+                act.OnLogLineRead += OnLogLineRead;
             }
 
             _discover = new Timer { Interval = 500 };
@@ -127,7 +132,6 @@ namespace Fct.LegacyHost
 
         private void SubscribeSdk(IDataSubscription sub)
         {
-            sub.LogLine += OnLogLine;
             sub.ZoneChanged += OnZoneChanged;
             sub.PartyListChanged += OnPartyListChanged;
             sub.PrimaryPlayerChanged += OnPrimaryPlayerChanged;
@@ -211,9 +215,32 @@ namespace Fct.LegacyHost
 
         // ---- SDK / ACT handlers → GameEvent projection (no parsing) ---------------------------------
 
-        // The raw FFXIV log line — the Trig/cactbot firehose. `eventType` is the LogMessageType.
-        private void OnLogLine(uint eventType, uint seconds, string line) =>
-            Enqueue(new RawLogLine(0, DateTimeOffset.Now, (LogMessageType)eventType, line ?? "", line ?? ""));
+        // The verbatim line stream (PIPELINE-COMPLETENESS-PLAN P2.1, G14): the facade's log-tail seam
+        // (FormActMain.FeedLine -> Before/OnLogLineRead) is the sole RawLogLine source — every line the
+        // plugin writes to Network_*.log crosses here, byte-for-byte, whether or not a parser is loaded.
+        // Import/oracle replays (isImport == true) are not the live stream and are ignored.
+        private void OnLogLineRead(bool isImport, LogLineEventArgs args)
+        {
+            if (isImport || args == null) return;
+            var line = args.logLine ?? "";
+            // The line's OWN parsed timestamp — never DateTimeOffset.Now (P2.1 verdict).
+            var ts = args.detectedTime > DateTime.MinValue
+                ? new DateTimeOffset(args.detectedTime)
+                : DateTimeOffset.Now;
+            Enqueue(new RawLogLine(0, ts, ParseLineType(line), line, line));
+        }
+
+        // The frame's LogMessageType, extracted from the line's leading "NN|" key (P0.2 verdict) —
+        // never args.detectedType, which FeedLine always sets to 0 on the plugin-free path. Sibling in
+        // shape to FormActMain.ParseLineTimestamp: parse the field before the first '|', default safely
+        // on malformed/empty input.
+        private static LogMessageType ParseLineType(string raw)
+        {
+            if (string.IsNullOrEmpty(raw)) return default;
+            int p = raw.IndexOf('|');
+            var key = p >= 0 ? raw.Substring(0, p) : raw;
+            return int.TryParse(key, out var n) ? (LogMessageType)n : default;
+        }
 
         private void OnZoneChanged(uint zoneId, string zoneName) =>
             Enqueue(new ZoneChanged(0, DateTimeOffset.Now, zoneId, zoneName ?? ""));
@@ -396,7 +423,6 @@ namespace Fct.LegacyHost
             try { UnsubscribeActEvents(); } catch { }
             if (_sub != null)
             {
-                try { _sub.LogLine -= OnLogLine; } catch { }
                 try { _sub.ZoneChanged -= OnZoneChanged; } catch { }
                 try { _sub.PartyListChanged -= OnPartyListChanged; } catch { }
                 try { _sub.PrimaryPlayerChanged -= OnPrimaryPlayerChanged; } catch { }
@@ -417,6 +443,7 @@ namespace Fct.LegacyHost
             try { act.EncounterSetRaised -= OnEncounterSet; } catch { }
             try { act.ZoneChangeRaised -= OnZoneChange; } catch { }
             try { act.CombatEndRaised -= OnCombatEnd; } catch { }
+            try { act.OnLogLineRead -= OnLogLineRead; } catch { }
         }
     }
 }
