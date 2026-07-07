@@ -95,5 +95,113 @@ namespace Fct.Parser.Legacy.Tests
                 .OfType<GameProcessChanged>()
                 .Any(p => p.Pid == Process.GetCurrentProcess().Id)), "ProcessChanged pid was not forwarded");
         }
+
+        private static List<GameEvent> Decode(ConcurrentQueue<string> captured) => captured
+            .Select(l => GameEventFrame.TryParse(l, out var e) ? e : null)
+            .Where(e => e != null).ToList()!;
+
+        // PIPELINE-COMPLETENESS-PLAN P3.3 / G5: EmitInitialRepositoryState builds and forwards ONE
+        // SessionStateChanged from the SDK repository, mapped through BridgeForwarder's
+        // Language/Region enum maps — never the ConsumerDataRepository stubs (those are a P3.5 concern
+        // on the OTHER end of the pipe; this test is the producer/origin side).
+        [Fact]
+        public void EmitInitialRepositoryState_forwards_one_mapped_SessionStateChanged()
+        {
+            var captured = new ConcurrentQueue<string>();
+            using var fwd = new BridgeForwarder(s => captured.Enqueue(s), NullLogger.Instance);
+            var sub = new FakeDataSubscription();
+            var repo = new FakeDataRepository
+            {
+                GameVersion = "6.58",
+                Language = Language.Japanese,
+                Region = 3,                                   // Korean, per the decompiled Region enum
+                ServerTimestamp = DateTime.UtcNow.AddSeconds(5),
+                ChatLogAvailable = true,
+            };
+
+            fwd.BindForTest(sub, repo);
+
+            Assert.True(WaitFor(() => Decode(captured).OfType<SessionStateChanged>().Any()),
+                "no SessionStateChanged was forwarded on bind");
+
+            var state = Decode(captured).OfType<SessionStateChanged>().Single();
+            Assert.Equal("6.58", state.GameVersion);
+            Assert.Equal(GameLanguage.Japanese, state.Language);
+            Assert.Equal(GameRegion.Korean, state.Region);
+            Assert.True(state.IsChatLogAvailable);
+            // The offset is computed against DateTime.UtcNow at forward time, so assert closeness rather
+            // than equality (the ~5s ServerTimestamp lead should survive, modulo test execution jitter).
+            Assert.InRange(state.ServerClockOffset.TotalSeconds, 3.0, 8.0);
+        }
+
+        // P0.3's headless verdict: GetGameVersion() == "" and GetServerTimestamp() == DateTime.MinValue
+        // with no live game process. The producer must forward "" (never a "0.0" placeholder, §3) and
+        // must guard the clock offset to TimeSpan.Zero (never the ~2000-year garbage span).
+        [Fact]
+        public void EmitInitialRepositoryState_guards_unknown_version_and_default_server_timestamp()
+        {
+            var captured = new ConcurrentQueue<string>();
+            using var fwd = new BridgeForwarder(s => captured.Enqueue(s), NullLogger.Instance);
+            var sub = new FakeDataSubscription();
+            var repo = new FakeDataRepository
+            {
+                GameVersion = "",              // P0.3: headless real plugin serves "" (no game path)
+                ServerTimestamp = DateTime.MinValue,   // P0.3: no live memory scan
+            };
+
+            fwd.BindForTest(sub, repo);
+
+            Assert.True(WaitFor(() => Decode(captured).OfType<SessionStateChanged>().Any()),
+                "no SessionStateChanged was forwarded on bind");
+
+            var state = Decode(captured).OfType<SessionStateChanged>().Single();
+            Assert.Equal("", state.GameVersion);
+            Assert.Equal(TimeSpan.Zero, state.ServerClockOffset);
+        }
+
+        // Version/region can change on relog/patch (P3.3) — OnProcessChanged must re-emit the current
+        // SessionStateChanged, not just the one-shot bind-time snapshot.
+        [Fact]
+        public void ProcessChanged_event_re_emits_SessionStateChanged()
+        {
+            var captured = new ConcurrentQueue<string>();
+            using var fwd = new BridgeForwarder(s => captured.Enqueue(s), NullLogger.Instance);
+            var sub = new FakeDataSubscription();
+            var repo = new FakeDataRepository { GameVersion = "1.0.0" };
+            fwd.BindForTest(sub, repo);
+
+            Assert.True(WaitFor(() => Decode(captured).OfType<SessionStateChanged>().Any()),
+                "no SessionStateChanged was forwarded on bind");
+
+            repo.GameVersion = "2.0.0";   // simulate a patch/relog changing the reported version
+            sub.RaiseProcessChanged(Process.GetCurrentProcess());
+
+            Assert.True(WaitFor(() => Decode(captured).OfType<SessionStateChanged>()
+                .Any(s => s.GameVersion == "2.0.0")), "ProcessChanged did not re-emit the updated SessionStateChanged");
+            Assert.True(Decode(captured).OfType<SessionStateChanged>().Count() >= 2,
+                "expected both the bind-time and the ProcessChanged-time SessionStateChanged");
+        }
+
+        // G7/P3.3: PartyListChanged's real SDK partySize argument must ride the PartyChanged record,
+        // distinct from Members.Count (alliance content: up to 24 visible members, 8-person party size).
+        [Fact]
+        public void PartyListChanged_event_forwards_the_real_partySize()
+        {
+            var captured = new ConcurrentQueue<string>();
+            using var fwd = new BridgeForwarder(s => captured.Enqueue(s), NullLogger.Instance);
+            var sub = new FakeDataSubscription();
+            var repo = new FakeDataRepository();
+            fwd.BindForTest(sub, repo);
+
+            var roster = new System.Collections.ObjectModel.ReadOnlyCollection<uint>(
+                Enumerable.Range(1, 24).Select(i => (uint)i).ToList());
+            sub.RaisePartyListChanged(roster, 8);
+
+            Assert.True(WaitFor(() => Decode(captured).OfType<PartyChanged>().Any(p => p.Members.Count == 24)),
+                "PartyChanged with the full 24-member roster was not forwarded");
+
+            var party = Decode(captured).OfType<PartyChanged>().Single(p => p.Members.Count == 24);
+            Assert.Equal(8, party.PartySize);
+        }
     }
 }

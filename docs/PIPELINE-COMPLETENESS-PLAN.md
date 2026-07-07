@@ -806,7 +806,7 @@ The G14 headline fix. No wire-codec change (the `RAW` frame already carries type
         `SessionStateChanged`), still exactly 1 red (same `GameSnapshotAggregatorTests` 8-vs-0 message);
         `Fct.FlowTests` 21/22 (same `EventMappingFlowTests` 8-vs-24 message). `Fct.Compat.Act.Tests`
         67/67 and `Fct.Compat.Shim.Tests` 56/56 both fully green, no regressions.
-- [ ] **P3.3 — Producer taps.** In `BridgeForwarder`: emit `SessionStateChanged` once from
+- [x] **P3.3 — Producer taps.** In `BridgeForwarder`: emit `SessionStateChanged` once from
       `EmitInitialRepositoryState` (`BridgeForwarder.cs:149-164`) and re-emit on `OnProcessChanged`
       (`:145-146` — version can change on relog/patch). Map SDK `Language`→`GameLanguage`, `byte`
       region→`GameRegion`, `ServerClockOffset = _repo.GetServerTimestamp() - DateTime.UtcNow`
@@ -815,6 +815,103 @@ The G14 headline fix. No wire-codec change (the `RAW` frame already carries type
       instead of a ~2000-year garbage span.
       Serve `""` for an unknown version (§3, never a placeholder). Forward the real `partySize` in
       `OnPartyListChanged` (`:221-222`). *Done when:* both frames observed on a replay run.
+      **Verdict:** ✅ DONE. `src/Fct.LegacyHost/BridgeForwarder.cs`:
+      - **`BuildSessionState()`** (new private helper): reads `_repo.GetGameVersion()` (`?? ""`,
+        never a `"0.0"` placeholder), `_repo.GetSelectedLanguageID()` through new `MapLanguage(Language)`,
+        `_repo.GetGameRegion()` through new `MapRegion(byte)`, `_repo.IsChatLogAvailable()`, and computes
+        `ServerClockOffset` from `_repo.GetServerTimestamp()` **guarded**: `if (serverTime.Year >= 2000)
+        clockOffset = serverTime - DateTime.UtcNow;` else `TimeSpan.Zero` stays (the P0.3 guard — a
+        headless `DateTime.MinValue` never reaches the ~2000-year garbage span). Every repository read is
+        wrapped in its own `try/catch` so one faulted member yields only that field's safe default, never
+        drops the whole frame. `EmitInitialRepositoryState()` now `Enqueue(BuildSessionState())` once
+        (alongside the existing PID/resource one-shot forwards); `OnProcessChanged` now also
+        `Enqueue(BuildSessionState())` after its existing `GameProcessChanged` (version/region can change
+        on relog/patch, per the plan).
+      - **Enum maps (new private statics, explicit by name — not a numeric cast):**
+        `MapLanguage(FFXIV_ACT_Plugin.Common.Language) : GameLanguage` — English/French/German/Japanese/
+        Chinese/Korean/TraditionalChinese map 1:1 by name (confirmed the SDK `Language` enum
+        (`Fct.Compat.Shim.SdkFacade/DataRepository.cs:10-19`) and `Fct.Abstractions.GameLanguage`
+        (`Session.cs:76`) carry identical underlying values, English=1..TraditionalChinese=7 — the
+        explicit-by-name map survives either side renumbering and gives an unrecognized/default(0) SDK
+        value a defined `GameLanguage.Unknown`). `MapRegion(byte) : GameRegion` — 1→Global, 2→Chinese,
+        3→Korean, 4→TraditionalChinese, else→Unknown. **Verified against the decompile** (dispatched to a
+        research pass over `E:\dev\FFXIV_ACT_Plugin\ffxiv_act_plugin\decompiled`): the real
+        `Region` enum (`ffxiv_act_plugin.config/FFXIV_ACT_Plugin.Config/Region.cs:3-9`) is `Global=1,
+        Chinese=2, Korean=3, TraditionalChinese=4` — byte 0 has no named SDK member (unconfigured/default),
+        confirmed identical in `Machina.FFXIV/GameRegion.cs` and OverlayPlugin's local copy
+        (`FFXIVRepository.cs:67-73`). `IDataRepository.GetGameRegion()` (`DataRepository.cs:158-161`) just
+        casts the stored `DataCollectionSettings.RegionID` field — no assignment site exists in the
+        decompiled tree (the settings-UI project isn't present), so whether an unconfigured install
+        defaults to byte 0 vs. some persisted prior selection is unverifiable from the decompile alone;
+        empirically on this dev machine the installed plugin reports region byte `1` (`Global`) — flagged
+        for P3.4/P3.5 as the one open item (no code impact: `MapRegion`'s `_ => GameRegion.Unknown` default
+        already covers byte 0 safely either way).
+      - **`OnPartyListChanged`** (`:248-249`): now `Enqueue(new PartyChanged(0, DateTimeOffset.Now,
+        partyList != null ? partyList.ToArray() : Array.Empty<uint>(), partySize))` — forwards the SDK's
+        real second argument instead of dropping it (G7).
+      - **Headless deterministic tests (`tests/Fct.Parser.Legacy.Tests/BridgeForwarderProducerTests.cs`,
+        4 new, alongside the existing 2 producer-tap tests)**, driven through `FakeDataSubscription`/
+        `FakeDataRepository` (the latter extended with settable `Language`/`Region`/`ServerTimestamp`/
+        `GameVersion`/`ChatLogAvailable` properties — a test-only, non-production change) and the REAL wire
+        codec (`GameEventFrame.ToWire`/`TryParse`):
+        `EmitInitialRepositoryState_forwards_one_mapped_SessionStateChanged` (bind-time STATE, correct
+        Language/Region mapping, offset within tolerance of a live server timestamp),
+        `EmitInitialRepositoryState_guards_unknown_version_and_default_server_timestamp` (`GameVersion=""`,
+        `ServerTimestamp=DateTime.MinValue` → `ServerClockOffset == TimeSpan.Zero`, the P0.3 guard),
+        `ProcessChanged_event_re_emits_SessionStateChanged` (a changed `GameVersion` after
+        `RaiseProcessChanged` produces a second, updated STATE frame), and
+        `PartyListChanged_event_forwards_the_real_partySize` (a 24-member alliance roster with
+        `partySize=8` decodes to `PartyChanged.PartySize == 8`, distinct from `Members.Count`). All 6
+        producer-tap tests pass; full `Fct.Parser.Legacy.Tests` run: 13/14 (the 1 red is the pre-existing,
+        unrelated P1.5 `ConsumerDataRepositoryStubTests` structural gate — unchanged message).
+      - **Empirical replay evidence — the STATE frame**
+        (`tests/Fct.Integration.Tests/SessionStateReplayTests.cs`, new, `[SkippableFact]`, requires the
+        staged satellite + real `FFXIV_ACT_Plugin.dll`): boots a REAL producer satellite through the
+        production catalog path (empty boot → `LOADPLUGIN`, the exact `SatelliteRunFixture`/
+        `OnParserLoaded()` shape) and drains the raw event pipe directly — deliberately **not**
+        `ReplayBridgeHarness.RunAndCollect` (`--replay` mode): confirmed empirically first that `--replay`
+        blocks the satellite's UI thread synchronously feeding log lines, so `BridgeForwarder`'s
+        SDK-discovery `Timer` (WinForms, ticked only by the message loop) never gets a turn and the SDK
+        never binds — that run's captured tags were only `ZONE/ZCHG/SETENC/SWING/ENDC` (zero `STATE`,
+        `PID`, `REPO`, `RSRC`). The catalog-boot + `LOADPLUGIN` driver runs a real message loop, so the
+        real plugin's SDK binds for real and `EmitInitialRepositoryState()` fires. **Captured wire line
+        (real FFXIV_ACT_Plugin, this dev machine, no live game process):**
+        ```
+        EVT STATE	2026-07-06T21:47:02.8116391-03:00	ver=	lang=1	region=1	clockoffms=0	chat=1
+        ```
+        Decoded: `GameVersion=""` (headless, never `"0.0"` — matches the P0.3 verdict exactly),
+        `Language=English` (`lang=1`), `Region=Global` (`region=1`), `ServerClockOffset=TimeSpan.Zero`
+        (`clockoffms=0` — the guard engaged: no live memory-scanned server time on this machine),
+        `IsChatLogAvailable=true` (`chat=1`). Test asserts the raw `EVT STATE` line appears, decodes via
+        the real `GameEventFrame.TryParse`, and asserts `GameVersion != "0.0"`. Passing.
+      - **The PARTY frame is not independently reproducible live on this dev machine** (no live FFXIV game
+        process to trigger the SDK's `PartyListChanged`; the same catalog-boot run above produced zero
+        `PARTY`/`PID`/`REPO`/`RSRC` frames in its ~6s window before the STATE frame satisfied the wait) —
+        this mirrors P1.6's own methodology (that gate also drives `PartyChanged`/`PartySize` via direct
+        construction, not a live replay, for the identical reason). The `PartySize` forward is instead
+        proven through `PartyListChanged_event_forwards_the_real_partySize` above: the exact production
+        `BridgeForwarder.OnPartyListChanged` handler, the real `IDataSubscription`/`IDataRepository`
+        interface shapes, and the real wire codec (`GameEventFrame.ToWire`→`TryParse`) — only the SDK event
+        source (`FakeDataSubscription.RaisePartyListChanged` vs. a live plugin callback) is substituted,
+        per the task's own "plugin-gated/skippable is fine" allowance.
+      - **Build/regression check:** `dotnet build src\Fct.App\Fct.App.csproj` (stages the net48 satellite)
+        and `dotnet build ffxiv-combat-tracker.slnx` both clean, 0 warnings/errors.
+        `Fct.Compat.Act.Tests` 67/67, `Fct.Compat.Shim.Tests` 56/56 fully green. `Fct.Integration.Tests`
+        full run: 46 tests (was 45; +1 new `SessionStateReplayTests`), 39 passed, 3 skipped (env-gated
+        `DistTreeGateTests`/`FrameFixtureGenerator` + the plugin-gated `LineStreamDiffTests` clean skip), 4
+        failed — the exact same pre-existing intentional reds, byte-identical messages/values:
+        `RepositorySurfaceLiveTests`/`LateJoinPrimingTests`'s two `"0.0"`-vs-`""` `GameVersion` assertions
+        (P1.5), `LateJoinPrimingTests`'s empty-vs-7-line rawlog priming assertion (P1.4), and
+        `OverlaySatelliteTests`'s 12-key `PendingP5Keys` message (P1.2). `Fct.FlowTests` 21/22 (unchanged
+        `EventMappingFlowTests` 8-vs-24 P1.6 red); `Fct.App.Tests` 179/180 (unchanged
+        `GameSnapshotAggregatorTests` 8-vs-0 P1.6 red); `Fct.Engine.Tests` 9/10 (unchanged 12-key P1.2 red).
+        No gate flipped, no new regression — P3.4/P3.5 are what flip P1.4/P1.5/P1.6 green.
+      - **Handoff for P3.4/P3.5:** the region-byte-0-unconfigured-vs-Global question above is the one open
+        item; `MapRegion`'s existing `Unknown` default already covers it safely, so no code changes are
+        required, only awareness when P3.5 wires the consumer-side mirror. `BuildSessionState()`'s
+        enum maps (`MapLanguage`/`MapRegion`) are the ones P3.4/P3.5 should reuse rather than re-deriving
+        (P3.4 folds the already-mapped `SessionStateChanged.Language`/`.Region` onto `IGameSnapshot.Client`
+        — no further SDK-type mapping needed on that side).
 - [ ] **P3.4 — Host fold + routing.** `src/Fct.Host/StreamCatalog.cs`: route `SessionStateChanged`
       on the existing `repository` stream (`StreamCatalog.cs:48-52`).
       `src/Fct.Host/Hosting/GameSnapshotAggregator.cs`: fold `SessionStateChanged` into

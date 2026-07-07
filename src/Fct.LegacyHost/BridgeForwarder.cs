@@ -146,10 +146,16 @@ namespace Fct.LegacyHost
 
         // The game process id — forwarded so a consumer satellite materializes GetCurrentFFXIVProcess()
         // locally (Process.GetProcessById). A null process (game closed) forwards pid 0.
-        private void OnProcessChanged(System.Diagnostics.Process process) =>
+        // Version/region can also change on relog/patch (PIPELINE-COMPLETENESS-PLAN P3.3), so the
+        // one-shot env state is re-emitted alongside the pid.
+        private void OnProcessChanged(System.Diagnostics.Process process)
+        {
             Enqueue(new GameProcessChanged(0, DateTimeOffset.Now, process?.Id ?? 0));
+            Enqueue(BuildSessionState());
+        }
 
-        // One-shot on bind: the current PID + the id→name tables consumers read via GetResourceDictionary.
+        // One-shot on bind: the current PID + the id→name tables consumers read via GetResourceDictionary,
+        // plus the one-shot environment state (version/language/region/server-clock/chat-log, G5/P3.3).
         private void EmitInitialRepositoryState()
         {
             try
@@ -159,6 +165,8 @@ namespace Fct.LegacyHost
             }
             catch { /* best-effort PID */ }
 
+            Enqueue(BuildSessionState());
+
             // The combat-relevant tables (EN; the host catalog is locale-neutral). ItemList is omitted —
             // the target consumers don't read it and it is large enough to bloat a single wire line.
             ForwardResource(ResourceType.SkillList_EN, ResourceKind.Action);
@@ -166,6 +174,68 @@ namespace Fct.LegacyHost
             ForwardResource(ResourceType.ZoneList_EN, ResourceKind.Zone);
             ForwardResource(ResourceType.WorldList_EN, ResourceKind.World);
         }
+
+        // The one-shot environment state (G5/P3.3): version/language/region/server-clock-offset/chat-log
+        // availability, built from the SDK repository so a consumer satellite mirrors the parser's
+        // environment without a live game process. Never throws — a missing/faulted repository member
+        // yields that field's safe default, never a stub placeholder.
+        private SessionStateChanged BuildSessionState()
+        {
+            var repo = _repo;
+            string version = "";
+            var language = GameLanguage.Unknown;
+            var region = GameRegion.Unknown;
+            var clockOffset = TimeSpan.Zero;
+            bool chatAvailable = false;
+            if (repo != null)
+            {
+                // GetGameVersion() is "" headless / when unknown (P0.3 verdict) — never a "0.0"
+                // placeholder (§3). A null return is normalized the same way.
+                try { version = repo.GetGameVersion() ?? ""; } catch { }
+                try { language = MapLanguage(repo.GetSelectedLanguageID()); } catch { }
+                try { region = MapRegion(repo.GetGameRegion()); } catch { }
+                try
+                {
+                    // GetServerTimestamp() is DateTime.MinValue with no live memory scan (P0.3 verdict);
+                    // guard against the ~2000-year garbage offset that a default/pre-2000 value would
+                    // produce against DateTime.UtcNow.
+                    var serverTime = repo.GetServerTimestamp();
+                    if (serverTime.Year >= 2000)
+                        clockOffset = serverTime - DateTime.UtcNow;
+                }
+                catch { }
+                try { chatAvailable = repo.IsChatLogAvailable(); } catch { }
+            }
+            return new SessionStateChanged(0, DateTimeOffset.Now, version, language, region, clockOffset, chatAvailable);
+        }
+
+        // SDK Language -> the modern GameLanguage enum. Mapped explicitly by name (both enums share the
+        // same numeric values today, English=1..TraditionalChinese=7, but an explicit map survives either
+        // side renumbering and gives an unrecognized/default(0) SDK value a defined Unknown result).
+        private static GameLanguage MapLanguage(Language l) => l switch
+        {
+            Language.English => GameLanguage.English,
+            Language.French => GameLanguage.French,
+            Language.German => GameLanguage.German,
+            Language.Japanese => GameLanguage.Japanese,
+            Language.Chinese => GameLanguage.Chinese,
+            Language.Korean => GameLanguage.Korean,
+            Language.TraditionalChinese => GameLanguage.TraditionalChinese,
+            _ => GameLanguage.Unknown,
+        };
+
+        // SDK GetGameRegion() byte -> the modern GameRegion enum. Confirmed against the FFXIV_ACT_Plugin
+        // decompile's Region enum (ffxiv_act_plugin.config/Region.cs): Global=1, Chinese=2, Korean=3,
+        // TraditionalChinese=4 — identical numbering to GameRegion, byte 0 is unconfigured (no named SDK
+        // member) and maps to GameRegion.Unknown.
+        private static GameRegion MapRegion(byte region) => region switch
+        {
+            1 => GameRegion.Global,
+            2 => GameRegion.Chinese,
+            3 => GameRegion.Korean,
+            4 => GameRegion.TraditionalChinese,
+            _ => GameRegion.Unknown,
+        };
 
         private void ForwardResource(ResourceType type, ResourceKind kind)
         {
@@ -246,7 +316,7 @@ namespace Fct.LegacyHost
             Enqueue(new ZoneChanged(0, DateTimeOffset.Now, zoneId, zoneName ?? ""));
 
         private void OnPartyListChanged(ReadOnlyCollection<uint> partyList, int partySize) =>
-            Enqueue(new PartyChanged(0, DateTimeOffset.Now, partyList != null ? partyList.ToArray() : Array.Empty<uint>()));
+            Enqueue(new PartyChanged(0, DateTimeOffset.Now, partyList != null ? partyList.ToArray() : Array.Empty<uint>(), partySize));
 
         private void OnPrimaryPlayerChanged()
         {

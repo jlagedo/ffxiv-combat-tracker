@@ -21,14 +21,24 @@ namespace Fct.Parser.Legacy.Tests
         public IDictionary<uint, string> GetResourceDictionary(ResourceType resourceType) =>
             Resources.TryGetValue(resourceType, out var d) ? d : new Dictionary<uint, string>();
 
-        public Language GetSelectedLanguageID() => Language.English;
+        // Settable so tests can exercise BridgeForwarder's SessionStateChanged projection (P3.3) —
+        // defaults mirror the values the real headless plugin returns per the P0.3 verdict, except
+        // GetGameVersion (defaulted here to a non-empty sentinel so tests can tell "forwarded" from
+        // "never touched" apart from the real "" unknown-version case, which is exercised explicitly).
+        public Language Language { get; set; } = Language.English;
+        public byte Region { get; set; } = 0;
+        public DateTime ServerTimestamp { get; set; } = DateTime.MinValue;
+        public string GameVersion { get; set; } = "1.2.3";
+        public bool ChatLogAvailable { get; set; } = true;
+
+        public Language GetSelectedLanguageID() => Language;
         public uint GetCurrentTerritoryID() => 0;
         public uint GetCurrentPlayerID() => 0;
         public SdkModels.Player GetPlayer() => new SdkModels.Player();
-        public DateTime GetServerTimestamp() => DateTime.UtcNow;
-        public string GetGameVersion() => "0.0";
-        public bool IsChatLogAvailable() => true;
+        public DateTime GetServerTimestamp() => ServerTimestamp;
+        public string GetGameVersion() => GameVersion;
+        public bool IsChatLogAvailable() => ChatLogAvailable;
         public string[] GetAntiVirusNames() => Array.Empty<string>();
-        public byte GetGameRegion() => 0;
+        public byte GetGameRegion() => Region;
     }
 }
