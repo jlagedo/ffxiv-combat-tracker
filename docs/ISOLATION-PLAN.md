@@ -10,6 +10,14 @@ Companion docs: [`ARCHITECTURE.md`](ARCHITECTURE.md) (the design and rationale),
 [`PLUGIN-API.md`](PLUGIN-API.md) (the host pipes), [`TESTING.md`](TESTING.md) (the parity/oracle
 harnesses the gates build on).
 
+**The satellite topology is transitional, not terminal.** net48 + the satellites are a
+compatibility shim that runs today's plugins unmodified from day 1; the destination is every plugin
+— the parser included — native on .NET 10, with the net48 leg, the bridge, and the satellites
+**deleted** ([`ARCHITECTURE.md`](ARCHITECTURE.md) §10). This plan builds and hardens that shim so
+plugin owners have a stable, well-routed base to migrate *off* — the isolation invariants below hold
+for as long as any net48 plugin remains, then the whole tier retires. The host is the enabler of
+that migration, not a permanent net48 host.
+
 ---
 
 ## 1. The invariants (the doctrine every decision defers to)
@@ -55,6 +63,12 @@ harnesses the gates build on).
   Tests that need the real FFXIV_ACT_Plugin binary skip cleanly when it is not installed.
 
 ## 3. Target topology
+
+*This is the **interim** topology — the compat tier that hosts plugins that have not yet migrated. It
+is scaffolding with a demolition date ([`ARCHITECTURE.md`](ARCHITECTURE.md) §10): as each plugin's
+owner ships a net10 build the plugin moves in-process on the typed API and its satellite is deleted;
+when the last net48 plugin is gone, the satellite runtime, the bridge, and the net48 projects are
+removed. The permanent topology is the net10 host box alone, every plugin in-process.*
 
 ```
                     ┌────────────────────────────────────────────┐

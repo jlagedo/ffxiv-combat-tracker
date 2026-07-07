@@ -38,23 +38,34 @@ to run — but a great plugin story delivered through a bad UI is not success.
 
 ## The future state
 
-Every plugin ported to modern .NET with its UI migrated to Avalonia, running natively in the host.
-That is the destination. We do not get there with a flag day; we get there by giving every plugin a
-place to run **today** and a road to walk **incrementally**.
+Every plugin — **including the parser** — ported to modern .NET with its UI migrated to Avalonia,
+running natively in the host. That is the destination. At that point the entire .NET Framework 4.8
+leg (the satellites, the IPC bridge, the net48 ACT facade) has served its purpose and is **removed**:
+it is transitional scaffolding, not permanent architecture.
+
+We do not get there with a flag day. We get there by giving every plugin a place to run **today** and
+a road to walk **incrementally**. The sunset is a **goal, not a schedule we impose**: net48 support
+stays as long as any plugin still needs it, and the scaffolding is removed only once the last plugin
+has migrated — never by a unilateral drop that would break directive-1 plugins. The end-state is
+fully native; the path there is owned by each plugin's author, not forced by us.
 
 ## The three plugin patterns
 
 The migration road is three stops. A plugin can sit at any stop and move forward when its author
-chooses — the host supports all three at once.
+chooses — the host supports all three at once, for as long as any plugin still needs them.
 
 1. **Legacy** — runs unmodified in an isolated .NET Framework 4.8 satellite process, talking to the
-   host over IPC. This is the drop-in on-ramp: the plugin author does nothing.
+   host over IPC. This is the drop-in on-ramp: the plugin author does nothing. It is also the
+   **transitional** stop — the one whose scaffolding is removed once no plugin is left on it.
 2. **.NET 10 legacy** — recompiled onto modern .NET, still using its WinForms UI, but running as a
    native in-process plugin. The programming model is preserved; the runtime is modern.
 3. **Fully ported** — modern .NET with the UI migrated to Avalonia. The destination.
 
 The direction of travel is always 1 → 2 → 3, and it is always **opt-in and incremental**. The host
-never forces a plugin off the stop it's on.
+never forces a plugin off the stop it's on. Stop 1 is meant to **empty over time** — that is the
+terminal goal — but it empties because authors migrate, never because we drop it out from under a
+plugin still relying on it. The parser is a plugin like any other: it moves 1 → 3 on its owner's
+schedule and stays *the* sole parser without a satellite once it does.
 
 ## Major rules — what we do and do not build
 
@@ -81,5 +92,7 @@ Before adding scope, ask:
   in scope. Polishing the host UI so users prefer it over legacy ACT is a goal, not drift.
 - Does it serve **plugin developers** migrating onto the platform, **or** make the host itself a
   better product for **users**? Either is legitimate. Serving neither is drift.
-- Does it keep the **1 → 2 → 3 path opt-in and incremental**? Anything that forces a plugin to move,
-  or that closes a stop on the road, violates the North Star.
+- Does it keep the **1 → 2 → 3 path opt-in and incremental**? Anything that forces a plugin to move
+  violates the North Star. Removing the net48 scaffolding is the *terminal goal*, not drift — but
+  only once no plugin still sits on stop 1; dropping it while a plugin depends on it breaks
+  directive 1.

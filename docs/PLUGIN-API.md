@@ -37,10 +37,12 @@ decision:
    assembly (see [Isolation](#isolation--assembly-loading)).
 3. **The host provides every pipe the tested plugins need — on both sides of the satellite.** A pipe is
    not "done" until every face a real tested plugin will use exists.
-4. **The only host intelligence is ACT-mirror aggregation.** Its one game-touching behavior is
-   reproducing the two things old ACT maintains — the combatant/zone/party **repository snapshot**
-   (`IGameSnapshot`) and the **encounter/DPS rollup** (`IEncounterService` + `ExportVariables`) — as a
-   simplification consumers already expect. Everything else is pure transport.
+4. **The only host intelligence is the ACT-mirror aggregation engine** — the **encounter/DPS rollup**
+   (`IEncounterService` + `ExportVariables`), the one ACT behavior we reproduce, as a simplification
+   consumers already expect. The combatant/zone/party **repository snapshot** (`IGameSnapshot`) is
+   *not* a second reproduced behavior: those tables live on the parser (`DataRepository`), not on ACT,
+   so the host merely folds the forwarded, already-parsed stream into a queryable snapshot — pure host
+   routing. Everything else is pure transport.
 
 Three non-negotiables gate every entry in this document:
 
@@ -442,13 +444,23 @@ incremental migration (swap one call at a time, then drop the shim).
   carries status/enmity/in-combat and the snapshot carries focus/hover. Its poll-and-diff
   (`XIVPluginHelper.cs:904-912`) maps onto `IGameSnapshot`, or it adopts typed events and stops
   diffing. TTSYukkuri is both an audio producer and a sink provider ([G3](#contract-gaps-tracked)/[G8](#contract-gaps-tracked), shipped).
-- **OverlayPlugin — stays in its own satellite.** Its `IDataSubscription`/`ExportVariables` use
+- **OverlayPlugin — the last to leave its satellite.** Its `IDataSubscription`/`ExportVariables` use
   recompiles fine, but **CefSharp is net48-only** (pinned `95.7.141`, `HtmlRenderer.csproj:45-52`), so
-  OP's CEF/Fleck rendering stays in a net48 satellite — **its own**, fully isolated from the parser,
-  fed by the host-routed streams through the facade's synthetic parser stand-in
+  OP's CEF/Fleck rendering stays in a net48 satellite **until CefSharp ships a modern-.NET build it
+  can adopt** — the pin is the blocker, not the design. It is **its own** satellite, fully isolated
+  from the parser, fed by the host-routed streams through the facade's synthetic parser stand-in
   ([`ISOLATION-PLAN.md`](ISOLATION-PLAN.md) P8, shipped — the `overlay` consumer satellite). It is also itself a mini plugin-host
   (`IOverlayAddonV2.Init`, `PluginMain.cs:493-504`). The recompile path serves managed consumers; OP
-  is why a satellite persists longest — consistent with overlays = unmodified OP, hosted. The managed-consumer surface for cactbot fidelity ([G1](#contract-gaps-tracked)/[G2](#contract-gaps-tracked)/[G4](#contract-gaps-tracked)) is shipped.
+  is why a satellite persists **longest**, not forever — when the CefSharp pin lifts it migrates in
+  and the net48 tier can retire. The managed-consumer surface for cactbot fidelity ([G1](#contract-gaps-tracked)/[G2](#contract-gaps-tracked)/[G4](#contract-gaps-tracked)) is shipped.
+- **FFXIV_ACT_Plugin (the parser) — owner-driven, not ours to do.** The parser is on the same ladder
+  as every other plugin: its *owner* migrates its source to net10 (Machina + memory scan + opcode
+  decode recompiled), at which point it loads in-process as the producer and the parser satellite
+  retires. What stays fixed is **we never reimplement or port its parsing** — that is the owner's
+  code, on whatever runtime the owner targets. Until a net10 build exists it runs unmodified in the
+  net48 parser satellite; the "sole parser" role and the zero-opcode-maintenance guarantee are
+  unaffected by which runtime hosts it. This is the one migration we cannot drive ourselves, so it
+  gates the final deletion of the net48 tier.
 
 ## Contract gaps (tracked)
 

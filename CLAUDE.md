@@ -10,6 +10,16 @@ carries the community's existing plugins forward by reproducing ACT's plugin-hos
 from-scratch, FFXIV-only compatibility facade that hosts the real plugins unmodified. Target
 plugins: FFXIV_ACT_Plugin, OverlayPlugin/cactbot, Triggernometry, ACT-Discord-Triggers, ACT.Hojoring.
 
+**.NET 4.x is a transitional compatibility shim, not the destination.** The net48 satellite leg
+exists only to run today's plugins unmodified on day 1. The terminal goal is the whole ecosystem —
+**including the parser** — running natively on .NET 10, with .NET 4.x, the satellites, and the
+bridge deleted. From day 1 the host ships a forward path so each plugin's *owner* can migrate their
+own source onto net10 and the typed modern API, at their own pace; **the host is an enabler of that
+migration, not a permanent home for net48.** "We never reimplement a plugin's logic" (the parser's
+opcode/packet/memory decode stays its owner's job) constrains *us* — it does **not** pin the plugin
+to net48: its owner recompiles it to net10 like any other, and it stays *the* sole parser without a
+satellite.
+
 Design docs — **read before proposing changes:**
 
 - [`docs/NORTH-STAR.md`](docs/NORTH-STAR.md) — the fixed goals and scope boundary. Every other
@@ -28,7 +38,9 @@ Design docs — **read before proposing changes:**
 
 1. The first version must run the five legacy plugins above by **drop-in, unmodified**.
 2. Built for the future with a **clear legacy → native migration path**, opt-in and
-   incremental — never a flag day.
+   incremental — never a flag day. Shipping is gated on this path existing from day 1 so plugin
+   owners can port their source to net10; the terminal goal is the whole ecosystem native and
+   .NET 4.x removed. The host **enables** that migration — it is not a permanent net48 host.
 3. **The host owns all calculations and all routing.** Every ACT calculation (encounters, DPS,
    `ExportVariables`) lives in the net10 host's engine; every inter-plugin data path crosses
    through the host. Each legacy plugin package runs in its **own** satellite process, so no two
@@ -51,7 +63,11 @@ Design docs — **read before proposing changes:**
   subscriptions, and forwards its `LOADPLUGIN`; parser, OverlayPlugin (+ cactbot, with its whole
   CEF/Fleck stack in-satellite), Triggernometry, and Discord-Triggers are isolated today — Hojoring
   isolation is deferred to P10 ([`docs/ISOLATION-PLAN.md`](docs/ISOLATION-PLAN.md)). `AssemblyLoadContext` isolates net10 plugins
-  from each other — it is **not** cross-runtime.
+  from each other — it is **not** cross-runtime. The entire net48 leg — `Fct.LegacyHost`, the
+  bridge, `Fct.Compat.Act` — is **transitional scaffolding**: each satellite exists only until its
+  plugin's owner ships a net10 build, and the satellite runtime is deleted once the last plugin has
+  migrated (the two-runtime split is a property of *unmodified* legacy binaries, not a permanent
+  architecture).
 - **Aggregation truth lives in the host (`Fct.Engine`).** `ModernEncounterEngine` folds the
   bridged full-fidelity `CombatSwing` + encounter-lifecycle stream through the shared
   `Fct.Aggregation` graph and backs `IEncounterService`. Any engine instance in a satellite or the

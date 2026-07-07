@@ -7,6 +7,13 @@ carry the community's existing plugins forward. To do that it reproduces ACT's p
 surface as a from-scratch compatibility facade (**FFXIV-only**), with the network/opcode parser
 living as a swappable, independently-released component.
 
+**.NET 4.x is a transitional compatibility layer, not the destination.** The net48 satellite leg
+exists only to run today's plugins unmodified on day 1; the terminal goal is the whole ecosystem —
+the parser included — native on .NET 10, with .NET 4.x, the satellites, and the bridge **deleted**.
+The host is an **enabler** of that migration: from day 1 it ships the forward path (§7, §10) so each
+plugin's *owner* can port their own source onto the typed modern API at their own pace. Every net48
+component below is scaffolding with a demolition date, not permanent architecture.
+
 ---
 
 ## 1. Why this exists
@@ -41,7 +48,9 @@ The reference decompiles for all of this live under `E:\dev` (see §13).
    - **ACT.Hojoring** (SpecialSpellTimer / TTSYukkuri / UltraScouter / XIVLog)
 2. **Built for the future, with a clear legacy → native migration path** that unlocks
    capabilities the legacy log-line format cannot express. Migration is opt-in and
-   incremental — never a flag day.
+   incremental — never a flag day. **Shipping is gated on this path existing from day 1**: the end
+   state is every plugin — the parser included — native on net10 and the net48 runtime removed. The
+   migration is the point, not a bonus; the host exists to enable it.
 3. **The host owns the calculations and the routing; processes enforce it.** All ACT
    calculations (encounter aggregation, DPS, `ExportVariables`) live in the .NET 10 host's
    engine — the single source of truth. Each legacy plugin package runs in its **own**
@@ -76,6 +85,11 @@ Therefore: **legacy plugins run in real .NET Framework 4.8 processes; only data
 crosses to the .NET 10 host, over IPC.** `AssemblyLoadContext` isolates net10
 plugins from each other but is **not** cross-runtime — don't conflate the two.
 
+This split is a property of *unmodified* legacy binaries, not a permanent architecture: it lasts
+exactly as long as a plugin has no net10 build. As owners migrate their source (§10), each plugin
+moves in-process and the net48 leg shrinks toward deletion — the CefSharp/etc. blockers gate *when*
+a given plugin can cross, not *whether* the destination is native.
+
 ### 3c. One satellite process per plugin package — the boundary that enforces routing
 Under real ACT the plugins share one managed heap and reach each other through
 `ActGlobals.oFormActMain` — the parser is read by reflection, the DPS rollup is read
@@ -101,8 +115,11 @@ Directive 1 requires honoring **three** legacy contracts, but we only *build* on
 
 Hosting the real FFXIV_ACT_Plugin means we **inherit Ravahn's per-patch cadence for
 free** — we sign up for **zero opcode maintenance, permanently**. Reimplementing the FFXIV
-parser natively is an explicit **non-goal**: the real plugin is the parser for good. We build
-only the consume/aggregate side (the ACT engine).
+parser natively is an explicit **non-goal**: FFXIV_ACT_Plugin stays *the* parser and we never
+rewrite, mirror, or port its logic. That non-goal constrains *us*, not the *runtime* — its owner
+is free to migrate the plugin's own source to net10 (§10), at which point it stops needing a
+satellite but is still the same sole parser (still owner-maintained, still zero opcode work for us).
+We build only the consume/aggregate side (the ACT engine).
 
 ---
 
@@ -130,6 +147,11 @@ only the consume/aggregate side (the ACT engine).
      the OS process boundary IS both the runtime boundary and the isolation boundary;
      only DATA crosses, and every inter-plugin path crosses THROUGH the host
 ```
+
+This is the **interim** target — the compat tier that carries plugins that have **not yet
+migrated**. The satellite row is scaffolding: each satellite is deleted as its plugin goes native
+(§10), and when the last one is empty the whole net48 runtime + bridge is removed. The **permanent**
+target is the net10 host with every plugin — the parser included — in-process on the typed API.
 
 `Fct.Abstractions` **multi-targets `net48;net10`** — records + interfaces compile for
 both runtimes, so the *same* event/contract types exist on each side of the bridge.
@@ -193,7 +215,9 @@ Fct.LegacyHost     net48        the satellite: ACT facade host + IActPluginV1 lo
                                 synthetic parser stand-in for consumer packages).
 
 Fct.Parser.Legacy  net48        wraps the real FFXIV_ACT_Plugin (DataRepository +
-                                RingBufferDataSubscription / IRawPacketSource). The parser, permanently.
+                                RingBufferDataSubscription / IRawPacketSource). The sole parser
+                                (never reimplemented by us); this net48 wrapper is retired once the
+                                owner ships a net10 build.
                                 Its WrappedFfxivPlugin implements the facade's IActPluginV1 /
                                 IActPluginAlias, so it references Fct.Compat.Act (see note below).
 
@@ -350,17 +374,21 @@ contract is specified in [`PLUGIN-API.md`](PLUGIN-API.md).
 
 ## 8. The parser is the sole, hosted parser
 
-The **real FFXIV_ACT_Plugin is the only parser**, hosted unmodified in the net48 parser satellite.
-`Fct.Parser.Legacy` wraps it: `WrappedFfxivPlugin` forwards `DataRepository`/`_iocContainer`/
-lifecycle to the real instance, and `RingBufferDataSubscription` funnels its events through one
-bounded ring + single dispatch thread and exposes the `IRawPacketSource` hatch. A game patch ships
-a new `FFXIV_ACT_Plugin.dll` and nothing else changes — we inherit Ravahn's cadence for free. Its
-post-parse data reaches the net10 bus as typed `GameEvent`s over the bridge forwarder.
+The **real FFXIV_ACT_Plugin is the only parser** — today hosted unmodified in the net48 parser
+satellite. `Fct.Parser.Legacy` wraps it: `WrappedFfxivPlugin` forwards `DataRepository`/
+`_iocContainer`/lifecycle to the real instance, and `RingBufferDataSubscription` funnels its events
+through one bounded ring + single dispatch thread and exposes the `IRawPacketSource` hatch. A game
+patch ships a new `FFXIV_ACT_Plugin.dll` and nothing else changes — we inherit Ravahn's cadence for
+free. Its post-parse data reaches the net10 bus as typed `GameEvent`s over the bridge forwarder.
 
 **Reimplementing the FFXIV parser natively is an explicit non-goal.** Opcode/packet/memory decode
-stays the plugin's job, permanently; we never read, mirror, or port its logic. We build only the
-**consume/aggregate** side — the ACT aggregation engine (`Fct.Aggregation`, fed through the
-`Fct.Compat.Act` facade) — held to the real ACT binary corpus-wide (see `docs/TESTING.md`).
+stays *the plugin's* job — we never read, mirror, or port its logic. But "the plugin's job" is a
+statement about ownership, not runtime: the parser is a first-class citizen of the migration ladder
+(§10) like any other plugin. When its owner recompiles it to net10 it moves in-process, retires the
+parser satellite, and remains the sole, owner-maintained parser — we still write zero parsing code.
+We build only the **consume/aggregate** side — the ACT aggregation engine (`Fct.Aggregation`, fed
+through the `Fct.Compat.Act` facade) — held to the real ACT binary corpus-wide (see
+`docs/TESTING.md`).
 
 ---
 
@@ -405,6 +433,13 @@ around unmodified plugins. The build order (fabric → fan-out → projection �
 cutover, each e2e-gated) is [`ISOLATION-PLAN.md`](ISOLATION-PLAN.md). As a plugin goes
 native its satellite disappears; when the last one is empty, the satellite runtime is
 deleted.
+
+This ladder applies to **every** plugin, the parser included: FFXIV_ACT_Plugin migrates onto net10
+the same way — still the sole, owner-maintained parser, still zero parsing code from us — retiring
+the parser satellite. **Killing .NET 4.x entirely is the terminal milestone**: once the last net48
+plugin has crossed, `Fct.LegacyHost`, the bridge, the per-satellite engine replicas, and
+`Fct.Compat.Act` are removed, and every plugin runs in-process on the typed API. The satellite tier
+is a means to that end, never the end.
 
 **Feature unlocks that pull authors forward** (impossible via the pipe-delimited line):
 - Full position/heading/velocity at packet rate (log lines round/drop these).
