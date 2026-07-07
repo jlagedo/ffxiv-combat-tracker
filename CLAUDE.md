@@ -12,6 +12,8 @@ plugins: FFXIV_ACT_Plugin, OverlayPlugin/cactbot, Triggernometry, ACT-Discord-Tr
 
 Design docs — **read before proposing changes:**
 
+- [`docs/NORTH-STAR.md`](docs/NORTH-STAR.md) — the fixed goals and scope boundary. Every other
+  doc and decision serves this; conflicts resolve in its favor.
 - [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md) — the full design.
 - [`docs/DATA-FLOW.md`](docs/DATA-FLOW.md) — how data flows through the real upstream stack
   (FFXIV_ACT_Plugin → ACT → OverlayPlugin) and the compat seams we reproduce.
