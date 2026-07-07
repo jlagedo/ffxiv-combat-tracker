@@ -15,25 +15,29 @@ namespace Fct.Integration.Tests
     // a forwarded GameVersion from priming alone (state folded onto the bus BEFORE the consumer
     // subscribes). This gate is the companion for a NORMALLY-BOOTED, non-late-joining consumer: the
     // stand-in satellite starts and subscribes to `repository` with NO bus pre-staging at all — there is
-    // no producer env tap yet (G5 — P3 not built), so there is nothing an env-forwarding event could fold
-    // even live; that absence is exactly the point being gated. Every one of IDataRepository's five
-    // env-scalar members (GetGameVersion/GetSelectedLanguageID/GetGameRegion/GetServerTimestamp/
-    // IsChatLogAvailable) is read through the real cross-process ConsumerDataRepository (reusing the
-    // `--consume --stand-in --verify-standin` harness LateJoinPrimingTests/ConsumerStandInTests already
-    // established) and checked against P0.3's recorded headless verdict, never the hardcoded stub
-    // (ConsumerDataSurface.cs ~156-160, G4).
+    // this test's own boot — no producer satellite runs alongside it — so there is nothing an
+    // env-forwarding event could fold even live; that absence is exactly the point being gated. Every one
+    // of IDataRepository's five env-scalar members (GetGameVersion/GetSelectedLanguageID/GetGameRegion/
+    // GetServerTimestamp/IsChatLogAvailable) is read through the real cross-process ConsumerDataRepository
+    // (reusing the `--consume --stand-in --verify-standin` harness LateJoinPrimingTests/ConsumerStandInTests
+    // already established) and checked against the forwarded-mirror design, never the hardcoded stub
+    // (ConsumerDataSurface.cs deleted the five G4 stubs at P3.5).
     //
-    // Per P0.3, three of the five have a pinned, machine-independent headless value — GameVersion=="",
-    // ServerTimestamp==DateTime.MinValue, IsChatLogAvailable==true — asserted here directly.
+    // GameVersion=="" and IsChatLogAvailable==true are P0.3's pinned, machine-independent headless
+    // values AND the mirror's own before-any-Apply() defaults (ConsumerDataSurface.cs), so they read the
+    // same whether or not a producer ever forwards state — asserted here directly.
+    // GetServerTimestamp() is ⚠️ RECONCILED at P3.5 (see the inline comment below): the consumer serves
+    // an offset-corrected approximation (UtcNow + ServerClockOffset), not P0.3's raw real-plugin verdict
+    // (DateTime.MinValue) — asserted here as "close to now", per docs/PIPELINE-COMPLETENESS-PLAN.md §3/§7.
     // GetSelectedLanguageID()/GetGameRegion() are explicitly NOT pinned by P0.3 (host-config-driven: they
     // depend on whatever ParseSettings.LanguageID/DataCollectionSettings.RegionID the installed
     // FFXIV_ACT_Plugin has saved on THIS machine), so asserting an exact value here would be a
     // machine-dependent flake rather than a real gate. They are recorded on the artifact and logged for
-    // observability only; the deterministic, always-on RED assertion for that half of G4 lives in
+    // observability only; the deterministic, always-on assertion for that half of G4 lives in
     // Fct.Parser.Legacy.Tests
     // (ConsumerDataRepositoryStubTests.ConsumerDataRepository_has_no_forwarded_backing_field_for_language_or_region_yet),
-    // which proves structurally — with no real plugin/satellite involved — that neither member has any
-    // Apply()-fed backing field yet.
+    // which proves structurally — with no real plugin/satellite involved — that both members now have an
+    // Apply()-fed backing field (P3.5).
     public sealed class RepositorySurfaceLiveTests
     {
         private readonly ITestOutputHelper _out;
@@ -90,19 +94,37 @@ namespace Fct.Integration.Tests
                                 "(host-config-driven per P0.3 — exact value left unpinned here; see " +
                                 "Fct.Parser.Legacy.Tests for the deterministic structural gate on this half)");
 
-                // THE GATE (deliberately red): P0.3's hard headless verdicts. GetGameVersion() stubs "0.0"
-                // unconditionally (ConsumerDataSurface.cs ~158) instead of "" (only a live game path
-                // reading ffxivgame.ver ever populates a real version).
+                // GameVersion: forwarded mirror, GREEN as of P3.5. GetGameVersion() now serves the
+                // ConsumerDataRepository env mirror (ConsumerDataSurface.cs), which defaults "" until an
+                // Apply()'d SessionStateChanged says otherwise — no producer runs in this test (a
+                // stand-in-only boot, deliberately no bus pre-staging), so the mirror never leaves its
+                // default. Either way, "" is exactly P0.3's hard headless verdict for a live producer too.
                 Assert.Equal("", gameVersion);
 
-                // GetServerTimestamp() stubs `DateTime.UtcNow` (~159); the real plugin's ServerTimeProcessor
-                // is only ever assigned by a live memory scan, so headless it is DateTime.MinValue.
-                Assert.Equal(DateTime.MinValue.Ticks.ToString(CultureInfo.InvariantCulture), serverTimestampTicks);
+                // ⚠️ RECONCILED (PIPELINE-COMPLETENESS-PLAN P3.5, per §3/§7's offset-corrected server-clock
+                // decision): this assertion originally pinned P0.3's RAW headless verdict for the real
+                // plugin's own GetServerTimestamp() — DateTime.MinValue (no live memory scan). But the
+                // plan's SHIPPED CONSUMER DESIGN is not a passthrough of that raw value: P3.5's
+                // ConsumerDataRepository.GetServerTimestamp() deliberately serves an offset-corrected
+                // server-clock APPROXIMATION for custom-line timestamps — UtcNow + the forwarded
+                // ServerClockOffset (Zero when no producer has forwarded a live server time, exactly the
+                // case here: this test's stand-in boots with no producer/bus pre-staging at all). Serving
+                // MinValue would defeat the whole point of the projection (§7: "acceptable for
+                // custom-line timestamps"), so the gate is reconciled to assert the DESIGN — the served
+                // timestamp is within a generous tolerance of "now" — rather than the old raw-passthrough
+                // expectation. See docs/PIPELINE-COMPLETENESS-PLAN.md P3.5 verdict for the full citation.
+                var servedTicks = long.Parse(serverTimestampTicks, CultureInfo.InvariantCulture);
+                var served = new DateTime(servedTicks, DateTimeKind.Utc);
+                Assert.True((DateTime.UtcNow - served) < TimeSpan.FromMinutes(1),
+                    $"GetServerTimestamp() should be ~UtcNow (offset-corrected design, ServerClockOffset=Zero " +
+                    $"here — no producer ran), not the real plugin's raw headless DateTime.MinValue. Got {served:o}");
 
-                // Passes today — NOT because it is forwarded, but because the stub's unconditional `true`
-                // (~160) happens to coincide with P0.3's hard headless verdict. Kept as an explicit
-                // assertion (per the plan's own framing) rather than dropped, so a future accidental stub
-                // flip to `false` is still caught.
+                // Forwarded mirror default, GREEN as of P3.5 for the RIGHT reason now: IsChatLogAvailable()
+                // reads the env mirror, which defaults true (the real plugin's own headless value, P0.3)
+                // until an Apply()'d SessionStateChanged overrides it — no producer runs in this test, so
+                // it stays at that default. No longer the coincidental G4 stub (`=> true;` unconditionally,
+                // deleted), but the same value for a principled reason: kept as an explicit assertion so a
+                // future accidental default flip to `false` is still caught.
                 Assert.Equal("1", isChatLogAvailable);
             }
             finally

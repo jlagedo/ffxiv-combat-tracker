@@ -41,10 +41,15 @@ public sealed class DataRepository : IDataRepository
 
     public string GetGameVersion() => Snapshot().Client.Version;
 
-    public DateTime GetServerTimestamp() => _host.Clock.ServerNow.UtcDateTime;
+    // Offset-corrected server-clock approximation (PIPELINE-COMPLETENESS-PLAN §3/§7): the real
+    // plugin's GetServerTimestamp() is only ever populated by a live memory scan (DateTime.MinValue
+    // headless, P0.3), so the consumer instead serves a usable clock for custom-line timestamps — the
+    // host clock plus the parser's forwarded ServerClockOffset (Zero when the parser has no live
+    // server time either).
+    public DateTime GetServerTimestamp() => (_host.Clock.ServerNow + Snapshot().Client.ServerClockOffset).UtcDateTime;
 
-    // The chat log rides the RawLogLine firehose, so it is always available to consumers.
-    public bool IsChatLogAvailable() => true;
+    // Forwarded from the parser's env tap (G4/G5) — never a satellite-local re-derivation.
+    public bool IsChatLogAvailable() => Snapshot().Client.IsChatLogAvailable;
 
     // ACT's AV-detection diagnostic has no equivalent here.
     public string[] GetAntiVirusNames() => Array.Empty<string>();

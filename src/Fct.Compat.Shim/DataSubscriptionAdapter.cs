@@ -74,9 +74,9 @@ public sealed class DataSubscriptionAdapter : IDataSubscription, IDisposable
                 ZoneChanged?.Invoke(z.ZoneId, z.ZoneName);
                 break;
             case Fct.Abstractions.PartyChanged p:
-                // partySize == member count: the real-SDK nuance (size != list count for cross-world /
-                // alliance parties) is not reconstructable from the typed event.
-                PartyListChanged?.Invoke(new ReadOnlyCollection<uint>(p.Members.ToList()), p.Members.Count);
+                // PartySize is the SDK's real second argument (distinct from Members.Count in alliance
+                // content, G7/P3.5) — forward it verbatim, never re-derive from the roster length.
+                PartyListChanged?.Invoke(new ReadOnlyCollection<uint>(p.Members.ToList()), p.PartySize);
                 break;
             case Fct.Abstractions.PrimaryPlayerChanged:
                 // The SDK delegate is parameterless; consumers re-poll the repository for the new player.

@@ -14,7 +14,8 @@ namespace Fct.Abstractions.Testing
         public PartySnapshot Party { get; set; } = new PartySnapshot(Array.Empty<Actor>(), PartyMembership.None);
         public ZoneRef Zone { get; set; }
         public IResourceCatalog Resources { get; set; } = new FakeResourceCatalog();
-        public GameClient Client { get; set; } = new GameClient("0.0", GameRegion.Global, GameLanguage.English, true, true);
+        public GameClient Client { get; set; } =
+            new GameClient("0.0", GameRegion.Global, GameLanguage.English, true, true) { IsChatLogAvailable = true };
 
         public Actor? Find(uint actorId)
         {

@@ -994,7 +994,7 @@ The G14 headline fix. No wire-codec change (the `RAW` frame already carries type
         `Members.Count` — flips `EventMappingFlowTests.A5b` green (remember to add `PartySize: 3` to
         `A5_TypedZonePartyEvents_ReachMappedConsumer`'s call site per the P1.6 verdict's own handoff, so
         that pre-existing green test doesn't go red for the wrong reason).
-- [ ] **P3.5 — Consumer projections.** `ConsumerDataRepository` (`ConsumerDataSurface.cs`): `Apply`
+- [x] **P3.5 — Consumer projections.** `ConsumerDataRepository` (`ConsumerDataSurface.cs`): `Apply`
       stores the forwarded env; serve
       `GetGameVersion/GetSelectedLanguageID/GetGameRegion/GetServerTimestamp` (offset-corrected:
       `UtcNow + offset`) and `IsChatLogAvailable` from the mirror; **delete the stubs (`:156-160`)**.
@@ -1002,6 +1002,147 @@ The G14 headline fix. No wire-codec change (the `RAW` frame already carries type
       `Fct.Compat.Shim/DataSubscriptionAdapter.cs:77` + the repository adapter.
       `Fct.Abstractions.Testing/ShimStub.cs` maps `PartyChanged.PartySize` → `op.PartySize`. *Done
       when:* build green; `EventMappingFlowTests` compiles against the real-size semantics.
+      **Verdict:** ✅ DONE, both P1.5 and P1.6 flipped GREEN.
+      - **`ConsumerDataRepository` (`src/Fct.Parser.Legacy/ConsumerDataSurface.cs`):** new env-mirror
+        fields — `_gameVersion` (`volatile string`, default `""`), `_language` (`volatile Language`,
+        the **SDK** enum type directly — chosen, not `Fct.Abstractions.GameLanguage`, so the P1.5
+        structural test's `FieldType == typeof(Language)` reflection check finds it), `_region`
+        (`volatile byte`, name-matched by the structural test's `IndexOf("region", ...)` check),
+        `_serverClockOffsetTicks` (`long`, read/written via `Volatile.Read/Write` — `TimeSpan` itself
+        cannot carry the `volatile` modifier), `_isChatLogAvailable` (`volatile bool`, default `true`).
+        `Apply()` gained a `SessionStateChanged` case mapping `Fct.Abstractions.GameLanguage`/`GameRegion`
+        to the SDK's `Language`/`byte` via two new private mappers (`MapLanguageToSdk`/`MapRegionToSdk`,
+        the exact reverse-direction mirror of `BridgeForwarder.MapLanguage`/`MapRegion` and identical in
+        shape to `Fct.Compat.Shim.DataRepository`'s existing `MapLanguage`) and writing all five fields.
+        **The five stubs (`:156-160`) are deleted** — `GetSelectedLanguageID/GetGameRegion/GetGameVersion/
+        GetServerTimestamp/IsChatLogAvailable` now read the mirror fields directly.
+        `GetServerTimestamp()` is `DateTime.UtcNow + new TimeSpan(Volatile.Read(ref _serverClockOffsetTicks))`
+        — the offset-corrected design (see reconciliation below), never the deleted stub's bare `UtcNow`.
+        **Before-any-`Apply()` defaults, chosen deliberately, not incidentally:** `GameVersion=""` (never
+        a placeholder, §3) and `ServerClockOffset=Zero` (→ `GetServerTimestamp()` ≈ `UtcNow`) mirror the
+        STATE codec's own missing-key decode defaults (P3.2); `Language`/`Region` default to the SDK's own
+        unnamed zero value (`(Language)0`/`(byte)0`) — the honest "not yet configured" value a real,
+        unconfigured plugin would also report (P0.3), never a fabricated guess; `IsChatLogAvailable=true`
+        is the one deliberate exception — kept `true` (matching P0.3's real headless verdict and the old
+        stub's coincidental value) so a consumer that boots before any producer's env tap has run still
+        reports the common case, not a pessimistic `false`. `ConsumerDataSubscription.Raise`'s `PartyChanged`
+        case (`:56`, was `p.Members.Count`) now forwards `p.PartySize` verbatim (G7).
+      - **Net10 shim, the identical two fixes:** `Fct.Compat.Shim/DataSubscriptionAdapter.cs:76-80`'s
+        `PartyChanged` case now forwards `p.PartySize` (was `p.Members.Count`; the stale "not
+        reconstructable from the typed event" comment is corrected). `Fct.Compat.Shim/DataRepository.cs`
+        (the repository adapter): `GetServerTimestamp()` changed from the plain `_host.Clock.ServerNow.
+        UtcDateTime` to `(_host.Clock.ServerNow + Snapshot().Client.ServerClockOffset).UtcDateTime` (the
+        same offset-corrected design as the net48 side); `IsChatLogAvailable()` changed from the hardcoded
+        `=> true` to `Snapshot().Client.IsChatLogAvailable` (forwarded from the host-folded `GameClient`,
+        P3.4). `GetGameVersion`/`GetSelectedLanguageID`/`GetGameRegion` were **already** forwarded from
+        `Snapshot().Client` here (an earlier phase's work) — no change needed for those three.
+      - **`Fct.Abstractions.Testing/ShimStub.cs:34-37`:** the `PartyChanged` case now invokes
+        `PartyListChanged?.Invoke(p.Members, p.PartySize)` (was `p.Members.Count`).
+      - **Fake-default fix required for the net10 shim tests to stay green:**
+        `src/Fct.Abstractions.Testing/GameStateFakes.cs`'s `FakeSnapshot.Client` default gained
+        `{ IsChatLogAvailable = true }` (was unset → `false`) — required once
+        `Fct.Compat.Shim.DataRepository.IsChatLogAvailable()` started reading the snapshot instead of a
+        hardcoded `true`; without this, `DataRepositoryTests.Unsourced_members_return_honest_defaults`
+        (which asserts `IsChatLogAvailable() == true`) would have broken. `ServerClockOffset` needed no
+        such fix — its unset default (`TimeSpan.Zero`) already matches
+        `DataRepositoryTests.Server_timestamp_comes_from_the_clock`'s fixed-clock expectation.
+      - **⚠️ `GetServerTimestamp()` RECONCILIATION (the CLAUDE.md-flagged spec conflict, resolved per the
+        offset-corrected design in §3/§7, not the raw P0.3 headless value):** P0.3 recorded the RAW real
+        plugin's `GetServerTimestamp()` as `DateTime.MinValue` headless, and the pre-written P1.5 gate
+        (`RepositorySurfaceLiveTests.Live_stand_in_repository_serves_forwarded_env_scalars_never_the_stubs`)
+        asserted exactly that (`serverTimestampTicks == DateTime.MinValue.Ticks.ToString(...)`). But the
+        plan's SHIPPED CONSUMER DESIGN (§3, §7 "Server-clock offset ... acceptable for custom-line
+        timestamps") is a deliberate PROJECTION, not a passthrough: `UtcNow + ServerClockOffset`, so a
+        consumer always has a usable server-clock approximation for custom-line timestamps even though the
+        real plugin's own value is useless headless. Implemented exactly that in both `ConsumerDataRepository`
+        and the net10 `DataRepository`. **Reconciled the assertion** in
+        `tests/Fct.Integration.Tests/RepositorySurfaceLiveTests.cs` (which this test's own scenario — a
+        stand-in-only boot with zero bus pre-staging, so `ServerClockOffset` stays its mirror default
+        `Zero` — makes the reconciliation observable): replaced the `DateTime.MinValue.Ticks` string-equality
+        assertion with a tolerance check that the served timestamp is within one minute of `DateTime.UtcNow`,
+        with an inline comment citing this exact plan section and explaining why serving `MinValue` would
+        defeat the projection's purpose. Also rewrote
+        `tests/Fct.Parser.Legacy.Tests/ConsumerDataRepositoryStubTests.cs`'s documenting test (see below) with
+        the identical reconciled assertion for the in-process, no-satellite axis.
+      - **`ConsumerDataRepositoryStubTests.cs` (`tests/Fct.Parser.Legacy.Tests`), per the P1.5 handoff:**
+        `ConsumerDataRepository_serves_hardcoded_env_stubs_today_documenting_G4` (documented the now-deleted
+        literal stub values) is **REWRITTEN**, not deleted, as
+        `ConsumerDataRepository_serves_forwarded_mirror_defaults_before_any_apply` — asserts the new
+        before-any-`Apply()` mirror defaults (`GameVersion=""`, `Language=default(Language)`, `Region=
+        (byte)0`, `IsChatLogAvailable=true`, `GetServerTimestamp()` ≈ `UtcNow`) instead of the deleted
+        stub's literals. `ConsumerDataRepository_has_no_forwarded_backing_field_for_language_or_region_yet`
+        (the structural gate) is **unchanged in assertion logic** — its reflection check
+        (`FieldType == typeof(Language)`; `FieldType == typeof(byte)` name-matched `"region"`) now finds
+        the real `_language`/`_region` fields and flips GREEN; only its explanatory comment was updated
+        to state the flip.
+      - **A5 call-site fix (P1.6 handoff, done here as instructed):**
+        `tests/Fct.FlowTests/EventMappingFlowTests.cs`'s `A5_TypedZonePartyEvents_ReachMappedConsumer` now
+        passes `PartySize: 3` explicitly on its `new PartyChanged(2, Flow.T0, ...)` call (previously
+        implicit via the `Members.Count` derivation) — stays green for the right reason now that `ShimStub`
+        reads `p.PartySize`. The sibling shim-level test
+        `tests/Fct.Compat.Shim.Tests/DataSubscriptionTests.cs` had the identical latent issue (not called
+        out in the P1.6 handoff, but the same code path): renamed
+        `PartyListChanged_maps_members_with_size_equal_to_count` →
+        `PartyListChanged_forwards_the_real_partysize`, added `PartySize: 3` explicitly to its
+        `PartyChanged` construction.
+      - **A P1.4 gate needed reconciling for the identical "stub deletion masks the assertion" reason as
+        `GetServerTimestamp()`, caught empirically (not anticipated in the task brief) — documented here for
+        the record:** `LateJoinPrimingTests.Late_stand_in_repository_never_converges_on_a_forwarded_
+        GameVersion_from_priming_alone` originally asserted `GetGameVersion() == ""` as its RED gate (true
+        before P3.5, when the stub hardcoded `"0.0"`). Once P3.5 deleted the stub, `GetGameVersion()`
+        defaults to `""` **before any `Apply()` at all**, which made that assertion pass **unconditionally**
+        — a false green (proves nothing about convergence-from-priming, since `""` is what an entirely
+        untouched mirror already reads). Fixed by folding a real, distinctive `SessionStateChanged`
+        (`GameVersion = "9.9.9.9-primed-not-forwarded"`) onto the shared bus/aggregator before the consumer
+        subscribes (the aggregator folds it into its snapshot per P3.4) and asserting the late-joining
+        stand-in's `GetGameVersion()` equals that primed value — which fails today (`Actual: ""`) because
+        `BuildPrimeEvents` has no `repository`-stream `SessionStateChanged` branch yet (G8, P4.2's job).
+        This restores the gate's honest RED-for-the-right-reason status; the sibling rawlog test
+        (`Late_rawlog_subscriber_converges_on_none_of_the_one_shot_lines_from_priming_alone`) needed no
+        change (unaffected by the stub deletion) and stays red with its original, unchanged assertion.
+      - **Empirical GREEN — P1.5 (both gates):**
+        `dotnet test tests\Fct.Integration.Tests\Fct.Integration.Tests.csproj --filter
+        "FullyQualifiedName~RepositorySurfaceLiveTests"` → **1/1 passed** (was red on the first
+        `Assert.Equal("", gameVersion)`).
+        `dotnet test tests\Fct.Parser.Legacy.Tests\Fct.Parser.Legacy.Tests.csproj --filter
+        "FullyQualifiedName~ConsumerDataRepositoryStubTests"` → **2/2 passed** (was 1/2).
+      - **Empirical GREEN — P1.6/A5b (the alliance shim-mapping gate):**
+        `dotnet test tests\Fct.FlowTests\Fct.FlowTests.csproj --filter "FullyQualifiedName~
+        EventMappingFlowTests"` → **2/2 passed**, including
+        `A5b_AllianceGathering_PartySizeDistinctFromMemberCount_PendingP3` (was 8-vs-24, method name kept
+        per the plan's own naming — it is the exact gate this document names as flipped).
+      - **Empirically confirmed still red (unchanged, this task's own boundary — P4/P5 territory):**
+        `LateJoinPrimingTests`'s two gates (both now red for reconciled/original reasons, see above);
+        `Fct.Engine.Tests.OracleParityTests.ExportVariables_g1_keys_match_the_plugin_oracle_baseline_pending_P5`
+        (9/10, same 12-key message); `Fct.Integration.Tests.OverlaySatelliteTests` (same 12-key message,
+        this run — a prior run's environmental `Encounter.damage` mismatch, documented in the P2.3 verdict
+        as pre-existing live-game contamination on this dev machine, did not reproduce this time).
+      - **No other regressions — whole-solution build + full suite run:**
+        `dotnet build ffxiv-combat-tracker.slnx` clean (0 warnings/errors, both TFMs);
+        `dotnet build src\Fct.App\Fct.App.csproj` clean (stages the net48 satellite + compat runtime).
+        `Fct.FlowTests` **22/22** (was 21/22). `Fct.Parser.Legacy.Tests` **14/14** (was 13/14).
+        `Fct.Compat.Shim.Tests` **56/56** fully green (no regression from the `DataRepository`/
+        `DataSubscriptionAdapter`/fake-default changes). `Fct.Compat.Shim.E2E.Tests` **1/1**.
+        `Fct.App.Tests` **181/181** (unaffected — no `Fct.Host`/`Fct.App` code touched this task).
+        `Fct.Engine.Tests` **9/10** (unchanged P1.2 red). `Fct.Integration.Tests` full run: **46 tests,
+        39 passed, 3 failed** (the two reconciled `LateJoinPrimingTests` + the one `OverlaySatelliteTests`
+        P1.2 red, all intentional), **4 skipped** (env-gated `DistTreeGateTests`/`FrameFixtureGenerator`/
+        `PacketDispatchTests` + the plugin-gated `LineStreamDiffTests` clean skip) —
+        `FourRealPackagesTests` passed in the full run this time (no flake reproduced), independently
+        reconfirmed green in isolation (1/1) as well.
+      - **Handoff for P3.6:** unrelated surface (Machina `SetRegion` reflection + locale-selected resource
+        dictionaries) — no dependency on this phase's mirror fields, though `ConsumerDataRepository`'s new
+        `_region`/`_language` fields are the natural read source if P3.6's bring-up code wants the
+        already-mapped SDK-typed values instead of re-deriving from `SessionStateChanged` itself.
+      - **Handoff for P4:** `BuildPrimeEvents` (`SatelliteHost.cs` ~388-431) needs a `repository`-stream
+        branch that emits a `SessionStateChanged` built from `snap.Client` to a late joiner (P4.2) — this
+        is exactly what `LateJoinPrimingTests.Late_stand_in_repository_never_converges_on_a_forwarded_
+        GameVersion_from_priming_alone` (reconciled above) now gates, with a distinctive primed
+        `GameVersion` value that only a real priming branch could deliver. The rawlog one-shot-line
+        priming gate is untouched and still gates G8/P4.1's last-line cache separately. No `ConsumerDataRepository`
+        change is anticipated for P4 itself — `Apply(SessionStateChanged)` already exists and will fire
+        correctly the moment a primed `SessionStateChanged` frame reaches the satellite; P4's work is
+        entirely on the host-side priming/`BuildPrimeEvents` side.
 - [ ] **P3.6 — Machina region (KR/CN only, non-blocking).** In the consumer stand-in bring-up:
       reflectively call `Machina.FFXIV.Headers.Opcodes.OpcodeManager.Instance.SetRegion(region)`
       from the forwarded region. Default `Global` is already correct for the primary audience —

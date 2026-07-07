@@ -48,13 +48,15 @@ public class DataSubscriptionTests
     }
 
     [Fact]
-    public void PartyListChanged_maps_members_with_size_equal_to_count()
+    public void PartyListChanged_forwards_the_real_partysize()
     {
         var (sub, bus) = NewAdapter();
         ReadOnlyCollection<uint> list = null!; int size = -1;
         sub.PartyListChanged += (l, s) => { list = l; size = s; };
 
-        bus.Emit(new PartyChanged(1, T0, new List<uint> { 100, 200, 300 }));
+        // PartySize given explicitly (P3.5) and distinct from Members.Count, proving the adapter
+        // forwards it verbatim rather than deriving it from the roster length (G7).
+        bus.Emit(new PartyChanged(1, T0, new List<uint> { 100, 200, 300 }, PartySize: 3));
 
         Assert.Equal(new uint[] { 100, 200, 300 }, list);
         Assert.Equal(3, size);

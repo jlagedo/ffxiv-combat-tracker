@@ -21,7 +21,9 @@ namespace Fct.FlowTests
 
             var bus = host.Bus!;
             bus.Emit(new ZoneChanged(1, Flow.T0, 132, "Limsa Lominsa"));
-            bus.Emit(new PartyChanged(2, Flow.T0, new List<uint> { 100, 200, 300 }));
+            // PartySize given explicitly (P3.5): ShimStub now re-raises p.PartySize instead of deriving
+            // it from Members.Count, so this call must carry the size that used to be implicit.
+            bus.Emit(new PartyChanged(2, Flow.T0, new List<uint> { 100, 200, 300 }, PartySize: 3));
 
             Assert.Equal(132u, op.ZoneId);
             Assert.Equal("Limsa Lominsa", op.ZoneName);
@@ -31,10 +33,9 @@ namespace Fct.FlowTests
 
         // P1.6 (alliance party gate) — G7: in alliance content the SDK's PartyListChanged(partyList,
         // partySize) reports partySize (the player's 8-person party) DISTINCT from the up-to-24
-        // visible alliance roster. PartyChanged now carries a PartySize field (Events.cs), but nothing
-        // forwards or folds it yet — the shim's PartyChanged handler (ShimStub.cs:35) still derives
-        // the SDK partySize argument from Members.Count. This must stay RED until P3.5 rewires
-        // ShimStub/ConsumerDataSubscription/DataSubscriptionAdapter to re-raise p.PartySize.
+        // visible alliance roster. GREEN as of P3.5: ShimStub's PartyChanged handler (ShimStub.cs)
+        // re-raises p.PartySize instead of deriving it from Members.Count. Method name kept
+        // (_PendingP3 suffix) — it is the exact gate PIPELINE-COMPLETENESS-PLAN.md names as flipped.
         [Fact]
         public void A5b_AllianceGathering_PartySizeDistinctFromMemberCount_PendingP3()
         {
@@ -50,8 +51,8 @@ namespace Fct.FlowTests
             // The 24-member alliance roster crosses intact regardless of the gate's outcome.
             Assert.Equal(24, op.PartyList!.Count);
 
-            // RED today: op.PartySize reports 24 (Members.Count) instead of the true 8-person party
-            // size — ShimStub.cs:35 ignores PartyChanged.PartySize entirely.
+            // GREEN as of P3.5: op.PartySize reports the true 8-person party size, distinct from the
+            // 24-member roster — ShimStub now forwards PartyChanged.PartySize verbatim.
             Assert.Equal(8, op.PartySize);
         }
     }

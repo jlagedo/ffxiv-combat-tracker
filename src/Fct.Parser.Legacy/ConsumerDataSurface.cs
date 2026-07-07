@@ -53,7 +53,9 @@ namespace Fct.Parser.Legacy
                     ZoneChanged?.Invoke(z.ZoneId, z.ZoneName ?? "");
                     break;
                 case PartyChanged p:
-                    PartyListChanged?.Invoke(new ReadOnlyCollection<uint>(p.Members.ToList()), p.Members.Count);
+                    // PartySize is the SDK's real second argument (distinct from Members.Count in alliance
+                    // content, G7/P3.5) — forward it verbatim, never re-derive from the roster length.
+                    PartyListChanged?.Invoke(new ReadOnlyCollection<uint>(p.Members.ToList()), p.PartySize);
                     break;
                 case Fct.Abstractions.PrimaryPlayerChanged:
                     // The SDK delegate is parameterless; consumers re-poll the repository for the new player.
@@ -100,6 +102,19 @@ namespace Fct.Parser.Legacy
         private uint _playerId;
         private uint _territoryId;
 
+        // The one-shot environment mirror (G4/G5, PIPELINE-COMPLETENESS-PLAN P3.5), fed only by a
+        // forwarded SessionStateChanged crossing the `repository` stream — never a satellite-local
+        // re-derivation (constraint 2). Before the first Apply(), these hold the SDK's own "not yet
+        // known" values: GameVersion "" (never a placeholder, §3), Language/Region the SDK's unnamed
+        // zero value (mirrors the real plugin's unconfigured state, P0.3) — except IsChatLogAvailable,
+        // which defaults true (the real plugin's own headless default, P0.3) so a consumer that boots
+        // before any producer env tap exists still sees the honest common-case value.
+        private volatile string _gameVersion = "";
+        private volatile Language _language;
+        private volatile byte _region;
+        private long _serverClockOffsetTicks;
+        private volatile bool _isChatLogAvailable = true;
+
         public void Apply(GameEvent e)
         {
             switch (e)
@@ -118,6 +133,13 @@ namespace Fct.Parser.Legacy
                     break;
                 case ZoneChanged z:
                     Volatile.Write(ref _territoryId, z.ZoneId);
+                    break;
+                case Fct.Abstractions.SessionStateChanged s:
+                    _gameVersion = s.GameVersion ?? "";
+                    _language = MapLanguageToSdk(s.Language);
+                    _region = MapRegionToSdk(s.Region);
+                    Volatile.Write(ref _serverClockOffsetTicks, s.ServerClockOffset.Ticks);
+                    _isChatLogAvailable = s.IsChatLogAvailable;
                     break;
             }
         }
@@ -153,12 +175,42 @@ namespace Fct.Parser.Legacy
                     : new Dictionary<uint, string>();
         }
 
-        public Language GetSelectedLanguageID() => Language.English;
-        public byte GetGameRegion() => 0;
-        public string GetGameVersion() => "0.0";
-        public DateTime GetServerTimestamp() => DateTime.UtcNow;
-        public bool IsChatLogAvailable() => true;
+        public Language GetSelectedLanguageID() => _language;
+        public byte GetGameRegion() => _region;
+        public string GetGameVersion() => _gameVersion;
+
+        // Offset-corrected server-clock approximation (PIPELINE-COMPLETENESS-PLAN §3/§7): the real
+        // plugin's GetServerTimestamp() is only ever populated by a live memory scan (DateTime.MinValue
+        // headless, P0.3), so the consumer instead serves a usable clock for custom-line timestamps —
+        // UtcNow plus the producer's forwarded ServerClockOffset (Zero when the producer has no live
+        // server time either).
+        public DateTime GetServerTimestamp() => DateTime.UtcNow + new TimeSpan(Volatile.Read(ref _serverClockOffsetTicks));
+
+        public bool IsChatLogAvailable() => _isChatLogAvailable;
         public string[] GetAntiVirusNames() => Array.Empty<string>();
+
+        // Fct.Abstractions.GameLanguage -> the SDK's Language enum. Mirrors Fct.Compat.Shim.DataRepository's
+        // identical MapLanguage(GameLanguage): GameLanguage.Unknown has no SDK equivalent (Language has no
+        // 0 member), so it maps to English, the same default the net10 shim's repository adapter uses.
+        private static Language MapLanguageToSdk(GameLanguage l)
+        {
+            switch (l)
+            {
+                case GameLanguage.English: return Language.English;
+                case GameLanguage.French: return Language.French;
+                case GameLanguage.German: return Language.German;
+                case GameLanguage.Japanese: return Language.Japanese;
+                case GameLanguage.Chinese: return Language.Chinese;
+                case GameLanguage.Korean: return Language.Korean;
+                case GameLanguage.TraditionalChinese: return Language.TraditionalChinese;
+                default: return Language.English;
+            }
+        }
+
+        // Fct.Abstractions.GameRegion -> the SDK's raw byte. Identical numbering (Global=1, Chinese=2,
+        // Korean=3, TraditionalChinese=4; Unknown=0 is the SDK's own "unconfigured" value, P3.3), so a
+        // direct cast is the whole mapping.
+        private static byte MapRegionToSdk(GameRegion r) => (byte)r;
 
         // ResourceType is locale-tagged; the forwarded catalog is locale-neutral, so the suffix is
         // dropped. MountList has no ResourceKind equivalent → null (empty dictionary).

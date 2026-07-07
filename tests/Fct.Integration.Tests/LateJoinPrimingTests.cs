@@ -188,6 +188,20 @@ namespace Fct.Integration.Tests
                 // priming branch has a live pid to seed, same as a real late join would see.
                 bus.Emit(new ZoneChanged(0, DateTimeOffset.UtcNow, 999, "Kugane"));
                 bus.Emit(new GameProcessChanged(0, DateTimeOffset.UtcNow, 22244));
+                // PIPELINE-COMPLETENESS-PLAN P3.5 note: SessionStateChanged now exists and folds into the
+                // aggregator's snapshot (P3.4's GameSnapshotAggregator.OnEvent), so fold a REAL,
+                // distinctive GameVersion here (never "" or "0.0" — a value no default could coincide
+                // with) BEFORE the consumer subscribes. This keeps the gate honest: since P3.5 deleted
+                // ConsumerDataRepository's hardcoded stubs, GetGameVersion() now defaults to "" even with
+                // NO priming at all (an honest "not yet known" value, ConsumerDataSurface.cs), which would
+                // make the OLD `Assert.Equal("", gameVersion)` pass for the wrong reason — coincidence, not
+                // a proof of convergence (the same coincidence RepositorySurfaceLiveTests documents for
+                // IsChatLogAvailable). Asserting against a distinctive primed value instead proves the real
+                // point: a late-joining consumer does NOT converge on host-primed env state, because
+                // BuildPrimeEvents has no `repository`-stream SessionStateChanged branch yet (G8/P4.2).
+                const string PrimedVersion = "9.9.9.9-primed-not-forwarded";
+                bus.Emit(new SessionStateChanged(0, DateTimeOffset.UtcNow, PrimedVersion,
+                    GameLanguage.English, GameRegion.Global, TimeSpan.Zero, true));
 
                 await consumer.StartAsync();
                 await Task.Delay(2500);   // consumer loads the SDK (Costura), registers the stand-in, subscribes
@@ -202,11 +216,12 @@ namespace Fct.Integration.Tests
                 Assert.Equal("1", f[1]);   // DataSubscription/DataRepository bound to real SDK types
                 var gameVersion = f.Length > 8 ? f[8] : "";
 
-                // THE GATE (deliberately red): per P0.3, a headless real plugin serves GetGameVersion()
-                // == "" (never a placeholder — see plan §3). No wire path forwards ANY env today (G5 —
-                // P3 not built) and no priming path carries it either (G8/G4) — ConsumerDataRepository
-                // hardcodes "0.0" (ConsumerDataSurface.cs ~158) regardless of what a late joiner primes.
-                Assert.Equal("", gameVersion);
+                // THE GATE (deliberately red): the host-side snapshot already holds PrimedVersion (folded
+                // above, per P3.4), but BuildPrimeEvents (SatelliteHost.cs ~388-431) has no branch that
+                // emits a SessionStateChanged to a late `repository` subscriber (G8) — that is P4.2's job.
+                // So the late-joining stand-in's ConsumerDataRepository never Apply()'s one, and
+                // GetGameVersion() reads its own before-any-Apply() default ("") instead of the primed value.
+                Assert.Equal(PrimedVersion, gameVersion);
             }
             finally
             {

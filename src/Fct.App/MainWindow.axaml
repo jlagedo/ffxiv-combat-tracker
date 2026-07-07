@@ -9,6 +9,7 @@
         x:Class="Fct.App.MainWindow"
         x:DataType="vm:MainViewModel"
         Title="FFXIV Combat Tracker"
+        Icon="/Assets/app-icon.ico"
         Width="1180" Height="760" MinWidth="980" MinHeight="640"
         FontFamily="{StaticResource BodyFont}"
         Background="{StaticResource AbyssBrush}"

@@ -13,39 +13,42 @@ namespace Fct.Parser.Legacy.Tests
     // satellite process, no real FFXIV_ACT_Plugin.dll install required, always runs.
     public sealed class ConsumerDataRepositoryStubTests
     {
-        // Documents today's five hardcoded env-scalar stubs (G4) so a future accidental edit to the
-        // literal values themselves is caught here first. NOT the red gate — these values are exactly
-        // what ConsumerDataSurface.cs ~156-160 returns today; the gate that these must change once P3
-        // forwards real values lives in the cross-process Fct.Integration.Tests
-        // RepositorySurfaceLiveTests (GameVersion/ServerTimestamp/IsChatLogAvailable) and in
-        // ConsumerDataRepository_has_no_forwarded_backing_field_for_language_or_region_yet below
-        // (Language/Region).
+        // PIPELINE-COMPLETENESS-PLAN P3.5: the five G4 stubs are deleted. This test used to document
+        // their hardcoded literal values (ConsumerDataSurface.cs ~156-160); it is REWRITTEN (not
+        // deleted, per the P3.5 handoff) to document today's replacement — the forwarded-mirror
+        // defaults a ConsumerDataRepository serves before any SessionStateChanged has ever been
+        // Apply()'d (no producer env tap has folded yet). These are honest "not yet known" values, per
+        // constraint 2 (never a satellite-local re-derivation): GameVersion "" (never a placeholder,
+        // §3), Language/Region the SDK's own unnamed zero value (mirrors an unconfigured real plugin,
+        // P0.3), IsChatLogAvailable true (the real plugin's headless default, P0.3 — kept true by
+        // design so a consumer that boots before any producer exists still reports the common case),
+        // and GetServerTimestamp() the offset-corrected design (UtcNow + ServerClockOffset, Zero here)
+        // rather than the old stub's bare UtcNow or the real plugin's raw headless DateTime.MinValue.
         [Fact]
-        public void ConsumerDataRepository_serves_hardcoded_env_stubs_today_documenting_G4()
+        public void ConsumerDataRepository_serves_forwarded_mirror_defaults_before_any_apply()
         {
             var repo = new ConsumerDataRepository();
-            Assert.Equal("0.0", repo.GetGameVersion());
-            Assert.Equal(Language.English, repo.GetSelectedLanguageID());
+            Assert.Equal("", repo.GetGameVersion());
+            Assert.Equal(default(Language), repo.GetSelectedLanguageID());
             Assert.Equal((byte)0, repo.GetGameRegion());
             Assert.True(repo.IsChatLogAvailable());
-            // The stub is literally `=> DateTime.UtcNow;` (not DateTime.MinValue) — assert it lands within
-            // a generous window of "now" rather than pinning an exact instant.
+            // GetServerTimestamp() == UtcNow + ServerClockOffset; with no Apply() yet, the offset mirror
+            // is still TimeSpan.Zero, so this reduces to "close to now" — never DateTime.MinValue.
             Assert.True((DateTime.UtcNow - repo.GetServerTimestamp()) < TimeSpan.FromMinutes(1),
-                "GetServerTimestamp() stub is expected to track UtcNow, not DateTime.MinValue");
+                "GetServerTimestamp() should be ~UtcNow (offset-corrected design), not DateTime.MinValue");
         }
 
-        // THE RED GATE for the Language/Region half of P1.5 (G4). P0.3 could not pin an exact headless
-        // value for GetSelectedLanguageID()/GetGameRegion() — both are host-config-driven
-        // (ParseSettings.LanguageID / DataCollectionSettings.RegionID) and depend on whatever the
-        // installed FFXIV_ACT_Plugin has saved on the running machine, so a cross-process gate asserting
-        // an exact value would be a machine-dependent flake (see RepositorySurfaceLiveTests, which
-        // deliberately leaves these two unasserted-by-value for the same reason). This test asserts the
-        // STRUCTURAL claim instead: every OTHER forwarded member (_pid/_playerId/_territoryId/
-        // _combatants/_resources) has a real Apply()-fed backing field; Language/Region have none — both
-        // GetSelectedLanguageID() and GetGameRegion() are unconditional literal expression bodies
-        // (`=> Language.English;` / `=> 0;`, ConsumerDataSurface.cs ~156-157). Deliberately red today;
-        // P3.5 ("ConsumerDataRepository ... Apply stores the forwarded env ... delete the stubs") adds
-        // exactly the missing fields, at which point this flips green.
+        // THE STRUCTURAL GATE for the Language/Region half of P1.5 (G4) — GREEN as of P3.5. P0.3 could
+        // not pin an exact headless value for GetSelectedLanguageID()/GetGameRegion() — both are
+        // host-config-driven (ParseSettings.LanguageID / DataCollectionSettings.RegionID) and depend on
+        // whatever the installed FFXIV_ACT_Plugin has saved on the running machine, so a cross-process
+        // gate asserting an exact value would be a machine-dependent flake (see RepositorySurfaceLiveTests,
+        // which deliberately leaves these two unasserted-by-value for the same reason). This test asserts
+        // the STRUCTURAL claim instead: every forwarded member (_pid/_playerId/_territoryId/_combatants/
+        // _resources/Language/Region) has a real Apply()-fed backing field. P3.5 added the missing
+        // Language (SDK `Language`-typed) and region (`byte`-typed, name-matched) fields
+        // (ConsumerDataSurface.cs ~112-116), fed from the forwarded SessionStateChanged in Apply()
+        // (~137-143) — this flips the assertion green.
         [Fact]
         public void ConsumerDataRepository_has_no_forwarded_backing_field_for_language_or_region_yet()
         {

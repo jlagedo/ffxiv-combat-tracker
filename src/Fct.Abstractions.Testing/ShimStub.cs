@@ -32,7 +32,9 @@ namespace Fct.Abstractions.Testing
                         ZoneChanged?.Invoke(z.ZoneId, z.ZoneName);
                         break;
                     case Fct.Abstractions.PartyChanged p:
-                        PartyListChanged?.Invoke(p.Members, p.Members.Count);
+                        // PartySize is the SDK's real second argument (distinct from Members.Count in
+                        // alliance content, G7/P3.5) — forward it verbatim.
+                        PartyListChanged?.Invoke(p.Members, p.PartySize);
                         break;
                 }
             });
