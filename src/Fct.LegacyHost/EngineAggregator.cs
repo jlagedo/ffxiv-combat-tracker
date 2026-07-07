@@ -96,6 +96,104 @@ namespace Fct.LegacyHost
             return n;
         }
 
+        // Corpus-scale plugin-in-the-loop parity (PIPELINE-COMPLETENESS-PLAN P5.9): same replay as
+        // Run/AggregateAndDump above (OUR Fct.Compat.Act engine, EngineTables.Install() already
+        // registers the ported ACT_UIMods/G1 keys), but dumps the FULL enumerated
+        // CombatantData/EncounterData.ExportVariables key set — never the hardcoded ACT-core-only
+        // ExportKeys/EncounterExportKeys arrays above — to <name>.engine.full.exports.tsv. Diffed by
+        // MassCompare against tools/act-oracle's <name>.plugin.exports.tsv (the real plugin-in-the-loop
+        // baseline, ActOracle --plugin-baseline-folder), the corpus-scale sibling of
+        // Fct.Engine.Tests/OracleParityTests.ExportVariables_g1_keys_match_the_plugin_oracle_baseline_pending_P5.
+        public static void RunFull(string folder)
+        {
+            string logPath = Path.Combine(folder, "_mass-engine-exports-full.log");
+            void Log(string s) { try { File.AppendAllText(logPath, $"{DateTime.Now:HH:mm:ss.fff} {s}\n"); } catch { } }
+            try
+            {
+                InstallTables();
+                var files = Directory.GetFiles(folder, "*.oracle.tsv")
+                                     .OrderBy(f => Path.GetFileName(f), StringComparer.Ordinal).ToArray();
+                Log($"mass-engine-exports-full: {files.Length} oracle stream(s) in {folder}");
+                int done = 0;
+                foreach (var f in files)
+                {
+                    string name = Path.GetFileName(f);
+                    name = name.Substring(0, name.Length - ".oracle.tsv".Length);
+                    int swings = AggregateAndDumpFull(f, Path.Combine(folder, name + ".engine.full.exports.tsv"));
+                    Log($"  [{++done}/{files.Length}] {name}: swings={swings}");
+                }
+                Log("mass-engine-exports-full done");
+            }
+            catch (Exception ex) { Log("FATAL: " + ex); }
+        }
+
+        // Same swing replay as AggregateAndDump, but dumps every registered ExportVariables key
+        // (enumerated, never a hardcoded list) — the shape tools/act-oracle's DumpAllExportVariables
+        // uses for the plugin-in-the-loop baseline, so the two TSVs join 1:1 on every key either side
+        // registers.
+        private static int AggregateAndDumpFull(string inTsv, string exportsOut)
+        {
+            var zone = new ZoneData { ZoneName = "" };
+            var enc = new EncounterData("YOU", "", zone) { Active = true };
+            zone.ActiveEncounter = enc;
+            zone.Items.Add(enc);
+
+            int n = 0;
+            var lastSwingTime = DateTime.MinValue;
+            foreach (var line in File.ReadLines(inTsv))
+            {
+                if (n++ == 0 && line.StartsWith("swingType")) continue;
+                var c = line.Split('\t');
+                if (c.Length < 9) continue;
+                int swingType = int.Parse(c[0], CultureInfo.InvariantCulture);
+                bool crit = c[1] == "1";
+                long dmg = long.Parse(c[2], CultureInfo.InvariantCulture);
+                string special = c[3], attackType = c[4], attacker = c[5], damageType = c[6], victim = c[7];
+                var time = DateTime.Parse(c[8], CultureInfo.InvariantCulture, DateTimeStyles.RoundtripKind);
+                enc.AddCombatAction(new MasterSwing(swingType, crit, special, new Dnum(dmg), time, n, attackType, attacker, damageType, victim));
+                lastSwingTime = time;
+            }
+
+            // LastNDPS (P5.6) reads AggregationGlobals.lastKnownTime at GetExportString-call time. The
+            // uninitialized oFormActMain used by InstallTables() below has no live _lifecycle instance
+            // (FormActMain's real ctor never ran), so the default accessor would NRE mid-enumeration and
+            // silently drop these 6 keys (caught by the <EX:...> guard below) — a test-harness artifact,
+            // not a real divergence, exactly the class of issue root-caused in the OverlaySatelliteTests
+            // P5.6 verdict. Pin it to this replay's own last swing time (mirroring ActOracle's identical
+            // per-file `lastKnownTime` backing-field set for --plugin-baseline) so the two sides compare
+            // the SAME clock.
+            AggregationGlobals.LastKnownTimeAccessor = () => lastSwingTime;
+
+            using (var w = new StreamWriter(exportsOut))
+            {
+                w.WriteLine("name\tkey\tvalue");
+                foreach (var cd in enc.Items.Values)
+                {
+                    foreach (var kv in CombatantData.ExportVariables)
+                    {
+                        string val;
+                        try { val = kv.Value.GetExportString(cd, ""); }
+                        catch (Exception ex) { var x = ex; while (x.InnerException != null) x = x.InnerException; val = "<EX:" + x.GetType().Name + ">"; }
+                        if (val == null || val == "ERROR" || val.StartsWith("<EX:")) continue;
+                        if (val.IndexOf('\n') >= 0 || val.IndexOf('\t') >= 0 || val.IndexOf('\r') >= 0) continue;
+                        w.WriteLine(cd.Name + "\t" + kv.Key + "\t" + val);
+                    }
+                }
+
+                var allies = enc.GetAllies();
+                foreach (var kv in EncounterData.ExportVariables)
+                {
+                    string val;
+                    try { val = kv.Value.GetExportString(enc, allies, ""); }
+                    catch (Exception ex) { var x = ex; while (x.InnerException != null) x = x.InnerException; val = "<EX:" + x.GetType().Name + ">"; }
+                    if (val == null || val == "ERROR" || val.StartsWith("<EX:")) continue;
+                    if (val.IndexOf('\n') >= 0 || val.IndexOf('\t') >= 0 || val.IndexOf('\r') >= 0) continue;
+                    w.WriteLine("*ENCOUNTER*\t" + kv.Key + "\t" + val);
+                }
+            }
+            return n;
+        }
+
         // The exact ExportVariables key set tools/act-oracle dumps, so the two payloads join 1:1 in
         // the diff. Kept identical to ActOracle.cs.
         private static readonly string[] ExportKeys =

@@ -210,6 +210,30 @@ internal static class ActOracle
                 int sw = PluginBaselineAndDump(argv[1], argv[2]);
                 _result = "OK swings=" + sw;
             }
+            else if (argv[0] == "--plugin-baseline-folder")
+            {
+                // Corpus-scale plugin-in-the-loop baseline (PIPELINE-COMPLETENESS-PLAN P5.9): load the
+                // real FFXIV_ACT_Plugin.dll ONCE (its ExportVariables/ColumnDefs registrations are
+                // static, process-wide), then replay every already-captured plugin swing stream
+                // (<name>.oracle.tsv, produced by the satellite's --mass-oracle) through a fresh
+                // real-ACT encounter and dump the FULL enumerated ExportVariables key set to
+                // <name>.plugin.exports.tsv. This is the folder-batch sibling of --plugin-baseline —
+                // same per-file replay (ReplaySwings + DumpAllExportVariables), just looped and with
+                // the plugin loaded once up front instead of per file.
+                LoadPluginAndInitACT_UIMods();
+                string dir = argv[1];
+                var files = new List<string>(Directory.GetFiles(dir, "*.oracle.tsv"));
+                files.Sort(StringComparer.Ordinal);
+                int done = 0;
+                foreach (var f in files)
+                {
+                    string exportsOut = f.Substring(0, f.Length - ".oracle.tsv".Length) + ".plugin.exports.tsv";
+                    int sw = PluginBaselineAndDump(f, exportsOut);
+                    Console.WriteLine("  [" + (++done) + "/" + files.Count + "] " +
+                        Path.GetFileName(f) + " swings=" + sw);
+                }
+                _result = "OK files=" + files.Count;
+            }
             else if (argv[0] == "--folder")
             {
                 // Batch: aggregate every captured plugin swing stream (*.oracle.tsv) through the real
@@ -447,7 +471,7 @@ internal static class ActOracle
         // to the corpus (a months-long single session is millions of swings); a single slice keeps
         // the original 2-minute budget.
         int timeoutMs = 120000;
-        if (argv[0] == "--folder")
+        if (argv[0] == "--folder" || argv[0] == "--plugin-baseline-folder")
         {
             try { timeoutMs = Math.Max(120000, Directory.GetFiles(argv[1], "*.oracle.tsv").Length * 30000); }
             catch { timeoutMs = 3600000; }

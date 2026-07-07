@@ -11,11 +11,30 @@ using System.Text;
 // Fct.Compat.Act.Tests/ExportVarsCompatTests — the actual overlay drop-in contract, end to end.
 //
 //   MassCompare <folder>
+//
+// PIPELINE-COMPLETENESS-PLAN P5.9 mode: diff our engine's FULL enumerated ExportVariables key set
+// (<name>.engine.full.exports.tsv, --mass-engine-exports-full) against the plugin-in-the-loop oracle
+// baseline (<name>.plugin.exports.tsv, tools/act-oracle --plugin-baseline-folder) — the corpus-scale
+// sibling of Fct.Engine.Tests/OracleParityTests.ExportVariables_g1_keys_match_the_plugin_oracle_baseline_pending_P5
+// / Fct.Integration.Tests/OverlaySatelliteTests. Unlike the percentage-style diff above, completeness
+// is the point here: any key/value divergence not explained by the documented fixture-provenance
+// exclusions is reported by name, never folded into an aggregate percentage.
+//
+//   MassCompare --plugin <folder>
 
 if (args.Length < 1)
 {
-    Console.Error.WriteLine("usage: MassCompare <folder>");
+    Console.Error.WriteLine("usage: MassCompare <folder> | MassCompare --plugin <folder>");
     return 2;
+}
+if (args[0] == "--plugin")
+{
+    if (args.Length < 2)
+    {
+        Console.Error.WriteLine("usage: MassCompare --plugin <folder>");
+        return 2;
+    }
+    return PluginExportsDiff(args[1]);
 }
 return ExportsDiff(args[0]);
 
@@ -109,6 +128,102 @@ static int ExportsDiff(string folder)
     File.WriteAllText(Path.Combine(folder, "exports-diff.txt"), db.ToString());
     Console.WriteLine($"\nWrote {Path.Combine(folder, "exports-summary.txt")} and exports-diff.txt");
     return totalExact == totalPairs ? 0 : 1;
+}
+
+// PIPELINE-COMPLETENESS-PLAN P5.9: corpus-scale completeness diff. The plugin-in-the-loop oracle
+// (<name>.plugin.exports.tsv — the FULL enumerated CombatantData/EncounterData.ExportVariables key
+// set the real FFXIV_ACT_Plugin registers, tools/act-oracle --plugin-baseline-folder) is the
+// completeness AUTHORITY: every key/value it carries must be reachable, and equal, through our
+// engine's identically-enumerated payload (<name>.engine.full.exports.tsv,
+// --mass-engine-exports-full). Mirrors Fct.Engine.Tests/OracleParityTests.
+// ExportVariables_g1_keys_match_the_plugin_oracle_baseline_pending_P5's own semantics: iterate the
+// oracle's keys (never a hardcoded list, never the reverse direction — an extra key we register that
+// the plugin doesn't is not a completeness gap), and report every divergence by name — no aggregate
+// percentage stands in for a real port-bug report here.
+static int PluginExportsDiff(string folder)
+{
+    var baselineFiles = Directory.GetFiles(folder, "*.plugin.exports.tsv")
+                                 .OrderBy(f => Path.GetFileName(f), StringComparer.Ordinal).ToArray();
+    if (baselineFiles.Length == 0)
+    {
+        Console.Error.WriteLine($"no *.plugin.exports.tsv files in {folder} — run ActOracle --plugin-baseline-folder first");
+        return 2;
+    }
+
+    // per key: [comparedPairs, exactMatches].
+    var keyStats = new SortedDictionary<string, long[]>(StringComparer.Ordinal);
+    long[] KS(string k) => keyStats.TryGetValue(k, out var a) ? a : (keyStats[k] = new long[2]);
+
+    var divergences = new List<string>();   // every real divergence, never capped — this is the gate.
+    int filesCompared = 0, filesMissingOurs = 0, combatantMissingInOurs = 0, excludedByProvenance = 0;
+    long totalPairs = 0, totalExact = 0;
+
+    foreach (var bf in baselineFiles)
+    {
+        string baseName = Path.GetFileName(bf);
+        baseName = baseName.Substring(0, baseName.Length - ".plugin.exports.tsv".Length);
+        string of = Path.Combine(folder, baseName + ".engine.full.exports.tsv");
+        if (!File.Exists(of)) { filesMissingOurs++; continue; }
+        filesCompared++;
+
+        var baseline = ReadExports(bf);   // plugin-in-the-loop oracle (the authority)
+        var ours = ReadExports(of);       // our engine, full enumeration
+
+        foreach (var (name, keys) in baseline)
+        {
+            if (!ours.TryGetValue(name, out var ourKeys))
+            {
+                combatantMissingInOurs++;
+                foreach (var key in keys.Keys)
+                    divergences.Add($"{baseName}/{name}.{key}: combatant/encounter row missing from our engine's payload");
+                continue;
+            }
+
+            foreach (var (key, want) in keys)
+            {
+                // *ENCOUNTER*.CurrentZoneName is zone-frame provenance, not a swing-stream fact — the
+                // identical exclusion Fct.Engine.Tests/OracleParityTests and OverlaySatelliteTests make
+                // (both replay swings only / a corpus-independent zone frame, so the VALUE differs by
+                // construction). Registration is still required; only the value compare is skipped.
+                bool excludeValue = name == "*ENCOUNTER*" && key == "CurrentZoneName";
+
+                var a = KS(key); a[0]++; totalPairs++;
+                if (!ourKeys.TryGetValue(key, out var got))
+                {
+                    divergences.Add($"{baseName}/{name}.{key}: key not registered in our engine (oracle='{want}')");
+                    continue;
+                }
+                if (excludeValue) { excludedByProvenance++; a[1]++; totalExact++; continue; }
+                if (got == want) { a[1]++; totalExact++; }
+                else divergences.Add($"{baseName}/{name}.{key}: ours='{got}' oracle='{want}'");
+            }
+        }
+    }
+
+    var sb = new StringBuilder();
+    void S(string s) { sb.AppendLine(s); Console.WriteLine(s); }
+    S("");
+    S("======== PLUGIN-IN-THE-LOOP COMPLETENESS DIFF (P5.9) — OUR ENGINE vs REAL ACT + REAL PLUGIN ========");
+    S("full enumerated ExportVariables key set; the plugin-in-the-loop oracle is the completeness authority");
+    S($"files compared: {filesCompared}  (missing our-engine payload: {filesMissingOurs})");
+    S($"combatant/encounter rows missing from our engine: {combatantMissingInOurs}");
+    S($"key/value pairs checked: {totalPairs:N0}  divergences: {divergences.Count:N0}  (excluded by documented provenance: {excludedByProvenance:N0})");
+    S("");
+    S("per-key  [pairs  exact  exact%]");
+    foreach (var kv in keyStats.OrderBy(k => (double)k.Value[1] / Math.Max(1, k.Value[0])).ThenBy(k => k.Key, StringComparer.Ordinal))
+    {
+        var a = kv.Value;
+        double ex = a[0] == 0 ? 100 : 100.0 * a[1] / a[0];
+        S($"  {kv.Key,-20} {a[0],9:N0} {a[1],9:N0} {ex,8:0.000}%");
+    }
+    S("=======================================================================================");
+    File.WriteAllText(Path.Combine(folder, "plugin-exports-summary.txt"), sb.ToString());
+
+    // Every divergence, never capped/sampled — a completeness gate must show the whole gap, not a
+    // representative slice of it.
+    File.WriteAllLines(Path.Combine(folder, "plugin-exports-diff.txt"), divergences);
+    Console.WriteLine($"\nWrote {Path.Combine(folder, "plugin-exports-summary.txt")} and plugin-exports-diff.txt ({divergences.Count} divergence(s))");
+    return divergences.Count == 0 ? 0 : 1;
 }
 
 static Dictionary<string, Dictionary<string, string>> ReadExports(string path)

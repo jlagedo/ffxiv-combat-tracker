@@ -41,6 +41,37 @@ plugin swings  ->  our Fct.Compat.Act  ->  <name>.engine.exports.tsv   (under te
                                            \__ MassCompare diffs these __/
 ```
 
+## Plugin-in-the-loop completeness diff (P5.9)
+
+`-PluginBaseline` adds a second, completeness-oriented diff over the *same* captured swings — the
+corpus-scale sibling of `Fct.Engine.Tests/OracleParityTests.ExportVariables_g1_keys_match_the_plugin_oracle_baseline_pending_P5`
+and `Fct.Integration.Tests/OverlaySatelliteTests`. Where the diff above holds our engine to **ACT
+core** over a hardcoded key list, this one holds it to the **real FFXIV_ACT_Plugin's own
+`ACT_UIMods` registrations** over the **full enumerated** `ExportVariables` key set (the G1
+`ACT_UIMods` keys: `Job`, `ParryPct`, `BlockPct`, `IncToHit`, `OverHealPct`, `DirectHit*`,
+`CritDirectHit*`, `Last10/30/60DPS`, `CurrentZoneName`, …), never a fixed list.
+
+```powershell
+./tools/mass-compare/run.ps1 -PluginBaseline `
+    -FfxivPluginDll "E:\path\to\FFXIV_ACT_Plugin.dll" `
+    -LogFolder <corpus> -OutFolder <out>
+```
+
+Pipeline additions (steps 6–8, after the ACT-core diff):
+
+6. **Plugin-in-the-loop baseline** — `ActOracle --plugin-baseline-folder <out>` loads the real
+   `FFXIV_ACT_Plugin.dll` once (`ACT_UIMods.UpdateACTTables(false)`), replays each `<name>.oracle.tsv`
+   through the real ACT engine with the plugin's tables installed, and dumps the **enumerated**
+   `ExportVariables` to `<name>.plugin.exports.tsv`.
+7. **Our engine, full enumeration** — `Fct.LegacyHost.exe --mass-engine-exports-full <out>`
+   aggregates the same swings through our `Fct.Compat.Act`/`EngineTables.Install()` engine and dumps
+   its **enumerated** `ExportVariables` to `<name>.engine.full.exports.tsv`.
+8. **Completeness diff** — `MassCompare --plugin <out>` iterates the oracle's keys (the completeness
+   authority), reports **every** divergence by name (never an aggregate percentage), and excludes only
+   `*ENCOUNTER*.CurrentZoneName` (zone-frame provenance, not a swing-stream fact — the identical
+   exclusion the committed slice gates make). Outputs: `plugin-exports-summary.txt`,
+   `plugin-exports-diff.txt`.
+
 ## Outputs (`tmp/mass-compare/`, gitignored)
 
 | file | contents |

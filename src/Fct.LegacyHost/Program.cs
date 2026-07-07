@@ -350,6 +350,17 @@ namespace Fct.LegacyHost
                 return;
             }
 
+            // Corpus-scale plugin-in-the-loop parity (PIPELINE-COMPLETENESS-PLAN P5.9): same swings,
+            // full enumerated ExportVariables key set (never a hardcoded list) -> <name>.engine.full.exports.tsv,
+            // diffed by MassCompare against tools/act-oracle's --plugin-baseline-folder output.
+            //   --mass-engine-exports-full <oracleFolder>
+            int mef = Array.IndexOf(args, "--mass-engine-exports-full");
+            if (mef >= 0 && args.Length >= mef + 2)
+            {
+                EngineAggregator.RunFull(args[mef + 1]);
+                return;
+            }
+
             SatelliteLogging.Initialize(_satelliteId);
             _log = SatelliteLogging.Log;
             _log.LogInformation(LogEvents.SatelliteBooting,

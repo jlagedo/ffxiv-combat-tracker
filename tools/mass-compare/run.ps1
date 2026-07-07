@@ -21,10 +21,21 @@
   Outputs go to -OutFolder (default tmp\mass-compare, gitignored). They contain real combatant
   names and are not committed.
 
+  PIPELINE-COMPLETENESS-PLAN P5.9 extends this with a second, completeness-oriented diff run
+  alongside the ACT-core percentage diff above: the SAME captured <name>.oracle.tsv swings are also
+  aggregated through (a) the plugin-in-the-loop oracle (tools/act-oracle --plugin-baseline-folder —
+  the real FFXIV_ACT_Plugin.dll's own ACT_UIMods.UpdateACTTables registrations, full enumerated
+  ExportVariables) and (b) our engine's full enumerated ExportVariables (--mass-engine-exports-full,
+  EngineTables.Install()'s registrations — same binary as Fct.Aggregation). MassCompare --plugin
+  diffs those two, reporting every divergence by name (no aggregate percentage stands in for a real
+  gap here). Pass -PluginBaseline to run this second diff; requires $env:FFXIV_PLUGIN_DLL (or
+  -FfxivPluginDll) pointing at a real FFXIV_ACT_Plugin.dll.
+
 .EXAMPLE
   ./tools/mass-compare/run.ps1
   ./tools/mass-compare/run.ps1 -MaxLines 200000        # quick: cap lines per file
   ./tools/mass-compare/run.ps1 -SkipOracle             # reuse existing oracle.tsv captures
+  ./tools/mass-compare/run.ps1 -PluginBaseline -FfxivPluginDll "E:\tmp\plugins\FFXIV_ACT_Plugin_3.0.2.3\FFXIV_ACT_Plugin.dll"
 #>
 [CmdletBinding()]
 param(
@@ -33,7 +44,9 @@ param(
     [int]$MaxLines = 0,            # 0 = all lines
     [string]$ActDir = $env:ACT_DIR,
     [switch]$SkipOracle,
-    [switch]$SkipBuild
+    [switch]$SkipBuild,
+    [switch]$PluginBaseline,       # also run the P5.9 plugin-in-the-loop completeness diff
+    [string]$FfxivPluginDll = $env:FFXIV_PLUGIN_DLL
 )
 $ErrorActionPreference = 'Stop'
 $repo = Resolve-Path "$PSScriptRoot\..\.."
@@ -104,3 +117,30 @@ dotnet run --project "$repo\tools\mass-compare\MassCompare.csproj" -c Debug -- "
 
 Write-Host "`nExports summary: $OutFolder\exports-summary.txt"
 Write-Host "Exports detail:  $OutFolder\exports-diff.txt"
+
+# ---- P5.9: plugin-in-the-loop completeness diff (opt-in, -PluginBaseline) ----
+if ($PluginBaseline) {
+    if (-not $FfxivPluginDll -or -not (Test-Path $FfxivPluginDll)) {
+        throw "PluginBaseline requires a real FFXIV_ACT_Plugin.dll: pass -FfxivPluginDll or set `$env:FFXIV_PLUGIN_DLL."
+    }
+    $env:FFXIV_PLUGIN_DLL = $FfxivPluginDll
+
+    Write-Host "==> plugin-in-the-loop oracle: aggregating the same plugin swings through the real FFXIV_ACT_Plugin's ACT_UIMods tables (baseline)" -ForegroundColor Cyan
+    $p = New-Object System.Diagnostics.Process
+    $p.StartInfo.FileName = $actOracleExe
+    $p.StartInfo.UseShellExecute = $false
+    $p.StartInfo.Arguments = "--plugin-baseline-folder `"$OutFolder`""
+    [void]$p.Start(); $p.WaitForExit()
+    Write-Host "act-oracle --plugin-baseline-folder exit=$($p.ExitCode)"
+
+    Write-Host "==> aggregating the same plugin swings through OUR engine, full enumerated ExportVariables (under test)" -ForegroundColor Cyan
+    $ec = Invoke-Satellite("--mass-engine-exports-full `"$OutFolder`"")
+    Write-Host "mass-engine-exports-full exit=$ec"
+    Get-Content "$OutFolder\_mass-engine-exports-full.log" -Tail 6 -ErrorAction SilentlyContinue
+
+    Write-Host "==> diffing the FULL ExportVariables payload (our engine vs the plugin-in-the-loop oracle)" -ForegroundColor Cyan
+    dotnet run --project "$repo\tools\mass-compare\MassCompare.csproj" -c Debug -- --plugin "$OutFolder"
+
+    Write-Host "`nPlugin-completeness summary: $OutFolder\plugin-exports-summary.txt"
+    Write-Host "Plugin-completeness detail:  $OutFolder\plugin-exports-diff.txt"
+}

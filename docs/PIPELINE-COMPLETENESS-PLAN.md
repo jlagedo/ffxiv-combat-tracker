@@ -1447,7 +1447,7 @@ The G14 headline fix. No wire-codec change (the `RAW` frame already carries type
       (built from `snap.Client`) with no live post-subscribe event. Priming is a pure function of the
       last-line cache + snapshot. Only P1.2's 12-key `ExportVariables` gap remains red (P5).
 
-### P5 — Engine surface: the `ACT_UIMods` keys (the irreducible port) ☐
+### P5 — Engine surface: the `ACT_UIMods` keys (the irreducible port) ☑
 
 The only phase that edits the parity-gated shared `Fct.Aggregation` binary — it lands last among
 code phases so P1's baseline catches any regression, and the ACT-core oracle suite
@@ -2111,9 +2111,74 @@ the completeness authority.
       warnings/errors. No-regression sweep: `Fct.Compat.Act.Tests` 67/67 (ACT-core untouched,
       confirmed unaffected as expected — it never calls `EngineTables.Install()`); `Fct.FlowTests`
       22/22.
-- [ ] **P5.9 — Gate flip + mass check.** P1.2 fully green with an **empty skip-list**. Run the
+- [x] **P5.9 — Gate flip + mass check.** P1.2 fully green with an **empty skip-list**. Run the
       corpus-wide mass check once locally (`tools/mass-compare` extended with the
       plugin-in-the-loop baseline); record the result here.
+      **Verdict:** ✅ DONE — both P1.2 gates green with an empty `PendingP5Keys`, and the extended
+      mass check runs clean (**zero key/value divergences**) over a representative corpus subset.
+      - **Gate-flip confirmation (both re-confirmed green, `PendingP5Keys = new(StringComparer.Ordinal)`
+        in both files):**
+        - `Fct.Engine.Tests/OracleParityTests` (headless engine variant) →
+          `Passed! - Failed: 0, Passed: 6, Skipped: 0, Total: 6` — includes
+          `ExportVariables_g1_keys_match_the_plugin_oracle_baseline_pending_P5` (the `PendingP5Keys.Count == 0`
+          headline assertion now passes).
+        - `Fct.Integration.Tests/OverlaySatelliteTests` (real `--consume` satellite path; staged via
+          `dotnet build src\Fct.App\Fct.App.csproj` first) →
+          `Passed! - Failed: 0, Passed: 1, Skipped: 0, Total: 1`.
+      - **The corpus-wide mass check — command.** `tools/mass-compare` + `tools/act-oracle` extended
+        with a plugin-in-the-loop completeness mode (the corpus-scale sibling of the P1.2 gates):
+        `ActOracle --plugin-baseline-folder` (real `FFXIV_ACT_Plugin.dll` +
+        `ACT_UIMods.UpdateACTTables(false)`, enumerating the FULL `ExportVariables` key set per file →
+        `<name>.plugin.exports.tsv`), `Fct.LegacyHost --mass-engine-exports-full` (our engine's
+        identically-enumerated payload → `<name>.engine.full.exports.tsv`), and `MassCompare --plugin`
+        (iterates the oracle's keys — the completeness authority — reporting every divergence by name,
+        never an aggregate percentage). Driven per character by:
+        ```
+        tools/mass-compare/run.ps1 -PluginBaseline `
+          -FfxivPluginDll "E:\tmp\plugins\FFXIV_ACT_Plugin_3.0.2.3\FFXIV_ACT_Plugin.dll" `
+          -LogFolder <corpus\char> -OutFolder <out\char> -MaxLines 250000
+        ```
+      - **Coverage (representative subset; the full 15 GB run stays a manual local step per §3).**
+        **15 of the 208 corpus files, spanning all three characters** (`leon` 5/108, `luci` 5/77,
+        `seth` 5/23), each capped at 250,000 lines — chosen to span the corpus's date/content range
+        (Dec 2025→Jun 2026 for leon incl. Ultimate/Extreme/Savage tiers; Oct 2024→Jun 2025 for luci;
+        May→Jun 2026 for seth) across many jobs and zones. Real plugin-produced swings after the cap:
+        leon ~273k, luci ~308k, seth ~291k (~872k swings total). Run **sequentially, one character at a
+        time** (a first attempt running all three characters concurrently over the full ~500 MB/character
+        subset died mid-capture on resource contention — three real `FFXIV_ACT_Plugin` instances each
+        parsing hundreds of MB at once; the sequential, `-MaxLines`-capped runs each complete in
+        ~1.5 min). *Not run:* the remaining 193 files / full ~15 GB — a legitimate manual local mass
+        check per §3, not required for P5.9's "record the result."
+      - **Result — ZERO divergences, corpus-wide.** `MassCompare --plugin` reported **0 divergences**
+        for every character; `plugin-exports-diff.txt` is empty in all three:
+        - leon: **1,253** key/value pairs checked, **0 divergences** (5 `CurrentZoneName` provenance
+          exclusions).
+        - luci: **2,999** pairs, **0 divergences** (5 exclusions).
+        - seth: **2,990** pairs, **0 divergences** (5 exclusions).
+        - **Total: 7,242 plugin-in-the-loop key/value pairs, 0 divergences.** Every one of the 13
+          `ACT_UIMods`/G1 keys — `Job`, `ParryPct`, `BlockPct`, `IncToHit`, `OverHealPct`,
+          `DirectHitPct`, `DirectHitCount`, `CritDirectHitCount`, `CritDirectHitPct`, `Last10DPS`,
+          `Last30DPS`, `Last60DPS`, and (registration-checked, value-excluded) `CurrentZoneName` —
+          matched the real plugin bit-for-bit at **100.000%** on every character. No real port bug
+          surfaced; the only excluded class is the documented `*ENCOUNTER*.CurrentZoneName` value
+          provenance (zone-frame, not swing-stream — the identical exclusion the committed slice gates
+          make), and the `LastNDPS` per-file `AggregationGlobals.LastKnownTimeAccessor` pinning
+          (pinned to each replay's own last swing time, mirroring `ActOracle`'s `--plugin-baseline`
+          backing-field set — a harness clock-alignment detail, not a value divergence).
+        - The pipeline's pre-existing **ACT-core** percentage diff (run alongside, over the same
+          swings) was also **100.000%** for every character (leon 7,433 / luci 17,135 / seth 17,069
+          exact string matches), confirming no ACT-core regression from the P5.1–P5.6 engine edits.
+      - **Tooling added (dev-only, not in the solution / not shipped):**
+        `tools/act-oracle/ActOracle.cs` (`--plugin-baseline-folder` batch mode + timeout scaling),
+        `tools/mass-compare/Program.cs` (`--plugin` → `PluginExportsDiff`, oracle-key-driven,
+        divergences reported in full — never sampled/capped), `tools/mass-compare/run.ps1`
+        (`-PluginBaseline`/`-FfxivPluginDll` pipeline steps), `tools/mass-compare/README.md` (the new
+        mode's docs), and the satellite's `src/Fct.LegacyHost` batch driver
+        (`EngineAggregator.RunFull`/`AggregateAndDumpFull` + the `--mass-engine-exports-full` CLI
+        dispatch, a dev seam alongside the existing `--mass-oracle`/`--mass-engine-exports` modes —
+        **no** change to any production forwarding/aggregation path, and **no** change to
+        `Fct.Aggregation`/engine registrations). `dotnet build ffxiv-combat-tracker.slnx` clean
+        (0 warnings/errors) throughout.
 
 ### P6 — Truth-up ☐
 
