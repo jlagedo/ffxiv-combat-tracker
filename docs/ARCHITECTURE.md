@@ -12,7 +12,8 @@ exists only to run today's plugins unmodified on day 1; the terminal goal is the
 the parser included — native on .NET 10, with .NET 4.x, the satellites, and the bridge **deleted**.
 The host is an **enabler** of that migration: from day 1 it ships the forward path (§7, §10) so each
 plugin's *owner* can port their own source onto the typed modern API at their own pace. Every net48
-component below is scaffolding with a demolition date, not permanent architecture.
+component below is transitional scaffolding slated for removal — retired per plugin as its owner
+migrates, and deleted only once the last plugin has crossed — not permanent architecture.
 
 ---
 
@@ -50,7 +51,10 @@ The reference decompiles for all of this live under `E:\dev` (see §13).
    capabilities the legacy log-line format cannot express. Migration is opt-in and
    incremental — never a flag day. **Shipping is gated on this path existing from day 1**: the end
    state is every plugin — the parser included — native on net10 and the net48 runtime removed. The
-   migration is the point, not a bonus; the host exists to enable it.
+   migration is a first-class goal, not a bonus, and the host exists to enable it — but not *only*
+   that: serving end users is equally non-optional. `Fct.App` ships a polished Avalonia shell that is
+   a clear step up from legacy ACT's cluttered WinForms UI — a product users choose on its own merits,
+   not a thin wrapper excused by the developer story (see [`NORTH-STAR.md`](NORTH-STAR.md)).
 3. **The host owns the calculations and the routing; processes enforce it.** All ACT
    calculations (encounter aggregation, DPS, `ExportVariables`) live in the .NET 10 host's
    engine — the single source of truth. Each legacy plugin package runs in its **own**
@@ -420,12 +424,19 @@ through the `Fct.Compat.Act` facade) — held to the real ACT binary corpus-wide
 
 ## 10. Migration ladder + sequencing
 
-**Per plugin (opt-in, incremental):**
-1. **Drop-in** — unmodified DLL runs via the ACT/FFXIV/Overlay surfaces. *v1 success test.*
-2. **Augment** — author adds a `Fct.Abstractions` integration for typed access, still
-   shipping the ACT entrypoint.
-3. **Native** — drops the ACT entrypoint; ships as a first-class net10 plugin; hops from
-   its net48 satellite into the net10 host.
+**Per plugin (opt-in, incremental) — the three stops of the North Star's 1 → 2 → 3 path:**
+1. **Drop-in (legacy)** — unmodified DLL runs via the ACT/FFXIV/Overlay surfaces in its own net48
+   satellite. *v1 success test.* Optionally the author adds a `Fct.Abstractions` integration for
+   typed access while still shipping the ACT entrypoint on the satellite.
+2. **Recompile (net10 legacy)** — author recompiles the source onto net10, keeps the ACT/WinForms
+   programming model via the compat shim (`Fct.Compat.Shim` + its facades), and hops **in-process**
+   into the net10 host — no satellite, no UI rewrite.
+3. **Native (fully ported)** — drops the ACT entrypoint and migrates the UI to Avalonia; ships as a
+   first-class net10 plugin on the typed API.
+
+Reaching the in-process net10 host (stop 2) does **not** require a full port — the compat shim carries
+the legacy programming model in-process so an author can leave the satellite without rewriting their
+UI, then move to stop 3 when they choose.
 
 **Process sequencing:** the host is the center of gravity from day one — it owns the
 aggregation truth and routes every stream; the satellites are per-package compat shells

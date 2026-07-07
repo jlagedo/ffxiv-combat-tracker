@@ -45,6 +45,13 @@ line cache keys on the frame's already-typed `LogMessageType` field only).
    every datum ships as a typed domain event/record in `Fct.Abstractions` (or an opaque routed frame
    in `Fct.Bridge.Contracts`), routed by stream name. The `LogMessageType` wire taxonomy in
    `Fct.Abstractions/LogMessageType.cs` is a wire contract, not plugin identity.
+   *One bounded exception, tracked:* P4.2's `SynthesizeRawLogLine` reconstructs the FFXIV wire shape
+   of the two snapshot-derivable one-shot lines (`01`/`02`) as a fresh-boot priming fallback, and
+   today lives in `SatelliteHost` (`Fct.Host`). That embeds a sliver of FFXIV log-line format in the
+   agnostic host — a tension with this constraint and NORTH-STAR tenet 7. It is scoped narrowly (two
+   line shapes, never decoding, only when no cached line exists); the preferred end-state is to move
+   that synthesis behind the producer/ACT-facade boundary (`Fct.Compat.Act`), where FFXIV/ACT wire
+   specifics already legitimately live, leaving `Fct.Host` format-agnostic.
 2. **The host pipe is the source of truth.** Every datum a consumer reads crosses the host —
    parser satellite → typed frame → host bus/session state → fan-out → consumer-facade projection.
    No fix may satisfy a consumer satellite-locally from data that is not on the pipe; the facade is

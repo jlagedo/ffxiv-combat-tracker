@@ -36,11 +36,16 @@ that migration, not a permanent net48 host.
    A satellite's facade is host-owned code: what a plugin produces, the facade taps and ships
    to the host; what a plugin consumes, the host fans out and the facade projects. The process
    boundary makes this physically enforceable — there is no shared heap left to bypass it.
-4. **The host knows no plugin.** Routing is keyed by stream and capability names, never plugin
-   identity. Plugin-name knowledge is confined to (a) each satellite's *legacy discovery seam*
-   (reproducing the title/status-string reflection the plugins themselves perform — see
-   [`DATA-FLOW.md`](DATA-FLOW.md) §4.1) and (b) the `Fct.App` install-catalog UI. Neither
-   reaches host routing or engine logic.
+4. **The host knows no plugin.** Runtime routing is keyed by stream and capability names, never
+   plugin identity — the bus fans out strictly by subscribed stream token and never inspects which
+   plugin is on the other end. Plugin-name knowledge is confined to (a) each satellite's *legacy
+   discovery seam* (reproducing the title/status-string reflection the plugins themselves perform —
+   see [`DATA-FLOW.md`](DATA-FLOW.md) §4.1), (b) the `Fct.App` install-catalog UI, and (c) the
+   host-side catalog classifier (`PluginClassifier`/`PackageResolver`), which at install/launch time
+   derives a package's default *capability/subscription profile* — role + the stream set its
+   satellite subscribes to — for an unmodified legacy plugin that cannot self-declare one. That is
+   classification, not routing: it picks which streams a satellite asks for, then the runtime bus
+   routes those streams by token alone. None of the three reaches per-frame routing or engine logic.
 5. **The sole-parser directive is untouched.** The real FFXIV_ACT_Plugin remains the only
    parser; the host parses nothing, decodes nothing, and raw bytes/lines cross verbatim.
 

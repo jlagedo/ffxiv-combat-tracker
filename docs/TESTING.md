@@ -171,6 +171,14 @@ and reflection-invokes `ACT_UIMods.UpdateACTTables(false)`, then enumerates the 
 `CombatantData`/`EncounterData.ExportVariables` key set (never a hardcoded list) — committed as
 `tests/Fct.Compat.Act.Tests/fixtures/combat-slice.plugin.exportvars.tsv`.
 
+These keys originate in `FFXIV_ACT_Plugin` (via `ACT_UIMods.UpdateACTTables`), not ACT core, so a
+word on scope: reproducing them in `EngineTables.Install()` is **not** a port of the parser
+(NORTH-STAR tenet 6's "never port parser logic"). They are aggregate *formatters* that run in the
+ACT aggregation hub over swings the real parser has **already** decoded — the same `ExportVariables`
+surface tenet 6 explicitly sanctions the host to reproduce, because consumers (cactbot, OverlayPlugin
+MiniParse) read the full dict off the host. The parser's decode/potency/DoT-HoT-shield logic stays
+its owner's, untouched; what we reproduce is only the host-side aggregation over its output.
+
 Two gates enumerate that same full key set on the consumer/engine side and diff keys **and**
 values against the plugin-in-the-loop baseline:
 
