@@ -249,7 +249,7 @@ Each task produces a recorded verdict (fill in the checkbox line). No production
       consumer-side `LogLine` re-raise (`ConsumerDataSubscription.cs:46-51`) stays (harmless — no target
       binder); after P2 its `seconds` derives from the line-accurate frame timestamp.
 
-### P1 — Differential gates (land red or explicitly skipped) ☐
+### P1 — Differential gates (land red or explicitly skipped) ☑
 
 All gates live in the suites named in [`TESTING.md`](TESTING.md); plugin-in-the-loop gates are
 `[plugin-gated]` and skip cleanly without the real plugins.
@@ -544,10 +544,84 @@ All gates live in the suites named in [`TESTING.md`](TESTING.md); plugin-in-the-
         not a regression). The `--verify-standin` artifact's columns 9–12
         (`Language`/`Region`/`ServerTimestampTicks`/`IsChatLogAvailable`) are ready to observe the real
         forwarded values once P3 lands; no further harness changes are needed on the observability side.
-- [ ] **P1.6 — Alliance party gate.** `Fct.FlowTests` `EventMappingFlowTests` + a satellite gate:
+- [x] **P1.6 — Alliance party gate.** `Fct.FlowTests` `EventMappingFlowTests` + a satellite gate:
       a `PartyChanged` with `PartySize < Members.Count` must preserve **both** end-to-end (today
       `EventMappingFlowTests.cs:14-29` asserts a size derived from `Members.Count`). *Done when:*
       gate runs red.
+      **Verdict:** ✅ DONE, red as designed. Two scaffolding-only record additions plus two gates:
+      - **Inert record-shape additions (no forwarding/fold/consumer wiring):**
+        `src/Fct.Abstractions/Events.cs:112` `PartyChanged` gained a trailing defaulted
+        `int PartySize = 0`; `src/Fct.Abstractions/Session.cs:64` `PartySnapshot` gained a trailing
+        defaulted `int Size = 0`. Both are pure source-compat additions — every existing positional
+        call site (`Fct.FlowTests`, `Fct.Integration.Tests/LateJoinPrimingTests.cs:100`,
+        `Fct.App.Tests/Hosting/GameSnapshotAggregatorTests.cs:44`,
+        `Fct.App.Tests/Hosting/GameEventBusTests.cs:52`,
+        `Fct.Compat.Shim.Tests/DataSubscriptionTests.cs:57`, `Fct.Abstractions.Testing/GameStateFakes.cs:14`,
+        `Fct.App.Tests/BridgeEventFrameTests.cs:54,57`, `Fct.Bridge.Contracts/GameEventFrame.cs:149`,
+        `Fct.Host/SatelliteHost.cs:406`, `Fct.LegacyHost/BridgeForwarder.cs:222`,
+        `Fct.Host/Hosting/GameSnapshotProvider.cs:33`, `Fct.Host/Hosting/GameSnapshotAggregator.cs:127`)
+        keeps compiling unmodified — grepped and confirmed every one omits the new trailing param.
+        **No** producer/fold/consumer path (`BridgeForwarder`, `GameSnapshotAggregator`,
+        `ShimStub`/`ConsumerDataSubscription`/`DataSubscriptionAdapter`) was touched — every one still
+        derives size from `Members.Count`, exactly as today.
+      - **Gate 1 — FlowTests (shim mapping):**
+        `tests/Fct.FlowTests/EventMappingFlowTests.cs`
+        `A5b_AllianceGathering_PartySizeDistinctFromMemberCount_PendingP3`: emits
+        `new PartyChanged(1, Flow.T0, allianceRoster24, PartySize: 8)` through `ShimStub`/
+        `OpTypedConsumerDouble` (the same A5 seam). Asserts `op.PartyList!.Count == 24` (passes — the
+        full alliance roster crosses intact) then `op.PartySize == 8`. **Red today:**
+        `Assert.Equal() Failure: Expected: 8 Actual: 24` — `ShimStub.cs:35`
+        (`PartyListChanged?.Invoke(p.Members, p.Members.Count)`) still derives the SDK `partySize`
+        argument from `Members.Count`, ignoring the new field entirely. The pre-existing
+        `A5_TypedZonePartyEvents_ReachMappedConsumer` (3-member, non-alliance case) is untouched and
+        stays green — it never sets `PartySize`, so the default-0 field changes nothing for it.
+      - **Gate 2 — host-fold (chosen over a real satellite subprocess):**
+        `tests/Fct.App.Tests/Hosting/GameSnapshotAggregatorTests.cs`
+        `Alliance_party_size_survives_the_host_fold_distinct_from_member_count_pending_P3`: adds 24
+        combatants (`PartyMembership.Alliance`) then emits
+        `new PartyChanged(100, T0, allianceRoster24, PartySize: 8)` onto a real `GameEventBus` +
+        running `GameSnapshotAggregator` (the exact production host-fold class). Asserts
+        `snap.Party.Members.Count == 24` (passes) then `snap.Party.Size == 8`. **Red today:**
+        `Assert.Equal() Failure: Expected: 8 Actual: 0` — `GameSnapshotAggregator.Publish()`
+        (`GameSnapshotAggregator.cs:127`) constructs `new PartySnapshot(members, composition)`,
+        never reading `PartyChanged.PartySize`, so `PartySnapshot.Size` stays its default `0`.
+      - **Why host-fold, not a real satellite subprocess:** the plan's own escape hatch offered
+        either; `GameSnapshotAggregator` is the faithful, deterministic home a real satellite
+        ultimately routes through (constraint 2 — the datum crosses the host pipe and folds into
+        `IGameSnapshot`, the exact seam a native plugin reads per constraint 3), and it is
+        fully deterministic (no subprocess, no timing-sensitive wire round-trip) — matching the
+        pattern already used by the suite's other `GameSnapshotAggregatorTests` fold assertions. A
+        real two-satellite subprocess gate would exercise the same fold one layer further out for no
+        additional coverage of the constraint P1.6 gates (the size-preserved claim), at the cost of
+        the ~5-10s-per-run subprocess weight `LineStreamDiffTests`/`LateJoinPrimingTests` already carry.
+      - **Verification:** both gates fail with the exact size-preserved assertion (`8` vs `24`/`0`),
+        never a compile error or harness exception. Whole-solution build
+        (`dotnet build ffxiv-combat-tracker.slnx`) and `dotnet build src\Fct.App\Fct.App.csproj`
+        both clean, 0 warnings/errors. No regressions beyond the two new intentional reds: full
+        `Fct.FlowTests` run 22 tests (21 passed + this 1 new red, was 21/21 before);
+        `Fct.App.Tests` run 173 tests (172 passed + this 1 new red, was 172/172 before);
+        `Fct.Engine.Tests` (9 passed + the pre-existing P1.2 red, unchanged);
+        `Fct.Parser.Legacy.Tests` (9 passed + the pre-existing P1.5 red, unchanged);
+        `Fct.Compat.Act.Tests` (67/67) and `Fct.Compat.Shim.Tests` (56/56) both fully green;
+        `Fct.Integration.Tests` run 45 tests, 35 passed, 3 skipped (env-gated
+        `FrameFixtureGenerator`/`DistTreeGateTests`/`PacketDispatchTests`, unrelated), 7 failed —
+        exactly the documented pre-existing reds (P1.2 `OverlaySatelliteTests` + P1.3
+        `LineStreamDiffTests`×2 + P1.4 `LateJoinPrimingTests`×2 + P1.5 `RepositorySurfaceLiveTests`)
+        plus the known load-sensitive `FourRealPackagesTests` flake — none of these six suites'
+        code was touched by this task, and none regressed.
+      - **Handoff for P3:** P3.3 must forward the real SDK `partySize` in `OnPartyListChanged`
+        (`BridgeForwarder.cs:221-222`, currently discarded per G7); P3.4 must fold
+        `PartyChanged.PartySize` into `PartySnapshot.Size` in `GameSnapshotAggregator.Publish()`
+        (`:127`) — flips Gate 2 green; P3.5 must rewire `ShimStub.cs:35`,
+        `ConsumerDataSubscription.Raise` (`:56`), and the net10 shim's
+        `Fct.Compat.Shim/DataSubscriptionAdapter.cs:77` to re-raise `p.PartySize` instead of
+        `Members.Count` — flips Gate 1 green. No existing test needs updating/deleting for this
+        flip: the old `A5_TypedZonePartyEvents_ReachMappedConsumer` never sets `PartySize`
+        (defaults to 0, and 0 never equals `Members.Count` for its 3-member case — wait, it asserts
+        `op.PartySize == 3` today via the `Members.Count` derivation; once P3.5 switches to
+        `p.PartySize`, that call site must pass `PartySize: 3` explicitly or the assertion goes red
+        for the *wrong* reason. P3.5 must update `A5_TypedZonePartyEvents_ReachMappedConsumer`'s
+        `new PartyChanged(2, Flow.T0, ...)` call to add `PartySize: 3` alongside the wiring change).
 
 ### P2 — The verbatim line stream: one tap ☐
 

@@ -108,8 +108,14 @@ namespace Fct.Abstractions
     public sealed record ZoneChanged(long Sequence, DateTimeOffset Timestamp, uint ZoneId, string ZoneName)
         : GameEvent(Sequence, Timestamp);
 
-    /// <summary>The party/alliance roster changed (PartyList).</summary>
-    public sealed record PartyChanged(long Sequence, DateTimeOffset Timestamp, IReadOnlyList<uint> Members)
+    /// <summary>
+    /// The party/alliance roster changed (PartyList). <paramref name="PartySize"/> is the SDK's
+    /// <c>PartyListChanged(partyList, partySize)</c> second argument — in alliance content it is the
+    /// player's 8-person party size, distinct from (and smaller than) <see cref="Members"/>'s up-to-24
+    /// visible roster. Defaulted for source compatibility with existing call sites; not yet forwarded
+    /// or folded anywhere (see docs/PIPELINE-COMPLETENESS-PLAN.md P1.6/P3).
+    /// </summary>
+    public sealed record PartyChanged(long Sequence, DateTimeOffset Timestamp, IReadOnlyList<uint> Members, int PartySize = 0)
         : GameEvent(Sequence, Timestamp);
 
     /// <summary>The local player identity changed (ChangePrimaryPlayer).</summary>

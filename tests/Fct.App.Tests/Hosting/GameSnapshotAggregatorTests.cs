@@ -59,6 +59,36 @@ public class GameSnapshotAggregatorTests
         bus.Dispose();
     }
 
+    // P1.6 (alliance party gate) — G7: PartyChanged.PartySize (the SDK's 8-person party size) must
+    // cross the host fold distinct from the up-to-24 alliance Members list. Chosen as the
+    // "satellite gate" home per the plan's own escape hatch: GameSnapshotAggregator is the faithful,
+    // deterministic host-fold path that a real satellite ultimately routes through (constraint 2 —
+    // the datum crosses the host pipe), without the added weight/nondeterminism of a real subprocess.
+    [Fact]
+    public async Task Alliance_party_size_survives_the_host_fold_distinct_from_member_count_pending_P3()
+    {
+        var (bus, provider, agg) = await NewAsync();
+
+        var allianceRoster = Enumerable.Range(1, 24).Select(i => (uint)i).ToArray();
+        foreach (var id in allianceRoster)
+            bus.Emit(new CombatantAdded(id, T0, Combatant(id, $"Member{id}", PartyMembership.Alliance)));
+        bus.Emit(new PartyChanged(100, T0, allianceRoster, PartySize: 8));
+
+        Assert.True(TestWait.Until(() => provider.Current.Party.Members.Count == 24));
+        var snap = provider.Current;
+
+        // The full 24-member alliance roster crosses intact regardless of the gate's outcome.
+        Assert.Equal(24, snap.Party.Members.Count);
+
+        // RED today: GameSnapshotAggregator.Publish() (GameSnapshotAggregator.cs:127) constructs
+        // PartySnapshot(members, composition) — it never reads PartyChanged.PartySize, so
+        // PartySnapshot.Size stays its default 0 instead of the true 8-person party size.
+        Assert.Equal(8, snap.Party.Size);
+
+        await agg.StopAsync(CancellationToken.None);
+        bus.Dispose();
+    }
+
     [Fact]
     public async Task Removes_combatants_and_updates_hp()
     {

@@ -60,8 +60,14 @@ namespace Fct.Abstractions
         Actor? Find(uint actorId);
     }
 
-    /// <summary>The party/alliance roster at snapshot time.</summary>
-    public sealed record PartySnapshot(IReadOnlyList<Actor> Members, PartyMembership Composition);
+    /// <summary>
+    /// The party/alliance roster at snapshot time. <paramref name="Size"/> mirrors
+    /// <see cref="PartyChanged.PartySize"/> (the SDK's 8-person party size, distinct from an
+    /// alliance's up-to-24 <see cref="Members"/>). Defaulted for source compatibility with existing
+    /// call sites; not yet folded from <see cref="PartyChanged"/> anywhere (see
+    /// docs/PIPELINE-COMPLETENESS-PLAN.md P1.6/P3).
+    /// </summary>
+    public sealed record PartySnapshot(IReadOnlyList<Actor> Members, PartyMembership Composition, int Size = 0);
 
     /// <summary>A zone identity.</summary>
     public readonly record struct ZoneRef(uint Id, string Name);
