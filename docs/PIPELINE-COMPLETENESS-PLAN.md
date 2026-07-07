@@ -2084,11 +2084,33 @@ the completeness authority.
       registration and exclude its value for provenance (per the P1.2 verdict), and both are green.
       Existing registration matches → left in place (§3 "Do NOT edit CombatTables.cs" also forbids
       moving it).
-- [ ] **P5.8 — Modern-API assertion.** `EncounterProjector` (`:55-69`) iterates the registered
+- [x] **P5.8 — Modern-API assertion.** `EncounterProjector` (`:55-69`) iterates the registered
       formatters, so the keys appear in `EncounterSnapshot/CombatantMetrics.ExportVariables`
       automatically once `EngineTables.Install()` registers them (`ModernEncounterEngine.cs:47`).
       Add a `Fct.FlowTests`/`Fct.Engine.Tests` assertion that `ExportVariables["Job"]` is non-empty
       on a native-plugin `EncounterSnapshot`.
+      **Verdict:** ✅ DONE, test-only, no production change. Added
+      `OracleParityTests.Projected_snapshot_carries_the_registered_Job_export_variable`
+      (`tests/Fct.Engine.Tests/OracleParityTests.cs`), reusing the same production input path as
+      `BuildThroughEngine` (session bus → `ModernEncounterEngine` → `EncounterProjector.Project`,
+      extracted into a shared `NewStartedEngine()` helper so both call sites construct/start the
+      engine identically). The test emits one `SetEncounterRequested` + one `CombatSwing` — attacker
+      `"YOU"` (matching `AggregationGlobals.CharNameAccessor`'s default, the same anchor name the
+      oracle fixtures use in their attacker column) carrying `Tags["Job"] = "War"` — through the
+      engine, projects the resulting `EncounterData` with `EncounterProjector.Project`, and asserts on
+      the `CombatantMetrics` for `"YOU"`: `ExportVariables.TryGetValue("Job", ...)` succeeds, the value
+      is neither null/whitespace, and equals `"War"`. This demonstrates modern-API reachability end to
+      end: a native net10 plugin never touches `EncounterData`/`CombatantData` — it reads
+      `EncounterSnapshot`/`CombatantMetrics` off `IEncounterService` — so asserting on the *projected*
+      snapshot (not the aggregation engine's own `ExportVariables` dictionary, which the tests above
+      already cover) proves the P5.1-P5.7 registered keys are reachable from that exact consumer
+      surface, closing constraint 3 (§2) for `Job` as the representative key (the same iteration in
+      `EncounterProjector` carries every other registered key identically).
+      **Result:** `dotnet test tests/Fct.Engine.Tests/Fct.Engine.Tests.csproj` → **32/32** (was 31/31 —
+      one new test, zero regressions). `dotnet build ffxiv-combat-tracker.slnx` clean, 0
+      warnings/errors. No-regression sweep: `Fct.Compat.Act.Tests` 67/67 (ACT-core untouched,
+      confirmed unaffected as expected — it never calls `EngineTables.Install()`); `Fct.FlowTests`
+      22/22.
 - [ ] **P5.9 — Gate flip + mass check.** P1.2 fully green with an **empty skip-list**. Run the
       corpus-wide mass check once locally (`tools/mass-compare` extended with the
       plugin-in-the-loop baseline); record the result here.

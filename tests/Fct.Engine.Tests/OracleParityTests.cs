@@ -39,15 +39,23 @@ namespace Fct.Engine.Tests
 
         private static string Fixture(string name) => Path.Combine(AppContext.BaseDirectory, "fixtures", name);
 
-        // Feed the oracle swing stream through a real ModernEncounterEngine and return the live,
-        // still-active encounter it aggregated — the exact input path the bridge drives in production.
-        private static EncounterData BuildThroughEngine(string slice)
+        // A freshly wired, started engine on its own session/bus — extracted so [Fact] bodies never
+        // call the blocking StartAsync(...).GetAwaiter().GetResult() themselves (xUnit1031).
+        private static (FakeGameSession Session, ModernEncounterEngine Engine) NewStartedEngine()
         {
             var session = new FakeGameSession();
             var engine = new ModernEncounterEngine(session, NullLogger<ModernEncounterEngine>.Instance);
             // Subscribe the engine to the bus; InMemoryEventBus dispatches synchronously on Emit, so the
             // whole stream is folded deterministically with no polling.
             engine.StartAsync(CancellationToken.None).GetAwaiter().GetResult();
+            return (session, engine);
+        }
+
+        // Feed the oracle swing stream through a real ModernEncounterEngine and return the live,
+        // still-active encounter it aggregated — the exact input path the bridge drives in production.
+        private static EncounterData BuildThroughEngine(string slice)
+        {
+            var (session, engine) = NewStartedEngine();
 
             long seq = 0;
             bool opened = false;
@@ -191,6 +199,40 @@ namespace Fct.Engine.Tests
             Assert.True(PendingP5Keys.Count == 0,
                 "P1.2 pending P5 registration of " + PendingP5Keys.Count + " ExportVariables key(s): " +
                 string.Join(", ", PendingP5Keys.OrderBy(k => k, StringComparer.Ordinal)));
+        }
+
+        // PIPELINE-COMPLETENESS-PLAN P5.8: a native net10 plugin never touches EncounterData/
+        // CombatantData (the Advanced_Combat_Tracker aggregation types) — it reads the projected
+        // EncounterSnapshot/CombatantMetrics off IEncounterService. This proves the registered
+        // ACT_UIMods keys (P5.1-P5.7) are reachable from THAT surface, not just the aggregation
+        // engine's own ExportVariables dictionaries the tests above assert against directly.
+        [Fact]
+        public void Projected_snapshot_carries_the_registered_Job_export_variable()
+        {
+            Thread.CurrentThread.CurrentCulture = CultureInfo.InvariantCulture;
+
+            var (session, engine) = NewStartedEngine();
+
+            var start = DateTimeOffset.Parse("2026-06-25T21:00:00Z", CultureInfo.InvariantCulture, DateTimeStyles.RoundtripKind);
+            var jobTag = new Dictionary<string, object> { ["Job"] = "War" };
+
+            // "YOU" is AggregationGlobals.charName's default (unset by any facade in this headless
+            // engine test) — GetAllies() anchors the friend/foe partition on that name, exactly as the
+            // oracle fixtures do (combat-slice.oracle.tsv's attacker column is literally "YOU").
+            session.Bus.Emit(new SetEncounterRequested(0, start, "YOU", "Training Dummy"));
+            session.Bus.Emit(new CombatSwing(1, start, 0, false, "", 100, 1,
+                "Melee", "YOU", "Direct", "Training Dummy", jobTag));
+
+            var enc = engine.Lifecycle.ActiveZone.ActiveEncounter;
+            Assert.NotNull(enc);
+            var snapshot = EncounterProjector.Project(enc!);
+
+            var tester = snapshot.Combatants.Single(c => c.Name == "YOU");
+            Assert.True(tester.ExportVariables.TryGetValue("Job", out var job),
+                "EncounterSnapshot/CombatantMetrics.ExportVariables is missing the 'Job' key — " +
+                "a native plugin reading IEncounterService would never see it.");
+            Assert.False(string.IsNullOrWhiteSpace(job), "ExportVariables[\"Job\"] is present but empty/whitespace.");
+            Assert.Equal("War", job);
         }
 
         // The EncounterProjector face the UI/replica read must carry the same oracle numbers: the
