@@ -49,6 +49,7 @@ namespace Fct.Host
                         types.Add(typeof(RepositorySnapshot));
                         types.Add(typeof(ResourceDictionaryForwarded));
                         types.Add(typeof(GameProcessChanged));
+                        types.Add(typeof(SessionStateChanged));
                         break;
                     default:
                         break; // unknown token — ignored

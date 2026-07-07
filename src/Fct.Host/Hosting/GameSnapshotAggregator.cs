@@ -29,6 +29,7 @@ internal sealed class GameSnapshotAggregator : IHostedService
             typeof(CombatantAdded), typeof(CombatantRemoved), typeof(HpUpdated),
             typeof(ZoneChanged), typeof(PartyChanged), typeof(PrimaryPlayerChanged),
             typeof(RepositorySnapshot), typeof(ResourceDictionaryForwarded), typeof(GameProcessChanged),
+            typeof(SessionStateChanged),
         },
         IncludeRawLogLines: false);
 
@@ -41,8 +42,14 @@ internal sealed class GameSnapshotAggregator : IHostedService
     private uint _playerId;
     private ZoneRef _zone;
     private HashSet<uint> _party = new();
+    private int _partySize;
     private readonly Dictionary<ResourceKind, IReadOnlyDictionary<uint, string>> _resources = new();
     private int _pid;
+    private string _clientVersion = "0.0";
+    private GameRegion _clientRegion = GameRegion.Unknown;
+    private GameLanguage _clientLanguage = GameLanguage.Unknown;
+    private TimeSpan _serverClockOffset = TimeSpan.Zero;
+    private bool _isChatLogAvailable;
 
     private IDisposable? _subscription;
 
@@ -86,6 +93,7 @@ internal sealed class GameSnapshotAggregator : IHostedService
                 break;
             case PartyChanged p:
                 _party = new HashSet<uint>(p.Members);
+                _partySize = p.PartySize;
                 break;
             case PrimaryPlayerChanged pp:
                 _playerId = pp.ActorId;
@@ -101,6 +109,13 @@ internal sealed class GameSnapshotAggregator : IHostedService
                 break;
             case GameProcessChanged gp:
                 _pid = gp.Pid;
+                break;
+            case SessionStateChanged s:
+                _clientVersion = s.GameVersion;
+                _clientRegion = s.Region;
+                _clientLanguage = s.Language;
+                _serverClockOffset = s.ServerClockOffset;
+                _isChatLogAvailable = s.IsChatLogAvailable;
                 break;
             default:
                 return; // not state-relevant — nothing to republish
@@ -123,8 +138,18 @@ internal sealed class GameSnapshotAggregator : IHostedService
             ? (IResourceCatalog)EmptyResourceCatalog.Instance
             : new LiveResourceCatalog(new Dictionary<ResourceKind, IReadOnlyDictionary<uint, string>>(_resources));
 
+        // IsRunning/IsForeground have no forwarded source yet (a tracked open item) and stay the
+        // same hardcoded values this fold has always published; every other field is the working
+        // state folded from GameProcessChanged/SessionStateChanged above.
+        var client = new GameClient(_clientVersion, _clientRegion, _clientLanguage, IsRunning: true, IsForeground: false)
+        {
+            ProcessId = _pid == 0 ? null : _pid,
+            ServerClockOffset = _serverClockOffset,
+            IsChatLogAvailable = _isChatLogAvailable,
+        };
+
         _provider.Publish(new ImmutableGameSnapshot(
-            actors, player, _zone, new PartySnapshot(members, composition), resources, _pid));
+            actors, player, _zone, new PartySnapshot(members, composition, _partySize), resources, client));
     }
 }
 
@@ -157,23 +182,23 @@ internal sealed class ImmutableGameSnapshot : IGameSnapshot
     private readonly IReadOnlyList<Actor> _actors;
     private readonly GameClient _client;
 
+    private static readonly GameClient DefaultClient =
+        new("0.0", GameRegion.Unknown, GameLanguage.Unknown, IsRunning: true, IsForeground: false);
+
     public ImmutableGameSnapshot(IReadOnlyList<Actor> actors, Actor? player, ZoneRef zone, PartySnapshot party)
-        : this(actors, player, zone, party, EmptyResourceCatalog.Instance, 0)
+        : this(actors, player, zone, party, EmptyResourceCatalog.Instance, DefaultClient)
     {
     }
 
     public ImmutableGameSnapshot(IReadOnlyList<Actor> actors, Actor? player, ZoneRef zone, PartySnapshot party,
-        IResourceCatalog resources, int pid)
+        IResourceCatalog resources, GameClient client)
     {
         _actors = actors;
         Player = player;
         Zone = zone;
         Party = party;
         Resources = resources;
-        _client = new GameClient("0.0", GameRegion.Unknown, GameLanguage.Unknown, IsRunning: true, IsForeground: false)
-        {
-            ProcessId = pid == 0 ? null : pid,
-        };
+        _client = client ?? throw new ArgumentNullException(nameof(client));
     }
 
     public Actor? Player { get; }

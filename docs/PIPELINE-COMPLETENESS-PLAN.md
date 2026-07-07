@@ -912,11 +912,88 @@ The G14 headline fix. No wire-codec change (the `RAW` frame already carries type
         enum maps (`MapLanguage`/`MapRegion`) are the ones P3.4/P3.5 should reuse rather than re-deriving
         (P3.4 folds the already-mapped `SessionStateChanged.Language`/`.Region` onto `IGameSnapshot.Client`
         — no further SDK-type mapping needed on that side).
-- [ ] **P3.4 — Host fold + routing.** `src/Fct.Host/StreamCatalog.cs`: route `SessionStateChanged`
+- [x] **P3.4 — Host fold + routing.** `src/Fct.Host/StreamCatalog.cs`: route `SessionStateChanged`
       on the existing `repository` stream (`StreamCatalog.cs:48-52`).
       `src/Fct.Host/Hosting/GameSnapshotAggregator.cs`: fold `SessionStateChanged` into
       `IGameSnapshot.Client` and `PartyChanged.PartySize` into `PartySnapshot.Size`. *Done when:* a
       flow test observes the env on `IGameSnapshot.Client` (native-plugin reachability, constraint 3).
+      **Verdict:** ✅ DONE, P1.6 host-fold gate flipped green.
+      - **Routing (`src/Fct.Host/StreamCatalog.cs:48-53`):** `SatelliteProtocol.StreamRepository`'s
+        type list gained `typeof(SessionStateChanged)`, alongside the existing
+        `RepositorySnapshot`/`ResourceDictionaryForwarded`/`GameProcessChanged` — a subscriber asking
+        for the `repository` stream now also fans in the env frame, on the same "no plugin identity"
+        stream-name routing the other one-shot state already uses.
+      - **Fold (`src/Fct.Host/Hosting/GameSnapshotAggregator.cs`):** `StateFilter` gained
+        `typeof(SessionStateChanged)`. New working-state fields `_partySize` (int),
+        `_clientVersion`/`_clientRegion`/`_clientLanguage`/`_serverClockOffset`/`_isChatLogAvailable`
+        (defaulted to the class's pre-existing hardcoded values — `"0.0"`/`Unknown`/`Unknown`/
+        `TimeSpan.Zero`/`false` — so a snapshot taken before any `SessionStateChanged` arrives is
+        unchanged from today). `OnEvent`: `PartyChanged` now also sets `_partySize = p.PartySize`; a
+        new `SessionStateChanged` case sets all five client fields from the event. `Publish()` now
+        builds a `GameClient` from the tracked fields —
+        `new GameClient(_clientVersion, _clientRegion, _clientLanguage, IsRunning: true, IsForeground:
+        false) { ProcessId = _pid == 0 ? null : _pid, ServerClockOffset = _serverClockOffset,
+        IsChatLogAvailable = _isChatLogAvailable }` — preserving `_pid` (folded independently from
+        `GameProcessChanged`) and the still-hardcoded `IsRunning`/`IsForeground` (no forwarded source
+        exists yet, an already-tracked open item, unaffected by this task) — and passes
+        `new PartySnapshot(members, composition, _partySize)`. `ImmutableGameSnapshot`'s constructor
+        was reshaped to take a pre-built `GameClient` instead of a bare `pid` int (the only call site
+        is `Publish()` itself; no other file constructs it), with a `DefaultClient` static covering the
+        4-arg test-convenience overload. `GameSnapshotProvider`'s `EmptySnapshot` fallback was not
+        touched — it already builds its own literal `GameClient` and needs no session-state input.
+      - **New flow test** (`tests/Fct.App.Tests/Hosting/GameSnapshotAggregatorTests.cs`)
+        `SessionStateChanged_folds_env_fields_into_client_without_clobbering_process_fields`: emits a
+        `GameProcessChanged(Pid: 4321)` then a `SessionStateChanged` (version
+        `"2025.07.01.0000.0000"`, `GameLanguage.Korean`, `GameRegion.Korean`,
+        `ServerClockOffset: TimeSpan.FromSeconds(5)`, `IsChatLogAvailable: true`) onto a real
+        `GameEventBus` + running `GameSnapshotAggregator` (the production host-fold class, same pattern
+        as the P1.6 gate) and asserts `snap.Client.Version`/`.Region`/`.Language`/`.ServerClockOffset`/
+        `.IsChatLogAvailable` all reflect the event **and** `snap.Client.ProcessId` still reads `4321`
+        from the earlier, independently-folded `GameProcessChanged` — proving the env fold does not
+        clobber the process fields, and demonstrating native-plugin reachability (constraint 3) since
+        `IGameSnapshot.Client` is the exact seam a net10 plugin reads.
+      - **Empirical gate flip:**
+        `dotnet test tests\Fct.App.Tests\Fct.App.Tests.csproj --filter "FullyQualifiedName~GameSnapshotAggregatorTests"`
+        → **7/7 passed**, including
+        `Alliance_party_size_survives_the_host_fold_distinct_from_member_count_pending_P3` (the P1.6
+        host-fold gate — was 8-vs-0, now green) and this task's new env-fold test. Full
+        `Fct.App.Tests` run: **181/181 passed** (was 179 passed + 1 red = 180 after P3.2's additions;
+        +1 new test here, and the former red flipped green).
+      - **P1.5/A5b confirmed still red, unchanged:**
+        `dotnet test tests\Fct.Parser.Legacy.Tests\Fct.Parser.Legacy.Tests.csproj --filter
+        "FullyQualifiedName~ConsumerDataRepositoryStubTests"` → 1/2, same message ("expected
+        ConsumerDataRepository to hold an Apply()-fed Language backing field (P3.5) — none exists
+        yet"). `dotnet test tests\Fct.Integration.Tests\Fct.Integration.Tests.csproj --filter
+        "FullyQualifiedName~RepositorySurfaceLiveTests"` → still red, same `""`-vs-`"0.0"` assertion
+        (this fold is host-side state only; P3.5's consumer-side `ConsumerDataRepository` stubs are
+        untouched, exactly per the task boundary). `dotnet test tests\Fct.FlowTests\Fct.FlowTests.csproj
+        --filter "FullyQualifiedName~EventMappingFlowTests"` → 21/22, `A5b_AllianceGathering_…` still
+        red with the identical `Expected: 8 Actual: 24` (`ShimStub.cs` still derives the SDK
+        `partySize` argument from `Members.Count` — P3.5's job).
+      - **No regressions:** `dotnet build ffxiv-combat-tracker.slnx` clean, 0 warnings/errors.
+        `Fct.Engine.Tests` 9/10 (unchanged 12-key P1.2 red). `Fct.Parser.Legacy.Tests` 13/14 (unchanged
+        P1.5 structural red). `Fct.Compat.Act.Tests` 67/67, `Fct.Compat.Shim.Tests` 56/56 fully green.
+        `Fct.Integration.Tests` full run: 46 tests, 36 passed, 5 skipped (env-gated
+        `DistTreeGateTests`/`FrameFixtureGenerator`/`SatelliteIntegrationTests`/`PacketDispatchTests` +
+        the plugin-gated `LineStreamDiffTests` clean skip), 5 failed — the same pre-existing intentional
+        reds (`LateJoinPrimingTests`×2, `RepositorySurfaceLiveTests`, `OverlaySatelliteTests`'s 12-key
+        `PendingP5Keys` message) plus the known `FourRealPackagesTests` run-ordering flake, reconfirmed
+        green in isolation (1/1) on a standalone re-run — no code in this task touches
+        `--stand-in`/`--verify-standin` or the satellite topology. No project besides
+        `Fct.Host`/`Fct.App.Tests` was edited.
+      - **Handoff for P3.5:** consumer-side work only remains. (1) `ConsumerDataRepository`
+        (`ConsumerDataSurface.cs`): add `Apply()`-fed backing fields for `Language`/`Region`, replace
+        the `GetGameVersion`/`GetServerTimestamp` stubs with the forwarded mirror (`UtcNow + offset`),
+        delete the five stub literals (`:156-160`) — flips `ConsumerDataRepositoryStubTests` and
+        `RepositorySurfaceLiveTests` green. Note this needs its own env datum on the wire at the
+        satellite boundary (the `STATE` frame decoded consumer-side) — P3.4 only folds it into the
+        **host**'s `IGameSnapshot`; the satellite-side consumer projection is a separate read of the
+        same routed `SessionStateChanged`/`STATE` frame via the `repository` stream this task just
+        wired up, not a re-derivation. (2) `ShimStub.cs`/`ConsumerDataSubscription.Raise`/
+        `Fct.Compat.Shim/DataSubscriptionAdapter.cs:77` re-raise `p.PartySize` instead of
+        `Members.Count` — flips `EventMappingFlowTests.A5b` green (remember to add `PartySize: 3` to
+        `A5_TypedZonePartyEvents_ReachMappedConsumer`'s call site per the P1.6 verdict's own handoff, so
+        that pre-existing green test doesn't go red for the wrong reason).
 - [ ] **P3.5 — Consumer projections.** `ConsumerDataRepository` (`ConsumerDataSurface.cs`): `Apply`
       stores the forwarded env; serve
       `GetGameVersion/GetSelectedLanguageID/GetGameRegion/GetServerTimestamp` (offset-corrected:

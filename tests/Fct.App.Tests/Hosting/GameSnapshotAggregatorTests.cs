@@ -89,6 +89,37 @@ public class GameSnapshotAggregatorTests
         bus.Dispose();
     }
 
+    // P3.4 (host fold + routing) — constraint 3 (modern-API parity): a SessionStateChanged env frame
+    // folds into IGameSnapshot.Client, the exact seam a native net10 plugin reads. Process fields
+    // (IsRunning/IsForeground/ProcessId) folded independently (GameProcessChanged) must survive
+    // untouched alongside the newly-folded env fields.
+    [Fact]
+    public async Task SessionStateChanged_folds_env_fields_into_client_without_clobbering_process_fields()
+    {
+        var (bus, provider, agg) = await NewAsync();
+
+        bus.Emit(new GameProcessChanged(1, T0, 4321));
+        Assert.True(TestWait.Until(() => provider.Current.Client.ProcessId == 4321));
+
+        bus.Emit(new SessionStateChanged(2, T0, "2025.07.01.0000.0000", GameLanguage.Korean,
+            GameRegion.Korean, TimeSpan.FromSeconds(5), IsChatLogAvailable: true));
+
+        Assert.True(TestWait.Until(() => provider.Current.Client.Version == "2025.07.01.0000.0000"));
+        var snap = provider.Current;
+
+        Assert.Equal("2025.07.01.0000.0000", snap.Client.Version);
+        Assert.Equal(GameRegion.Korean, snap.Client.Region);
+        Assert.Equal(GameLanguage.Korean, snap.Client.Language);
+        Assert.Equal(TimeSpan.FromSeconds(5), snap.Client.ServerClockOffset);
+        Assert.True(snap.Client.IsChatLogAvailable);
+
+        // The process fold from GameProcessChanged must survive the later SessionStateChanged fold.
+        Assert.Equal(4321, snap.Client.ProcessId);
+
+        await agg.StopAsync(CancellationToken.None);
+        bus.Dispose();
+    }
+
     [Fact]
     public async Task Removes_combatants_and_updates_hp()
     {
