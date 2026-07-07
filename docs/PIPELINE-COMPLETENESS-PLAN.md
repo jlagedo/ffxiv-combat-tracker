@@ -1858,11 +1858,111 @@ the completeness authority.
         task's pattern makes it likely if the frames corpus carries swing timing the oracle's
         swings-only dump doesn't reproduce identically) — verify empirically as this task did, don't
         assume.
-- [ ] **P5.5 — `MasterSwing.ColumnDefs`:** register `StatusDuration` and the plugin's swing columns
+- [x] **P5.5 — `MasterSwing.ColumnDefs`:** register `StatusDuration` and the plugin's swing columns
       (`Potency`, `StatusEffects`, `DoTBase`, `BuffByte1-3`, `CritRate`, `CritEffects`, `DHRate`,
       `DHEffects`) for any consumer reading `MasterSwing.GetColumnByName`. Source: the
       `MasterSwing.ColumnDefs.Add(...)` block in `ACT_UIMods.cs`. Lower value — gate against the
       baseline.
+      **Verdict:** ✅ DONE. `src/Fct.Aggregation/EngineTables.cs` `Install()` gained a new standalone
+      `MasterSwing.ColumnDefs` block (no `CombatantData`/`AttackType`/`DamageTypeData` chain — these
+      are read only via `MasterSwing.GetColumnByName` directly), ported verbatim from the decompile
+      (`E:\dev\FFXIV_ACT_Plugin\_decompiled\FFXIV_ACT_Plugin\FFXIV_ACT_Plugin\ACT_UIMods.cs`):
+      - **No base `MasterSwing.ColumnDefs` set existed before this task** — confirmed by grep:
+        `CombatTables.cs` never references `MasterSwing`, and no other file in `src/` registered
+        `MasterSwing.ColumnDefs` (the one prior hit was a comment, `EngineTables.cs:142`, from P5.3
+        documenting that `OverHealPct`'s chain does *not* reach it). This is a wholly new block.
+      - **`StatusDuration`** (`ACT_UIMods.cs:1880-1897`) — registered **unconditionally**, matching
+        the decompile: it sits *before* `UpdateACTTables`'s `if (showDebug)` gate (`:2520`), unlike
+        the eight columns below. Reads the `"StatusDuration"` tag (P0.4: `d`/double) via a direct
+        `(double)` cast — safe per P0.4's tag-type table.
+      - **`Potency`** (`:2522-2539`), **`StatusEffects`** (`:2541-2558`), **`DoTBase`** (`:2560-2577`,
+        tag key `"dotbase"`), **`BuffByte1`/`BuffByte2`/`BuffByte3`** (`:2579-2634`), **`CritRate`**
+        (`:2636-2653`), **`CritEffects`** (`:2655-2672`), **`DHRate`** (`:2674-2691`), **`DHEffects`**
+        (`:2693-2710`) — all nine ported verbatim from inside the decompile's `if (showDebug)` block.
+        Our engine has no analogous debug-mode toggle, so per this task's own column list (which
+        names exactly these nine, matching the P5.4 handoff) they are registered **unconditionally** —
+        available to any consumer, gated by nothing. `CritRate`'s decompile quirk (sort-comparer "no
+        tag" fallback `"0"` vs. the cell/sql fallback `""`) is preserved faithfully, not "fixed".
+        Case/key match confirmed against both the decompile body and P0.4's tag list: `potency` and
+        `dotbase` are **lowercase** tag keys (unlike `StatusDuration`/`StatusEffects`/`BuffByte*`/
+        `CritRate`/`CritEffects`/`DHRate`/`DHEffects`, which match their `ColumnDef` name's casing).
+      - **Deliberately excluded (out of this task's scope, per the exact P5.4 handoff list):** the
+        decompile's sibling standalone `MasterSwing.ColumnDefs["OverHeal"]` (`:2206-2223`) and
+        `["DirectHit"]` (`:2225-2242`) registrations. Neither is read through any chain this plan
+        ports — `OverHealPct`'s resolution reads `AttackType.Overheal()` (P5.1), which sums
+        `Tags["overheal"]` directly and never calls `GetColumnByName("OverHeal")` (confirmed in the
+        P5.3 verdict); no registered key resolves through a raw `MasterSwing.GetColumnByName
+        ("DirectHit")` either.
+      - **Codec-safety deviation from a verbatim port, called out explicitly:** the decompile's
+        `DoTBase` cell hard-casts `(uint)Data.Tags["dotbase"]`. P0.4's codec note flags this
+        specific tag's boxed-type identity across the wire as the one uncertain case in the producer
+        tag set. Traced firsthand for this task: the real plugin boxes it as `uint`
+        (`FFXIV_ACT_Plugin.Parse.DoTEffectEntry.DoTBaseDamage`, `public uint`), `BridgeForwarder`
+        forwards `MasterSwing.Tags` verbatim with no copy/convert, and the wire codec
+        (`GameEventFrame.cs` `TagType`/`DecodeTagValue`) has an explicit `uint => 'u'` case that
+        round-trips a uint-boxed tag as `uint` — so today it should in fact survive as `uint`, same
+        as P5.1–P5.4's `long`/`double` tags. Given P0.4's own text still flags this one as uncertain
+        ("would cross as string s"), the port reads it via `Convert.ToUInt32(Data.Tags["dotbase"],
+        CultureInfo.InvariantCulture)` instead of the decompile's hard cast — identical formatted
+        output ("0", invariant) whichever boxed type actually arrives, so it cannot throw either way.
+        This is the only cell body that isn't a byte-for-byte port of the decompile's cast expression;
+        every other cell/sort body in this block is verbatim.
+      - **Focused unit test added** (this task's optional-but-valuable ask, since no ExportVariables/
+        oracle gate exercises `MasterSwing`-level columns at all):
+        `tests/Fct.Engine.Tests/MasterSwingColumnDefsTests.cs`, 21 cases — constructs a `MasterSwing`
+        directly (no engine/bus), calls `EngineTables.Install()` (idempotent; already invoked by every
+        other test in this project via `ModernEncounterEngine`'s constructor, so no new static-state
+        risk), sets `.Tags`, and asserts `GetColumnByName(...)` for each of the 9 debug-set keys plus
+        `StatusDuration` — present-tag and absent-tag (blank/default fallback) cases, plus both a
+        `uint`-boxed and a numeric-`string`-boxed `"dotbase"` tag (defending the `Convert.ToUInt32`
+        choice against both codec outcomes).
+      - **Verification:**
+        - `dotnet build ffxiv-combat-tracker.slnx` — clean, 0 warnings/errors, both `Fct.Aggregation`
+          TFMs.
+        - `dotnet test tests\Fct.Compat.Act.Tests\Fct.Compat.Act.Tests.csproj` → **67/67 passed** — ACT-
+          core fully green, untouched (`new FormActMain(...)` → `CombatTables.Setup()` only, never
+          calls `EngineTables.Install()`).
+        - `dotnet test tests\Fct.Engine.Tests\Fct.Engine.Tests.csproj` → **30 passed, 1 failed** (the
+          pre-existing intentional P1.2 red, **unchanged**: `P1.2 pending P5 registration of 3
+          ExportVariables key(s): Last10DPS, Last30DPS, Last60DPS`) — the 21 new
+          `MasterSwingColumnDefsTests` cases all pass, confirming both the registration and the
+          `Convert.ToUInt32` defensive cast work for either boxed-type outcome.
+        - `dotnet test tests\Fct.Integration.Tests\Fct.Integration.Tests.csproj --filter
+          "FullyQualifiedName~OverlaySatelliteTests"` (isolation) → red with the **identical unchanged
+          3-key message**, same 6 split-invariant assertions passing — confirms this task added no
+          `ExportVariables` surface (as designed: `MasterSwing.ColumnDefs` isn't part of that key set)
+          and no MiniParse-side regression.
+        - Full `Fct.Integration.Tests` run: 46 tests, 39 passed, 3 failed, 4 skipped (env-gated). The
+          3 failures — `LateJoinPrimingTests.Late_stand_in_repository_never_converges_on_a_forwarded_
+          GameVersion_from_priming_alone` (unrelated P1.4/P3 surface), `OverlaySatelliteTests` (this
+          run hit the pre-documented "no YOU combatant in CombatData" transient, not the P1.2 skip-
+          list assertion), and `FourRealPackagesTests` (WebSocket close-handshake flake) — all
+          reconfirmed **passing in isolation** immediately after (2/2, 1/1, 1/1 respectively),
+          matching the already-documented pre-existing run-ordering-flakiness class
+          (`FourRealPackagesTests`/`SatelliteSupervisorTests`/`ReplayRouteTests`); this task touches
+          no satellite process/staging code and cannot be their cause.
+        - `Fct.FlowTests` 22/22, `Fct.App.Tests` 183/183, `Fct.Parser.Legacy.Tests` 26/26,
+          `Fct.Compat.Shim.Tests` 56/56 — all fully green, no regressions.
+      - **P1.2 unchanged, confirmed both ways:** the headless engine gate and the satellite gate both
+        still read exactly `Last10DPS, Last30DPS, Last60DPS` — P5.5 registers no `ExportVariables` key
+        (by design: `MasterSwing.ColumnDefs` is not in that key set), so the skip-list is untouched.
+      - **Handoff for P5.6:** unaffected by this task — `LastNDPS`'s two overloads
+        (`CombatantDataExtension.cs:122-153` in the decompile) read `AttackType.Items`/
+        `CombatantData.AllOut` directly, never `MasterSwing.GetColumnByName`, so they have no
+        dependency on this block. Per P5.1's and P5.4's handoffs: add a runtime-neutral
+        `Func<DateTime> LastKnownTimeAccessor` to `AggregationGlobals`
+        (`src/Fct.Aggregation/AggregationGlobals.cs`), mirroring the existing `charName`/`blockIsHit`/
+        `restrictToAll` facade-owned-state pattern, wired by each facade
+        (`FormActMain.LastKnownTime`/`EncounterLifecycle.LastKnownTime`) at startup — extension
+        methods have no instance handle to reach it otherwise. **Reproduce the divisor quirk
+        exactly:** combatant `= sum / min(Duration, N)`; encounter `= sum / min(Duration, 10.0)` —
+        hardcoded `10.0`, not `N` — per the plan text and the decompile
+        (`ACT_UIMods.cs:1808-1879`). Register both combatant **and** encounter `Last10/30/60DPS`
+        (6 formatters total) with the plugin's exact bodies
+        (`Data.LastNDPS([SelectiveAllies,] N).ToString("0", CultureInfo.InvariantCulture)`). This is
+        P5.9's final gap — `PendingP5Keys` reaching empty on both gates is P5.6's own exit criterion,
+        not this task's. Expect to verify (not assume) whether a sixth fixture-provenance satellite-
+        gate exclusion is needed, following the same empirical-check discipline P5.2–P5.4 established.
 - [ ] **P5.6 — `LastNDPS`:** port the two extension overloads (`CombatantDataExtension.cs:122-153`),
       reading `LastKnownTime` from `EncounterLifecycle` (advanced per folded swing —
       `FormActMain.cs:453`). **Reproduce the divisor quirk exactly:** combatant

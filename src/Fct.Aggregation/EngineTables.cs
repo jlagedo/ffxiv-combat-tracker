@@ -296,6 +296,141 @@ namespace Advanced_Combat_Tracker
                 (Left, Right) => (Left.CritDirectHitCount() * 100 / CombatantDataExtension.OneOrInt(Left.Items.Count))
                     .CompareTo(Right.CritDirectHitCount() * 100 / CombatantDataExtension.OneOrInt(Right.Items.Count)));
 
+            // StatusDuration (ACT_UIMods.cs:1880-1897) — a standalone MasterSwing-level raw column
+            // (no CombatantData/AttackType/DamageTypeData chain, no ExportVariables entry — any
+            // consumer reads it directly via MasterSwing.GetColumnByName("StatusDuration")). Reads the
+            // "StatusDuration" tag, P0.4-confirmed as a 'd' (double) tag, so a direct (double) cast is
+            // safe. Registered unconditionally in the decompile too (BEFORE its `if (showDebug)` gate
+            // at ACT_UIMods.cs:2520 — this key is not debug-gated, unlike the block below).
+            MasterSwing.ColumnDefs["StatusDuration"] = new MasterSwing.ColumnDef(
+                "StatusDuration", true, "VARCHAR(8)", "StatusDuration",
+                (MasterSwing.StringDataCallback)(d => !d.Tags.ContainsKey("StatusDuration")
+                    ? ""
+                    : ((double)d.Tags["StatusDuration"]).ToString("0.#", CultureInfo.InvariantCulture)),
+                (MasterSwing.StringDataCallback)(d => !d.Tags.ContainsKey("StatusDuration")
+                    ? ""
+                    : ((double)d.Tags["StatusDuration"]).ToString("0.#", CultureInfo.InvariantCulture)),
+                (Left, Right) => (Left.Tags.ContainsKey("StatusDuration") ? (double)Left.Tags["StatusDuration"] : 0.0)
+                    .CompareTo(Right.Tags.ContainsKey("StatusDuration") ? (double)Right.Tags["StatusDuration"] : 0.0));
+
+            // The plugin's remaining standalone MasterSwing.ColumnDefs (ACT_UIMods.cs:2520-2712),
+            // gated in the decompile behind a `showDebug` flag UpdateACTTables never resolves to true
+            // for us (our engine has no analogous debug-mode toggle). Registered unconditionally here
+            // per this task's scope — the plan's own P5.5 bullet lists exactly these nine keys
+            // (StatusDuration above + these eight) so any consumer reading MasterSwing.GetColumnByName
+            // gets them; the decompile's sibling "OverHeal"/"DirectHit" MasterSwing raw columns
+            // (:2206-2242) are NOT part of this task (P5.3 already established that OverHealPct's
+            // resolution chain never reaches MasterSwing.GetColumnByName("OverHeal") — Overheal() reads
+            // the "overheal" tag directly — and no CombatantData/AttackType key resolves through a raw
+            // MasterSwing "DirectHit" column either).
+            MasterSwing.ColumnDefs["Potency"] = new MasterSwing.ColumnDef(
+                "Potency", true, "FLOAT", "Potency",
+                (MasterSwing.StringDataCallback)(d => !d.Tags.ContainsKey("potency")
+                    ? "0"
+                    : ((double)d.Tags["potency"]).ToString("0.00", CultureInfo.InvariantCulture)),
+                (MasterSwing.StringDataCallback)(d => !d.Tags.ContainsKey("potency")
+                    ? "0"
+                    : ((double)d.Tags["potency"]).ToString("0.00", CultureInfo.InvariantCulture)),
+                (Left, Right) => string.Compare(
+                    Left.Tags.ContainsKey("potency") ? Left.Tags["potency"].ToString() : "0",
+                    Right.Tags.ContainsKey("potency") ? Right.Tags["potency"].ToString() : "0",
+                    StringComparison.OrdinalIgnoreCase));
+
+            MasterSwing.ColumnDefs["StatusEffects"] = new MasterSwing.ColumnDef(
+                "StatusEffects", true, "VARCHAR(50)", "StatusEffects",
+                (MasterSwing.StringDataCallback)(d => !d.Tags.ContainsKey("StatusEffects") ? "" : d.Tags["StatusEffects"]?.ToString()),
+                (MasterSwing.StringDataCallback)(d => !d.Tags.ContainsKey("StatusEffects") ? "" : d.Tags["StatusEffects"]?.ToString()),
+                (Left, Right) => string.Compare(
+                    Left.Tags.ContainsKey("StatusEffects") ? Left.Tags["StatusEffects"].ToString() : "",
+                    Right.Tags.ContainsKey("StatusEffects") ? Right.Tags["StatusEffects"].ToString() : "",
+                    StringComparison.OrdinalIgnoreCase));
+
+            // DoTBase ("dotbase" tag). The real plugin boxes this as `uint`
+            // (FFXIV_ACT_Plugin.Parse.DoTEffectEntry.DoTBaseDamage), which our wire codec's Tags
+            // encoding (GameEventFrame TagType/DecodeTagValue) round-trips as a genuine `uint` via its
+            // 'u' typechar. P0.4 flags this tag's boxed-type identity across the wire as the one
+            // uncertain case in the producer tag set ("an int-boxed tag (dotbase) would cross as
+            // string s"), so — unlike the decompile's unguarded `(uint)Data.Tags["dotbase"]` hard
+            // cast — read it via Convert.ToUInt32, which formats identically ("0", invariant) whether
+            // the boxed value survives as `uint` or arrives as a numeric string.
+            MasterSwing.ColumnDefs["DoTBase"] = new MasterSwing.ColumnDef(
+                "DoTBase", true, "INT", "DoTBase",
+                (MasterSwing.StringDataCallback)(d => !d.Tags.ContainsKey("dotbase")
+                    ? ""
+                    : Convert.ToUInt32(d.Tags["dotbase"], CultureInfo.InvariantCulture).ToString("0", CultureInfo.InvariantCulture)),
+                (MasterSwing.StringDataCallback)(d => !d.Tags.ContainsKey("dotbase")
+                    ? ""
+                    : Convert.ToUInt32(d.Tags["dotbase"], CultureInfo.InvariantCulture).ToString("0", CultureInfo.InvariantCulture)),
+                (Left, Right) => string.Compare(
+                    Left.Tags.ContainsKey("dotbase") ? Left.Tags["dotbase"].ToString() : "0",
+                    Right.Tags.ContainsKey("dotbase") ? Right.Tags["dotbase"].ToString() : "0",
+                    StringComparison.OrdinalIgnoreCase));
+
+            MasterSwing.ColumnDefs["BuffByte1"] = new MasterSwing.ColumnDef(
+                "BuffByte1", false, "int", "BuffByte1",
+                (MasterSwing.StringDataCallback)(d => !d.Tags.ContainsKey("BuffByte1") ? "" : d.Tags["BuffByte1"].ToString()),
+                (MasterSwing.StringDataCallback)(d => !d.Tags.ContainsKey("BuffByte1") ? "" : d.Tags["BuffByte1"].ToString()),
+                (Left, Right) => string.Compare(
+                    Left.Tags.ContainsKey("BuffByte1") ? Left.Tags["BuffByte1"].ToString() : "",
+                    Right.Tags.ContainsKey("BuffByte1") ? Right.Tags["BuffByte1"].ToString() : "",
+                    StringComparison.OrdinalIgnoreCase));
+
+            MasterSwing.ColumnDefs["BuffByte2"] = new MasterSwing.ColumnDef(
+                "BuffByte2", false, "int", "BuffByte2",
+                (MasterSwing.StringDataCallback)(d => !d.Tags.ContainsKey("BuffByte2") ? "" : d.Tags["BuffByte2"].ToString()),
+                (MasterSwing.StringDataCallback)(d => !d.Tags.ContainsKey("BuffByte2") ? "" : d.Tags["BuffByte2"].ToString()),
+                (Left, Right) => string.Compare(
+                    Left.Tags.ContainsKey("BuffByte2") ? Left.Tags["BuffByte2"].ToString() : "",
+                    Right.Tags.ContainsKey("BuffByte2") ? Right.Tags["BuffByte2"].ToString() : "",
+                    StringComparison.OrdinalIgnoreCase));
+
+            MasterSwing.ColumnDefs["BuffByte3"] = new MasterSwing.ColumnDef(
+                "BuffByte3", false, "int", "BuffByte3",
+                (MasterSwing.StringDataCallback)(d => !d.Tags.ContainsKey("BuffByte3") ? "" : d.Tags["BuffByte3"].ToString()),
+                (MasterSwing.StringDataCallback)(d => !d.Tags.ContainsKey("BuffByte3") ? "" : d.Tags["BuffByte3"].ToString()),
+                (Left, Right) => string.Compare(
+                    Left.Tags.ContainsKey("BuffByte3") ? Left.Tags["BuffByte3"].ToString() : "",
+                    Right.Tags.ContainsKey("BuffByte3") ? Right.Tags["BuffByte3"].ToString() : "",
+                    StringComparison.OrdinalIgnoreCase));
+
+            // CritRate's sort comparer's "no tag" fallback is "0" while its cell/sql fallback is ""
+            // — a genuine decompile quirk (ACT_UIMods.cs:2636-2653), ported faithfully, not "fixed".
+            MasterSwing.ColumnDefs["CritRate"] = new MasterSwing.ColumnDef(
+                "CritRate", false, "VARCHAR(8)", "CritRate",
+                (MasterSwing.StringDataCallback)(d => !d.Tags.ContainsKey("CritRate") ? "" : d.Tags["CritRate"].ToString()),
+                (MasterSwing.StringDataCallback)(d => !d.Tags.ContainsKey("CritRate") ? "" : d.Tags["CritRate"].ToString()),
+                (Left, Right) => string.Compare(
+                    Left.Tags.ContainsKey("CritRate") ? Left.Tags["CritRate"].ToString() : "0",
+                    Right.Tags.ContainsKey("CritRate") ? Right.Tags["CritRate"].ToString() : "0",
+                    StringComparison.OrdinalIgnoreCase));
+
+            MasterSwing.ColumnDefs["CritEffects"] = new MasterSwing.ColumnDef(
+                "CritEffects", false, "VARCHAR(8)", "CritEffects",
+                (MasterSwing.StringDataCallback)(d => !d.Tags.ContainsKey("CritEffects") ? "" : d.Tags["CritEffects"].ToString()),
+                (MasterSwing.StringDataCallback)(d => !d.Tags.ContainsKey("CritEffects") ? "" : d.Tags["CritEffects"].ToString()),
+                (Left, Right) => string.Compare(
+                    Left.Tags.ContainsKey("CritEffects") ? Left.Tags["CritEffects"].ToString() : "",
+                    Right.Tags.ContainsKey("CritEffects") ? Right.Tags["CritEffects"].ToString() : "",
+                    StringComparison.OrdinalIgnoreCase));
+
+            MasterSwing.ColumnDefs["DHRate"] = new MasterSwing.ColumnDef(
+                "DHRate", false, "VARCHAR(8)", "DHRate",
+                (MasterSwing.StringDataCallback)(d => !d.Tags.ContainsKey("DHRate") ? "" : d.Tags["DHRate"].ToString()),
+                (MasterSwing.StringDataCallback)(d => !d.Tags.ContainsKey("DHRate") ? "" : d.Tags["DHRate"].ToString()),
+                (Left, Right) => string.Compare(
+                    Left.Tags.ContainsKey("DHRate") ? Left.Tags["DHRate"].ToString() : "",
+                    Right.Tags.ContainsKey("DHRate") ? Right.Tags["DHRate"].ToString() : "",
+                    StringComparison.OrdinalIgnoreCase));
+
+            MasterSwing.ColumnDefs["DHEffects"] = new MasterSwing.ColumnDef(
+                "DHEffects", false, "VARCHAR(8)", "DHEffects",
+                (MasterSwing.StringDataCallback)(d => !d.Tags.ContainsKey("DHEffects") ? "" : d.Tags["DHEffects"].ToString()),
+                (MasterSwing.StringDataCallback)(d => !d.Tags.ContainsKey("DHEffects") ? "" : d.Tags["DHEffects"].ToString()),
+                (Left, Right) => string.Compare(
+                    Left.Tags.ContainsKey("DHEffects") ? Left.Tags["DHEffects"].ToString() : "",
+                    Right.Tags.ContainsKey("DHEffects") ? Right.Tags["DHEffects"].ToString() : "",
+                    StringComparison.OrdinalIgnoreCase));
+
             DamageTypeDef Out(string l, int ally) => new DamageTypeDef(l, ally, Color.Orange);
 
             CombatantData.OutgoingDamageTypeDataObjects = new Dictionary<string, DamageTypeDef>
