@@ -2182,9 +2182,21 @@ the completeness authority.
 
 ### P6 — Truth-up ☐
 
-- [ ] **P6.1** [`DATA-FLOW.md`](DATA-FLOW.md) §4/§8: the rawlog source (facade log-read seam, one
+- [x] **P6.1** [`DATA-FLOW.md`](DATA-FLOW.md) §4/§8: the rawlog source (facade log-read seam, one
       tap, verbatim), the plugin metadata layer, the one-shot line-state set + last-line priming,
       the environment/party-size state, OverlayPlugin memory scanning.
+      **Verdict:** ✅ DONE. §4.2 gained a paragraph pinning `Before/OnLogLineRead` as the sole,
+      verbatim `RawLogLine` source (`BridgeForwarder.cs:82-93`/`:337-346`) and the SDK `LogLine` tap
+      as unreproduced. §4.3 gained a paragraph recording that the `ACT_UIMods` key set registers once
+      in `EngineTables.Install()` (`src/Fct.Aggregation/EngineTables.cs:19-26`), never
+      `CombatTables.Setup()`, surfaced via `EncounterProjector` (`:55-69`). New §4.6 records
+      OverlayPlugin's real region/server-timestamp seams (Machina `OpcodeManager` reflection; live
+      memory scan) and our stand-in's reciprocal seams (`MachinaRegionBridge.TrySetRegion`,
+      `ConsumerDataRepository.GetServerTimestamp()`'s offset correction). §8's table gained a new
+      one-shot line-state late-join priming row (`LastLineCache` + `BuildPrimeEvents`'s ACT emission
+      order) and a new environment/party-size state row (`SessionStateChanged` + `PartySize` on the
+      `PARTY` frame + the Machina push), and had its log-line and `ExportVariables` rows tightened to
+      name the shipped mechanisms instead of the generic pre-P1 phrasing.
 - [ ] **P6.2** [`ACT-INTERFACE-MAP.md`](ACT-INTERFACE-MAP.md) §2/§4/§14: `ACT_UIMods` metadata as a
       shared-engine responsibility; `ConsumerDataRepository` no longer lists stubbed members;
       OverlayPlugin's region comes from Machina `OpcodeManager` (not the repo); SDK
