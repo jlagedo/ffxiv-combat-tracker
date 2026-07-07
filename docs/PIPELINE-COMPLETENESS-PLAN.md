@@ -2180,7 +2180,7 @@ the completeness authority.
         `Fct.Aggregation`/engine registrations). `dotnet build ffxiv-combat-tracker.slnx` clean
         (0 warnings/errors) throughout.
 
-### P6 — Truth-up ☐
+### P6 — Truth-up ☑
 
 - [x] **P6.1** [`DATA-FLOW.md`](DATA-FLOW.md) §4/§8: the rawlog source (facade log-read seam, one
       tap, verbatim), the plugin metadata layer, the one-shot line-state set + last-line priming,
@@ -2251,7 +2251,14 @@ the completeness authority.
       trigger) announcing a party member's in-game `/countdown` as a synchronized pull timer,
       proving the verbatim line stream carries FFXIV custom lines 257–274 (not just `ChatLog`);
       plus the existing Triggernometry/Discord-Triggers checks, unchanged.
-- [ ] **P6.5** Postmortem: mark fixed, link this plan.
+- [x] **P6.5** Postmortem: mark fixed, link this plan.
+      **Verdict:** ✅ DONE. [`POSTMORTEM-overlay-job-zone.md`](POSTMORTEM-overlay-job-zone.md)'s
+      status line now reads FIXED and a new "Resolution" section (right after the intro, before §1)
+      maps each documented root cause to its fixing phase: the ChatLog-only live rawlog (§6) →
+      **P2**; Bug B, blank zone/job on late join (§4) → **P4**; Bug A, missing `ACT_UIMods`
+      `ExportVariables` keys (§3) → **P5**; stubbed env/dropped party size (§6) → **P3**. §3/§4's
+      "Root cause A/B" lines and §7/§8's fix/preventive-measure bullets are each annotated
+      ✅ done + phase. Every annotation links back to this plan.
 
 ## 6. Deferred (post-v1) — kept for the record, do not build for the four-plugin ship
 

@@ -1,13 +1,39 @@
 # Post-mortem — OverlayPlugin player-job & zone go blank in the isolated topology
 
-**Status:** root-caused, fix pending. Discovered on a live run (2026-07-06, patch 30203 /
-Dawntrail, OverlayPlugin 0.19.101 + cactbot 0.37.3 + Ember Overlay) after the P8/P9 isolation
-work shipped OverlayPlugin in its own consumer satellite.
+**Status:** ✅ **FIXED.** Root-caused here; closed by
+[`PIPELINE-COMPLETENESS-PLAN.md`](PIPELINE-COMPLETENESS-PLAN.md) P1–P6 (see Resolution below).
+Discovered on a live run (2026-07-06, patch 30203 / Dawntrail, OverlayPlugin 0.19.101 + cactbot
+0.37.3 + Ember Overlay) after the P8/P9 isolation work shipped OverlayPlugin in its own consumer
+satellite.
 
 This is a **retrospective** — the one document in `docs/` that records history on purpose. The
 facts it establishes about the *current* contract belong in
 [`DATA-FLOW.md`](DATA-FLOW.md)/[`ACT-INTERFACE-MAP.md`](ACT-INTERFACE-MAP.md); the truth-up
 tasks are listed at the end.
+
+---
+
+## Resolution — FIXED by `PIPELINE-COMPLETENESS-PLAN.md`
+
+Every root cause documented below is closed. [`PIPELINE-COMPLETENESS-PLAN.md`](PIPELINE-COMPLETENESS-PLAN.md)
+(P1–P6, all phases complete) replaced the field-by-field patching this postmortem warned against
+with two complete carriers plus differential gates that diff whole surfaces against a real-stack
+reference:
+
+| Root cause (this postmortem) | Fixed by | Gate |
+|---|---|---|
+| **§3 — Bug A, missing job (and the rest of §5 point 1):** `ACT_UIMods`'s metadata contribution (`Job`, `ParryPct`, `BlockPct`, `Last10/30/60DPS`, …) was never registered — only its numeric routing tables were reproduced | **P5** — the full `ACT_UIMods` key set ported into the shared `Fct.Aggregation` engine via `EngineTables.Install()`, held to a plugin-in-the-loop oracle baseline | `OracleParityTests`/`OverlaySatelliteTests` ExportVariables diff (P1.2); P5.9 full-corpus mass check — 7,242 pairs, 0 divergences |
+| **§4 — Bug B, blank zone/late-join identity (and §5 point 2):** priming replayed only the typed SDK forms (`ZoneChanged`, `PrimaryPlayerChanged`); the type-01/02 log lines OverlayPlugin actually reads were never replayed for a late joiner | **P4** — `LastLineCache` + `BuildPrimeEvents` snapshot-then-stream priming replays the one-shot lines (`01 ChangeZone`/`02 ChangePrimaryPlayer`/`12`/`40`/`249`/`250`/`253`) verbatim, in ACT emission order | `LateJoinPrimingTests` (late-join convergence gate, P1.4) |
+| **§6 — the ChatLog-only live rawlog** underlying both bugs: the sole producer source was the SDK `LogLine` tap (ChatLog-only, malformed body); non-chat lines (zone/job/combat/custom) never crossed live at all | **P2** — the single verbatim facade-seam tap (`Before/OnLogLineRead`) replaces the SDK `LogLine` tap, which is removed | `LineStreamDiffTests` (line-stream diff gate, P1.3) |
+| **§6 — stubbed env / dropped party size** (`ConsumerDataRepository` env stubs, `partySize` discarded at the bridge) — the same class of "path never modeled" gap | **P3** — one additive `SessionStateChanged` STATE frame + `PartySize` riding the `PARTY` frame, forwarded end-to-end; stubs deleted | `RepositorySurfaceLiveTests`; alliance-party gate (`EventMappingFlowTests`/`GameSnapshotAggregatorTests`) |
+
+**Durable guarantee added (§8's ask, delivered):** a future missing datum is now a **red
+differential diff in CI, not a postmortem.** The line-stream diff (P1.3) and the plugin-in-the-loop
+`ExportVariables` diff (P1.2, P5.9) hold the two complete carriers — every log line, and the full
+enumerated `ExportVariables` key set/values — to a real-stack reference on every run, per the
+plan's design principle ([`PIPELINE-COMPLETENESS-PLAN.md`](PIPELINE-COMPLETENESS-PLAN.md) §1). The
+contract docs, test taxonomy, and go-live bar named in §8 are truthed up in the plan's P6 (P6.1
+`DATA-FLOW.md`, P6.2 `ACT-INTERFACE-MAP.md`, P6.3 `TESTING.md`, P6.4 `GO-LIVE.md`).
 
 ---
 
@@ -86,6 +112,8 @@ ACT-core value and not an OverlayPlugin value:
 dropped on the floor because no export formatter reads it → `CombatData` has no `Job` → overlays
 render job 0 → the Limit Break placeholder icon.
 
+**✅ FIXED by P5** — see Resolution above.
+
 ---
 
 ## 4. Bug B — the zone (and player identity)
@@ -117,6 +145,8 @@ via ACT's `BeforeLogLineRead`, not from the SDK events:
 subscribes, so the type-01/02 lines fired long ago. The host primes the SDK equivalents, which
 OverlayPlugin ignores for these values, and never replays the log lines OverlayPlugin actually
 reads → the overlay has no zone and cannot bind `YOU` to a job until the *next* live zone change.
+
+**✅ FIXED by P4** — see Resolution above.
 
 ---
 
@@ -180,7 +210,7 @@ reference.
 
 ---
 
-## 7. The fixes
+## 7. The fixes — ✅ done (`PIPELINE-COMPLETENESS-PLAN.md`)
 
 - **A (job):** register `CombatantData.ExportVariables["Job"]` in `EngineTables.Install()` (the
   consumer replica + host engine both call it), reading the combatant's swing `Tags["Job"]` exactly
@@ -188,30 +218,42 @@ reference.
   The tag data already flows; this only surfaces it. Keep it in `EngineTables` (the "what
   `ACT_UIMods` installs" layer), not `CombatTables` (ACT-core defaults), so core-parity fixtures are
   untouched.
+  **✅ Done in P5** (`EngineTables.Install()`, `Fct.Aggregation/EngineTables.cs`; gated by the P1.2
+  ExportVariables diff, 0 divergences at P5.9's full-corpus mass check).
 - **B (zone/identity):** in `SatelliteHost.BuildPrimeEvents`, when a subscriber takes `rawlog`,
   synthesize + prime a type-01 `ChangeZone` and type-02 `ChangePrimaryPlayer` `RawLogLine` from the
   current snapshot, so a late-joining consumer converges without a manual zone change.
+  **✅ Done in P4** (`LastLineCache` + `BuildPrimeEvents` snapshot-then-stream priming; gated by the
+  P1.4 `LateJoinPrimingTests`).
 
 ---
 
-## 8. Preventive measures (truth-up + new gates)
+## 8. Preventive measures (truth-up + new gates) — ✅ done (`PIPELINE-COMPLETENESS-PLAN.md`)
 
 - **Fix the oracle blind spot.** The parity oracle must include the plugin's `ACT_UIMods`
   contribution for any consumer-visible export the overlays read (at minimum `Job`), or the
   overlay gate must assert `CombatData`'s **full key set** against a plugin-in-the-loop capture —
   not the ACT-core `exportvars.tsv`. A parity oracle that excludes the plugin cannot gate a value
   the plugin produces.
+  **✅ Done in P1.1/P1.2/P5** — the plugin-in-the-loop oracle baseline
+  (`combat-slice.plugin.exportvars.tsv`) plus the full-key-set `ExportVariables` diff gate.
 - **Add a late-join priming gate.** A consumer that subscribes *after* a zone/primary-player change
   must converge to the current zone + player — assert an emitted `ChangeZone`/`ChangePrimaryPlayer`
   from priming with no live line.
+  **✅ Done in P1.4/P4** — `LateJoinPrimingTests`.
 - **Assert rendered outputs, not just numbers.** Extend the overlay gate to assert per-combatant
   `Job` and the `ChangeZone` event on the WS.
+  **✅ Done in P1.2/P6.3** — `OverlaySatelliteTests`' ExportVariables diff asserts the full key set
+  (incl. `Job`); `TESTING.md` names the axis.
 - **Broaden `GO-LIVE.md` A1** to name job-icon correctness and zone display explicitly.
+  **✅ Done in P6.4** — A1 now names job-icon correctness, zone display, map-dependent overlay
+  features, and a custom-line-driven feature explicitly.
 - **Truth-up the contract docs.** [`DATA-FLOW.md`](DATA-FLOW.md) §4/§8 and
   [`ACT-INTERFACE-MAP.md`](ACT-INTERFACE-MAP.md) §4/§14 should record: (a) `ACT_UIMods` metadata
   columns (`Job`) as a consumer-replica responsibility distinct from the routing tables; (b)
   OverlayPlugin's zone/primary-player derivation from type-01/02 log lines (vs the SDK events);
   (c) OverlayPlugin's own game-memory scanning as a real, PID-bootstrapped data path.
+  **✅ Done in P6.1/P6.2** — `DATA-FLOW.md` and `ACT-INTERFACE-MAP.md` truthed up accordingly.
 
 ---
 
