@@ -134,8 +134,16 @@ non-null `pluginObj`; Triggernometry additionally gates on `lblPluginStatus.Text
 ## 2. Producer write-path (aggregation) — ✅ DONE
 
 The only writer into ACT. FFXIV_ACT_Plugin converts each parsed entry to a `MasterSwing` and calls
-`AddCombatAction`, gated by `SetEncounter`/`InCombat`; `ACT_UIMods` rewrites ACT's *static* table
-model so the rollup exposes the FFXIV columns + the `ExportVariables` keys OP later reads (§4).
+`AddCombatAction`, gated by `SetEncounter`/`InCombat`. The real plugin's own `ACT_UIMods.UpdateACTTables`
+rewrites ACT's *static* table model to add the FFXIV `ColumnDefs`/`ExportVariables` keys OP later
+reads (§4) — `Job`, `ParryPct`, `BlockPct`, `IncToHit`, `OverHealPct`, `DirectHitPct`/`DirectHitCount`,
+`CritDirectHitPct`/`CritDirectHitCount`, `Last10/30/60DPS` (combatant and encounter). That metadata is
+a **shared-engine** responsibility on our side, not a per-plugin or per-facade one: the identical key
+set + `ColumnDefs` chains, plus the `CombatantDataExtension` helper math each formatter reads, are
+ported into `Fct.Aggregation` (`EngineTables.cs`, `CombatantDataExtension.cs`); `EngineTables.Install()`
+registers them once per engine instance — after `CombatTables.Setup()`, never inside it — so every
+replica (the plugin-in-the-loop oracle, `Fct.Engine`, and every facade satellite) exposes the identical
+keys from one binary.
 
 | St | member | consumers | why |
 |:--:|---|---|---|
@@ -159,7 +167,10 @@ corpus-wide by `tools/mass-compare` (our engine vs real ACT, identical plugin sw
 model/engine types are defined in `Fct.Aggregation` and **type-forwarded** into the `Advanced Combat
 Tracker` facade identity (`Fct.Compat.Act` on net48), so the binding contract below is unchanged.
 DoT/HoT/shield *values* are the plugin's synthesis, baked into the swings both engines receive — not
-an interface concern.
+an interface concern. The ported `ACT_UIMods` key set is held to the real plugin's own output by a
+plugin-in-the-loop oracle (`tools/act-oracle` loads the real `FFXIV_ACT_Plugin.dll` and invokes
+`ACT_UIMods.UpdateACTTables` for the baseline): the engine's enumerated `ExportVariables` key set and
+values match it exactly, corpus-wide.
 
 ## 3. Inbound log seam — ✅ DONE (🟡 1 VERIFY)
 
@@ -430,7 +441,7 @@ the FFXIV `pluginObj` from `ActPlugins` (§1) and reflects three members:
 | St | member | shape | consumers | why |
 |:--:|---|---|---|---|
 | ✅ | `DataRepository` (property) | `IDataRepository` (pull) | OP (~30 sites), Trig, Hojo | `GetCombatantList`, `GetCurrentPlayerID`, `GetPlayer`, `GetResourceDictionary`, `GetSelectedLanguageID`, `GetCurrentTerritoryID`, `GetCurrentFFXIVProcess`, `GetGameVersion`, `GetServerTimestamp` — party panels, target info, name→id, zone/process gating |
-| ✅ | `DataSubscription` (property) | `IDataSubscription` (11 events) | OP, Trig | `NetworkReceived`/`NetworkSent` (raw packets — OP's ~20 decoders + `RegisterNetworkParser`), `LogLine`/`ParsedLogLine` (Trig feed), `ZoneChanged`, `ProcessChanged` (no-game liveness), `PartyListChanged`, `PrimaryPlayerChanged`. **Hojoring is NOT a subscriber** — `SubscribeXIVPluginEvents()` is empty; it is **pull-only** (polls `DataRepository` + derives zone/party/player changes by diff) |
+| ✅ | `DataSubscription` (property) | `IDataSubscription` (11 events) | OP, Trig | `NetworkReceived`/`NetworkSent` (raw packets — OP's ~20 decoders + `RegisterNetworkParser`), `LogLine`/`ParsedLogLine` (shape-complete, bound by no v1 consumer's live path — see below), `ZoneChanged`, `ProcessChanged` (no-game liveness), `PartyListChanged`, `PrimaryPlayerChanged`. **Hojoring is NOT a subscriber** — `SubscribeXIVPluginEvents()` is empty; it is **pull-only** (polls `DataRepository` + derives zone/party/player changes by diff) |
 | ✅ | `_iocContainer` (private field, `Microsoft.MinIoC.Container`) | `GetService`/`Resolve<T>` | OP, Hojo | resolves `ILogOutput` for OP's **custom-log round-trip** (synthetic IDs ≥ 256 — MapEffect/FateDirector/CEDirector/InCombat); Hojo **casts it to `Microsoft.MinIoC.Container`** (a type compiled into `FFXIV_ACT_Plugin.dll`) and hard-gates attach on `Resolve<ILogFormat>()` **and** `Resolve<ILogOutput>()` non-null |
 
 **Strategy — DONE.** `WrappedFfxivPlugin` (placed in `pluginObj`) forwards the real plugin's
@@ -441,15 +452,37 @@ thread replacing the per-subscriber `BeginInvoke` fan-out — ~250× faster), an
 `IRawPacketSource.InjectNetworkReceived` adds a bridge/replay path; legacy `RegisterNetworkParser`
 consumers still see `NetworkReceived` normally. **No gaps** against the observed consumer set.
 (Adjacent: OP also reflects the **Machina** assembly directly for region/opcodes — same discovery
-path, not part of this seam.)
+path, not part of this seam — `FFXIVRepository.GetMachinaRegion()` reads
+`Machina.FFXIV.Headers.Opcodes.OpcodeManager.Instance.GameRegion` by reflection, **never**
+`IDataRepository.GetGameRegion()`.)
+
+**`LogLine`/`ParsedLogLine` — neither is a production source.** The SDK `LogLine` event is raised only
+by `FFXIV_ACT_Plugin.Memory.DataEventProcessor.OnLogLine`'s live memory-scanning pipeline and delivers
+**ChatLog lines only**; `ParsedLogLine` delivers a body-only `message` (no leading `NN|` type key, no
+timestamp) and never carries types 249/250/253. Both exist on the SDK surface for shape completeness,
+but no v1 plugin binds either on its live path: OverlayPlugin's only binder,
+`FFXIVRepository.RegisterLogLineHandler`, has no caller anywhere in the reference trees; Triggernometry's
+only `ParsedLogLine` reference is dead unsubscribe code. Every consumer's actual live-line feed is ACT's
+own `Before`/`OnLogLineRead` (§3), fed by the facade's log-read seam — the sole, verbatim `RawLogLine`
+source. The consumer stand-in's `IDataSubscription.LogLine` re-raise (`ConsumerDataSubscription.cs`)
+persists for SDK shape completeness; no v1 plugin binds it.
 
 **Isolated-satellite seam (the synthetic stand-in).** In the split topology a parser-free consumer
 satellite serves this whole surface from the host-routed streams via `Fct.Parser.Legacy`'s synthetic
-`FFXIV_ACT_Plugin` stand-in: `DataRepository` from the repository-snapshot mirror, `DataSubscription`
-events re-raised from the fanned stream, and `_iocContainer` as a **real** `Microsoft.MinIoC.Container`
+`FFXIV_ACT_Plugin` stand-in: `DataRepository`'s live combatant/resource data from the
+repository-snapshot mirror and its one-shot environment scalars
+(`GetGameVersion`/`GetSelectedLanguageID`/`GetGameRegion`/`GetServerTimestamp`/`IsChatLogAvailable`,
+`ConsumerDataSurface.cs`) from a forwarded `SessionStateChanged` mirror — never a hardcoded stub
+(`GetServerTimestamp()` offset-corrects `UtcNow` by the producer's forwarded server-clock offset, since
+the real plugin's own timestamp is populated only by a live memory scan); `DataSubscription` events
+re-raised from the fanned stream; and `_iocContainer` as a **real** `Microsoft.MinIoC.Container`
 constructed reflectively from the parser DLL (the type is compiled into `FFXIV_ACT_Plugin.dll`), with a
 write-back `ILogOutput` + a non-null `ILogFormat` registered so Hojoring's cast + `Resolve<T>` gate pass
-and OP's `GetService`→`WriteLine` round-trip works ([`ISOLATION-PLAN.md`](ISOLATION-PLAN.md) §P9a).
+and OP's `GetService`→`WriteLine` round-trip works ([`ISOLATION-PLAN.md`](ISOLATION-PLAN.md) §P9a). The
+stand-in also reflectively pushes the forwarded region into Machina's `OpcodeManager`
+(`MachinaRegionBridge.TrySetRegion`, KR/CN only, best-effort and non-blocking — Machina's own `Global`
+default is already correct for the primary audience), so OverlayPlugin's real region seam (above)
+converges too.
 
 **Hojoring → OverlayPlugin coupling (not an ACT seam).** Separately, Hojoring reflects **in-process**
 into OverlayPlugin.Core's `PluginLoader.Container` (`IEnmityMemory`/`ICombatantMemory`/`ITargetMemory`

@@ -2197,11 +2197,30 @@ the completeness authority.
       order) and a new environment/party-size state row (`SessionStateChanged` + `PartySize` on the
       `PARTY` frame + the Machina push), and had its log-line and `ExportVariables` rows tightened to
       name the shipped mechanisms instead of the generic pre-P1 phrasing.
-- [ ] **P6.2** [`ACT-INTERFACE-MAP.md`](ACT-INTERFACE-MAP.md) §2/§4/§14: `ACT_UIMods` metadata as a
+- [x] **P6.2** [`ACT-INTERFACE-MAP.md`](ACT-INTERFACE-MAP.md) §2/§4/§14: `ACT_UIMods` metadata as a
       shared-engine responsibility; `ConsumerDataRepository` no longer lists stubbed members;
       OverlayPlugin's region comes from Machina `OpcodeManager` (not the repo); SDK
       `LogLine`=ChatLog-only, `ParsedLogLine`=parsed-except-249/250/253 — neither is a production
       source.
+      **Verdict:** ✅ DONE. Both edits land in §2 and §14 (§4 "Consumer read-path" already described
+      only OP's own 3 injected `ExportVariables` keys — a real-OP behavior untouched by this plan — so
+      it needed no correction). §2's intro + Strategy paragraph now name `EngineTables.Install()` /
+      `CombatantDataExtension.cs` (`src/Fct.Aggregation/`) as the shared-engine home for the ported
+      `ACT_UIMods` key set (`Job`/`ParryPct`/`BlockPct`/`IncToHit`/`OverHealPct`/`DirectHit*`/
+      `CritDirectHit*`/`Last10-30-60DPS`), registered once per engine instance for every replica, and
+      note the plugin-in-the-loop oracle holds it to the real plugin's output corpus-wide. §14 gained:
+      (1) a corrected `DataSubscription` table row + a new paragraph stating the SDK `LogLine` event is
+      ChatLog-only (real plugin's live memory-scan path) and `ParsedLogLine` delivers a body-only
+      message missing 249/250/253, and that **neither** is bound by any v1 plugin's live path — the
+      production live-line source is ACT's own `Before`/`OnLogLineRead` (§3); (2) the Machina
+      `OpcodeManager`-reflection region fact folded into the existing real-plugin aside; (3) the
+      "Isolated-satellite seam" paragraph rewritten to state `ConsumerDataRepository`'s env scalars
+      (`GetGameVersion`/`GetSelectedLanguageID`/`GetGameRegion`/`GetServerTimestamp`/
+      `IsChatLogAvailable`) are forwarded from a `SessionStateChanged` mirror — never a hardcoded stub —
+      and that the stand-in reflectively pushes the region into Machina's `OpcodeManager`
+      (`MachinaRegionBridge.TrySetRegion`). Verified against `src/Fct.Aggregation/EngineTables.cs`,
+      `src/Fct.Aggregation/CombatantDataExtension.cs`, `src/Fct.Parser.Legacy/ConsumerDataSurface.cs`,
+      `src/Fct.Parser.Legacy/MachinaRegionBridge.cs`.
 - [ ] **P6.3** [`TESTING.md`](TESTING.md): the two differential gates as first-class parity axes
       (line-stream diff, plugin-in-the-loop ExportVariables diff) + the late-join variants.
 - [ ] **P6.4** `GO-LIVE.md` A1: name job-icon correctness, zone display, map-dependent overlay
