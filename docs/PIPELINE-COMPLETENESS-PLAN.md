@@ -703,7 +703,7 @@ The G14 headline fix. No wire-codec change (the `RAW` frame already carries type
         red); `Fct.FlowTests` 21/22 (unchanged P1.6 red); `Fct.Engine.Tests` 9/10 (unchanged P1.2 red,
         same 12-key skip-list message as before); `Fct.Compat.Shim.Tests` 56/56.
 
-### P3 — Session state: one additive frame ☐
+### P3 — Session state: one additive frame ☑
 
 - [x] **P3.1 — Abstractions.** In `src/Fct.Abstractions/Events.cs`: add
       `sealed record SessionStateChanged(long Sequence, DateTimeOffset Timestamp, string GameVersion,
@@ -1255,8 +1255,13 @@ The G14 headline fix. No wire-codec change (the `RAW` frame already carries type
         `GameSnapshotAggregatorTests`'s alliance-size test) — both already flipped by P3.5, unaffected by
         this task. P3.6 itself has no gate of its own to flip (G6 was never gated — plan §7 states it
         explicitly). P1.4/P1.2 remain the only reds in scope and are P4/P5's jobs respectively.
-- [ ] **P3.7 — Gate flips.** P1.5 green (forwarded env) and P1.6 green (alliance size preserved
+- [x] **P3.7 — Gate flips.** P1.5 green (forwarded env) and P1.6 green (alliance size preserved
       end-to-end). Prime-path convergence for this state lands in P4.
+      **Verdict:** ✅ CONFIRMED. All four P1.5+P1.6 gates green end-to-end after P3.5:
+      `RepositorySurfaceLiveTests` (1/1), `ConsumerDataRepositoryStubTests` (2/2),
+      `EventMappingFlowTests` (A5+A5b, 2/2), `GameSnapshotAggregatorTests` (7/7, incl. the alliance
+      host-fold). P1.4 (late-join priming) remains the only P3-adjacent red — its prime-path
+      convergence is P4's job, as noted.
 
 ### P4 — Generic priming: snapshot-then-stream ☐
 
