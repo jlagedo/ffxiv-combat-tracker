@@ -190,10 +190,16 @@ namespace Advanced_Combat_Tracker
         /// through <see cref="SetEncounter"/>/<see cref="EndCombat"/>, so the two never disagree).</summary>
         public bool InCombat => Host.Encounters.InCombat;
 
+        /// <summary>ACT's "now" for LastNDPS (net48 counterpart: <c>FormActMain.LastKnownTime</c>,
+        /// <c>Fct.Compat.Act/FormActMain.cs:210</c>) — advanced to the most recently folded swing's
+        /// own timestamp in <see cref="AddCombatAction"/>, never wall-clock time.</summary>
+        public DateTime LastKnownTime { get; set; } = DateTime.Now;
+
         /// <summary>Fold one swing into the active encounter (ACT's <c>AddCombatAction</c>); raises
         /// Before/AfterCombatAction so peers (e.g. OverlayPlugin's post-aggregation tap) observe it.</summary>
         public void AddCombatAction(MasterSwing action)
         {
+            LastKnownTime = action.Time;
             BeforeCombatAction?.Invoke(false, new CombatActionEventArgs(action));
             ActiveZone.ActiveEncounter?.AddCombatAction(action);
             AfterCombatAction?.Invoke(false, new CombatActionEventArgs(action));

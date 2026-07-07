@@ -28,13 +28,11 @@ namespace Fct.Engine.Tests
         private static readonly IReadOnlyDictionary<string, object> NoTags = new Dictionary<string, object>();
 
         // PIPELINE-COMPLETENESS-PLAN P1.2 / G1: ExportVariables keys the real FFXIV_ACT_Plugin registers
-        // (Job/Parry/Block/IncToHit/OverHeal/DirectHit*/CritDirectHit*/Last{10,30,60}DPS) that
-        // EngineTables.Install() does not register yet — ported by P5. Must shrink to empty as P5 lands;
-        // P5.9's exit criterion is this set reaching empty (P1.2 fully green).
-        private static readonly HashSet<string> PendingP5Keys = new(StringComparer.Ordinal)
-        {
-            "Last10DPS", "Last30DPS", "Last60DPS",
-        };
+        // that EngineTables.Install() did not register yet, pending P5's port. Empty since P5.6
+        // (Last10/30/60DPS, the final G1 keys) — P5.9's exit criterion (this set reaching empty,
+        // P1.2 fully green) is met; kept as an empty set so a future registration regression still
+        // fails loudly here rather than silently widening scope.
+        private static readonly HashSet<string> PendingP5Keys = new(StringComparer.Ordinal);
 
         private readonly ITestOutputHelper _out;
         public OracleParityTests(ITestOutputHelper output) => _out = output;

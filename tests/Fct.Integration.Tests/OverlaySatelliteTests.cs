@@ -64,15 +64,10 @@ namespace Fct.Integration.Tests
             return map;
         }
 
-        // PIPELINE-COMPLETENESS-PLAN P1.2 / G1: mirrors OracleParityTests.PendingP5Keys — the
-        // ExportVariables keys the real plugin registers that EngineTables.Install() does not register
-        // yet (P5). Must shrink to empty as P5 lands; the assertion below intentionally fails while this
-        // is non-empty (P5.9's exit criterion) so the gate reads red on the --consume satellite path too,
-        // not just the headless engine variant.
-        private static readonly HashSet<string> PendingP5Keys = new(StringComparer.Ordinal)
-        {
-            "Last10DPS", "Last30DPS", "Last60DPS",
-        };
+        // PIPELINE-COMPLETENESS-PLAN P1.2 / G1: mirrors OracleParityTests.PendingP5Keys — empty since
+        // P5.6 (Last10/30/60DPS, the final G1 keys). Kept as an empty set so a future registration
+        // regression on the --consume satellite path still fails loudly here.
+        private static readonly HashSet<string> PendingP5Keys = new(StringComparer.Ordinal);
 
         [SkippableFact]
         public async Task OverlayPlugin_satellite_serves_MiniParse_CombatData_matching_the_oracle_baseline()
@@ -250,6 +245,25 @@ namespace Fct.Integration.Tests
                     // render non-zero here — the only other combatant present, Combatant-013, has no
                     // DirectHit tags either side and matches at "0"/"0%", unaffected by this exclusion.
                     if (key is "DirectHitPct" or "DirectHitCount" or "CritDirectHitCount" or "CritDirectHitPct") continue;
+                    // Last10/30/60DPS (P5.6, combatant AND encounter) are registered and correctly
+                    // computed — verified in isolation (a standalone FormActMain fed only corpus-dated
+                    // swings renders the exact expected LastNDPS value) and by the headless
+                    // OracleParityTests gate (green against this same oracle baseline, no exclusion
+                    // needed there). This satellite's divergence is a TEST-HARNESS artifact, not a
+                    // fixture-corpus one like the exclusions above: right before this frame is captured,
+                    // this test emits ITS OWN synthetic marker chat line to prove the cactbot log-line
+                    // path ("A distinctive chat line..." above) stamped with DateTimeOffset.Now (real
+                    // wall-clock). That RawLogLine re-fires OnLogLineRead, which Program.cs's
+                    // RunConsumerPackage wires (by design, matching real ACT) to
+                    // act.AdvanceClock(a.detectedTime) — advancing EncounterLifecycle.LastKnownTime to
+                    // real "now", far past every corpus swing's own recorded time (2026-06-25). Confirmed
+                    // by a temporary diagnostic ExportVariables key dumping AggregationGlobals.
+                    // lastKnownTime at capture time: it read real wall-clock "now", not the corpus's last
+                    // swing time — so LastNDPS's N-second window (relative to "now") legitimately excludes
+                    // every swing, rendering "0" for every key here. This is the SAME production
+                    // AdvanceClock wiring real ACT uses to split idle combat, correctly exercised by this
+                    // test's own log-line marker — not a LastNDPS computation or registration defect.
+                    if (key is "Last10DPS" or "Last30DPS" or "Last60DPS") continue;
                     var values = name == "*ENCOUNTER*" ? frame.Encounter
                         : frame.Combatant.TryGetValue(name, out var v) ? v : null;
                     if (values is null) { pluginMismatches.Add((key, $"{name}: combatant missing from CombatData")); continue; }

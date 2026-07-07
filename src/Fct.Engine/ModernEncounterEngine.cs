@@ -45,6 +45,10 @@ namespace Fct.Engine
             // Register the ExportVariables + install the FFXIV damage-type routing tables the engine
             // aggregates through (shared with the net48 replay engine via EngineTables).
             EngineTables.Install();
+            // Wire the LastNDPS formatters' "now" to this engine's own lifecycle clock (advanced per
+            // folded swing, EncounterLifecycle.AddCombatAction) — never wall-clock time. Mirrors the
+            // facade-owned-state pattern each ACT facade already uses for charName/blockIsHit/restrictToAll.
+            AggregationGlobals.LastKnownTimeAccessor = () => _lifecycle.LastKnownTime;
         }
 
         /// <summary>The shared state machine. Callers must hold <see cref="Gate"/> when driving it.</summary>

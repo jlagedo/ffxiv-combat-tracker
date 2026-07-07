@@ -14,6 +14,7 @@ namespace Advanced_Combat_Tracker
         public static Func<string> CharNameAccessor = static () => "YOU";
         public static Func<bool> BlockIsHitAccessor = static () => true;
         public static Func<bool> RestrictToAllAccessor = static () => false;
+        public static Func<DateTime> LastKnownTimeAccessor = static () => DateTime.Now;
 
         // The local player's name; seeds each new EncounterData's "you" allocation.
         public static string charName => CharNameAccessor();
@@ -21,5 +22,10 @@ namespace Advanced_Combat_Tracker
         public static bool blockIsHit => BlockIsHitAccessor();
         // Aggregate only into the "All" attack-type bucket (skip per-type tables).
         public static bool restrictToAll => RestrictToAllAccessor();
+        // ACT's "now" for LastNDPS (CombatantDataExtension.LastNDPS): the active encounter's own
+        // clock, advanced to the most recently folded swing's own timestamp — never wall-clock time.
+        // Each facade wires this to the EncounterLifecycle instance (or equivalent) it folds swings
+        // through, mirroring FormActMain.LastKnownTime.
+        public static DateTime lastKnownTime => LastKnownTimeAccessor();
     }
 }

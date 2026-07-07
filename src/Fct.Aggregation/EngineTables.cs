@@ -296,6 +296,32 @@ namespace Advanced_Combat_Tracker
                 (Left, Right) => (Left.CritDirectHitCount() * 100 / CombatantDataExtension.OneOrInt(Left.Items.Count))
                     .CompareTo(Right.CritDirectHitCount() * 100 / CombatantDataExtension.OneOrInt(Right.Items.Count)));
 
+            // Last10/30/60DPS (ACT_UIMods.cs:1808-1879) — combatant AND encounter formatters, both
+            // reading CombatantDataExtension.LastNDPS (P5.6's ported overloads). The plugin's exact
+            // formatter bodies: Data.LastNDPS([SelectiveAllies,] N).ToString("0", InvariantCulture).
+            // The combatant overload's divisor caps at min(Duration, N); the encounter overload's
+            // divisor is hardcoded min(Duration, 10.0) for ALL THREE keys (30/60 included) — a
+            // faithfully-ported plugin quirk, not a transcription error (see LastNDPS's own comment).
+            CombatantData.ExportVariables["Last10DPS"] = new CombatantData.TextExportFormatter(
+                "Last10DPS", "Last 10 Seconds DPS", "Average DPS for last 10 seconds.",
+                (CombatantData.ExportStringDataCallback)((d, extraFormat) => d.LastNDPS(10).ToString("0", CultureInfo.InvariantCulture)));
+            CombatantData.ExportVariables["Last30DPS"] = new CombatantData.TextExportFormatter(
+                "Last30DPS", "Last 30 Seconds DPS", "Average DPS for last 30 seconds.",
+                (CombatantData.ExportStringDataCallback)((d, extraFormat) => d.LastNDPS(30).ToString("0", CultureInfo.InvariantCulture)));
+            CombatantData.ExportVariables["Last60DPS"] = new CombatantData.TextExportFormatter(
+                "Last60DPS", "Last 60 Seconds DPS", "Average DPS for last 60 seconds.",
+                (CombatantData.ExportStringDataCallback)((d, extraFormat) => d.LastNDPS(60).ToString("0", CultureInfo.InvariantCulture)));
+
+            EncounterData.ExportVariables["Last10DPS"] = new EncounterData.TextExportFormatter(
+                "Last10DPS", "Last 10 Seconds DPS", "Average DPS for last 10 seconds",
+                (EncounterData.ExportStringDataCallback)((d, SelectiveAllies, extra) => d.LastNDPS(SelectiveAllies, 10).ToString("0", CultureInfo.InvariantCulture)));
+            EncounterData.ExportVariables["Last30DPS"] = new EncounterData.TextExportFormatter(
+                "Last30DPS", "Last 30 Seconds DPS", "Average DPS for last 30 seconds",
+                (EncounterData.ExportStringDataCallback)((d, SelectiveAllies, extra) => d.LastNDPS(SelectiveAllies, 30).ToString("0", CultureInfo.InvariantCulture)));
+            EncounterData.ExportVariables["Last60DPS"] = new EncounterData.TextExportFormatter(
+                "Last60DPS", "Last 60 Seconds DPS", "Average DPS for last 60 seconds",
+                (EncounterData.ExportStringDataCallback)((d, SelectiveAllies, extra) => d.LastNDPS(SelectiveAllies, 60).ToString("0", CultureInfo.InvariantCulture)));
+
             // StatusDuration (ACT_UIMods.cs:1880-1897) — a standalone MasterSwing-level raw column
             // (no CombatantData/AttackType/DamageTypeData chain, no ExportVariables entry — any
             // consumer reads it directly via MasterSwing.GetColumnByName("StatusDuration")). Reads the

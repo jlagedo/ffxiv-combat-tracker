@@ -1,3 +1,4 @@
+using System;
 using System.Collections.Generic;
 using System.Globalization;
 
@@ -7,20 +8,16 @@ namespace Advanced_Combat_Tracker
     // FFXIV_ACT_Plugin there) — the plugin's own CombatantData/AttackType helper math that its
     // ExportVariables formatters (ACT_UIMods.cs, registered in EngineTables.Install() from P5.2 on)
     // call through: Job, Parry/Block tallies, direct-heal/overheal sums, direct-hit/crit-direct-hit
-    // counts. Lives in Fct.Aggregation (not a plugin assembly) per the pipeline completeness plan's
-    // constraint 1 — this is generic aggregation math, carrying no plugin identity, in the same
-    // shared engine binary every replica (host engine + both facades) runs.
+    // counts, and LastNDPS. Lives in Fct.Aggregation (not a plugin assembly) per the pipeline
+    // completeness plan's constraint 1 — this is generic aggregation math, carrying no plugin
+    // identity, in the same shared engine binary every replica (host engine + both facades) runs.
     //
-    // LastNDPS (CombatantDataExtension.cs:122-153 in the decompile) is deferred to P5.6 — it is the
-    // only method in the decompile source file that reads ActGlobals.oFormActMain.LastKnownTime; none
-    // of the methods ported here need current-time at all. When P5.6 ports it, our runtime-neutral
-    // equivalent of that read is EncounterLifecycle.LastKnownTime (src/Fct.Aggregation/EncounterLifecycle.cs:19,
-    // surfaced on the net48 facade as FormActMain.LastKnownTime, FormActMain.cs:210) — but these static
-    // extension methods have no direct handle to the owning EncounterLifecycle instance, so P5.6 should
-    // reach it the same way AggregationGlobals already exposes other facade-owned ACT-core state
-    // (charName/blockIsHit/restrictToAll, AggregationGlobals.cs) to this engine: add a
-    // `Func<DateTime> LastKnownTimeAccessor` there, wired by each facade at startup, rather than a new
-    // static/global on this class.
+    // LastNDPS (CombatantDataExtension.cs:122-153 in the decompile) is the only method here that
+    // reads a "current time" (ActGlobals.oFormActMain.LastKnownTime in the decompile). Our
+    // runtime-neutral equivalent is AggregationGlobals.lastKnownTime — each facade wires
+    // AggregationGlobals.LastKnownTimeAccessor to the EncounterLifecycle instance (or equivalent) it
+    // folds swings through, the same facade-owned-state pattern as charName/blockIsHit/restrictToAll,
+    // since these static extension methods have no direct handle to the owning instance.
     public static class CombatantDataExtension
     {
         // ACT_UIMods.OneOrInt(int)/(long): guards a divide-by-zero denominator (e.g.
@@ -159,6 +156,46 @@ namespace Advanced_Combat_Tracker
                 }
             }
             return num;
+        }
+
+        // Average outgoing damage over the last N seconds up to AggregationGlobals.lastKnownTime (the
+        // active encounter's own clock, advanced per folded swing — never wall-clock time). The
+        // divisor quirk is faithfully reproduced: it caps at the combatant's own Duration, so a
+        // combatant whose encounter is younger than N seconds isn't diluted by time it wasn't active.
+        public static double LastNDPS(this CombatantData combatant, int N)
+        {
+            long num = 0L;
+            DateTime dateTime = AggregationGlobals.lastKnownTime.Subtract(new TimeSpan(0, 0, N));
+            var items = combatant.Items[CombatantData.DamageTypeDataOutgoingDamage].Items["All"].Items;
+            for (int i = 0; i < items.Count; i++)
+            {
+                if (items[i].Time > dateTime)
+                {
+                    num += items[i].Damage.Number;
+                }
+            }
+            return (double)num / ((combatant.Duration.TotalSeconds < (double)N) ? combatant.Duration.TotalSeconds : (double)N);
+        }
+
+        // Encounter-wide LastNDPS across the allied roster. The divisor quirk is faithfully
+        // reproduced from the decompile: hardcoded 10.0, NOT N — Last30DPS/Last60DPS divide by the
+        // same 10-second cap as Last10DPS (a genuine plugin quirk, not a transcription error).
+        public static double LastNDPS(this EncounterData encounter, List<CombatantData> SelectiveAllies, int N)
+        {
+            long num = 0L;
+            DateTime dateTime = AggregationGlobals.lastKnownTime.Subtract(new TimeSpan(0, 0, N));
+            for (int i = 0; i < SelectiveAllies.Count; i++)
+            {
+                var items = SelectiveAllies[i].Items[CombatantData.DamageTypeDataOutgoingDamage].Items["All"].Items;
+                for (int j = 0; j < items.Count; j++)
+                {
+                    if (items[j].Time > dateTime)
+                    {
+                        num += items[j].Damage.Number;
+                    }
+                }
+            }
+            return (double)num / ((encounter.Duration.TotalSeconds < 10.0) ? encounter.Duration.TotalSeconds : 10.0);
         }
     }
 }

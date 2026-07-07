@@ -1,3 +1,5 @@
+using System;
+
 namespace Advanced_Combat_Tracker
 {
     // Static hub the plugins reach through. oFormActMain is the canonical FormActMain.
@@ -28,6 +30,10 @@ namespace Advanced_Combat_Tracker
             AggregationGlobals.CharNameAccessor = () => charName;
             AggregationGlobals.BlockIsHitAccessor = () => blockIsHit;
             AggregationGlobals.RestrictToAllAccessor = () => restrictToAll;
+            // LastNDPS's "now" (CombatantDataExtension.LastNDPS) — FormActMain.LastKnownTime is an
+            // instance property over its own EncounterLifecycle, advanced per folded swing
+            // (FormActMain.cs:453); a safe DateTime.Now default covers a read before oFormActMain exists.
+            AggregationGlobals.LastKnownTimeAccessor = () => oFormActMain != null ? oFormActMain.LastKnownTime : DateTime.Now;
         }
     }
 }
