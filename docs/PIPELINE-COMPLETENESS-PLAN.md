@@ -1455,13 +1455,79 @@ code phases so P1's baseline catches any regression, and the ACT-core oracle sui
 and let the P1.2 diff catch divergence; the diff (enumerated keys + values), not the task list, is
 the completeness authority.
 
-- [ ] **P5.1 — Port the `CombatantDataExtension` helpers** into `Fct.Aggregation` (new
+- [x] **P5.1 — Port the `CombatantDataExtension` helpers** into `Fct.Aggregation` (new
       `src/Fct.Aggregation/CombatantDataExtension.cs`, namespace `Advanced_Combat_Tracker`), reading
       our `LastKnownTime` (`EncounterLifecycle.cs:19`, surfaced `FormActMain.cs:210`) instead of
       `ActGlobals.oFormActMain`: `Job()` (`:10-20`), `Parry()` (`:22-33`), `Block()` (`:35-46`),
       `BlockParryCount()`, `DirectHeal()` (`:69-81`), `Overheal()` (`:83-94`), `DirectHitCount()`
       (`:96-107`), `CritDirectHitCount()` (`:109-120`), plus `OneOrInt(int)`. Source: FFXIV_ACT_Plugin
       decompile `CombatantDataExtension.cs`.
+      **Verdict:** ✅ DONE. New `src/Fct.Aggregation/CombatantDataExtension.cs`, namespace
+      `Advanced_Combat_Tracker`, `public static class CombatantDataExtension` with the eight listed
+      methods ported verbatim from the FFXIV_ACT_Plugin decompile
+      (`E:\dev\FFXIV_ACT_Plugin\_decompiled\FFXIV_ACT_Plugin\FFXIV_ACT_Plugin\CombatantDataExtension.cs`,
+      namespace `FFXIV_ACT_Plugin` there) plus `OneOrInt(int)`:
+      `public static string Job(this CombatantData combatant)`,
+      `public static long Parry(this AttackType attackType)`,
+      `public static long Block(this AttackType attackType)`,
+      `public static long BlockParryCount(this AttackType attackType)`,
+      `public static long DirectHeal(this CombatantData combatant)`,
+      `public static long Overheal(this AttackType attackType)`,
+      `public static long DirectHitCount(this AttackType attackType)`,
+      `public static long CritDirectHitCount(this AttackType attackType)`,
+      `private static int OneOrInt(int data)`. Every member the bodies touch maps onto our
+      `Fct.Aggregation` types **with no name or shape divergence** — verified by direct read of
+      `Aggregation.cs`/`Models.cs` before writing: `CombatantData.AllOut` (`SortedList<string,
+      AttackType>`), `AttackType.Items` (`List<MasterSwing>`), `DamageTypeData.Items["All"]` (keyed by
+      the "All" `AttackType` bucket via `CombatantData.Items[<DamageTypeData key>]`), and
+      `MasterSwing.Special`/`.AttackType`/`.DamageType`/`.Critical`/`.Tags`/`.Damage` (`Dnum`, implicit
+      `long` conversion) all already exist as the identical shapes the decompile indexes — so the
+      ported bodies are a literal transcription (natural `num += items[i].Damage` in place of the
+      decompile's `Dnum.op_Implicit(...)` IL-decompiler artifact, semantically identical). No
+      divisor/rounding/ordering changes; `OneOrInt`'s `long` overload (`ACT_UIMods.cs:2769`, used by
+      `ParryPct`/`BlockPct` against `BlockParryCount()`'s `long` return) is **not** ported here — the
+      plan's P5.1 bullet lists only `OneOrInt(int)`, and none of P5.1's eight methods call it; P5.2/P5.3
+      must add the `long` overload when they register `ParryPct`/`BlockPct`.
+      - **`LastKnownTime` finding:** none of the eight ported methods reads
+        `ActGlobals.oFormActMain.LastKnownTime` — only the two deferred `LastNDPS` overloads
+        (`CombatantDataExtension.cs:122-153`) do, per the plan's own P5.6 deferral. P5.1 therefore adds
+        **no** current-time read at all; the file's header comment documents the runtime-neutral
+        accessor P5.6 must use when it ports `LastNDPS`: these are `static` extension methods with no
+        handle to the owning `EncounterLifecycle` instance (`EncounterLifecycle.LastKnownTime`,
+        `EncounterLifecycle.cs:19`, surfaced net48-side as `FormActMain.LastKnownTime`,
+        `FormActMain.cs:210`), so P5.6 should extend `AggregationGlobals`
+        (`src/Fct.Aggregation/AggregationGlobals.cs`) with a `Func<DateTime> LastKnownTimeAccessor`
+        wired by each facade at startup — the exact existing pattern that already exposes
+        `charName`/`blockIsHit`/`restrictToAll` (facade-owned ACT-core state read through a static
+        accessor, never a direct facade reference, since `Fct.Aggregation` cannot depend on either
+        facade). No accessor was added in this task since it would be unused until P5.6.
+      - **No registration, no behavior change:** the new methods are extension methods with zero
+        call sites anywhere in the tree (confirmed — nothing references
+        `CombatantDataExtension` yet); `CombatTables.cs`/`EngineTables.cs` untouched.
+      - **Verification:** `dotnet build ffxiv-combat-tracker.slnx` clean, 0 warnings/errors — both
+        `Fct.Aggregation` TFMs (`net48`, `net10.0`) built the new file. ACT-core suite green:
+        `tests\Fct.Compat.Act.Tests` 67/67 passed (incl. `ExportVarsCompatTests`);
+        `Fct.Engine.Tests --filter FullyQualifiedName~OracleParityTests` 4 passed + the P1.2 gate
+        (`ExportVariables_g1_keys_match_the_plugin_oracle_baseline_pending_P5`) still red with the
+        **identical unchanged 12-key message** (`BlockPct, CritDirectHitCount, CritDirectHitPct,
+        DirectHitCount, DirectHitPct, IncToHit, Job, Last10DPS, Last30DPS, Last60DPS, OverHealPct,
+        ParryPct`); full `Fct.Engine.Tests` 9/10 (same 1 intentional red). Full `Fct.Integration.Tests`
+        46 tests: 42 passed, 1 intentional red (`OverlaySatelliteTests`, identical unchanged 12-key
+        message), 3 skipped (env-gated `FrameFixtureGenerator`/`DistTreeGateTests` +
+        `[plugin-gated]` `LineStreamDiffTests` variant); `SatelliteSupervisorTests` failed once in the
+        full run (`Satellite executable not staged` despite the exe existing on disk) but passed both
+        in isolation and on a full-suite rerun — confirmed pre-existing run-ordering flakiness, same
+        class as the documented `FourRealPackagesTests` flake, unrelated to this change (this task
+        never touches satellite staging/process code). `Fct.Parser.Legacy.Tests` 26/26,
+        `Fct.App.Tests` 183/183, `Fct.FlowTests` 22/22, `Fct.Compat.Shim.Tests` 56/56 — all green, no
+        regressions.
+      - **Handoff for P5.2:** the helpers live in `Advanced_Combat_Tracker.CombatantDataExtension`
+        (`src/Fct.Aggregation/CombatantDataExtension.cs`), referenced from `EngineTables.Install()`
+        (`src/Fct.Aggregation/EngineTables.cs:22`) via the `C(...)`/direct
+        `CombatantData.ExportVariables[key] = ...`/`CombatantData.ColumnDefs[key] = ...` assignment
+        shape `CombatTables.cs` already establishes. P5.2 registers `CombatantData.ColumnDefs["Job"]`
+        (cell `= d.Job()`) and `CombatantData.ExportVariables["Job"]` (body
+        `= d.GetColumnByName("Job")`) — `Job()` is ready to call as-is, no further changes needed here.
 - [ ] **P5.2 — `Job`: ColumnDef + ExportVar.** Register `CombatantData.ColumnDefs["Job"]` (cell
       `= d.Job()`, `ACT_UIMods.cs:1899-1916`) **and** `CombatantData.ExportVariables["Job"]` (body
       `= d.GetColumnByName("Job")`, `:1918-1928`) — the real formatter's indirection, so direct
