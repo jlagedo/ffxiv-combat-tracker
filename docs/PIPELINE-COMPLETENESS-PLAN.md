@@ -1265,12 +1265,80 @@ The G14 headline fix. No wire-codec change (the `RAW` frame already carries type
 
 ### P4 — Generic priming: snapshot-then-stream ☐
 
-- [ ] **P4.1 — Last-line cache.** Host session: cache the last-seen verbatim `RawLogLine` per
+- [x] **P4.1 — Last-line cache.** Host session: cache the last-seen verbatim `RawLogLine` per
       `LogMessageType` in the one-shot set (§3 literal), updated from the rawlog fan-in — no
       decoding, keyed on the typed frame field. Lives with the session state `SatelliteHost` reads
       (alongside `GameSnapshotAggregator`); host-internal (native plugins read typed state from
       `IGameSnapshot`). *Done when:* unit test — fold lines, observe the cache hold the last
       instance per type.
+      **Verdict:** ✅ DONE. New `src/Fct.Host/Hosting/LastLineCache.cs`:
+      - **The single one-shot-set literal (§3):** `internal static class OneShotLineTypes` —
+        `EmissionOrder` is the one `IReadOnlyList<LogMessageType>` array literal
+        (`Version, Settings, Process, Territory, ChangePrimaryPlayer, ChangeMap, PlayerStats`) backing
+        both a `HashSet<LogMessageType>` membership check (`Contains`) and the emission order P4.2
+        replays. No other file declares this set. **Naming note (per the task's own "confirm against
+        the file" caveat):** the plan's shorthand "01 ChangeZone" is `LogMessageType.Territory = 1` in
+        `Fct.Abstractions/LogMessageType.cs` — there is no `ChangeZone` member; documented in the type's
+        XML doc so the mapping isn't rediscovered later. All seven values confirmed against the enum:
+        `Territory=1, ChangePrimaryPlayer=2, PlayerStats=12, ChangeMap=40, Settings=249, Process=250,
+        Version=253`.
+      - **The cache component:** `internal sealed class LastLineCache : IHostedService, ILastLineCache`.
+        Subscribes `GameEventBus` with a filter that matches **only** `RawLogLine` events
+        (`Types: [typeof(RawLogLine)]` + `IncludeRawLogLines: true` — `RawLogLine` bypasses the `Types`
+        check entirely in `GameEventBus.Matches`, and no other event type is assignable to `RawLogLine`,
+        so this excludes every typed event exactly like `GameSnapshotAggregator`'s inverse filter
+        excludes raw lines). `OnEvent` does zero decoding: `if (!OneShotLineTypes.Contains(line.Type))
+        return;` then `_lastByType[line.Type] = line` under a private lock (mirrors
+        `GameSnapshotAggregator`'s single-reader-bus-pump reasoning, but adds an explicit lock since a
+        second caller — `Snapshot()` — reads concurrently from whatever thread `SatelliteHost` calls it
+        on, unlike the aggregator's OnEvent-only mutation).
+      - **Read API (P4.2 binds to this):** `ILastLineCache.Snapshot() : IReadOnlyList<RawLogLine>` —
+        returns the cached lines **in `OneShotLineTypes.EmissionOrder`**, one entry per type observed at
+        least once (an unobserved type is simply absent, never a placeholder). P4.2 can iterate and
+        enqueue directly with no re-sorting.
+      - **DI registration** (`src/Fct.Host/ServiceCollectionExtensions.cs`, immediately after
+        `AddHostedService<GameSnapshotAggregator>()`): `AddSingleton<LastLineCache>()` +
+        `AddSingleton<ILastLineCache>(sp => sp.GetRequiredService<LastLineCache>())` +
+        `AddHostedService(sp => sp.GetRequiredService<LastLineCache>())` — the same three-line shape
+        `Fct.Engine.ModernEncounterEngine` uses to be both a live hosted service and directly injectable.
+      - **Reaching `SatelliteHost` (the P4.2 wiring):** threaded through the exact same constructor-param
+        path `IRawLogLineEmitter` already uses: `AddFctHostServices` passes
+        `lastLineCache: sp.GetService<ILastLineCache>()` into `SatelliteSupervisor`'s constructor;
+        `SatelliteSupervisor` stores `_lastLineCache` and passes it to every `new SatelliteHost(...,
+        lastLineCache: _lastLineCache)` in `StartOneAsync`; `SatelliteHost` stores it and exposes
+        `internal ILastLineCache? LastLineCache => _lastLineCache` (next to the existing
+        `EgressCounters` property) for `BuildPrimeEvents` (P4.2) to read. Not wired into
+        `BuildPrimeEvents` itself — out of scope for this task; the field/property exist unused today
+        (nullable, defaults to `null` in every existing direct `new SatelliteHost(...)` test call site,
+        none of which pass the new trailing optional param, so nothing else needed updating).
+      - **Unit test:** `tests/Fct.App.Tests/Hosting/LastLineCacheTests.cs`,
+        `Holds_only_the_last_instance_per_one_shot_type_and_ignores_non_one_shot_types` — folds an
+        earlier "first-boot" instance of all 7 one-shot types, four non-one-shot lines interleaved
+        (ChatLog, ActionEffect, AOEActionEffect, StatusAdd), then a later "relog/zone-move" instance of
+        all 7 one-shot types again, onto a real `GameEventBus` + running `LastLineCache`. Asserts the
+        cache holds exactly 7 entries, in `OneShotLineTypes.EmissionOrder`, each the LAST (relog)
+        instance by `Sequence`, and that none of the 4 non-one-shot types ever appear. A second test,
+        `Snapshot_stays_empty_when_only_non_one_shot_lines_have_been_observed`, pins the negative case.
+        Both green: `dotnet test tests\Fct.App.Tests\Fct.App.Tests.csproj --filter
+        "FullyQualifiedName~LastLineCacheTests"` → 2/2.
+      - **Verification:** `dotnet build ffxiv-combat-tracker.slnx` clean (0 warnings/errors — the repo
+        builds with `TreatWarningsAsErrors`, so `LastLineCache.LastLineCache` field had to be exposed via
+        the `SatelliteHost.LastLineCache` property rather than left write-only). Full suite runs, no
+        regressions: `Fct.App.Tests` 183/183 (was 173 baseline + these 2 new, all green — P1.6's former
+        red is already flipped green by the completed P3 phase, unrelated to this task);
+        `Fct.Integration.Tests` 39 passed/3 failed/4 skipped — the 3 failures are exactly the
+        pre-existing reds this task must NOT touch: `LateJoinPrimingTests`×2 (P1.4, unchanged messages —
+        confirmed still `Actual: []` / `Actual: ""`) and `OverlaySatelliteTests` (P1.2, unchanged 12-key
+        message); `Fct.Engine.Tests` 9 passed/1 failed (`OracleParityTests`, same P1.2 12-key message);
+        `Fct.Parser.Legacy.Tests` 26/26 and `Fct.FlowTests` 22/22 (P1.5/P1.6 already green from the
+        completed P3 phase). No `FourRealPackagesTests` flake reproduced this run.
+      - **Handoff for P4.2:** call `satelliteHost.LastLineCache?.Snapshot()` inside `BuildPrimeEvents`
+        when the subscriber's tokens include `SatelliteProtocol.StreamRawLog` — the returned list is
+        already in ACT emission order (253/249/250 → 01 → 02 → 40 → 12), so it can be enqueued directly
+        ahead of the live fan-out. `01`/`02` synthesis from the typed snapshot is still needed as the
+        fresh-boot fallback **only** when `Snapshot()` has no entry for `Territory`/`ChangePrimaryPlayer`
+        (an unobserved type is simply absent from the returned list — trivial to detect by scanning for
+        `l.Type == LogMessageType.Territory` / `.ChangePrimaryPlayer`).
 - [ ] **P4.2 — Prime from the snapshot + cache.** `BuildPrimeEvents`
       (`SatelliteHost.cs:388-431`): when the subscriber takes `rawlog` (currently excluded from
       priming), replay the cached lines in ACT emission order (`253/249/250 → 01 → 02 → 40 → 12`)

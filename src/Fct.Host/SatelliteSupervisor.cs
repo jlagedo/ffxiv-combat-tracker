@@ -92,6 +92,7 @@ namespace Fct.Host
         private readonly IAudioOutput? _audio;        // host-routed services shared across satellites (P6)
         private readonly IPluginRegistry? _registry;
         private readonly IRawLogLineEmitter? _rawLog;
+        private readonly ILastLineCache? _lastLineCache;   // one-shot line-state priming source (P4)
         private readonly RestartPolicy _policy;
         private readonly Func<DateTimeOffset> _now;
         private readonly Func<TimeSpan, CancellationToken, Task> _delay;
@@ -116,7 +117,8 @@ namespace Fct.Host
             IGameSession? session = null,
             IAudioOutput? audio = null,
             IPluginRegistry? registry = null,
-            IRawLogLineEmitter? rawLog = null)
+            IRawLogLineEmitter? rawLog = null,
+            ILastLineCache? lastLineCache = null)
         {
             _loggerFactory = loggerFactory ?? throw new ArgumentNullException(nameof(loggerFactory));
             _log = loggerFactory.CreateLogger("Fct.Satellite.Supervisor");
@@ -127,6 +129,7 @@ namespace Fct.Host
             _audio = audio;
             _registry = registry;
             _rawLog = rawLog;
+            _lastLineCache = lastLineCache;
             _policy = policy ?? new RestartPolicy();
             _now = now ?? (() => DateTimeOffset.UtcNow);
             _delay = delay ?? ((d, ct) => Task.Delay(d, ct));
@@ -155,7 +158,8 @@ namespace Fct.Host
         private async Task StartOneAsync(SupervisedSatellite sat, bool isRestart, CancellationToken ct)
         {
             var host = new SatelliteHost(_loggerFactory, _sink, _notifications, _texts, sat.Id, _session,
-                extraArgs: sat.ExtraArgs, audio: _audio, registry: _registry, rawLog: _rawLog);
+                extraArgs: sat.ExtraArgs, audio: _audio, registry: _registry, rawLog: _rawLog,
+                lastLineCache: _lastLineCache);
             host.ProcessExited += code => OnExited(sat, code);
             sat.Host = host;
             sat.Set(isRestart ? SatelliteState.Restarting : SatelliteState.Starting);

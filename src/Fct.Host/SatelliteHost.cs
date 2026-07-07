@@ -66,6 +66,11 @@ public sealed class SatelliteHost
         get { lock (_egressLock) return _egress is null ? null : (_egress.Sent, _egress.Dropped); }
     }
 
+    /// <summary>The one-shot line-state cache (P4.1) this satellite's <c>BuildPrimeEvents</c> reads a
+    /// late <c>rawlog</c> subscriber's priming lines from (P4.2), or null when no cache is wired (e.g.
+    /// most existing tests construct a <see cref="SatelliteHost"/> directly without one).</summary>
+    internal ILastLineCache? LastLineCache => _lastLineCache;
+
     /// <summary>Raised when the satellite process exits UNEXPECTEDLY (not during a requested shutdown),
     /// carrying the exit code. The <see cref="SatelliteSupervisor"/> uses it to drive restart/quarantine.</summary>
     public event Action<int>? ProcessExited;
@@ -97,6 +102,7 @@ public sealed class SatelliteHost
     private readonly IAudioOutput? _audio;
     private readonly IPluginRegistry? _registry;
     private readonly IRawLogLineEmitter? _rawLog;
+    private readonly ILastLineCache? _lastLineCache;   // one-shot line-state priming source (P4.2 reads this)
     private readonly object _sinkLock = new();
     private IDisposable? _audioSink;            // this satellite's terminal audio sink proxy (P6)
     private bool _sinkTts, _sinkSound;          // which slots its plugin has taken over
@@ -106,7 +112,8 @@ public sealed class SatelliteHost
     internal SatelliteHost(ILoggerFactory loggerFactory, IGameEventSink sink,
         INotificationHub? notifications = null, ISatelliteNotificationText? texts = null,
         string satelliteId = "ffxiv", IGameSession? session = null, string extraArgs = "",
-        IAudioOutput? audio = null, IPluginRegistry? registry = null, IRawLogLineEmitter? rawLog = null)
+        IAudioOutput? audio = null, IPluginRegistry? registry = null, IRawLogLineEmitter? rawLog = null,
+        ILastLineCache? lastLineCache = null)
     {
         _loggerFactory = loggerFactory;
         _satelliteId = string.IsNullOrWhiteSpace(satelliteId) ? "ffxiv" : satelliteId;
@@ -115,6 +122,7 @@ public sealed class SatelliteHost
         _audio = audio;
         _registry = registry;
         _rawLog = rawLog;
+        _lastLineCache = lastLineCache;
         _log = loggerFactory.CreateLogger<SatelliteHost>();
         // Forwarded records land under a per-satellite category so N satellites are attributable in the
         // host log (Fct.Satellite.<id>); the single-satellite path keeps Fct.Satellite.ffxiv.

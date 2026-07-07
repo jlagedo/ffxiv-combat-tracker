@@ -41,7 +41,8 @@ public static class ServiceCollectionExtensions
             session: sp.GetService<IGameSession>(),
             audio: sp.GetService<IAudioOutput>(),
             registry: sp.GetService<IPluginRegistry>(),
-            rawLog: sp.GetService<IRawLogLineEmitter>()));
+            rawLog: sp.GetService<IRawLogLineEmitter>(),
+            lastLineCache: sp.GetService<ILastLineCache>()));
         services.AddSingleton<SatelliteRouter>(sp => new SatelliteRouter(
             sp.GetRequiredService<SatelliteSupervisor>(), sp.GetRequiredService<ILoggerFactory>()));
 
@@ -55,6 +56,13 @@ public static class ServiceCollectionExtensions
         services.AddSingleton<IGameSession, GameSession>();
         // Folds the live event stream into the pull snapshot IDataRepository/consumers read.
         services.AddHostedService<GameSnapshotAggregator>();
+        // Caches the last-seen verbatim RawLogLine per one-shot LogMessageType (P4.1), alongside the
+        // snapshot aggregator above — the host-internal session state a late-joining rawlog subscriber
+        // primes from (P4.2). Registered as itself too (not just IHostedService) so SatelliteSupervisor
+        // can hand it to each SatelliteHost, the same shape as IRawLogLineEmitter below.
+        services.AddSingleton<LastLineCache>();
+        services.AddSingleton<ILastLineCache>(sp => sp.GetRequiredService<LastLineCache>());
+        services.AddHostedService(sp => sp.GetRequiredService<LastLineCache>());
         services.AddSingleton<RegistryService>();
         services.AddSingleton<IPluginRegistry>(sp => sp.GetRequiredService<RegistryService>());
         services.AddSingleton<IAudioOutput, AudioService>();
