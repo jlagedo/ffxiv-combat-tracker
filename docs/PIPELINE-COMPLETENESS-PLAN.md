@@ -1765,10 +1765,99 @@ the completeness authority.
         assuming no new provenance exclusion is needed for the `DirectHit*`/`CritDirectHit*` values
         themselves (their swing tag, per P0.4, **is** present in both corpora — `DirectHit s True`
         — so a fixture-provenance divergence like `OverHealPct`'s is less likely here, but verify).
-- [ ] **P5.4 — `DirectHitPct`, `DirectHitCount`, `CritDirectHitCount`, `CritDirectHitPct`:** same
+- [x] **P5.4 — `DirectHitPct`, `DirectHitCount`, `CritDirectHitCount`, `CritDirectHitPct`:** same
       chain pattern (`CombatantData.ColumnDefs` → `Items[DamageTypeDataOutgoingDamage]` →
       `AttackType.ColumnDefs`) + ExportVar. Bodies: `:2250,2269,2288,2301-2311`;
       `:2319,2357,2370-2380`; `:2388,2426,2439-2449`; `:2457,2495,2508-2518`.
+      **Verdict:** ✅ DONE. `src/Fct.Aggregation/EngineTables.cs` `Install()`'s ACT_UIMods block
+      gained four new registrations, each porting its **full three-level chain** verbatim from the
+      decompile (`E:\dev\FFXIV_ACT_Plugin\_decompiled\FFXIV_ACT_Plugin\FFXIV_ACT_Plugin\ACT_UIMods.cs`),
+      the identical shape P5.3 established:
+      - **`DirectHitPct`** — `CombatantData.ColumnDefs["DirectHitPct"]` + `ExportVariables["DirectHitPct"]`
+        (`:2282-2299`, `:2301-2311`, cell = `Items[DamageTypeDataOutgoingDamage].GetColumnByName("DirectHitPct")`,
+        ExportVar = the `Convert.ToDouble(...Replace("%",""))` re-render); `DamageTypeData.ColumnDefs["DirectHitPct"]`
+        (`:2263-2280`, guarded by the "All" bucket, else `"0.0%"`); `AttackType.ColumnDefs["DirectHitPct"]`
+        (`:2244-2261`, reads `Data.DirectHitCount()` (P5.1) against `OneOrInt(Data.Items.Count)` — the
+        **int** overload, since `AttackType.Items.Count` is `int`, unlike ParryPct/BlockPct's `long`
+        `BlockParryCount()` denominator).
+      - **`DirectHitCount`** — the identical three-level chain (`:2351-2368`, `:2332-2349`, `:2313-2330`),
+        a raw count: `AttackType.ColumnDefs["DirectHitCount"]` reads `Data.DirectHitCount()` directly
+        (no percentage, no denominator); `ExportVariables["DirectHitCount"]` is a plain
+        `Data.GetColumnByName("DirectHitCount")` passthrough (`:2370-2380`).
+      - **`CritDirectHitCount`** — the identical shape as `DirectHitCount` (`:2420-2437`, `:2401-2418`,
+        `:2382-2399`, `:2439-2449`), reading `Data.CritDirectHitCount()` (P5.1).
+      - **`CritDirectHitPct`** — the identical shape as `DirectHitPct` (`:2489-2506`, `:2470-2487`,
+        `:2451-2468`, `:2508-2518`), reading `Data.CritDirectHitCount()` against the same
+        `OneOrInt(Data.Items.Count)` denominator. The `AttackType` **sort comparer** uses integer
+        division (`Left.CritDirectHitCount() * 100 / OneOrInt(Left.Items.Count)`), verbatim from the
+        decompile — deliberately different arithmetic from the cell body's double division; ported
+        as-is, not "fixed."
+      - No new `CombatantDataExtension` helper was needed: P5.1's `DirectHitCount()`/
+        `CritDirectHitCount()` and the existing `OneOrInt(int)` overload (P5.1) cover every call site
+        here — `AttackType.Items.Count` is `int`, so the `long` overload P5.3 added for
+        `BlockParryCount()`/`DirectHeal()` is not used by this task.
+      - **Skip-list shrink:** `"DirectHitPct"`, `"DirectHitCount"`, `"CritDirectHitCount"`,
+        `"CritDirectHitPct"` removed from `PendingP5Keys` in both
+        `tests/Fct.Engine.Tests/OracleParityTests.cs` and
+        `tests/Fct.Integration.Tests/OverlaySatelliteTests.cs` — **3 keys remain, byte-identical in
+        both**: `Last10DPS, Last30DPS, Last60DPS` (P5.6's remainder).
+      - **Headless gate (`Fct.Engine.Tests.OracleParityTests`) — clean:** `dotnet test
+        tests\Fct.Engine.Tests\Fct.Engine.Tests.csproj --filter "FullyQualifiedName~OracleParityTests"`
+        → 4 passed, 1 red with exactly: `P1.2 pending P5 registration of 3 ExportVariables key(s):
+        Last10DPS, Last30DPS, Last60DPS` — the 4 keys gone, no unexpected mismatch, no stale
+        skip-list entry. Full `Fct.Engine.Tests` run: 9/10 (same single intentional red).
+      - **Satellite gate (`Fct.Integration.Tests.OverlaySatelliteTests`) — required one additional
+        provenance exclusion, verified empirically (not assumed) per the P5.3 handoff's explicit
+        instruction:** naively removing the 4 keys surfaced exactly 4 "unexpected" `YOU.*` value
+        mismatches (`YOU.DirectHitPct: got='17%' oracle='0%'`, `DirectHitCount: got='52' oracle='0'`,
+        `CritDirectHitCount: got='16' oracle='0'`, `CritDirectHitPct: got='5%' oracle='0%'`) — **zero**
+        new "combatant missing" entries (the `alliesGapCombatants` name-scoped exclusion already
+        covers those, unchanged, confirming it needed no edit). Root-caused as a **fourth instance**
+        of the same fixture-provenance class as Job/OverHealPct/CurrentZoneName, confirmed by direct
+        grep (not assumed): `combat-slice.oracle.tsv` (the swings-only dump behind P1.1's baseline)
+        has **0** occurrences of `DirectHit`, while `combat-slice.frames.tsv` (this satellite's richer
+        replayed corpus) has **77** — so the oracle bakes `"0"`/`"0%"` for every combatant while
+        `YOU`'s correctly-registered value legitimately renders non-zero against the richer corpus.
+        Confirmed not a registration bug: `Combatant-013` (the only other combatant present after the
+        ally-gap exclusion) has no `DirectHit` tags either side and matches at `"0"`/`"0%"` unaffected.
+        Added `if (key is "DirectHitPct" or "DirectHitCount" or "CritDirectHitCount" or
+        "CritDirectHitPct") continue;` immediately below the existing `OverHealPct` exclusion, same
+        shape, fully commented in place. **Result after the fix:** `dotnet test
+        tests\Fct.Integration.Tests\Fct.Integration.Tests.csproj --filter
+        "FullyQualifiedName~OverlaySatelliteTests"` → red with the **identical** clean 3-key message
+        as the headless gate, in isolation — no unexpected mismatch, no stale entry. The 5 pre-existing
+        split-invariant assertions (`Encounter.damage`/`YOU.damage`/`YOU.damage%`/`Encounter.DURATION`/
+        `Encounter.encdps`/`YOU.encdps`) still pass, unchanged values.
+      - **ACT-core stays fully green, untouched:** `dotnet test
+        tests\Fct.Compat.Act.Tests\Fct.Compat.Act.Tests.csproj` → 67/67 — `new FormActMain(...)` →
+        `CombatTables.Setup()` only, never calls `EngineTables.Install()`, never observes these keys.
+      - **Build:** `dotnet build ffxiv-combat-tracker.slnx` clean, 0 warnings/errors (both
+        `Fct.Aggregation` TFMs); `dotnet build src\Fct.App\Fct.App.csproj` clean (satellite/compat
+        staged for the satellite gate).
+      - **No regressions:** full `Fct.Integration.Tests` run — 46 tests, 42 passed, 1 failed (the
+        expected `OverlaySatelliteTests` P1.2 red, unchanged shape), 3 skipped (env-gated
+        `FrameFixtureGenerator`/`DistTreeGateTests` + the plugin-gated `LineStreamDiffTests` clean
+        skip); `FourRealPackagesTests`/`SatelliteSupervisorTests`/`ReplayRouteTests` all passed in
+        this run (no flake reproduced). `Fct.FlowTests` 22/22, `Fct.App.Tests` 183/183,
+        `Fct.Parser.Legacy.Tests` 26/26, `Fct.Compat.Shim.Tests` 56/56 — all fully green. P1.3/P1.4/
+        P1.5/P1.6 gates confirmed still green throughout.
+      - **Handoff for P5.5:** the standalone `MasterSwing.ColumnDefs` set (`StatusDuration`,
+        `Potency`, `StatusEffects`, `DoTBase`, `BuffByte1-3`, `CritRate`, `CritEffects`, `DHRate`,
+        `DHEffects`) is untouched by this task — none of the four DirectHit*/CritDirectHit* chains
+        read `MasterSwing.GetColumnByName` (they read `AttackType.Items[i].Tags` directly via the
+        P5.1 extensions), so P5.5 remains fully independent, gated only against the P1.1 baseline
+        (which registers no `MasterSwing`-level keys itself).
+      - **Handoff for P5.6:** `PendingP5Keys` is now `Last10DPS, Last30DPS, Last60DPS` in both test
+        projects — the only remaining gap. Per P5.1's note, `LastNDPS` needs a runtime-neutral
+        `LastKnownTime` accessor added to `AggregationGlobals` (a `Func<DateTime>` wired by each
+        facade, mirroring the existing `charName`/`blockIsHit`/`restrictToAll` accessor pattern) since
+        `CombatantDataExtension`'s extension methods have no handle to `EncounterLifecycle`/
+        `FormActMain.LastKnownTime`. Reproduce the divisor quirk exactly per the plan text: combatant
+        `= sum / min(Duration, N)`; encounter `= sum / min(Duration, 10.0)` (hardcoded 10, not N).
+        Expect to check for a fifth fixture-provenance exclusion instance on the satellite gate (this
+        task's pattern makes it likely if the frames corpus carries swing timing the oracle's
+        swings-only dump doesn't reproduce identically) — verify empirically as this task did, don't
+        assume.
 - [ ] **P5.5 — `MasterSwing.ColumnDefs`:** register `StatusDuration` and the plugin's swing columns
       (`Potency`, `StatusEffects`, `DoTBase`, `BuffByte1-3`, `CritRate`, `CritEffects`, `DHRate`,
       `DHEffects`) for any consumer reading `MasterSwing.GetColumnByName`. Source: the

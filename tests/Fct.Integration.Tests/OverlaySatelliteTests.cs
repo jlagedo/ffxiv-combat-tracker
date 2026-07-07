@@ -71,7 +71,6 @@ namespace Fct.Integration.Tests
         // not just the headless engine variant.
         private static readonly HashSet<string> PendingP5Keys = new(StringComparer.Ordinal)
         {
-            "DirectHitPct", "DirectHitCount", "CritDirectHitCount", "CritDirectHitPct",
             "Last10DPS", "Last30DPS", "Last60DPS",
         };
 
@@ -238,6 +237,19 @@ namespace Fct.Integration.Tests
                     // here (empirically confirmed: the only other combatant present, Combatant-013, has no
                     // overheal data either way and matches at "0%" — unaffected by this exclusion).
                     if (key == "OverHealPct") continue;
+                    // DirectHitPct/DirectHitCount/CritDirectHitCount/CritDirectHitPct (P5.4) are
+                    // registered and correct — a FOURTH instance of the identical fixture-provenance
+                    // gap, verified empirically before assuming it (per the P5.3 handoff's explicit
+                    // instruction to confirm, not assume): combat-slice.oracle.tsv (the swings-only
+                    // dump behind P1.1's baseline) carries zero "DirectHit" swing tags (grepped,
+                    // confirmed 0 occurrences), so every combatant's DirectHitCount()/
+                    // CritDirectHitCount()-derived value bakes in "0"/"0%" in the oracle;
+                    // combat-slice.frames.tsv (this satellite's richer corpus) carries 77 real
+                    // "DirectHit s True" tag occurrences (P0.4), so YOU's correctly-computed
+                    // DirectHitPct/DirectHitCount/CritDirectHitCount/CritDirectHitPct legitimately
+                    // render non-zero here — the only other combatant present, Combatant-013, has no
+                    // DirectHit tags either side and matches at "0"/"0%", unaffected by this exclusion.
+                    if (key is "DirectHitPct" or "DirectHitCount" or "CritDirectHitCount" or "CritDirectHitPct") continue;
                     var values = name == "*ENCOUNTER*" ? frame.Encounter
                         : frame.Combatant.TryGetValue(name, out var v) ? v : null;
                     if (values is null) { pluginMismatches.Add((key, $"{name}: combatant missing from CombatData")); continue; }

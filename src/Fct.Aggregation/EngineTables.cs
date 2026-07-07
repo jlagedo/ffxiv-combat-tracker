@@ -167,6 +167,135 @@ namespace Advanced_Combat_Tracker
                 (AttackType.StringDataCallback)(d => d.Overheal().ToString(CultureInfo.InvariantCulture)),
                 (Left, Right) => Left.Overheal().CompareTo(Right.Overheal()));
 
+            // DirectHitPct (ACT_UIMods.cs:2244-2261 AttackType level; :2263-2280 DamageTypeData
+            // level; :2282-2299 CombatantData level; :2301-2311 ExportVar). CombatantData.
+            // ColumnDefs["DirectHitPct"] resolves through Items[DamageTypeDataOutgoingDamage]
+            // .GetColumnByName("DirectHitPct") -> DamageTypeData.ColumnDefs["DirectHitPct"]
+            // (guarded by the "All" attack-type bucket's presence, else "0.0%") ->
+            // Items["All"].GetColumnByName("DirectHitPct") -> AttackType.ColumnDefs["DirectHitPct"],
+            // which reads Data.DirectHitCount() (P5.1's ported CombatantDataExtension extension)
+            // against OneOrInt(Data.Items.Count) — the int overload, since AttackType.Items.Count is
+            // int (unlike ParryPct/BlockPct's long BlockParryCount() denominator).
+            CombatantData.ColumnDefs["DirectHitPct"] = new CombatantData.ColumnDef(
+                "DirectHitPct", true, "VARCHAR(8)", "DirectHitPct",
+                (CombatantData.StringDataCallback)(d => d.Items[CombatantData.DamageTypeDataOutgoingDamage].GetColumnByName("DirectHitPct")),
+                (CombatantData.StringDataCallback)(d => d.Items[CombatantData.DamageTypeDataOutgoingDamage].GetColumnByName("DirectHitPct")),
+                (Left, Right) => string.Compare(
+                    Left.Items[CombatantData.DamageTypeDataOutgoingDamage].GetColumnByName("DirectHitPct"),
+                    Right.Items[CombatantData.DamageTypeDataOutgoingDamage].GetColumnByName("DirectHitPct"),
+                    StringComparison.OrdinalIgnoreCase));
+            CombatantData.ExportVariables["DirectHitPct"] = new CombatantData.TextExportFormatter(
+                "DirectHitPct", "Direct Hit Percent", "Percent of hits that were Direct Hits.",
+                (CombatantData.ExportStringDataCallback)((d, extraFormat) => (d.GetColumnByName("DirectHitPct") == ""
+                    ? 0.0
+                    : Convert.ToDouble(d.GetColumnByName("DirectHitPct").Replace("%", ""), CultureInfo.InvariantCulture)).ToString("0'%", CultureInfo.InvariantCulture)));
+
+            DamageTypeData.ColumnDefs["DirectHitPct"] = new DamageTypeData.ColumnDef(
+                "DirectHitPct", true, "VARCHAR(8)", "DirectHitPct",
+                (DamageTypeData.StringDataCallback)(d => !d.Items.ContainsKey("All")
+                    ? 0.ToString("0.0'%", CultureInfo.InvariantCulture)
+                    : d.Items["All"].GetColumnByName("DirectHitPct")),
+                (DamageTypeData.StringDataCallback)(d => !d.Items.ContainsKey("All")
+                    ? 0.ToString("0.0'%", CultureInfo.InvariantCulture)
+                    : d.Items["All"].GetColumnByName("DirectHitPct")));
+
+            AttackType.ColumnDefs["DirectHitPct"] = new AttackType.ColumnDef(
+                "DirectHitPct", true, "VARCHAR(8)", "DirectHitPct",
+                (AttackType.StringDataCallback)(d => ((double)d.DirectHitCount() * 100.0 / (double)CombatantDataExtension.OneOrInt(d.Items.Count)).ToString("0.0'%", CultureInfo.InvariantCulture)),
+                (AttackType.StringDataCallback)(d => ((double)d.DirectHitCount() * 100.0 / (double)CombatantDataExtension.OneOrInt(d.Items.Count)).ToString("0.0'%", CultureInfo.InvariantCulture)),
+                (Left, Right) => Left.DirectHitCount().CompareTo(Right.DirectHitCount()));
+
+            // DirectHitCount (ACT_UIMods.cs:2313-2330 AttackType level; :2332-2349 DamageTypeData
+            // level; :2351-2368 CombatantData level; :2370-2380 ExportVar) — the identical
+            // three-level chain as DirectHitPct, but a raw count (no percentage):
+            // AttackType.ColumnDefs["DirectHitCount"] reads Data.DirectHitCount() directly (P5.1's
+            // ported extension), no OneOrInt/denominator involved.
+            CombatantData.ColumnDefs["DirectHitCount"] = new CombatantData.ColumnDef(
+                "DirectHitCount", false, "INT", "DirectHitCount",
+                (CombatantData.StringDataCallback)(d => d.Items[CombatantData.DamageTypeDataOutgoingDamage].GetColumnByName("DirectHitCount")),
+                (CombatantData.StringDataCallback)(d => d.Items[CombatantData.DamageTypeDataOutgoingDamage].GetColumnByName("DirectHitCount")),
+                (Left, Right) => string.Compare(
+                    Left.Items[CombatantData.DamageTypeDataOutgoingDamage].GetColumnByName("DirectHitCount"),
+                    Right.Items[CombatantData.DamageTypeDataOutgoingDamage].GetColumnByName("DirectHitCount"),
+                    StringComparison.OrdinalIgnoreCase));
+            CombatantData.ExportVariables["DirectHitCount"] = new CombatantData.TextExportFormatter(
+                "DirectHitCount", "Direct Hit Count", "Number of hits that were direct hit.",
+                (CombatantData.ExportStringDataCallback)((d, extraFormat) => d.GetColumnByName("DirectHitCount")));
+
+            DamageTypeData.ColumnDefs["DirectHitCount"] = new DamageTypeData.ColumnDef(
+                "DirectHitCount", false, "INT", "DirectHitCount",
+                (DamageTypeData.StringDataCallback)(d => !d.Items.ContainsKey("All") ? "0" : d.Items["All"].GetColumnByName("DirectHitCount")),
+                (DamageTypeData.StringDataCallback)(d => !d.Items.ContainsKey("All") ? "0" : d.Items["All"].GetColumnByName("DirectHitCount")));
+
+            AttackType.ColumnDefs["DirectHitCount"] = new AttackType.ColumnDef(
+                "DirectHitCount", false, "INT", "DirectHitCount",
+                (AttackType.StringDataCallback)(d => d.DirectHitCount().ToString(CultureInfo.InvariantCulture)),
+                (AttackType.StringDataCallback)(d => d.DirectHitCount().ToString(CultureInfo.InvariantCulture)),
+                (Left, Right) => Left.DirectHitCount().CompareTo(Right.DirectHitCount()));
+
+            // CritDirectHitCount (ACT_UIMods.cs:2382-2399 AttackType level; :2401-2418
+            // DamageTypeData level; :2420-2437 CombatantData level; :2439-2449 ExportVar) — the
+            // identical shape as DirectHitCount, reading Data.CritDirectHitCount() (P5.1's ported
+            // extension: DirectHit=="True" swings that were also Critical).
+            CombatantData.ColumnDefs["CritDirectHitCount"] = new CombatantData.ColumnDef(
+                "CritDirectHitCount", false, "INT", "CritDirectHitCount",
+                (CombatantData.StringDataCallback)(d => d.Items[CombatantData.DamageTypeDataOutgoingDamage].GetColumnByName("CritDirectHitCount")),
+                (CombatantData.StringDataCallback)(d => d.Items[CombatantData.DamageTypeDataOutgoingDamage].GetColumnByName("CritDirectHitCount")),
+                (Left, Right) => string.Compare(
+                    Left.Items[CombatantData.DamageTypeDataOutgoingDamage].GetColumnByName("CritDirectHitCount"),
+                    Right.Items[CombatantData.DamageTypeDataOutgoingDamage].GetColumnByName("CritDirectHitCount"),
+                    StringComparison.OrdinalIgnoreCase));
+            CombatantData.ExportVariables["CritDirectHitCount"] = new CombatantData.TextExportFormatter(
+                "CritDirectHitCount", "Crit Direct Hit Count", "Number of hits that were critical as well as direct hit.",
+                (CombatantData.ExportStringDataCallback)((d, extraFormat) => d.GetColumnByName("CritDirectHitCount")));
+
+            DamageTypeData.ColumnDefs["CritDirectHitCount"] = new DamageTypeData.ColumnDef(
+                "CritDirectHitCount", false, "INT", "CritDirectHitCount",
+                (DamageTypeData.StringDataCallback)(d => !d.Items.ContainsKey("All") ? "0" : d.Items["All"].GetColumnByName("CritDirectHitCount")),
+                (DamageTypeData.StringDataCallback)(d => !d.Items.ContainsKey("All") ? "0" : d.Items["All"].GetColumnByName("CritDirectHitCount")));
+
+            AttackType.ColumnDefs["CritDirectHitCount"] = new AttackType.ColumnDef(
+                "CritDirectHitCount", false, "INT", "CritDirectHitCount",
+                (AttackType.StringDataCallback)(d => d.CritDirectHitCount().ToString(CultureInfo.InvariantCulture)),
+                (AttackType.StringDataCallback)(d => d.CritDirectHitCount().ToString(CultureInfo.InvariantCulture)),
+                (Left, Right) => Left.CritDirectHitCount().CompareTo(Right.CritDirectHitCount()));
+
+            // CritDirectHitPct (ACT_UIMods.cs:2451-2468 AttackType level; :2470-2487 DamageTypeData
+            // level; :2489-2506 CombatantData level; :2508-2518 ExportVar) — the identical shape as
+            // DirectHitPct, reading Data.CritDirectHitCount() against the same
+            // OneOrInt(Data.Items.Count) denominator. The AttackType sort comparer uses integer
+            // division (verbatim from the decompile), unlike the cell body's double division — a
+            // faithfully-ported quirk, not a transcription error.
+            CombatantData.ColumnDefs["CritDirectHitPct"] = new CombatantData.ColumnDef(
+                "CritDirectHitPct", true, "VARCHAR(8)", "CritDirectHitPct",
+                (CombatantData.StringDataCallback)(d => d.Items[CombatantData.DamageTypeDataOutgoingDamage].GetColumnByName("CritDirectHitPct")),
+                (CombatantData.StringDataCallback)(d => d.Items[CombatantData.DamageTypeDataOutgoingDamage].GetColumnByName("CritDirectHitPct")),
+                (Left, Right) => string.Compare(
+                    Left.Items[CombatantData.DamageTypeDataOutgoingDamage].GetColumnByName("CritDirectHitPct"),
+                    Right.Items[CombatantData.DamageTypeDataOutgoingDamage].GetColumnByName("CritDirectHitPct"),
+                    StringComparison.OrdinalIgnoreCase));
+            CombatantData.ExportVariables["CritDirectHitPct"] = new CombatantData.TextExportFormatter(
+                "CritDirectHitPct", "Crit Direct Hit Percent", "Percent of hits that were Direct Hits as well as Critical Hits.",
+                (CombatantData.ExportStringDataCallback)((d, extraFormat) => (d.GetColumnByName("CritDirectHitPct") == ""
+                    ? 0.0
+                    : Convert.ToDouble(d.GetColumnByName("CritDirectHitPct").Replace("%", ""), CultureInfo.InvariantCulture)).ToString("0'%", CultureInfo.InvariantCulture)));
+
+            DamageTypeData.ColumnDefs["CritDirectHitPct"] = new DamageTypeData.ColumnDef(
+                "CritDirectHitPct", true, "VARCHAR(8)", "CritDirectHitPct",
+                (DamageTypeData.StringDataCallback)(d => !d.Items.ContainsKey("All")
+                    ? 0.ToString("0.0'%", CultureInfo.InvariantCulture)
+                    : d.Items["All"].GetColumnByName("CritDirectHitPct")),
+                (DamageTypeData.StringDataCallback)(d => !d.Items.ContainsKey("All")
+                    ? 0.ToString("0.0'%", CultureInfo.InvariantCulture)
+                    : d.Items["All"].GetColumnByName("CritDirectHitPct")));
+
+            AttackType.ColumnDefs["CritDirectHitPct"] = new AttackType.ColumnDef(
+                "CritDirectHitPct", true, "VARCHAR(8)", "CritDirectHitPct",
+                (AttackType.StringDataCallback)(d => ((double)d.CritDirectHitCount() * 100.0 / (double)CombatantDataExtension.OneOrInt(d.Items.Count)).ToString("0.0'%", CultureInfo.InvariantCulture)),
+                (AttackType.StringDataCallback)(d => ((double)d.CritDirectHitCount() * 100.0 / (double)CombatantDataExtension.OneOrInt(d.Items.Count)).ToString("0.0'%", CultureInfo.InvariantCulture)),
+                (Left, Right) => (Left.CritDirectHitCount() * 100 / CombatantDataExtension.OneOrInt(Left.Items.Count))
+                    .CompareTo(Right.CritDirectHitCount() * 100 / CombatantDataExtension.OneOrInt(Right.Items.Count)));
+
             DamageTypeDef Out(string l, int ally) => new DamageTypeDef(l, ally, Color.Orange);
 
             CombatantData.OutgoingDamageTypeDataObjects = new Dictionary<string, DamageTypeDef>
