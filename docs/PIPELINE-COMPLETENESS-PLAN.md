@@ -2221,8 +2221,23 @@ the completeness authority.
       (`MachinaRegionBridge.TrySetRegion`). Verified against `src/Fct.Aggregation/EngineTables.cs`,
       `src/Fct.Aggregation/CombatantDataExtension.cs`, `src/Fct.Parser.Legacy/ConsumerDataSurface.cs`,
       `src/Fct.Parser.Legacy/MachinaRegionBridge.cs`.
-- [ ] **P6.3** [`TESTING.md`](TESTING.md): the two differential gates as first-class parity axes
+- [x] **P6.3** [`TESTING.md`](TESTING.md): the two differential gates as first-class parity axes
       (line-stream diff, plugin-in-the-loop ExportVariables diff) + the late-join variants.
+      **Verdict:** ✅ DONE. The header's two-axis framing is now four axes (oracle parity / replica
+      parity / line-stream diff / plugin-in-the-loop `ExportVariables` diff), pointing at
+      `PIPELINE-COMPLETENESS-PLAN.md` §1 for the diff-whole-surfaces doctrine. Three new sections
+      land between "End-to-end live route" and "Differential ACT-engine compat": **Line-stream diff
+      (rawlog, byte-for-byte)** names `LineStreamDiffTests` (plugin-free strict gate + `[plugin-gated]`
+      pass-or-skip companion); **Plugin-in-the-loop ExportVariables diff** names the
+      `combat-slice.plugin.exportvars.tsv` baseline and its two legs
+      (`OracleParityTests.ExportVariables_g1_keys_match_the_plugin_oracle_baseline_pending_P5`,
+      `OverlaySatelliteTests`), the empty `PendingP5Keys` skip-list, the `CurrentZoneName` exclusion,
+      and the P5.9 mass-check total (7,242 pairs, 0 divergences); **Late-join convergence** names
+      `LateJoinPrimingTests`' two gates plus the related `RepositorySurfaceLiveTests` and
+      alliance-party (`EventMappingFlowTests`/`GameSnapshotAggregatorTests`) gates. The Projects table
+      rows for `Fct.Engine.Tests`/`Fct.FlowTests`/`Fct.Integration.Tests` point at the new sections.
+      Present-tense throughout — all named tests/fixtures verified to exist and to be green (or
+      pass/skip by construction for `[plugin-gated]`) as described.
 - [ ] **P6.4** `GO-LIVE.md` A1: name job-icon correctness, zone display, map-dependent overlay
       features, and one custom-line-driven feature explicitly.
 - [ ] **P6.5** Postmortem: mark fixed, link this plan.
