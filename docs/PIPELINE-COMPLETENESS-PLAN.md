@@ -1263,7 +1263,7 @@ The G14 headline fix. No wire-codec change (the `RAW` frame already carries type
       host-fold). P1.4 (late-join priming) remains the only P3-adjacent red — its prime-path
       convergence is P4's job, as noted.
 
-### P4 — Generic priming: snapshot-then-stream ☐
+### P4 — Generic priming: snapshot-then-stream ☑
 
 - [x] **P4.1 — Last-line cache.** Host session: cache the last-seen verbatim `RawLogLine` per
       `LogMessageType` in the one-shot set (§3 literal), updated from the rawlog fan-in — no
@@ -1438,10 +1438,14 @@ The G14 headline fix. No wire-codec change (the `RAW` frame already carries type
         its checkbox and fold this verdict's empirical evidence into its own entry (no further code
         change expected). **Handoff for P5:** the only remaining red in the whole suite is P1.2's
         12-key `ExportVariables` gap (`OracleParityTests`/`OverlaySatelliteTests`), exactly as scoped.
-- [ ] **P4.3 — Gate flip.** P1.4 green: a late joiner converges on zone/map/player/stats/version
+- [x] **P4.3 — Gate flip.** P1.4 green: a late joiner converges on zone/map/player/stats/version
       lines and env values from priming alone.
-- [ ] **P4.3 — Gate flip.** P1.4 green: a late joiner converges on zone/map/player/stats/version
-      lines and env values from priming alone.
+      **Verdict:** ✅ CONFIRMED. Both `LateJoinPrimingTests` variants green after P4.2: the rawlog
+      late joiner receives all 7 one-shot lines (253/249/250 → 01 → 02 → 40 → 12) from
+      `LastLineCache` replay alone, byte-identical and in order; the repository/stand-in late joiner's
+      `GetGameVersion()` converges on the distinctive primed value `9.9.9.9-primed-not-forwarded`
+      (built from `snap.Client`) with no live post-subscribe event. Priming is a pure function of the
+      last-line cache + snapshot. Only P1.2's 12-key `ExportVariables` gap remains red (P5).
 
 ### P5 — Engine surface: the `ACT_UIMods` keys (the irreducible port) ☐
 
