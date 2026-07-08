@@ -36,6 +36,7 @@ public static class Resources
     public static string Nav_Overview => Get(nameof(Nav_Overview));
     public static string Nav_Plugins => Get(nameof(Nav_Plugins));
     public static string Nav_Encounters => Get(nameof(Nav_Encounters));
+    public static string Nav_Console => Get(nameof(Nav_Console));
     public static string Nav_Settings => Get(nameof(Nav_Settings));
 
     // ---- All-caps section eyebrows ----
@@ -139,6 +140,20 @@ public static class Resources
     public static string Plugins_ModernPluginDescription => Get(nameof(Plugins_ModernPluginDescription));
     public static string Plugins_ModernUiErrorTitle => Get(nameof(Plugins_ModernUiErrorTitle));
     public static string Plugins_ModernUiErrorBodyFormat => Get(nameof(Plugins_ModernUiErrorBodyFormat));
+
+    // ---- Console page ----
+    public static string Console_Subtitle => Get(nameof(Console_Subtitle));
+    public static string Console_Live => Get(nameof(Console_Live));
+    public static string Console_Paused => Get(nameof(Console_Paused));
+    public static string Console_Filter_All => Get(nameof(Console_Filter_All));
+    public static string Console_Filter_Info => Get(nameof(Console_Filter_Info));
+    public static string Console_Filter_Warnings => Get(nameof(Console_Filter_Warnings));
+    public static string Console_Filter_Errors => Get(nameof(Console_Filter_Errors));
+    public static string Console_Search_Placeholder => Get(nameof(Console_Search_Placeholder));
+    public static string Console_Copy => Get(nameof(Console_Copy));
+    public static string Console_CopyAll => Get(nameof(Console_CopyAll));
+    public static string Console_Clear => Get(nameof(Console_Clear));
+    public static string Console_Empty => Get(nameof(Console_Empty));
 
     // ---- Encounters page ----
     public static string Encounters_Subtitle => Get(nameof(Encounters_Subtitle));

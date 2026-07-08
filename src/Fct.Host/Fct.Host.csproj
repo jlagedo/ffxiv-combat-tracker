@@ -29,8 +29,9 @@
   </ItemGroup>
 
   <ItemGroup>
+    <!-- The host shell assembly; its shipped exe is CombatTracker.exe (Fct.App.csproj AssemblyName). -->
     <AssemblyAttribute Include="System.Runtime.CompilerServices.InternalsVisibleTo">
-      <_Parameter1>Fct.App</_Parameter1>
+      <_Parameter1>CombatTracker</_Parameter1>
     </AssemblyAttribute>
     <AssemblyAttribute Include="System.Runtime.CompilerServices.InternalsVisibleTo">
       <_Parameter1>Fct.App.Tests</_Parameter1>

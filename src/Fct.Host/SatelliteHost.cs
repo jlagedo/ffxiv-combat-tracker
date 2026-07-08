@@ -135,6 +135,29 @@ public sealed class SatelliteHost
     public async Task<SatelliteStartResult> StartAsync(CancellationToken ct = default)
     {
         var pipeName = "fct-bridge-" + Guid.NewGuid().ToString("N");
+
+        // The launch prefix — named-pipe + shutdown-event creation, the legacy-root mkdir, and
+        // Process.Start — is synchronous kernel/OS work. The shell spawns satellites from the UI thread
+        // (one per installed package, sequentially), so run it on the thread pool to keep startup off
+        // the frame.
+        await Task.Run(() => LaunchProcess(pipeName), ct).ConfigureAwait(false);
+
+        await _server!.WaitForConnectionAsync(ct).ConfigureAwait(false);
+        _log.LogDebug(LogEvents.BridgeConnected, "Satellite connected to bridge {Pipe}", pipeName);
+
+        // Accept the command-pipe connection in the background; the writer is ready once the satellite
+        // connects. User-initiated load/unload commands happen well after startup, so this races safely.
+        _ = AcceptCommandPipeAsync(ct);
+
+        var reader = new StreamReader(_server);   // do not dispose: keeps the pipe open
+        var result = new SatelliteStartResult();
+        return await ReadHandshakeAsync(reader, result, ct).ConfigureAwait(false);
+    }
+
+    // Synchronous process launch: create the pipes + shutdown event and start (then lifetime-bind) the
+    // satellite process. Runs on the thread pool via StartAsync so the caller's thread never blocks.
+    private void LaunchProcess(string pipeName)
+    {
         var exe = Path.Combine(AppData.InstallDirectory, "satellite", "Fct.LegacyHost.exe");
         if (!File.Exists(exe))
         {
@@ -219,17 +242,14 @@ public sealed class SatelliteHost
                         "Kill-on-close job unavailable; satellite {Pid} is not tied to host lifetime", Process.Id);
             }
         }
+    }
 
-        await _server.WaitForConnectionAsync(ct).ConfigureAwait(false);
-        _log.LogDebug(LogEvents.BridgeConnected, "Satellite connected to bridge {Pipe}", pipeName);
-
-        // Accept the command-pipe connection in the background; the writer is ready once the satellite
-        // connects. User-initiated load/unload commands happen well after startup, so this races safely.
-        _ = AcceptCommandPipeAsync(ct);
-
-        var reader = new StreamReader(_server);   // do not dispose: keeps the pipe open
-        var result = new SatelliteStartResult();
-
+    // Read the satellite handshake + per-plugin window announcements off the connected pipe, then leave
+    // the pipe draining for the host lifetime. Split out of StartAsync so the launch prefix can run on
+    // the thread pool while this async read stays on the caller's continuation flow.
+    private async Task<SatelliteStartResult> ReadHandshakeAsync(
+        StreamReader reader, SatelliteStartResult result, CancellationToken ct)
+    {
         // Read the handshake and the per-plugin window announcements until PLUGINS-END, with a
         // ceiling so a slow/failed plugin load can't hang the host forever. Forwarded LOG frames
         // may already be interleaved here, so route those out as they arrive.

@@ -39,6 +39,7 @@ public sealed partial class MainViewModel : ObservableObject
     public OverviewViewModel OverviewPage { get; }
     public PluginsViewModel PluginsPage { get; }
     public EncountersViewModel EncountersPage { get; }
+    public ConsoleViewModel ConsolePage { get; }
     public SettingsViewModel SettingsPage { get; }
 
     private readonly Dictionary<Section, PageViewModel> _pages;
@@ -74,6 +75,7 @@ public sealed partial class MainViewModel : ObservableObject
         OverviewPage = new OverviewViewModel(this);
         PluginsPage = new PluginsViewModel(this);
         EncountersPage = new EncountersViewModel(this, encounters: null);
+        ConsolePage = new ConsoleViewModel(this, ConsoleViewModel.CreateDesignStream());
         SettingsPage = new SettingsViewModel(this, store: null);
         _pages = BuildPages();
         _currentPage = OverviewPage;
@@ -88,7 +90,8 @@ public sealed partial class MainViewModel : ObservableObject
 
     // ---- runtime ctor: bind the real host services ----
     public MainViewModel(IPluginRegistry registry, IEncounterService encounters,
-        INotificationHub notifications, UiSettingsStore settings, PluginUiCoordinator? uiCoordinator = null)
+        INotificationHub notifications, UiSettingsStore settings, Fct.App.Logging.ILogStream logStream,
+        PluginUiCoordinator? uiCoordinator = null)
     {
         _hub = notifications;
         _registry = registry;
@@ -102,6 +105,7 @@ public sealed partial class MainViewModel : ObservableObject
         OverviewPage = new OverviewViewModel(this);
         PluginsPage = new PluginsViewModel(this);
         EncountersPage = new EncountersViewModel(this, encounters);
+        ConsolePage = new ConsoleViewModel(this, logStream);
         SettingsPage = new SettingsViewModel(this, settings);
         _pages = BuildPages();
         _currentPage = OverviewPage;
@@ -236,6 +240,7 @@ public sealed partial class MainViewModel : ObservableObject
         [Section.Overview] = OverviewPage,
         [Section.Plugins] = PluginsPage,
         [Section.Encounters] = EncountersPage,
+        [Section.Console] = ConsolePage,
         [Section.Settings] = SettingsPage,
     };
 

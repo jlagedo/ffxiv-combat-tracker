@@ -1,6 +1,10 @@
 ﻿<Project Sdk="Microsoft.NET.Sdk">
   <PropertyGroup>
     <OutputType>WinExe</OutputType>
+    <!-- Shipped executable name. The project/assembly identity stays Fct.App (RootNamespace,
+         ProjectReferences, InternalsVisibleTo) — only the produced host binary is renamed. -->
+    <AssemblyName>CombatTracker</AssemblyName>
+    <RootNamespace>Fct.App</RootNamespace>
     <!-- net10.0-windows (WinForms) because the net10 compat shim hosts recompiled legacy plugins
          in-process, and IActPluginV1.InitPlugin(TabPage, Label) requires the WindowsDesktop runtime.
          The host is Windows-only regardless (the net48 satellite). -->
@@ -34,6 +38,7 @@
   <ItemGroup>
     <PackageReference Include="Microsoft.Extensions.Hosting" />
     <PackageReference Include="Serilog.Extensions.Hosting" />
+    <PackageReference Include="Serilog.Sinks.Async" />
     <PackageReference Include="Serilog.Sinks.Console" />
     <PackageReference Include="Serilog.Sinks.File" />
   </ItemGroup>

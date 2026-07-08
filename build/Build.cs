@@ -106,7 +106,7 @@ void Publish(string configuration, bool singleFile, bool readyToRun, string mode
         Run("dotnet", $"pack \"{proj}\" -c {configuration} -o \"{pkgOut}\" --nologo", workingDirectory: root);
 
     // 4. Verify entry points + packages exist.
-    string hostExe = Path.Combine(outDir, "Fct.App.exe");
+    string hostExe = Path.Combine(outDir, "CombatTracker.exe");
     string satExe = Path.Combine(satOut, "Fct.LegacyHost.exe");
     string shimDll = Path.Combine(compatOut, "Fct.Compat.Shim.dll");
     foreach (var f in new[] { hostExe, satExe, shimDll })

@@ -32,6 +32,7 @@
   <data name="Nav_Overview" xml:space="preserve"><value>Overview</value></data>
   <data name="Nav_Plugins" xml:space="preserve"><value>Plugins</value></data>
   <data name="Nav_Encounters" xml:space="preserve"><value>Encounters</value></data>
+  <data name="Nav_Console" xml:space="preserve"><value>Console</value></data>
   <data name="Nav_Settings" xml:space="preserve"><value>Settings</value></data>
 
   <!-- All-caps section eyebrows -->
@@ -136,6 +137,20 @@
 
   <!-- Encounters page -->
   <data name="Encounters_Subtitle" xml:space="preserve"><value>Live DPS and per-player metrics for the current fight.</value></data>
+
+  <!-- Console (live log viewer) -->
+  <data name="Console_Subtitle" xml:space="preserve"><value>A live stream of everything the host and its plugins log.</value></data>
+  <data name="Console_Live" xml:space="preserve"><value>LIVE</value></data>
+  <data name="Console_Paused" xml:space="preserve"><value>PAUSED</value></data>
+  <data name="Console_Filter_All" xml:space="preserve"><value>All</value></data>
+  <data name="Console_Filter_Info" xml:space="preserve"><value>Info</value></data>
+  <data name="Console_Filter_Warnings" xml:space="preserve"><value>Warnings</value></data>
+  <data name="Console_Filter_Errors" xml:space="preserve"><value>Errors</value></data>
+  <data name="Console_Search_Placeholder" xml:space="preserve"><value>Filter…</value></data>
+  <data name="Console_Copy" xml:space="preserve"><value>Copy</value></data>
+  <data name="Console_CopyAll" xml:space="preserve"><value>Copy all</value></data>
+  <data name="Console_Clear" xml:space="preserve"><value>Clear</value></data>
+  <data name="Console_Empty" xml:space="preserve"><value>Waiting for log output…</value></data>
   <data name="Encounters_WaitingTitle" xml:space="preserve"><value>Waiting for game data</value></data>
   <data name="Encounters_WaitingBody" xml:space="preserve"><value>Encounters and per-player DPS appear here once combat data starts flowing in.</value></data>
   <data name="Encounters_DefaultTitle" xml:space="preserve"><value>Encounter</value></data>

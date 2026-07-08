@@ -221,7 +221,7 @@ dotnet build src\Fct.App\Fct.App.csproj   # net10 host; StageSatellite + StageCo
                                           #   the net48 satellite into bin\<cfg>\net10.0-windows\satellite\
                                           #   and the legacy compat runtime (shim + facades + engine) into
                                           #   bin\<cfg>\net10.0-windows\compat\.
-.\src\Fct.App\bin\Debug\net10.0-windows\Fct.App.exe   # run e2e: host launches satellite\Fct.LegacyHost.exe
+.\src\Fct.App\bin\Debug\net10.0-windows\CombatTracker.exe   # run e2e: host launches satellite\Fct.LegacyHost.exe
                                               #   --bridge <pipe>, loads the real plugins. Unified logs
                                               #   under %LOCALAPPDATA%\FFXIVCombatTracker\logs\.
 .\test.ps1                                    # build + stage + all suites under tests\.

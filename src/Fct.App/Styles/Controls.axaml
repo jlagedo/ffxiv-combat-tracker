@@ -636,4 +636,71 @@
         <Setter Property="Background" Value="{StaticResource RimeBrush}"/>
     </Style>
 
+    <!-- ============================ Console (live log) ============================ -->
+    <!-- Live pulse: the Ember tail dot breathes while follow-tail is armed; static when paused. -->
+    <Style Selector="Ellipse.livepulse">
+        <Style.Animations>
+            <Animation Duration="0:0:1.6" IterationCount="INFINITE" PlaybackDirection="Alternate" Easing="SineEaseInOut">
+                <KeyFrame Cue="0%"><Setter Property="Opacity" Value="1"/></KeyFrame>
+                <KeyFrame Cue="100%"><Setter Property="Opacity" Value="0.32"/></KeyFrame>
+            </Animation>
+        </Style.Animations>
+    </Style>
+
+    <!-- Segmented level filter: compact mono pills; the active segment fills and brightens. -->
+    <Style Selector="Button.seg">
+        <Setter Property="Background" Value="Transparent"/>
+        <Setter Property="BorderBrush" Value="{StaticResource HairlineBrush}"/>
+        <Setter Property="BorderThickness" Value="1"/>
+        <Setter Property="Foreground" Value="{StaticResource HoarfrostBrush}"/>
+        <Setter Property="CornerRadius" Value="6"/>
+        <Setter Property="Padding" Value="11,5"/>
+        <Setter Property="FontFamily" Value="{StaticResource MonoFont}"/>
+        <Setter Property="FontSize" Value="11"/>
+    </Style>
+    <Style Selector="Button.seg /template/ ContentPresenter">
+        <Setter Property="Transitions">
+            <Transitions>
+                <BrushTransition Property="Background" Duration="0:0:0.14"/>
+                <BrushTransition Property="BorderBrush" Duration="0:0:0.14"/>
+            </Transitions>
+        </Setter>
+    </Style>
+    <Style Selector="Button.seg:pointerover /template/ ContentPresenter">
+        <Setter Property="Background" Value="{StaticResource RimeBrush}"/>
+    </Style>
+    <Style Selector="Button.seg.active">
+        <Setter Property="Foreground" Value="{StaticResource GlintBrush}"/>
+    </Style>
+    <Style Selector="Button.seg.active /template/ ContentPresenter">
+        <Setter Property="Background" Value="{StaticResource RimeHiBrush}"/>
+        <Setter Property="BorderBrush" Value="{StaticResource FrostDimBrush}"/>
+    </Style>
+
+    <!-- The log list: transparent, borderless; rows carry a frost-tinted hover/selection wash. -->
+    <Style Selector="ListBox.console">
+        <Setter Property="Background" Value="Transparent"/>
+        <Setter Property="BorderThickness" Value="0"/>
+        <Setter Property="Padding" Value="0"/>
+    </Style>
+    <Style Selector="ListBox.console ListBoxItem">
+        <Setter Property="Padding" Value="0"/>
+        <Setter Property="Margin" Value="0"/>
+        <Setter Property="MinHeight" Value="0"/>
+        <Setter Property="CornerRadius" Value="4"/>
+    </Style>
+    <Style Selector="ListBox.console ListBoxItem /template/ ContentPresenter#PART_ContentPresenter">
+        <Setter Property="Background" Value="Transparent"/>
+    </Style>
+    <Style Selector="ListBox.console ListBoxItem:pointerover /template/ ContentPresenter#PART_ContentPresenter">
+        <Setter Property="Background" Value="{StaticResource RimeBrush}"/>
+    </Style>
+    <Style Selector="ListBox.console ListBoxItem:selected /template/ ContentPresenter#PART_ContentPresenter">
+        <Setter Property="Background" Value="{StaticResource RimeHiBrush}"/>
+    </Style>
+    <!-- Frost-tinted, translucent text selection so the underlying line stays legible. -->
+    <Style Selector="ListBox.console SelectableTextBlock">
+        <Setter Property="SelectionBrush" Value="#4D8FD4F0"/>
+    </Style>
+
 </Styles>

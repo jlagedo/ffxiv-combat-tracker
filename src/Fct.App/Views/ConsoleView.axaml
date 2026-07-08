@@ -1,0 +1,130 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:vm="using:Fct.App.ViewModels"
+             xmlns:lang="using:Fct.App.Lang"
+             xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+             xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+             mc:Ignorable="d" d:DesignWidth="860" d:DesignHeight="620"
+             x:Class="Fct.App.Views.ConsoleView"
+             x:DataType="vm:ConsoleViewModel"
+             d:DataContext="{x:Static vm:DesignData.Console}">
+
+    <Border Classes="card rise1" Padding="0">
+        <DockPanel>
+            <!-- ===== Toolbar ===== -->
+            <Border DockPanel.Dock="Top" BorderBrush="{StaticResource HairlineBrush}"
+                    BorderThickness="0,0,0,1" Padding="18,13">
+                <Grid ColumnDefinitions="Auto,Auto,*,Auto,Auto" VerticalAlignment="Center">
+
+                    <!-- Live / paused follow-tail toggle -->
+                    <Button Grid.Column="0" Classes="ghost small" Command="{Binding ToggleFollowCommand}"
+                            AutomationProperties.AutomationId="console.follow" Padding="12,6" Margin="0,0,16,0">
+                        <StackPanel Orientation="Horizontal" Spacing="8" VerticalAlignment="Center">
+                            <Panel Width="8" Height="8" VerticalAlignment="Center">
+                                <Ellipse Fill="{StaticResource EmberBrush}" Classes="livepulse"
+                                         IsVisible="{Binding FollowTail}"/>
+                                <Ellipse Fill="{StaticResource HoarfrostBrush}" IsVisible="{Binding !FollowTail}"/>
+                            </Panel>
+                            <TextBlock Text="{x:Static lang:Resources.Console_Live}" FontFamily="{StaticResource MonoFont}"
+                                       FontSize="11" LetterSpacing="1.5" Foreground="{StaticResource EmberBrush}"
+                                       VerticalAlignment="Center" IsVisible="{Binding FollowTail}"/>
+                            <TextBlock Text="{x:Static lang:Resources.Console_Paused}" FontFamily="{StaticResource MonoFont}"
+                                       FontSize="11" LetterSpacing="1.5" Foreground="{StaticResource HoarfrostBrush}"
+                                       VerticalAlignment="Center" IsVisible="{Binding !FollowTail}"/>
+                        </StackPanel>
+                    </Button>
+
+                    <!-- Level filter segments -->
+                    <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="5" VerticalAlignment="Center">
+                        <Button Classes="seg" Command="{Binding SetLevelFilterCommand}" CommandParameter="All"
+                                Content="{x:Static lang:Resources.Console_Filter_All}"
+                                Classes.active="{Binding LevelFilter, Converter={StaticResource EnumEquals}, ConverterParameter=All}"/>
+                        <Button Classes="seg" Command="{Binding SetLevelFilterCommand}" CommandParameter="Info"
+                                Content="{x:Static lang:Resources.Console_Filter_Info}"
+                                Classes.active="{Binding LevelFilter, Converter={StaticResource EnumEquals}, ConverterParameter=Info}"/>
+                        <Button Classes="seg" Command="{Binding SetLevelFilterCommand}" CommandParameter="Warnings"
+                                Content="{x:Static lang:Resources.Console_Filter_Warnings}"
+                                Classes.active="{Binding LevelFilter, Converter={StaticResource EnumEquals}, ConverterParameter=Warnings}"/>
+                        <Button Classes="seg" Command="{Binding SetLevelFilterCommand}" CommandParameter="Errors"
+                                Content="{x:Static lang:Resources.Console_Filter_Errors}"
+                                Classes.active="{Binding LevelFilter, Converter={StaticResource EnumEquals}, ConverterParameter=Errors}"/>
+                    </StackPanel>
+
+                    <!-- Search -->
+                    <TextBox Grid.Column="2" Text="{Binding SearchText}" Margin="14,0"
+                             MaxWidth="260" HorizontalAlignment="Stretch" FontFamily="{StaticResource MonoFont}"
+                             FontSize="12" PlaceholderText="{x:Static lang:Resources.Console_Search_Placeholder}"
+                             AutomationProperties.AutomationId="console.search"/>
+
+                    <!-- Copy · Clear -->
+                    <Button Grid.Column="3" Classes="ghost small" Command="{Binding CopyAllCommand}"
+                            Content="{x:Static lang:Resources.Console_Copy}" Margin="0,0,8,0"
+                            AutomationProperties.AutomationId="console.copy"/>
+                    <Button Grid.Column="4" Classes="ghost small" Command="{Binding ClearCommand}"
+                            Content="{x:Static lang:Resources.Console_Clear}"
+                            AutomationProperties.AutomationId="console.clear"/>
+                </Grid>
+            </Border>
+
+            <!-- ===== Log body ===== -->
+            <Grid>
+                <ListBox Name="LogList" Classes="console" ItemsSource="{Binding Entries}"
+                         SelectionMode="Multiple" Margin="8,8,8,10"
+                         ScrollViewer.HorizontalScrollBarVisibility="Disabled"
+                         AutomationProperties.AutomationId="console.log">
+                    <ListBox.KeyBindings>
+                        <KeyBinding Gesture="Ctrl+C" Command="{Binding CopySelectedCommand}"
+                                    CommandParameter="{Binding #LogList.SelectedItems}"/>
+                    </ListBox.KeyBindings>
+                    <ListBox.ContextMenu>
+                        <ContextMenu>
+                            <MenuItem Header="{x:Static lang:Resources.Console_Copy}" Command="{Binding CopySelectedCommand}"
+                                      CommandParameter="{Binding #LogList.SelectedItems}"/>
+                            <MenuItem Header="{x:Static lang:Resources.Console_CopyAll}" Command="{Binding CopyAllCommand}"/>
+                            <Separator/>
+                            <MenuItem Header="{x:Static lang:Resources.Console_Clear}" Command="{Binding ClearCommand}"/>
+                        </ContextMenu>
+                    </ListBox.ContextMenu>
+                    <ListBox.ItemTemplate>
+                        <DataTemplate x:DataType="vm:LogEntryViewModel">
+                            <Grid ColumnDefinitions="3,92,40,116,*" Margin="0,1">
+                                <!-- Severity gutter tick -->
+                                <Rectangle Grid.Column="0" Width="3" VerticalAlignment="Stretch"
+                                           RadiusX="1.5" RadiusY="1.5" Margin="0,1"
+                                           Fill="{Binding Level, Converter={StaticResource LogLevelToBrush}}"/>
+                                <TextBlock Grid.Column="1" Text="{Binding Time}" FontFamily="{StaticResource MonoFont}"
+                                           FontSize="11.5" Foreground="{StaticResource HoarfrostBrush}"
+                                           Margin="10,2,0,0" VerticalAlignment="Top"/>
+                                <TextBlock Grid.Column="2" Text="{Binding LevelCode}" FontFamily="{StaticResource MonoFont}"
+                                           FontSize="11.5" FontWeight="SemiBold" Margin="6,2,0,0" VerticalAlignment="Top"
+                                           Foreground="{Binding Level, Converter={StaticResource LogLevelToBrush}}"/>
+                                <TextBlock Grid.Column="3" Text="{Binding Source}" FontFamily="{StaticResource MonoFont}"
+                                           FontSize="11.5" Foreground="{StaticResource FrostDimBrush}"
+                                           TextTrimming="CharacterEllipsis" Margin="6,2,8,0" VerticalAlignment="Top"
+                                           IsVisible="{Binding HasSource}"/>
+                                <StackPanel Grid.Column="4" Spacing="2" Margin="2,0,4,0">
+                                    <SelectableTextBlock Text="{Binding Message}" FontFamily="{StaticResource MonoFont}"
+                                                         FontSize="12" Foreground="{StaticResource GlintBrush}"
+                                                         TextWrapping="Wrap" Padding="0,2"/>
+                                    <SelectableTextBlock Text="{Binding Exception}" FontFamily="{StaticResource MonoFont}"
+                                                         FontSize="11" Foreground="{StaticResource WarnBrush}"
+                                                         TextWrapping="Wrap" IsVisible="{Binding HasException}"
+                                                         Padding="0,0,0,3"/>
+                                </StackPanel>
+                            </Grid>
+                        </DataTemplate>
+                    </ListBox.ItemTemplate>
+                </ListBox>
+
+                <!-- Empty state -->
+                <StackPanel IsVisible="{Binding IsEmpty}" VerticalAlignment="Center" HorizontalAlignment="Center"
+                            Spacing="10" IsHitTestVisible="False">
+                    <Path Width="34" Height="34" Stretch="Uniform" Opacity="0.5" Fill="{StaticResource FrostDimBrush}"
+                          Data="M4 4 H20 V20 H4 Z M7 9 L10 12 L7 15 M12 15 H16"/>
+                    <TextBlock Text="{x:Static lang:Resources.Console_Empty}" Classes="meta"
+                               HorizontalAlignment="Center"/>
+                </StackPanel>
+            </Grid>
+        </DockPanel>
+    </Border>
+</UserControl>

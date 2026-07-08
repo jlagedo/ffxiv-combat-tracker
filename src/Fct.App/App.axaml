@@ -80,6 +80,7 @@
 
             <conv:StatusToBrushConverter x:Key="StatusToBrush"/>
             <conv:SeverityToBrushConverter x:Key="SeverityToBrush"/>
+            <conv:LogLevelToBrushConverter x:Key="LogLevelToBrush"/>
             <conv:EnumEqualsConverter x:Key="EnumEquals"/>
             <conv:InverseBoolConverter x:Key="InverseBool"/>
         </ResourceDictionary>
@@ -87,8 +88,8 @@
 
     <Application.Styles>
         <FluentTheme />
-        <StyleInclude Source="avares://Fct.App/Styles/Controls.axaml"/>
+        <StyleInclude Source="/Styles/Controls.axaml"/>
         <!-- Blessed plugin-facing style classes (fct-*), applied after the shell's own. -->
-        <StyleInclude Source="avares://Fct.App/Styles/PluginTokens.axaml"/>
+        <StyleInclude Source="/Styles/PluginTokens.axaml"/>
     </Application.Styles>
 </Application>

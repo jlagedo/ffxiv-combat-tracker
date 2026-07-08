@@ -6,5 +6,6 @@ public enum Section
     Overview,
     Plugins,
     Encounters,
+    Console,
     Settings,
 }

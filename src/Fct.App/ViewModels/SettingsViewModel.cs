@@ -1,3 +1,4 @@
+using System.Threading.Tasks;
 using CommunityToolkit.Mvvm.ComponentModel;
 using Fct.Host.Hosting;
 using Fct.App.Lang;
@@ -33,7 +34,9 @@ public sealed partial class SettingsViewModel : PageViewModel
         if (_loading || _store is null) return;
         var s = _store.Current;
         s.LaunchSatelliteOnStartup = value;
-        _store.Save(s);
+        // Best-effort disk write off the UI thread — the toggle shouldn't wait on the file system
+        // (an AV scanner or slow disk could stall it). Save swallows its own failures.
+        _ = Task.Run(() => _store.Save(s));
     }
 
     // Read-only environment info shown in the Diagnostics card.

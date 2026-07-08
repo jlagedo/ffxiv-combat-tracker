@@ -28,13 +28,16 @@ class Program
         // Resolve the UI culture before anything else touches Resources or formats a string.
         Fct.App.Lang.LocalizationStartup.Initialize();
 
-        // Stand the logger up first so even a failure building the host is recorded.
-        Log.Logger = LoggingBootstrap.CreateLogger();
+        // Stand the logger up first so even a failure building the host is recorded. The Console's
+        // log stream is constructed here too — before the logger — so it captures the earliest
+        // startup records; the same instance is registered in DI below.
+        var logStream = new LogStream();
+        Log.Logger = LoggingBootstrap.CreateLogger(logStream);
 
         IHost? host = null;
         try
         {
-            host = BuildHost(args);
+            host = BuildHost(args, logStream);
             App.Services = host.Services;
 
             var log = host.Services.GetRequiredService<ILogger<Program>>();
@@ -63,13 +66,17 @@ class Program
         }
     }
 
-    private static IHost BuildHost(string[] args)
+    private static IHost BuildHost(string[] args, LogStream logStream)
     {
         var builder = Microsoft.Extensions.Hosting.Host.CreateApplicationBuilder(args);
 
         // Serilog is the sole logging backend; drop the default console/debug/eventsource providers.
         builder.Logging.ClearProviders();
         builder.Services.AddSerilog(Log.Logger, dispose: false);
+
+        // The live log stream the Console reads (fed by the UiLogSink on the pipeline above). Same
+        // instance stood up in Main so it already holds the startup records.
+        builder.Services.AddSingleton<ILogStream>(logStream);
 
         // The headless host runtime: IPluginHost services, the ALC plugin loader, and the satellite
         // bridge client. Everything below is the Avalonia shell + composition-root wiring that binds

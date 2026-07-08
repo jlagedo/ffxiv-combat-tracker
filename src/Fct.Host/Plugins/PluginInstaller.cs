@@ -65,7 +65,15 @@ internal sealed class PluginInstaller
 
     /// <summary>Install a plugin from a directory or a <c>.zip</c>, classify it, load it live, and
     /// persist it. Returns the outcome for the UI to surface.</summary>
-    public async Task<InstallResult> InstallAsync(string sourcePath, CancellationToken ct)
+    /// <remarks>The synchronous prefix — zip extraction (an OverlayPlugin package carries CEF), the
+    /// metadata-load-context classification, and the recursive catalog copy — is heavy, and the shell
+    /// awaits this straight off the UI thread. Run the whole routine on the thread pool so a frame is
+    /// never blocked; feedback stays thread-safe (notifications go through the hub, roster changes
+    /// marshal via the UI dispatcher).</remarks>
+    public Task<InstallResult> InstallAsync(string sourcePath, CancellationToken ct)
+        => Task.Run(() => InstallCoreAsync(sourcePath, ct), ct);
+
+    private async Task<InstallResult> InstallCoreAsync(string sourcePath, CancellationToken ct)
     {
         string? staging = null;
         try
@@ -138,7 +146,13 @@ internal sealed class PluginInstaller
 
     /// <summary>Unload = uninstall: tear the plugin down live, delete its install folder, and remove it
     /// from the registry. Files that are still locked (collectible ALC / CEF) are deferred to next launch.</summary>
-    public async Task<bool> UninstallAsync(string id, CancellationToken ct, LoadKind? kindHint = null)
+    /// <remarks>Runs on the thread pool: the shell awaits this off the UI thread, and the recursive
+    /// delete of a catalog-owned (CEF-sized) tree plus the registry write can run synchronously when the
+    /// unload await completes without yielding.</remarks>
+    public Task<bool> UninstallAsync(string id, CancellationToken ct, LoadKind? kindHint = null)
+        => Task.Run(() => UninstallCoreAsync(id, ct, kindHint), ct);
+
+    private async Task<bool> UninstallCoreAsync(string id, CancellationToken ct, LoadKind? kindHint)
     {
         var record = _registry.Find(id);
         var kind = record?.Kind ?? kindHint ?? LoadKind.Native;
@@ -225,7 +239,11 @@ internal sealed class PluginInstaller
     /// <summary>Re-point a real-legacy record whose install-by-reference source moved: classify the
     /// newly picked DLL, verify it is the same plugin, update the registry record, and ask the
     /// satellite to load it from the new location.</summary>
-    public async Task<InstallResult> RelinkLegacyAsync(string id, string dllPath)
+    public Task<InstallResult> RelinkLegacyAsync(string id, string dllPath)
+        => Task.Run(() => RelinkLegacyCoreAsync(id, dllPath));
+
+    // Off the UI thread: classification opens the newly picked DLL through a metadata-load context.
+    private async Task<InstallResult> RelinkLegacyCoreAsync(string id, string dllPath)
     {
         try
         {

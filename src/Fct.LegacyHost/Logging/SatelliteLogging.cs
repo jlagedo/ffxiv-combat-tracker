@@ -4,6 +4,7 @@ using Fct.Logging;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Logging.Abstractions;
 using Serilog;
+using Serilog.Core;
 using Serilog.Events;
 using Serilog.Extensions.Logging;
 using ILogger = Microsoft.Extensions.Logging.ILogger;
@@ -20,6 +21,13 @@ namespace Fct.LegacyHost.Logging
     {
         private const string FullTemplate =
             "{Timestamp:yyyy-MM-dd HH:mm:ss.fff} [{Level:u3}] {SourceContext} {EventId} {Message:lj}{NewLine}{Exception}";
+
+        // Caps a single day's shared file so a runaway error loop can't fill the disk.
+        private const long FileSizeLimitBytes = 50_000_000;
+
+        // The live minimum level, adjustable at runtime without a restart. Seeded from FCT_LOG_LEVEL /
+        // build config at Initialize.
+        public static LoggingLevelSwitch LevelSwitch { get; } = new(ResolveLevel());
 
         private static ILoggerFactory _factory;
 
@@ -41,14 +49,20 @@ namespace Fct.LegacyHost.Logging
             try { File.Delete(verificationLog); } catch { }
 
             var serilog = new LoggerConfiguration()
-                .MinimumLevel.Is(ResolveLevel())
+                .MinimumLevel.ControlledBy(LevelSwitch)
                 .Enrich.WithProperty("Process", "satellite")
-                .WriteTo.File(
+                // The unified rolling file is shared by every satellite process, so its disk I/O runs
+                // on a background worker rather than blocking the dispatch/UI thread that logged. The
+                // verification artifact and the bridge sink stay synchronous: the integration tests
+                // read the artifact as a black box, and the bridge sink only hands off to the pipe.
+                .WriteTo.Async(a => a.File(
                     path: Path.Combine(logsDir, "satellite-.log"),
                     rollingInterval: RollingInterval.Day,
                     retainedFileCountLimit: 14,
+                    fileSizeLimitBytes: FileSizeLimitBytes,
+                    rollOnFileSizeLimit: true,
                     shared: true,
-                    outputTemplate: FullTemplate)
+                    outputTemplate: FullTemplate))
                 .WriteTo.File(
                     path: verificationLog,
                     outputTemplate: "{Message:lj}{NewLine}{Exception}")

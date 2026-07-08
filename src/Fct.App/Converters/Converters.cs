@@ -89,6 +89,44 @@ public sealed class SeverityToBrushConverter : IValueConverter
     }
 }
 
+// Maps a console log level to a themed brush (with a "glow" halo variant for the row's severity
+// gutter), mirroring SeverityToBrushConverter. Debug/Verbose read dim, Info the muted accent,
+// Warning amber, Error/Fatal the danger red — so error/warn density scans down the gutter.
+public sealed class LogLevelToBrushConverter : IValueConverter
+{
+    private static readonly Dictionary<string, IBrush> GlowCache = new();
+
+    public object Convert(object? value, Type targetType, object? parameter, CultureInfo culture)
+    {
+        var key = (value as Fct.App.Logging.ConsoleLevel?) switch
+        {
+            Fct.App.Logging.ConsoleLevel.Warning => "Ember",
+            Fct.App.Logging.ConsoleLevel.Error => "Warn",
+            Fct.App.Logging.ConsoleLevel.Fatal => "Warn",
+            Fct.App.Logging.ConsoleLevel.Information => "FrostDim",
+            _ => "Hoarfrost",   // Verbose / Debug
+        };
+        return (parameter as string) == "glow" ? Glow(key) : Brush(key + "Brush");
+    }
+
+    public object ConvertBack(object? value, Type targetType, object? parameter, CultureInfo culture)
+        => throw new NotSupportedException();
+
+    private static IBrush Brush(string key) =>
+        Application.Current?.Resources.TryGetResource(key, null, out var r) == true && r is IBrush b
+            ? b : Brushes.Gray;
+
+    private static IBrush Glow(string key)
+    {
+        if (GlowCache.TryGetValue(key, out var cached)) return cached;
+        var glow = Brush(key + "Brush") is ISolidColorBrush scb
+            ? new SolidColorBrush(Color.FromArgb(0x2E, scb.Color.R, scb.Color.G, scb.Color.B))
+            : Brush(key + "Brush");
+        GlowCache[key] = glow;
+        return glow;
+    }
+}
+
 // True when the bound enum value's name equals the ConverterParameter — drives the nav
 // rail's active styling against MainViewModel.CurrentPage.Section.
 public sealed class EnumEqualsConverter : IValueConverter

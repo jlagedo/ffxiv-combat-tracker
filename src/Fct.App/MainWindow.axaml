@@ -21,6 +21,7 @@
         <DataTemplate DataType="vm:OverviewViewModel"><views:OverviewView/></DataTemplate>
         <DataTemplate DataType="vm:PluginsViewModel"><views:PluginsView/></DataTemplate>
         <DataTemplate DataType="vm:EncountersViewModel"><views:EncountersView/></DataTemplate>
+        <DataTemplate DataType="vm:ConsoleViewModel"><views:ConsoleView/></DataTemplate>
         <DataTemplate DataType="vm:SettingsViewModel"><views:SettingsView/></DataTemplate>
     </Window.DataTemplates>
 
@@ -147,6 +148,20 @@
                                         <Path Width="17" Height="17" Stretch="Uniform"
                                               Data="M3 20 V11 H6 V20 Z M9.5 20 V4 H12.5 V20 Z M16 20 V14 H19 V20 Z"/>
                                         <TextBlock Text="{x:Static lang:Resources.Nav_Encounters}" FontSize="13.5" VerticalAlignment="Center"/>
+                                    </StackPanel>
+                                </Grid>
+                            </Button>
+
+                            <Button Classes="nav" AutomationProperties.AutomationId="nav.console"
+                                    Classes.active="{Binding CurrentPage.Section, Converter={StaticResource EnumEquals}, ConverterParameter=Console}"
+                                    Command="{Binding SelectPageCommand}" CommandParameter="Console">
+                                <Grid>
+                                    <Rectangle Classes="navbar" Width="3" Height="18" Fill="{StaticResource FrostBrush}"
+                                               HorizontalAlignment="Left" VerticalAlignment="Center" RadiusX="2" RadiusY="2"/>
+                                    <StackPanel Orientation="Horizontal" Spacing="13" Margin="16,11">
+                                        <Path Width="17" Height="17" Stretch="Uniform"
+                                              Data="M4 6 L10 12 L4 18 L6.8 18 L12.8 12 L6.8 6 Z M13 15.5 H20.5 V18 H13 Z"/>
+                                        <TextBlock Text="{x:Static lang:Resources.Nav_Console}" FontSize="13.5" VerticalAlignment="Center"/>
                                     </StackPanel>
                                 </Grid>
                             </Button>

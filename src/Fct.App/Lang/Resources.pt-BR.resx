@@ -32,6 +32,7 @@
   <data name="Nav_Overview" xml:space="preserve"><value>Visão geral</value></data>
   <data name="Nav_Plugins" xml:space="preserve"><value>Plugins</value></data>
   <data name="Nav_Encounters" xml:space="preserve"><value>Combates</value></data>
+  <data name="Nav_Console" xml:space="preserve"><value>Console</value></data>
   <data name="Nav_Settings" xml:space="preserve"><value>Configurações</value></data>
 
   <!-- All-caps section eyebrows -->
@@ -136,6 +137,20 @@
 
   <!-- Encounters page -->
   <data name="Encounters_Subtitle" xml:space="preserve"><value>DPS ao vivo e métricas por jogador para a luta atual.</value></data>
+
+  <!-- Console (visualizador de log ao vivo) -->
+  <data name="Console_Subtitle" xml:space="preserve"><value>Um fluxo ao vivo de tudo o que o host e seus plugins registram.</value></data>
+  <data name="Console_Live" xml:space="preserve"><value>AO VIVO</value></data>
+  <data name="Console_Paused" xml:space="preserve"><value>PAUSADO</value></data>
+  <data name="Console_Filter_All" xml:space="preserve"><value>Tudo</value></data>
+  <data name="Console_Filter_Info" xml:space="preserve"><value>Info</value></data>
+  <data name="Console_Filter_Warnings" xml:space="preserve"><value>Avisos</value></data>
+  <data name="Console_Filter_Errors" xml:space="preserve"><value>Erros</value></data>
+  <data name="Console_Search_Placeholder" xml:space="preserve"><value>Filtrar…</value></data>
+  <data name="Console_Copy" xml:space="preserve"><value>Copiar</value></data>
+  <data name="Console_CopyAll" xml:space="preserve"><value>Copiar tudo</value></data>
+  <data name="Console_Clear" xml:space="preserve"><value>Limpar</value></data>
+  <data name="Console_Empty" xml:space="preserve"><value>Aguardando saída de log…</value></data>
   <data name="Encounters_WaitingTitle" xml:space="preserve"><value>Aguardando dados do jogo</value></data>
   <data name="Encounters_WaitingBody" xml:space="preserve"><value>Combates e DPS por jogador aparecem aqui assim que os dados de combate começarem a chegar.</value></data>
   <data name="Encounters_DefaultTitle" xml:space="preserve"><value>Combate</value></data>

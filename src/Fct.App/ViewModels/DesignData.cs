@@ -11,5 +11,6 @@ internal static class DesignData
     public static OverviewViewModel Overview => Shell.OverviewPage;
     public static PluginsViewModel Plugins => Shell.PluginsPage;
     public static EncountersViewModel Encounters => Shell.EncountersPage;
+    public static ConsoleViewModel Console => Shell.ConsolePage;
     public static SettingsViewModel Settings => Shell.SettingsPage;
 }
