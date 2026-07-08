@@ -29,6 +29,17 @@ internal sealed class PluginInstallPaths
     /// <summary>The permanent install directory for a given plugin id.</summary>
     public string DirFor(string id) => Path.Combine(InstalledRoot, Sanitize(id));
 
+    /// <summary>True when <paramref name="dir"/> lives under our install catalog — i.e. we copied it in
+    /// (a zip install) and therefore own its files. Install-by-reference dirs live elsewhere and are
+    /// never ours, so uninstall must leave them untouched.</summary>
+    public bool Owns(string dir)
+    {
+        var root = Path.GetFullPath(InstalledRoot);
+        var full = Path.GetFullPath(dir);
+        return string.Equals(full, root, StringComparison.OrdinalIgnoreCase)
+            || full.StartsWith(root + Path.DirectorySeparatorChar, StringComparison.OrdinalIgnoreCase);
+    }
+
     /// <summary>A fresh, empty staging directory for one extraction (caller deletes it when done).</summary>
     public string NewStagingDir(string token)
     {

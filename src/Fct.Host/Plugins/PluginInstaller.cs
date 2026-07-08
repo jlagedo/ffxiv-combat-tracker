@@ -23,11 +23,12 @@ internal sealed record InstallResult(bool Success, LoadKind Kind, string Id, str
 /// The single entry point for adding and removing plugins. Accepts a <b>directory, a single .dll, or a
 /// zip</b>, classifies the plugin (native / recompiled-shim / real-legacy), routes it to the right
 /// executor (in-process ALC, or the satellite), and records it in the persisted registry so it re-loads
-/// across restarts. Native/shim plugins are copied into the catalog; <b>real-legacy plugins install by
-/// reference</b> — loaded in place from where the user picked them (like ACT itself), never copied.
+/// across restarts. Every kind <b>installs by reference</b> — loaded in place from where the user picked
+/// it (like ACT itself), never copied — so a plugin keeps its sibling dependencies; only a zip is copied
+/// into the catalog, because its extract dir is transient.
 /// <see cref="UninstallAsync"/> is the symmetric unload = uninstall: tear down live, drop the registry
-/// entry, and delete the install folder for catalog-owned plugins (legacy files are left untouched) —
-/// all without a restart.
+/// entry, and delete the install folder only for catalog-owned (zip) plugins (referenced files are left
+/// untouched) — all without a restart.
 /// </summary>
 internal sealed class PluginInstaller
 {
@@ -84,11 +85,12 @@ internal sealed class PluginInstaller
                 ? _classifier.ClassifyFile(singleDll, manifest)
                 : _classifier.Classify(payloadDir, manifest);
 
-            // Legacy plugins install by reference: load in place from where the user picked them (like ACT
-            // itself), so folder plugins keep their sibling deps (OverlayPlugin's libs/CEF/deucalion) and
-            // uninstall never deletes the user's files. Native/shim plugins are copied into our catalog.
-            // A zip is always copied (its extract dir is transient), even for legacy.
-            bool inPlace = c.Kind == LoadKind.RealLegacy && staging is null;
+            // Every kind installs by reference: load in place from where the user picked it (like ACT
+            // itself), so the plugin keeps its sibling deps (a native plugin's own dependency DLLs,
+            // OverlayPlugin's libs/CEF/deucalion) and uninstall never deletes the user's files. A single
+            // picked DLL loads from its own folder — the deps sit right next to it. Only a zip is copied
+            // (its extract dir is transient), and that copy is the one thing we own.
+            bool inPlace = staging is null;
             string destDir;
             if (inPlace)
             {
@@ -99,10 +101,7 @@ internal sealed class PluginInstaller
                 destDir = _paths.DirFor(c.Id);
                 if (Directory.Exists(destDir)) Directory.Delete(destDir, recursive: true);
                 Directory.CreateDirectory(destDir);
-                if (singleDll is not null)
-                    File.Copy(singleDll, Path.Combine(destDir, Path.GetFileName(singleDll)), overwrite: true);
-                else
-                    CopyDirectory(payloadDir, destDir);
+                CopyDirectory(payloadDir, destDir);
             }
 
             var title = manifest?.Name ?? c.Id;
@@ -158,11 +157,11 @@ internal sealed class PluginInstaller
                 freed = await _manager.UnloadAsync(id).ConfigureAwait(false);
             }
 
-            // Legacy plugins are loaded in place (never copied into our catalog), so uninstall only
-            // unregisters + unloads them — it must never delete the user's own files. Native/shim
-            // plugins live in our install dir, so those are deleted (deferred if still locked).
-            bool ownsFiles = kind != LoadKind.RealLegacy;
-            if (ownsFiles && dir is not null) DeleteOrDefer(dir, freed);
+            // We own (and delete) only files we copied into our catalog — zip installs. Everything else
+            // is install-by-reference (loaded in place), so uninstall only unregisters + unloads it and
+            // must never delete the user's own files. Owned dirs are deleted (deferred if still locked).
+            bool ownsFiles = dir is not null && _paths.Owns(dir);
+            if (ownsFiles) DeleteOrDefer(dir!, freed);
             _registry.Remove(id);
 
             var fileState = !ownsFiles ? "left in place" : freed ? "deleted" : "deferred";
@@ -279,6 +278,12 @@ internal sealed class PluginInstaller
             return await _satellite.RequestLoadPluginAsync(c.Id, dll, title).ConfigureAwait(false);
         }
         var loaded = await _manager.LoadDirectoryAsync(destDir, ct).ConfigureAwait(false);
+        if (loaded is not null)
+            // Startup's one-time RegisterUi flush (MainWindow.OnOpened) already ran, so a plugin
+            // installed live would otherwise never contribute its UI until the next restart — a
+            // 'ui'-capable plugin would show the fallback details card. Flush it now; the coordinator
+            // marshals to the UI thread and skips non-UI plugins.
+            _ui.FlushRegisterUi(new[] { (loaded.Manifest, loaded.Instance) });
         return loaded is not null;
     }
 
