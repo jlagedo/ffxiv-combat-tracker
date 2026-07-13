@@ -12,7 +12,6 @@
     <TargetFramework>net10.0</TargetFramework>
     <ImplicitUsings>disable</ImplicitUsings>
     <RootNamespace>Fct.Engine</RootNamespace>
-    <Version>1.0.0</Version>
     <Description>FFXIV Combat Tracker modern encounter engine: the host-side ACT aggregation source of truth.</Description>
   </PropertyGroup>
 
@@ -22,6 +21,7 @@
 
   <ItemGroup>
     <ProjectReference Include="..\Fct.Abstractions\Fct.Abstractions.csproj" />
+    <ProjectReference Include="..\Fct.Logging.Contracts\Fct.Logging.Contracts.csproj" />
     <!--
       Compile-only, non-transitive: Fct.Aggregation must NOT ship next-to-exe or land in a downstream
       deps.json. The single runtime identity is the staged compat\ copy, resolved by CompatRuntime's

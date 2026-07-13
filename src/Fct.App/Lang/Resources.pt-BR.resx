@@ -96,6 +96,10 @@
   <data name="Notify_EngineStoppedBody" xml:space="preserve"><value>Os plugins clássicos não estão mais em execução. Reinicie-o na página Plugins.</value></data>
   <data name="Notify_PluginReportedErrorTitle" xml:space="preserve"><value>Um plugin clássico reportou um erro</value></data>
   <data name="Notify_PluginLoadFailedTitle" xml:space="preserve"><value>Falha ao carregar um plugin clássico</value></data>
+  <data name="Notify_PluginLoadFailedBody" xml:space="preserve"><value>{0} não pôde ser inicializado e foi removido.</value></data>
+  <data name="Notify_HostStartFailedTitle" xml:space="preserve"><value>Falha ao iniciar o runtime do rastreador</value></data>
+  <data name="Plugins_LoadingTitle" xml:space="preserve"><value>Iniciando…</value></data>
+  <data name="Plugins_LoadingBody" xml:space="preserve"><value>O plugin está carregando e aparecerá aqui em instantes.</value></data>
   <data name="Notify_EngineErrorTitle" xml:space="preserve"><value>Erro no motor clássico</value></data>
   <data name="Notify_EngineWarningTitle" xml:space="preserve"><value>Aviso do motor clássico</value></data>
   <data name="Notify_NotAPluginFolderTitle" xml:space="preserve"><value>Essa pasta não é um plugin</value></data>

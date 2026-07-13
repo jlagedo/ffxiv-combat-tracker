@@ -11,6 +11,7 @@ namespace Fct.Abstractions
     /// </summary>
     public interface IGameSession
     {
+        /// <summary>The typed push stream of <see cref="GameEvent"/>s. Subscribe with a <see cref="GameEventFilter"/>.</summary>
         IGameEventStream Events { get; }
 
         /// <summary>A free-threaded, immutable point-in-time view. Safe to call from any thread.</summary>
@@ -47,24 +48,43 @@ namespace Fct.Abstractions
     /// <summary>An immutable snapshot of game state. All members are free-threaded reads.</summary>
     public interface IGameSnapshot
     {
+        /// <summary>The local player, or <c>null</c> when not yet known (no live game / not logged in).</summary>
         Actor? Player { get; }
+
+        /// <summary>Every tracked actor at snapshot time.</summary>
         IReadOnlyList<Actor> Actors { get; }
+
+        /// <summary>The player's current hard target, or <c>null</c> when nothing is targeted.</summary>
         Actor? Target { get; }
+
+        /// <summary>The player's focus target, or <c>null</c> when unset.</summary>
         Actor? Focus { get; }
+
+        /// <summary>The actor currently under the mouse cursor, or <c>null</c>.</summary>
         Actor? Hover { get; }
+
+        /// <summary>The party/alliance roster at snapshot time.</summary>
         PartySnapshot Party { get; }
+
+        /// <summary>The current zone identity.</summary>
         ZoneRef Zone { get; }
+
+        /// <summary>Id→name lookups (skills/statuses/zones/worlds/items).</summary>
         IResourceCatalog Resources { get; }
+
+        /// <summary>Client-level state (version/region/language + process liveness/foreground).</summary>
         GameClient Client { get; }
 
+        /// <summary>Find a tracked actor by id, or <c>null</c> when absent.</summary>
         Actor? Find(uint actorId);
     }
 
     /// <summary>
     /// The party/alliance roster at snapshot time. <paramref name="Size"/> mirrors
     /// <see cref="PartyChanged.PartySize"/> (the SDK's 8-person party size, distinct from an
-    /// alliance's up-to-24 <see cref="Members"/>). Defaulted for source compatibility with existing
-    /// call sites; not yet folded from <see cref="PartyChanged"/> anywhere.
+    /// alliance's up-to-24 <see cref="Members"/>).
+    /// <para>NOT YET WIRED: <paramref name="Size"/> is defaulted for source compatibility and is not
+    /// yet folded from <see cref="PartyChanged"/> — treat it as reserved.</para>
     /// </summary>
     public sealed record PartySnapshot(IReadOnlyList<Actor> Members, PartyMembership Composition, int Size = 0);
 
@@ -88,15 +108,14 @@ namespace Fct.Abstractions
 
         /// <summary>
         /// Forwarded server/client clock offset (<c>GetServerTimestamp() - DateTime.UtcNow</c> at the
-        /// producer). <see cref="TimeSpan.Zero"/> when the producer has no live memory-scanned server
-        /// time. Defaulted for source compatibility;
-        /// not yet forwarded or folded anywhere.
+        /// producer). <see cref="TimeSpan.Zero"/> when the producer has no live memory-scanned server time.
+        /// <para>NOT YET WIRED: defaulted for source compatibility; not yet forwarded or folded — treat as reserved.</para>
         /// </summary>
         public TimeSpan ServerClockOffset { get; init; }
 
         /// <summary>
-        /// Forwarded <c>IDataRepository.IsChatLogAvailable()</c>. Defaulted for source compatibility;
-        /// not yet forwarded or folded anywhere.
+        /// Forwarded <c>IDataRepository.IsChatLogAvailable()</c>.
+        /// <para>NOT YET WIRED: defaulted for source compatibility; not yet forwarded or folded — treat as reserved.</para>
         /// </summary>
         public bool IsChatLogAvailable { get; init; }
     }
@@ -110,7 +129,10 @@ namespace Fct.Abstractions
     /// </summary>
     public interface IResourceCatalog
     {
+        /// <summary>The display name for <paramref name="id"/> in the given <paramref name="kind"/>, or <c>null</c> when unknown.</summary>
         string? Name(ResourceKind kind, uint id);
+
+        /// <summary>The whole id→name table for a <see cref="ResourceKind"/>.</summary>
         IReadOnlyDictionary<uint, string> All(ResourceKind kind);
     }
 }

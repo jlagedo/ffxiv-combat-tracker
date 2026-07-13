@@ -48,32 +48,75 @@ public partial class MainWindow : Window
         DataContext = _vm;
 
         // The shell owns the satellite lifecycle and the OS file picker; the view models raise intent.
+        // The plugin actions open an OS file picker that can throw (no TopLevel, OS error) before the
+        // installer takes over, so they route through SafeFire — a throw is logged + surfaced, never an
+        // unobserved task exception. StartSatelliteAsync already guards itself.
         _vm.SatelliteRestartRequested += () => _ = StartSatelliteAsync();
-        _vm.AddPluginRequested += () => _ = PickPluginAsync();
-        _vm.UnloadPluginRequested += row => _ = UnloadPluginAsync(row);
-        _vm.LocatePluginRequested += row => _ = LocatePluginAsync(row);
+        _vm.AddPluginRequested += () => SafeFire(PickPluginAsync);
+        _vm.UnloadPluginRequested += row => SafeFire(() => UnloadPluginAsync(row));
+        _vm.LocatePluginRequested += row => SafeFire(() => LocatePluginAsync(row));
 
         // Legacy plugins loaded/unloaded live across the package satellites reconcile the flat roster.
+        // A load first shows a "Starting" placeholder (Pending), then the satellite's announce replaces
+        // it — or, if the load can't be dispatched, LoadFailed removes the placeholder.
+        _router.PluginLoadPending += (key, title) => _vm.AddPendingLegacyPlugin(key, title);
+        _router.PluginLoadFailed += key => _vm.FailPendingLegacyPlugin(key);
         _router.PluginAnnounced += p => _vm.AddLegacyPlugin(p);
         _router.PluginUnloaded += key => _vm.RemoveLegacyPlugin(key);
+
+        // Native / recompiled-shim loads run in-process and show a placeholder while they initialize:
+        // success upgrades the row through the registry roster (OnRosterChanged), failure removes it.
+        if (App.Services?.GetService<PluginInstaller>() is { } installer)
+        {
+            installer.NativeLoadStarting += (id, title) => _vm.AddPendingModernPlugin(id, title);
+            installer.NativeLoadFailed += id => _vm.FailModernPlugin(id);
+        }
     }
 
-    // Kick off the satellite once the shell is on screen, so the window paints first — unless the
-    // user has turned auto-launch off, in which case we sit idle until they start it.
+    // Everything expensive runs here, once the shell is on screen, so the window paints first: the
+    // host runtime comes online, persisted plugins load, their UI is flushed, and the satellite
+    // (optionally) launches. Program.cs deliberately does NOT start the host before Avalonia.
     protected override void OnOpened(EventArgs e)
     {
         base.OnOpened(e);
+        _ = StartRuntimeAsync();
+    }
+
+    private async Task StartRuntimeAsync()
+    {
+        // Bring the host runtime online now that the shell is painted: hosted services subscribe the
+        // bus/engine and the persisted net10 plugins load in-process. A start fault leaves the shell up
+        // (degraded) with a surfaced notification instead of a pre-UI fatal exit.
+        if (App.Host is { } host)
+        {
+            try
+            {
+                await host.StartAsync();
+                _log.LogInformation(LogEvents.HostStarted, "Host runtime online");
+            }
+            catch (Exception ex)
+            {
+                _log.LogCritical(LogEvents.HostUnhandledException, ex, "Host runtime failed to start");
+                _notifications.Publish(NotificationSeverity.Error, Strings.Notify_Source_Plugins,
+                    Strings.Notify_HostStartFailedTitle, ex.Message);
+            }
+        }
+
+        // Persisted plugins are now loaded (their roster rows arrived via RosterChanged); register
+        // their UI in one pass.
         FlushPluginUi();
+
+        // The launch decision honours the persisted setting, now read off the UI thread.
+        await _vm.SettingsPage.EnsureLoadedAsync();
         if (_vm.SettingsPage.LaunchSatelliteOnStartup)
             _ = StartSatelliteAsync();
         else
             _vm.SetIdle();
     }
 
-    // Native plugins finish IPlugin.InitializeAsync before Avalonia starts (Program.cs runs
-    // host.Start() before StartWithClassicDesktopLifetime), so IUiContributor.RegisterUi — which the
-    // contract requires to run "on the UI thread, after init, with the shell live" — can only happen
-    // here, once the window is actually on screen.
+    // IUiContributor.RegisterUi must run "on the UI thread, after init, with the shell live" — so it
+    // can only happen here, after StartRuntimeAsync has brought the host online and the persisted
+    // plugins have finished IPlugin.InitializeAsync.
     private void FlushPluginUi()
     {
         var manager = App.Services?.GetService<PluginManager>();
@@ -81,6 +124,23 @@ public partial class MainWindow : Window
         if (manager is null || coordinator is null) return;
 
         coordinator.FlushRegisterUi(manager.Loaded.Select(p => (p.Manifest, p.Instance)));
+    }
+
+    // Run a UI intent so it can never become an unobserved task exception: the whole body is guarded,
+    // so a picker/OS failure is logged and surfaced to the user instead of vanishing until GC. async
+    // void is correct here precisely because nothing can escape the try/catch.
+    private async void SafeFire(Func<Task> op)
+    {
+        try
+        {
+            await op();
+        }
+        catch (Exception ex)
+        {
+            _log.LogError(LogEvents.NativePluginManifestRejected, ex, "A plugin UI action failed");
+            _notifications.Publish(NotificationSeverity.Error, Strings.Notify_Source_Plugins,
+                Strings.Notify_PluginInstallFailedTitle, ex.Message);
+        }
     }
 
     // Add a plugin from a .zip package or a single .dll — the installer unpacks/classifies whatever

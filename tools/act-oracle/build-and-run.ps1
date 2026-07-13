@@ -13,7 +13,7 @@
 #
 # With no -Swings/-Out it regenerates BOTH committed slices (combat-slice, combat-slice2), and the
 # plugin baseline for combat-slice only ("one slice baseline" per the plan). Requires the real ACT
-# install (default E:\dev\Advanced Combat Tracker). Dev-only: the baselines it produces are
+# install (default %APPDATA%\Advanced Combat Tracker). Dev-only: the baselines it produces are
 # committed, so the normal test suite needs neither this tool nor an ACT install nor the plugin.
 param(
     [string]$ActDir  = $env:ACT_DIR,
@@ -22,7 +22,7 @@ param(
     [string]$PluginDll = $env:FFXIV_PLUGIN_DLL
 )
 
-if (-not $ActDir) { $ActDir = "E:\dev\Advanced Combat Tracker" }
+if (-not $ActDir) { $ActDir = Join-Path $env:APPDATA "Advanced Combat Tracker" }
 $act = Join-Path $ActDir "Advanced Combat Tracker.exe"
 if (-not (Test-Path $act)) { throw "ACT binary not found: $act (set -ActDir or `$env:ACT_DIR)" }
 
@@ -50,7 +50,7 @@ function Invoke-Slice([string]$swingsTsv, [string]$aggregateTsv) {
 # ACT_UIMods.UpdateACTTables registers (enumerated, never hardcoded) to <slice>.plugin.exportvars.tsv.
 function Invoke-PluginBaseline([string]$swingsTsv, [string]$exportsTsv) {
     if (-not $PluginDll) {
-        $PluginDll = "E:\tmp\plugins\FFXIV_ACT_Plugin_3.0.2.3\FFXIV_ACT_Plugin.dll"
+        $PluginDll = Join-Path $env:APPDATA "Advanced Combat Tracker\Plugins\FFXIV_ACT_Plugin.dll"
     }
     if (-not (Test-Path $PluginDll)) {
         Write-Warning "FFXIV_ACT_Plugin.dll not found ($PluginDll); skipping plugin-baseline regeneration. Set -PluginDll or `$env:FFXIV_PLUGIN_DLL."

@@ -21,8 +21,8 @@
     <Prefer32Bit>false</Prefer32Bit>
     <AssemblyName>Fct.StreamProbe</AssemblyName>
     <RootNamespace>Fct.StreamProbe</RootNamespace>
-    <!-- The real ACT install (override on other machines). -->
-    <ActExePath Condition="'$(ActExePath)' == ''">E:\dev\Advanced Combat Tracker\Advanced Combat Tracker.exe</ActExePath>
+    <!-- The real ACT install; defaults to the standard %APPDATA% location (override via -p:ActExePath=... elsewhere). -->
+    <ActExePath Condition="'$(ActExePath)' == ''">$(AppData)\Advanced Combat Tracker\Advanced Combat Tracker.exe</ActExePath>
   </PropertyGroup>
 
   <ItemGroup>

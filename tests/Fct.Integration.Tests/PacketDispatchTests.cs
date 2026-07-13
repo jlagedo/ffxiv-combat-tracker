@@ -17,10 +17,6 @@ namespace Fct.Integration.Tests
     [Collection("satellite")]
     public class PacketDispatchTests
     {
-        // Matches FacadeHost.OverlayPluginPath — the live DLL the wrapped path needs.
-        private const string OverlayPluginPath =
-            @"E:\dev\Advanced Combat Tracker\OverlayPlugin-0.16.5\OverlayPlugin.dll";
-
         private readonly SatelliteRunFixture _fx;
         private readonly ITestOutputHelper _out;
 
@@ -36,8 +32,8 @@ namespace Fct.Integration.Tests
                 "Satellite not staged. Build src/Fct.App first (dotnet build src/Fct.App/Fct.App.csproj).");
             Skip.IfNot(_fx.PluginPresent,
                 $"FFXIV_ACT_Plugin not installed at {SatelliteRunFixture.FfxivPluginPath}.");
-            Skip.IfNot(File.Exists(OverlayPluginPath),
-                $"OverlayPlugin not found at {OverlayPluginPath}; wrapped-path live test needs it.");
+            Skip.IfNot(File.Exists(SatelliteRunFixture.OverlayPluginPath),
+                $"OverlayPlugin not found at {SatelliteRunFixture.OverlayPluginPath}; wrapped-path live test needs it.");
 
             // Diagnostics land after OverlayPlugin's background registration; wait for the marker.
             var log = _fx.WaitForLog("[Diag] injected=", 60);

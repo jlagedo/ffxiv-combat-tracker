@@ -22,7 +22,8 @@ internal static class ActOracle
 {
     private static string _result = "";
     private static string _actDir =
-        Environment.GetEnvironmentVariable("ACT_DIR") ?? @"E:\dev\Advanced Combat Tracker";
+        Environment.GetEnvironmentVariable("ACT_DIR")
+        ?? Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData), "Advanced Combat Tracker");
     private static string _pluginDll = Environment.GetEnvironmentVariable("FFXIV_PLUGIN_DLL");
 
     private static Assembly Resolve(object sender, ResolveEventArgs e)

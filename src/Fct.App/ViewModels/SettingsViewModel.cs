@@ -11,15 +11,31 @@ namespace Fct.App.ViewModels;
 public sealed partial class SettingsViewModel : PageViewModel
 {
     private readonly UiSettingsStore? _store;
+    private readonly Task _loaded;
     private bool _loading;
 
     public SettingsViewModel(MainViewModel shell, UiSettingsStore? store) : base(shell)
     {
         _store = store;
+        _launchSatelliteOnStartup = true;   // optimistic default until the file is read off-thread
+        _loaded = LoadAsync();
+    }
+
+    // Read the persisted settings off the UI thread so window construction never waits on the file
+    // system (an AV scanner or slow disk could stall it). The await resumes on the UI SynchronizationContext
+    // captured in the ctor, so the property set below is marshalled correctly.
+    private async Task LoadAsync()
+    {
+        if (_store is null) return;
+        var settings = await Task.Run(() => _store.Load());
         _loading = true;
-        _launchSatelliteOnStartup = store?.Load().LaunchSatelliteOnStartup ?? true;
+        LaunchSatelliteOnStartup = settings.LaunchSatelliteOnStartup;
         _loading = false;
     }
+
+    // Completes once the persisted settings have been read; the shell awaits this before acting on
+    // LaunchSatelliteOnStartup so the real value (not the optimistic default) gates the launch.
+    public Task EnsureLoadedAsync() => _loaded;
 
     public override Section Section => Section.Settings;
     public override string Eyebrow => Resources.Nav_Settings;

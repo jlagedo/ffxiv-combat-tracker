@@ -10,7 +10,6 @@
     <TargetFrameworks>net48;net10.0</TargetFrameworks>
     <ImplicitUsings>disable</ImplicitUsings>
     <RootNamespace>Fct.Bridge</RootNamespace>
-    <Version>1.0.0</Version>
     <Description>FFXIV Combat Tracker bridge contract — the satellite handshake/command protocol and the typed GameEvent wire codec shared by the net10 host and the net48 satellite.</Description>
   </PropertyGroup>
 

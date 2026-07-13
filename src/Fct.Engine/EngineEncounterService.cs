@@ -5,6 +5,9 @@ using System.Text;
 using System.Threading;
 using Advanced_Combat_Tracker;
 using Fct.Abstractions;
+using Fct.Logging;
+using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Logging.Abstractions;
 
 namespace Fct.Engine
 {
@@ -24,21 +27,29 @@ namespace Fct.Engine
         private readonly IClock _clock;
         private readonly List<string> _log = new();
         private readonly Timer _tick;
+        // A projection throw must never kill the tick loop or drop the final-numbers capture — but it
+        // must not be silent either. First fault logs with the exception, then throttles.
+        private readonly ThrottledCounter _projectionFaults;
 
         private volatile EncounterSnapshot? _active;
         private volatile EncounterSnapshot? _last;
 
-        public EngineEncounterService(ModernEncounterEngine engine, IClock clock)
+        public EngineEncounterService(ModernEncounterEngine engine, IClock clock, ILogger<EngineEncounterService>? logger = null)
         {
             _engine = engine ?? throw new ArgumentNullException(nameof(engine));
             _clock = clock ?? throw new ArgumentNullException(nameof(clock));
+            _projectionFaults = new ThrottledCounter(
+                logger ?? (ILogger)NullLogger<EngineEncounterService>.Instance,
+                LogLevel.Error, LogEvents.EncounterProjectionFailed,
+                "Encounter projection faulted {Count} time(s) (total {Total}); the tick loop continues");
 
             // Capture the final numbers the instant combat ends (idle-out or explicit), before the next
             // encounter reuses the graph. Fires under the engine gate (bus pump or our tick) — the lock
             // below is re-entrant on that thread.
             _engine.Lifecycle.CombatEnded = enc =>
             {
-                lock (_engine.Gate) _last = EncounterProjector.Project(enc);
+                try { lock (_engine.Gate) _last = EncounterProjector.Project(enc); }
+                catch (Exception ex) { _projectionFaults.Record(ex); }
             };
 
             _tick = new Timer(_ => Tick(), null, TickInterval, TickInterval);
@@ -86,9 +97,11 @@ namespace Fct.Engine
                         : null;
                 }
             }
-            catch
+            catch (Exception ex)
             {
-                // A projection hiccup must never kill the tick loop; the next tick recovers.
+                // A projection hiccup must never kill the tick loop; the next tick recovers. Logged
+                // (throttled) so a persistent projection bug is visible, not silent.
+                _projectionFaults.Record(ex);
             }
         }
 

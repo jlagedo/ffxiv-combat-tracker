@@ -6,6 +6,8 @@ using System.Text.Json;
 using System.Text.Json.Serialization;
 using Fct.Host.Plugins;
 using Fct.Logging;
+using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Logging.Abstractions;
 
 namespace Fct.Host.Hosting;
 
@@ -50,10 +52,14 @@ internal sealed class PluginRegistryStore
 {
     private readonly object _gate = new();
     private readonly string _filePath;
+    private readonly ILogger _log;
 
     /// <param name="filePathOverride">Test seam: overrides the registry file location.</param>
-    public PluginRegistryStore(string? filePathOverride = null)
-        => _filePath = filePathOverride ?? Path.Combine(AppData.Root, "installed-plugins.json");
+    public PluginRegistryStore(string? filePathOverride = null, ILogger<PluginRegistryStore>? log = null)
+    {
+        _filePath = filePathOverride ?? Path.Combine(AppData.Root, "installed-plugins.json");
+        _log = log ?? (ILogger)NullLogger<PluginRegistryStore>.Instance;
+    }
 
     private string FilePath => _filePath;
 
@@ -69,7 +75,17 @@ internal sealed class PluginRegistryStore
                     Current = JsonSerializer.Deserialize(File.ReadAllText(FilePath), PluginRegistryJsonContext.Default.InstalledPlugins)
                               ?? new InstalledPlugins();
             }
-            catch { Current = new InstalledPlugins(); }
+            catch (Exception ex)
+            {
+                // A corrupt registry would silently wipe the user's ENTIRE installed-plugin set. Preserve
+                // the bad file (so it can be recovered/inspected) rather than overwriting it, and log
+                // loudly — this is the one true silent-data-loss path in the app.
+                var quarantined = Quarantine(FilePath);
+                _log.LogError(LogEvents.SettingsLoadFailed, ex,
+                    "Installed-plugin registry '{Path}' is unreadable; it was preserved as '{Quarantined}' and the registry reset to empty",
+                    FilePath, quarantined ?? "(preserve failed)");
+                Current = new InstalledPlugins();
+            }
             return Current;
         }
     }
@@ -145,6 +161,25 @@ internal sealed class PluginRegistryStore
             Directory.CreateDirectory(Path.GetDirectoryName(path)!);
             File.WriteAllText(path, JsonSerializer.Serialize(Current, PluginRegistryJsonContext.Default.InstalledPlugins));
         }
-        catch { /* best-effort: a registry write failure must not crash the app */ }
+        catch (Exception ex)
+        {
+            // A registry write failure must not crash the app, but a persistently unwritable file means
+            // installs won't survive a restart — the user must be able to see why.
+            _log.LogWarning(LogEvents.SettingsSaveFailed, ex, "Failed to persist the installed-plugin registry to '{Path}'", FilePath);
+        }
+    }
+
+    // Rename a corrupt config file aside so it is never silently lost. Returns the new path, or null if
+    // even the rename failed (best-effort — a failed preserve must not throw out of Load).
+    private string? Quarantine(string path)
+    {
+        try
+        {
+            if (!File.Exists(path)) return null;
+            var quarantined = path + ".corrupt-" + DateTime.UtcNow.ToString("yyyyMMddHHmmss") + ".json";
+            File.Move(path, quarantined);
+            return quarantined;
+        }
+        catch { return null; }
     }
 }

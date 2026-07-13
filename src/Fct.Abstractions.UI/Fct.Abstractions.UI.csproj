@@ -11,7 +11,6 @@
     <TargetFramework>net10.0</TargetFramework>
     <ImplicitUsings>disable</ImplicitUsings>
     <RootNamespace>Fct.Abstractions.UI</RootNamespace>
-    <Version>1.0.0</Version>
     <Description>FFXIV Combat Tracker plugin SDK — Avalonia UI contribution surfaces (settings page, RevealPage, corner controls).</Description>
   </PropertyGroup>
 

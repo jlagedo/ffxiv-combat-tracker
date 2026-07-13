@@ -23,7 +23,7 @@ namespace Fct.Integration.Tests
     // — every snapshot arrives, in order, with zero egress drops. Combined with the pinned 250 ms producer
     // interval and the measured sub-10 ms egress latency (FourSatelliteSoakTests), mirror staleness stays
     // under one poll interval. Plugin-free. (OverlayPlugin's internal read-poll instrumentation needs a live
-    // game — GO-LIVE A1; the fan-out cadence bound is what CI gates.)
+    // game; the fan-out cadence bound is what CI gates.)
     [Collection("satellite-p6")]
     public sealed class RepositoryCadenceTests
     {

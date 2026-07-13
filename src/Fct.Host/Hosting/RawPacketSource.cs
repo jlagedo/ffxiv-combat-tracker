@@ -1,6 +1,9 @@
 using System;
 using System.Collections.Generic;
 using Fct.Abstractions;
+using Fct.Logging;
+using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Logging.Abstractions;
 
 namespace Fct.Host.Hosting;
 
@@ -17,10 +20,16 @@ internal sealed class RawPacketSource : IRawPacketSource, IDisposable
     private readonly object _gate = new();
     private readonly List<Action<RawPacket>> _handlers = new();
     private readonly IDisposable _busSubscription;
+    // A throwing raw-packet consumer stays isolated, but the fault is logged (throttled) so a broken
+    // network-parser plugin is diagnosable rather than silently swallowed.
+    private readonly ThrottledCounter _consumerFaults;
 
-    public RawPacketSource(IGameEventStream stream)
+    public RawPacketSource(IGameEventStream stream, ILogger<RawPacketSource>? log = null)
     {
         if (stream is null) throw new ArgumentNullException(nameof(stream));
+        _consumerFaults = new ThrottledCounter(log ?? (ILogger)NullLogger<RawPacketSource>.Instance,
+            LogLevel.Warning, LogEvents.RawPacketConsumerFaulted,
+            "A raw-packet consumer threw {Count} time(s) (total {Total}); the packet was skipped for that consumer");
         // Only this service opts into the higher-bandwidth packet firehose; every other subscriber
         // (snapshot aggregator, shim DataSubscription) uses GameEventFilter.All, which excludes it.
         _busSubscription = stream.Subscribe(new GameEventFilter(IncludeRawPackets: true), OnBusEvent);
@@ -38,7 +47,7 @@ internal sealed class RawPacketSource : IRawPacketSource, IDisposable
         foreach (var h in snapshot)
         {
             try { h(packet); }
-            catch { /* isolated: a throwing consumer never starves peers */ }
+            catch (Exception ex) { _consumerFaults.Record(ex); }
         }
     }
 

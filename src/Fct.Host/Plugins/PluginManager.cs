@@ -61,11 +61,11 @@ internal sealed class PluginManager
         _registry = registry;
         _sink = bus;
         // One process-wide raw-packet reader over the bus firehose; handed out gated per plugin.
-        _rawPackets = rawPackets ?? new RawPacketSource(bus);
+        _rawPackets = rawPackets ?? new RawPacketSource(bus, loggerFactory.CreateLogger<RawPacketSource>());
         _clock = clock;
         _loggerFactory = loggerFactory;
         _notifications = notifications;
-        _classifier = classifier ?? new PluginClassifier();
+        _classifier = classifier ?? new PluginClassifier(loggerFactory.CreateLogger<PluginClassifier>());
         _log = loggerFactory.CreateLogger<PluginManager>();
         _legacyFactory = legacyFactory;
     }
@@ -200,7 +200,7 @@ internal sealed class PluginManager
             {
                 if (_legacyFactory is null)
                 {
-                    _log.LogWarning(LogEvents.NativePluginFaulted,
+                    _log.LogWarning(LogEvents.NativePluginManifestRejected,
                         "Plugin {Id}: legacy entry {Entry} but the compat shim is not available", manifest.Id, manifest.LegacyEntry);
                     alc.Unload();
                     return null;
@@ -209,7 +209,7 @@ internal sealed class PluginManager
                 instance = _legacyFactory(assembly, manifest.LegacyEntry);
                 if (instance is null)
                 {
-                    _log.LogWarning(LogEvents.NativePluginFaulted,
+                    _log.LogWarning(LogEvents.NativePluginManifestRejected,
                         "Plugin {Id}: compat shim could not host legacy entry {Entry}", manifest.Id, manifest.LegacyEntry);
                     alc.Unload();
                     return null;
@@ -223,7 +223,7 @@ internal sealed class PluginManager
                 var type = assembly.GetType(manifest.Entry!, throwOnError: false);
                 if (type is null || !typeof(IPlugin).IsAssignableFrom(type))
                 {
-                    _log.LogWarning(LogEvents.NativePluginFaulted,
+                    _log.LogWarning(LogEvents.NativePluginManifestRejected,
                         "Plugin {Id}: entry type {Entry} is missing or not an IPlugin", manifest.Id, manifest.Entry);
                     alc.Unload();
                     return null;

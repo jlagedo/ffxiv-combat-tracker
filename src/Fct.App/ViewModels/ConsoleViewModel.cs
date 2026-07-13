@@ -45,12 +45,11 @@ public sealed partial class ConsoleViewModel : PageViewModel
     {
         _stream = stream;
 
+        // Seed from the stream's current history without blocking construction: hand the snapshot to
+        // the same UI-thread drain the live feed uses, so the O(n) projection happens on the first
+        // flush tick (after the window paints) rather than inline here.
         foreach (var e in stream.Snapshot())
-        {
-            _ring.Enqueue(new LogEntryViewModel(e));
-            while (_ring.Count > Cap) _ring.Dequeue();
-        }
-        RebuildEntries();
+            _incoming.Enqueue(e);
 
         stream.Emitted += OnEmitted;
         _flush = new DispatcherTimer { Interval = FlushInterval };

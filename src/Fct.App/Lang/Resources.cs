@@ -102,6 +102,7 @@ public static class Resources
     public static string Notify_EngineStoppedBody => Get(nameof(Notify_EngineStoppedBody));
     public static string Notify_PluginReportedErrorTitle => Get(nameof(Notify_PluginReportedErrorTitle));
     public static string Notify_PluginLoadFailedTitle => Get(nameof(Notify_PluginLoadFailedTitle));
+    public static string Notify_PluginLoadFailedBody => Get(nameof(Notify_PluginLoadFailedBody));
     public static string Notify_EngineErrorTitle => Get(nameof(Notify_EngineErrorTitle));
     public static string Notify_EngineWarningTitle => Get(nameof(Notify_EngineWarningTitle));
     public static string Notify_NotAPluginFolderTitle => Get(nameof(Notify_NotAPluginFolderTitle));
@@ -109,6 +110,7 @@ public static class Resources
     public static string Notify_PluginInstalledTitleFormat => Get(nameof(Notify_PluginInstalledTitleFormat));
     public static string Notify_PluginInstalledBody => Get(nameof(Notify_PluginInstalledBody));
     public static string Notify_PluginInstallFailedTitle => Get(nameof(Notify_PluginInstallFailedTitle));
+    public static string Notify_HostStartFailedTitle => Get(nameof(Notify_HostStartFailedTitle));
     public static string Dialog_AddPluginTitle => Get(nameof(Dialog_AddPluginTitle));
     public static string Dialog_LocatePluginTitleFormat => Get(nameof(Dialog_LocatePluginTitleFormat));
 
@@ -136,6 +138,8 @@ public static class Resources
     public static string Plugins_EngineDownBody => Get(nameof(Plugins_EngineDownBody));
     public static string Plugins_MissingTitle => Get(nameof(Plugins_MissingTitle));
     public static string Plugins_MissingBody => Get(nameof(Plugins_MissingBody));
+    public static string Plugins_LoadingTitle => Get(nameof(Plugins_LoadingTitle));
+    public static string Plugins_LoadingBody => Get(nameof(Plugins_LoadingBody));
     public static string Plugins_ModernPluginRole => Get(nameof(Plugins_ModernPluginRole));
     public static string Plugins_ModernPluginDescription => Get(nameof(Plugins_ModernPluginDescription));
     public static string Plugins_ModernUiErrorTitle => Get(nameof(Plugins_ModernUiErrorTitle));

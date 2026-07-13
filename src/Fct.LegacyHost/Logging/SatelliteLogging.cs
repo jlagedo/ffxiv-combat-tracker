@@ -101,6 +101,9 @@ namespace Fct.LegacyHost.Logging
             if (TryTag(s, "[ChangeZone]", out text)) { evt = LogEvents.ActDebug; return LogLevel.Debug; }
             if (TryTag(s, "[Wrap]", out text)) { evt = LogEvents.RealPluginBound; return LogLevel.Information; }
             if (TryTag(s, "[RingDispatch]", out text)) { evt = LogEvents.SubscriberThrew; return LogLevel.Warning; }
+            if (TryTag(s, "[StandIn]", out text)) { evt = LogEvents.DispatcherDiagnostics; return LogLevel.Information; }
+            if (TryTag(s, "[NamedCallback]", out text)) { evt = LogEvents.ActCommand; return LogLevel.Information; }
+            if (TryTag(s, "[LogTail]", out text)) { evt = LogEvents.ActDebug; return LogLevel.Debug; }
             text = s;
             evt = LogEvents.ActInfo;
             return LogLevel.Information;

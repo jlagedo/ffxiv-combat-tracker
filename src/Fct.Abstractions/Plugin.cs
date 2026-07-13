@@ -96,7 +96,10 @@ namespace Fct.Abstractions
     /// <summary>Game-time clock. <see cref="ServerNow"/> tracks the FFXIV server clock.</summary>
     public interface IClock
     {
+        /// <summary>The local machine's wall-clock time.</summary>
         DateTimeOffset LocalNow { get; }
+
+        /// <summary>The FFXIV server clock (replaces <c>GetServerTimestamp</c>).</summary>
         DateTimeOffset ServerNow { get; }
     }
 
@@ -106,7 +109,13 @@ namespace Fct.Abstractions
         /// <summary>The plugin's private, writable data directory (created on first access).</summary>
         string DataDirectory { get; }
 
+        /// <summary>
+        /// Load a typed settings object from <c><paramref name="name"/>.json</c> in
+        /// <see cref="DataDirectory"/>. Returns <c>null</c> when the file does not exist yet.
+        /// </summary>
         Task<T?> LoadSettingsAsync<T>(string name = "settings") where T : class;
+
+        /// <summary>Persist a typed settings object to <c><paramref name="name"/>.json</c> in <see cref="DataDirectory"/>.</summary>
         Task SaveSettingsAsync<T>(T value, string name = "settings") where T : class;
     }
 
@@ -117,6 +126,7 @@ namespace Fct.Abstractions
     /// </summary>
     public interface IPluginRegistry
     {
+        /// <summary>Every plugin currently loaded by the host (typed, not <c>ActPlugins</c> reflection).</summary>
         System.Collections.Generic.IReadOnlyList<PluginInfo> LoadedPlugins { get; }
 
         /// <summary>
@@ -126,9 +136,14 @@ namespace Fct.Abstractions
         /// throws. Dispose the returned handle to unregister (replaces the legacy int-id unregister).
         /// </summary>
         IDisposable RegisterCallback(string name, Action<object?> callback, object? owner = null, bool allowDuplicate = false);
+
+        /// <summary>Invoke a named callback registered via <see cref="RegisterCallback"/> (no-op if none is registered).</summary>
         void InvokeCallback(string name, object? argument = null);
 
+        /// <summary>Publish a typed event of type <typeparamref name="T"/> to every peer that subscribed to it.</summary>
         void Publish<T>(T evt) where T : notnull;
+
+        /// <summary>Subscribe to typed events of type <typeparamref name="T"/> published by peers. Dispose to unsubscribe.</summary>
         IDisposable Subscribe<T>(Action<T> handler) where T : notnull;
 
         /// <summary>

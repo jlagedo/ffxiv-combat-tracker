@@ -96,6 +96,10 @@
   <data name="Notify_EngineStoppedBody" xml:space="preserve"><value>Classic plugins are no longer running. Restart it from the Plugins page.</value></data>
   <data name="Notify_PluginReportedErrorTitle" xml:space="preserve"><value>A classic plugin reported an error</value></data>
   <data name="Notify_PluginLoadFailedTitle" xml:space="preserve"><value>A classic plugin failed to load</value></data>
+  <data name="Notify_PluginLoadFailedBody" xml:space="preserve"><value>{0} couldn't be initialized and was removed.</value></data>
+  <data name="Notify_HostStartFailedTitle" xml:space="preserve"><value>The tracker runtime failed to start</value></data>
+  <data name="Plugins_LoadingTitle" xml:space="preserve"><value>Starting up…</value></data>
+  <data name="Plugins_LoadingBody" xml:space="preserve"><value>The plugin is loading and will appear here in a moment.</value></data>
   <data name="Notify_EngineErrorTitle" xml:space="preserve"><value>Classic engine error</value></data>
   <data name="Notify_EngineWarningTitle" xml:space="preserve"><value>Classic engine warning</value></data>
   <data name="Notify_NotAPluginFolderTitle" xml:space="preserve"><value>That folder isn't a plugin</value></data>

@@ -9,7 +9,6 @@
     <TargetFrameworks>net48;net10.0</TargetFrameworks>
     <ImplicitUsings>disable</ImplicitUsings>
     <RootNamespace>Fct.Logging</RootNamespace>
-    <Version>1.0.0</Version>
     <Description>FFXIV Combat Tracker logging contract — EventId taxonomy, log paths, and the bridge log wire record shared by the net10 host and the net48 satellite.</Description>
   </PropertyGroup>
 

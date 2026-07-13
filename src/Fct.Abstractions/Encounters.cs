@@ -10,6 +10,7 @@ namespace Fct.Abstractions
     /// </summary>
     public interface IEncounterService
     {
+        /// <summary>True while an encounter is active (the modern form of ACT's <c>InCombat</c>).</summary>
         bool InCombat { get; }
 
         /// <summary>
@@ -22,7 +23,10 @@ namespace Fct.Abstractions
         /// <summary>End the active encounter, optionally exporting it.</summary>
         void EndCombat(bool export = false);
 
+        /// <summary>The in-progress encounter, or <c>null</c> when not in combat.</summary>
         EncounterSnapshot? Active { get; }
+
+        /// <summary>The most recently completed encounter, or <c>null</c> before the first one ends.</summary>
         EncounterSnapshot? Last { get; }
 
         /// <summary>Render an encounter to text in the given format.</summary>

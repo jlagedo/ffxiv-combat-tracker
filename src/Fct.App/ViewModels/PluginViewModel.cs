@@ -56,8 +56,9 @@ public sealed partial class PluginViewModel : ObservableObject
     private bool _hasNativeConfig;
 
     [ObservableProperty]
-    [NotifyPropertyChangedFor(nameof(IsLive), nameof(IsMissing), nameof(ShowLegacyPlaceholder),
-        nameof(StatusLabel), nameof(ConfigPlaceholderTitle), nameof(ConfigPlaceholderBody))]
+    [NotifyPropertyChangedFor(nameof(IsLive), nameof(IsLoading), nameof(IsPulsing), nameof(IsMissing),
+        nameof(ShowLegacyPlaceholder), nameof(ShowNativeDetails), nameof(StatusLabel),
+        nameof(ConfigPlaceholderTitle), nameof(ConfigPlaceholderBody))]
     private PluginStatus _status = PluginStatus.Loading;
 
     // The Avalonia settings page this plugin contributed via IUiContributor.RegisterUi (work item 9),
@@ -69,13 +70,21 @@ public sealed partial class PluginViewModel : ObservableObject
     public bool IsLegacy => Kind == PluginKind.Legacy;
     public bool IsNative => Kind == PluginKind.Native;
     public bool IsLive => Status == PluginStatus.Live;
+
+    // A pending placeholder row: the satellite is still loading this plugin (it hasn't announced yet).
+    public bool IsLoading => Status == PluginStatus.Loading;
+
+    // Drives the breathing orb: both a live plugin and one that's still loading pulse.
+    public bool IsPulsing => Status is PluginStatus.Live or PluginStatus.Loading;
+
     public bool IsMissing => Status == PluginStatus.Missing;
     public bool HasModernUi => SettingsSurface is not null;
 
     // Which panel the config bay shows for this plugin. A contributed settings page takes priority
-    // over the read-only manifest details card; a missing row shows the re-locate panel instead.
-    public bool ShowNativeDetails => IsNative && !HasModernUi;
-    public bool ShowLegacyPlaceholder => IsLegacy && !HasNativeConfig && !IsMissing;
+    // over the read-only manifest details card; a missing row shows the re-locate panel instead; a
+    // still-loading row shows the loading placeholder rather than a half-empty details/config card.
+    public bool ShowNativeDetails => IsNative && !HasModernUi && !IsLoading;
+    public bool ShowLegacyPlaceholder => IsLegacy && !HasNativeConfig && !IsMissing && !IsLoading;
     public bool HasStatusText => !string.IsNullOrWhiteSpace(SatelliteStatusText);
 
     public string StatusLabel => Status switch

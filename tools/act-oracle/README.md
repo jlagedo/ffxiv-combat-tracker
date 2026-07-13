@@ -26,7 +26,7 @@ localization is seeded (`ActLocalization.Init`) so the `"All"` AttackType bucket
 ## Regenerate the baseline (dev-only; needs the ACT install)
 
 ```powershell
-./build-and-run.ps1                       # uses E:\dev\Advanced Combat Tracker by default
+./build-and-run.ps1                       # uses %APPDATA%\Advanced Combat Tracker by default
 ./build-and-run.ps1 -ActDir "C:\path\to\Advanced Combat Tracker"
 ```
 
@@ -43,7 +43,7 @@ enumerates every key it registers on `CombatantData.ExportVariables`/`EncounterD
 used to prove `ExportVariables` completeness (see [`docs/TESTING.md`](../../docs/TESTING.md)).
 
 ```powershell
-$env:FFXIV_PLUGIN_DLL = "C:\path\to\FFXIV_ACT_Plugin.dll"   # defaults to E:\tmp\plugins\FFXIV_ACT_Plugin_3.0.2.3\...
+$env:FFXIV_PLUGIN_DLL = "C:\path\to\FFXIV_ACT_Plugin.dll"   # defaults to %APPDATA%\Advanced Combat Tracker\Plugins\FFXIV_ACT_Plugin.dll
 ./build-and-run.ps1
 ```
 

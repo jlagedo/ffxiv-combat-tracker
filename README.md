@@ -12,20 +12,18 @@
 
 ---
 
-**FFXIV Combat Tracker modernizes the stack under the FFXIV ACT plugin ecosystem.** It runs
-today's ACT plugins unmodified on current .NET, and opens an incremental, opt-in path to
-migrate them onto a typed modern API. **It is not a new ACT and not a replacement** — the
-point is to carry the community's existing plugins forward, not to compete with the tools they
-rely on.
+**FFXIV Combat Tracker modernizes the stack under the FFXIV ACT plugin ecosystem.** It is an
+**FFXIV-only** .NET 10 host that runs today's ACT plugins — the real FFXIV_ACT_Plugin, OverlayPlugin,
+and the wider ecosystem — unmodified on current .NET, and opens an incremental, opt-in path to migrate
+them onto a typed modern API, with the network/opcode parser kept as a swappable, independently-released
+component. **It is not a new ACT and not a replacement** — the point is to carry the community's
+existing plugins forward, not to compete with the tools they rely on.
 
-Concretely, this is an **FFXIV-only** experiment: a .NET 10 host that runs the real
-FFXIV_ACT_Plugin + OverlayPlugin (and the wider ecosystem) unmodified — each legacy plugin
-package in its own isolated satellite process — with the network/opcode parser kept as a
-swappable, independently-released component.
-
-The authoritative design lives in [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md). The map of
-how data flows through the real upstream stack — and the compat seams this project must
-reproduce — is in [`docs/DATA-FLOW.md`](docs/DATA-FLOW.md).
+The authoritative design lives in [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md); how data flows
+through the real upstream stack — and the compat seams this project must reproduce — is
+[`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md) §5. Plugin authors start with
+[`docs/PORTING.md`](docs/PORTING.md) (the how-to) and [`docs/PLUGIN-API.md`](docs/PLUGIN-API.md)
+(the contract reference).
 
 ## The idea in one breath
 
@@ -43,23 +41,56 @@ of isolated satellite processes:
   boundary and the isolation boundary; only typed data crosses. The target set is five:
   FFXIV_ACT_Plugin, OverlayPlugin/cactbot, Triggernometry, ACT-Discord-Triggers, ACT.Hojoring.
 
-Two hard directives gate every decision:
-
-1. The first version must run the five legacy plugins by **drop-in, unmodified**.
-2. Built for the future with a **clear legacy → native migration path** — opt-in,
-   incremental, never a flag day.
-
 A key invariant: **opcodes never cross the plugin boundary.** The host↔plugin contract is
 typed domain events, so a game patch ships a new parser plugin only — everything else is
 untouched. One opt-in escape hatch (`IRawPacketSource`) exposes raw packets for legacy
 `RegisterNetworkParser` consumers.
 
+## The North Star
+
+The fixed goal: a modern, ACT-inspired **host** that lets the FFXIV plugin community — who build for
+Advanced Combat Tracker today — move onto modern .NET and an Avalonia UI, free of legacy ACT's
+constraints. Two things have to be true at once:
+
+- **For developers** — authors host their plugins on the modern platform, keep them running
+  unmodified, and migrate them forward on their own schedule. This is what makes the ecosystem move.
+- **For users** — the host's own shell is a polished Avalonia UI that is a clear step up from ACT's
+  cluttered WinForms interface. A great plugin story behind a bad UI is not success.
+
+The end state is **every** plugin — the parser included — ported to modern .NET and native in the
+host, at which point the whole .NET 4.8 leg (satellites, bridge, facade) has served its purpose and is
+**deleted**. It is transitional scaffolding, not permanent architecture. The full statement of goals
+and scope is [`docs/NORTH-STAR.md`](docs/NORTH-STAR.md).
+
+### The three plugin patterns — how your plugin comes along
+
+The migration road has three stops. A plugin sits at any stop and moves forward when its author
+chooses — the host supports all three at once, **opt-in and incremental, never a flag day**.
+
+| Stop | What it is | What the author does |
+|---|---|---|
+| **1 — Legacy** | runs unmodified in an isolated .NET Framework 4.8 satellite, over IPC | **nothing** — drop-in |
+| **2 — Recompile-shim** | same source recompiled onto .NET 10, WinForms UI intact, in-process | recompile against the shim facade |
+| **3 — Native** | modern .NET on the typed API, UI on Avalonia | write/port against `Fct.Abstractions` |
+
+Direction of travel is always **1 → 2 → 3**. Stop 1 is meant to *empty over time* — but only because
+authors migrate, never because the host drops it out from under a plugin still relying on it. The
+parser walks the same road and stays *the* sole parser once it does.
+
+### For plugin developers
+
+Start here: **[`docs/PORTING.md`](docs/PORTING.md)** — the hands-on guide (native + recompile paths,
+with real code) — and **[`docs/PLUGIN-API.md`](docs/PLUGIN-API.md)** — the contract reference (services,
+events, manifest schema). The reference plugins are
+[`samples/Fct.SamplePlugin`](samples/Fct.SamplePlugin) (native) and
+[`samples/Fct.SampleLegacyPlugin`](samples/Fct.SampleLegacyPlugin) (recompile-shim); UI styling is in
+[`docs/UI-TOKENS.md`](docs/UI-TOKENS.md).
+
 ## What's in here so far
 
-This is a prototype; the table below reflects what exists in the tree, not a finished system.
-
-This lists the load-bearing projects only; the full project map lives in
-[`CLAUDE.md`](CLAUDE.md) and [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md).
+The load-bearing projects that exist in the tree today — full project map in [`CLAUDE.md`](CLAUDE.md)
+and [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md); milestone map in
+[`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md) §11.
 
 | Project | TFM | Role |
 |---|---|---|
@@ -74,13 +105,6 @@ This lists the load-bearing projects only; the full project map lives in
 
 Plus `tools/mass-compare/` — a corpus-scale differential harness holding our ACT engine to the real
 ACT binary, both fed the same plugin-produced swings, on recorded logs.
-
-## Status
-
-An exploratory prototype: the host loads the real plugins in per-package satellites and the
-forward typed contract is in place, but large parts are unfinished or stubbed and everything is
-subject to change. See [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md) §11 for the milestone map and
-[`docs/PLUGIN-API.md`](docs/PLUGIN-API.md) for the forward surface + remaining work.
 
 ## Validation — ACT-engine output parity
 
@@ -133,9 +157,9 @@ method: [`docs/TESTING.md`](docs/TESTING.md).
   same numbers it sees off real ACT, to the character.
 - **It doesn't:** validate *parsing* — that is the plugin's job, hosted unmodified. DoT/HoT/shield
   values are the plugin's own estimates, baked into the swings both engines receive; we sum
-  whatever we are handed, exactly as ACT does. And this is still a prototype (see the banner above).
+  whatever we are handed, exactly as ACT does.
 
-## Building (for the curious only)
+## Building
 
 Requires the .NET 10 SDK, the net48 targeting pack, and the WindowsDesktop runtime on
 Windows. The net10 host build-depends on the net48 satellite and stages it alongside.
@@ -150,14 +174,11 @@ or an installed `FFXIV_ACT_Plugin.dll`) are absent.
 
 ## Relationship to upstream projects
 
-**This is not a replacement for ACT, FFXIV_ACT_Plugin, or OverlayPlugin — use the upstream
-tools for live play.** This project exists to carry their ecosystem forward onto modern .NET,
-not to compete with it. It studies and reproduces compat seams against the **decompiled**
-behavior of Advanced Combat Tracker, FFXIV_ACT_Plugin, and OverlayPlugin so the real plugins
-keep working; those are third-party works owned by their respective authors, and nothing here
-is affiliated with or endorsed by them. This repository contains **no game client code and no
-reverse-engineered game opcodes** — the v1 design deliberately hosts the real parser plugin
-rather than reimplementing it.
+This project studies and reproduces compat seams against the **decompiled** behavior of Advanced
+Combat Tracker, FFXIV_ACT_Plugin, and OverlayPlugin so the real plugins keep working; those are
+third-party works owned by their respective authors, and nothing here is affiliated with or endorsed
+by them. This repository contains **no game client code and no reverse-engineered game opcodes** — the
+v1 design deliberately hosts the real parser plugin rather than reimplementing it.
 
 FINAL FANTASY XIV © SQUARE ENIX CO., LTD. This is an unaffiliated fan project.
 

@@ -34,6 +34,36 @@ public class PluginRegistryStoreTests
     }
 
     [Fact]
+    public void A_corrupt_registry_is_preserved_not_silently_wiped()
+    {
+        var path = TempFile();
+        try
+        {
+            // A truncated / garbage file that fails to deserialize.
+            File.WriteAllText(path, "{ this is not valid json ");
+
+            var store = new PluginRegistryStore(path);
+            var loaded = store.Load();
+
+            // The registry resets to empty (the app still starts) …
+            Assert.Empty(loaded.Plugins);
+            // … but the bad file is NOT the file at `path` anymore — it was renamed aside, never lost.
+            Assert.False(File.Exists(path), "the corrupt file should have been renamed away from its path");
+            var dir = Path.GetDirectoryName(path)!;
+            var preserved = Directory.GetFiles(dir, Path.GetFileName(path) + ".corrupt-*.json");
+            Assert.Single(preserved);
+            Assert.Contains("this is not valid json", File.ReadAllText(preserved[0]));
+        }
+        finally
+        {
+            var dir = Path.GetDirectoryName(path)!;
+            try { File.Delete(path); } catch { }
+            foreach (var f in Directory.GetFiles(dir, Path.GetFileName(path) + ".corrupt-*.json"))
+                try { File.Delete(f); } catch { }
+        }
+    }
+
+    [Fact]
     public void Add_replaces_an_existing_record_for_the_same_id()
     {
         var path = TempFile();

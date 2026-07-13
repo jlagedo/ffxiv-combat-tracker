@@ -18,6 +18,8 @@ namespace Fct.Logging
         public static readonly EventId HostStarted = new EventId(1001, nameof(HostStarted));
         public static readonly EventId HostStopping = new EventId(1002, nameof(HostStopping));
         public static readonly EventId HostUnhandledException = new EventId(1003, nameof(HostUnhandledException));
+        public static readonly EventId UiUnhandledException = new EventId(1004, nameof(UiUnhandledException));
+        public static readonly EventId UiShellShown = new EventId(1005, nameof(UiShellShown));
 
         // -- 11xx satellite process control (host side) --
         public static readonly EventId SatelliteLaunching = new EventId(1100, nameof(SatelliteLaunching));
@@ -38,6 +40,9 @@ namespace Fct.Logging
         public static readonly EventId BridgeFrameMalformed = new EventId(1204, nameof(BridgeFrameMalformed));
         public static readonly EventId BridgeEventDecoded = new EventId(1205, nameof(BridgeEventDecoded));
         public static readonly EventId BridgeEventDecodeFailed = new EventId(1206, nameof(BridgeEventDecodeFailed));
+        public static readonly EventId BridgeEgressFailed = new EventId(1207, nameof(BridgeEgressFailed));
+        public static readonly EventId BridgeNotWired = new EventId(1209, nameof(BridgeNotWired));
+        public static readonly EventId BridgeSubscribed = new EventId(1211, nameof(BridgeSubscribed));
 
         // -- 13xx window embedding (host side) --
         public static readonly EventId WindowReparented = new EventId(1300, nameof(WindowReparented));
@@ -51,6 +56,8 @@ namespace Fct.Logging
         public static readonly EventId NativePluginFaulted = new EventId(1404, nameof(NativePluginFaulted));
         public static readonly EventId NativePluginUnloaded = new EventId(1405, nameof(NativePluginUnloaded));
         public static readonly EventId NativePluginsReady = new EventId(1406, nameof(NativePluginsReady));
+        public static readonly EventId NativePluginInstallFailed = new EventId(1407, nameof(NativePluginInstallFailed));
+        public static readonly EventId CompatRuntimeStaging = new EventId(1408, nameof(CompatRuntimeStaging));
 
         // -- 15xx native plugin UI face (RegisterUi coordinator, host side) --
         public static readonly EventId NativePluginUiRegistered = new EventId(1500, nameof(NativePluginUiRegistered));
@@ -60,6 +67,15 @@ namespace Fct.Logging
 
         // -- 16xx modern encounter engine (host side) --
         public static readonly EventId EncounterHeartbeat = new EventId(1600, nameof(EncounterHeartbeat));
+        public static readonly EventId EncounterProjectionFailed = new EventId(1601, nameof(EncounterProjectionFailed));
+
+        // -- 165x host bus dispatch (host side) --
+        public static readonly EventId BusSubscriberFaulted = new EventId(1650, nameof(BusSubscriberFaulted));
+        public static readonly EventId RawPacketConsumerFaulted = new EventId(1651, nameof(RawPacketConsumerFaulted));
+
+        // -- 17xx host persisted stores (settings / registry) --
+        public static readonly EventId SettingsLoadFailed = new EventId(1700, nameof(SettingsLoadFailed));
+        public static readonly EventId SettingsSaveFailed = new EventId(1701, nameof(SettingsSaveFailed));
 
         // -- 20xx satellite lifecycle (satellite side) --
         public static readonly EventId SatelliteBooting = new EventId(2000, nameof(SatelliteBooting));
@@ -78,6 +94,9 @@ namespace Fct.Logging
 
         // -- 22xx dispatch / ring buffer (satellite side) --
         public static readonly EventId RealPluginBound = new EventId(2200, nameof(RealPluginBound));
+        // Reserved: emitted from the compat parser wrapper's null-subscription / ring-drop paths, which
+        // log only through the Action<string> seam today (those libs take no logging dependency). Kept
+        // allocated so the ids are stable if that seam is ever given a direct ILogger.
         public static readonly EventId RealSubscriptionNull = new EventId(2201, nameof(RealSubscriptionNull));
         public static readonly EventId SubscriberThrew = new EventId(2202, nameof(SubscriberThrew));
         public static readonly EventId PacketsDropped = new EventId(2203, nameof(PacketsDropped));
@@ -100,7 +119,8 @@ namespace Fct.Logging
         public static readonly EventId ActCommand = new EventId(2404, nameof(ActCommand));
         public static readonly EventId ActRestartRequested = new EventId(2405, nameof(ActRestartRequested));
 
-        // -- 30xx native parser --
+        // -- 30xx native parser (reserved — the native parser is not yet implemented; these ids are
+        //    allocated ahead of it so the taxonomy is stable when it lands) --
         public static readonly EventId LineDropped = new EventId(3000, nameof(LineDropped));
         public static readonly EventId UnknownLineType = new EventId(3001, nameof(UnknownLineType));
         public static readonly EventId ParseAnomaly = new EventId(3002, nameof(ParseAnomaly));

@@ -77,7 +77,8 @@ public static class ServiceCollectionExtensions
         services.AddSingleton<Fct.Engine.ModernEncounterEngine>();
         services.AddHostedService(sp => sp.GetRequiredService<Fct.Engine.ModernEncounterEngine>());
         services.AddSingleton<IEncounterService>(sp => new Fct.Engine.EngineEncounterService(
-            sp.GetRequiredService<Fct.Engine.ModernEncounterEngine>(), sp.GetRequiredService<IClock>()));
+            sp.GetRequiredService<Fct.Engine.ModernEncounterEngine>(), sp.GetRequiredService<IClock>(),
+            sp.GetRequiredService<ILoggerFactory>().CreateLogger<Fct.Engine.EngineEncounterService>()));
         // Diagnostic: log the engine's live encounter so net10 aggregation is observable + comparable to
         // the satellite's [Capture] line in the unified host log.
         services.AddHostedService<EncounterHeartbeat>();

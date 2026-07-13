@@ -38,7 +38,7 @@ internal static class CompatRuntime
         {
             // Loud, early failure: a mis-staged build would otherwise surface as an opaque
             // "could not load Fct.Compat.Shim" plugin quarantine much later.
-            log.LogWarning(LogEvents.NativePluginFaulted,
+            log.LogWarning(LogEvents.CompatRuntimeStaging,
                 "Compat runtime directory not found at {CompatDir}; legacy (shim) plugins will fail to load",
                 compatDir);
             return;
@@ -50,10 +50,10 @@ internal static class CompatRuntime
             var path = Path.Combine(compatDir, name.Name + ".dll");
             if (!File.Exists(path)) return null;   // not ours — let other resolvers try
 
-            log.LogDebug(LogEvents.NativePluginLoaded, "Resolving {Assembly} from compat runtime", name.Name);
+            log.LogDebug(LogEvents.CompatRuntimeStaging, "Resolving {Assembly} from compat runtime", name.Name);
             return AssemblyLoadContext.Default.LoadFromAssemblyPath(path);
         };
 
-        log.LogInformation(LogEvents.NativePluginsScanning, "Compat runtime enabled from {CompatDir}", compatDir);
+        log.LogInformation(LogEvents.CompatRuntimeStaging, "Compat runtime enabled from {CompatDir}", compatDir);
     }
 }

@@ -5,6 +5,9 @@ using System.IO;
 using System.Linq;
 using System.Reflection;
 using System.Runtime.InteropServices;
+using Fct.Logging;
+using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Logging.Abstractions;
 
 namespace Fct.Host.Plugins;
 
@@ -32,6 +35,11 @@ internal sealed class PluginClassifier
     private const string PluginInterface = "Fct.Abstractions.IPlugin";
     private const string ActPluginInterface = "Advanced_Combat_Tracker.IActPluginV1";
 
+    private readonly ILogger _log;
+
+    public PluginClassifier(ILogger<PluginClassifier>? log = null)
+        => _log = log ?? (ILogger)NullLogger<PluginClassifier>.Instance;
+
     /// <summary>Classify the plugin in <paramref name="pluginDir"/>. When <paramref name="manifest"/>
     /// is non-null it is trusted; otherwise the directory's assemblies are inspected.</summary>
     public PluginClassification Classify(string pluginDir, PluginManifest? manifest)
@@ -48,7 +56,15 @@ internal sealed class PluginClassifier
         {
             Assembly asm;
             try { asm = mlc.LoadFromAssemblyPath(dll); }
-            catch { continue; }
+            catch (Exception ex)
+            {
+                // Non-plugin siblings legitimately fail to load as metadata — but if the DLL the user
+                // actually wanted is the one failing, the only signal today is the generic terminal
+                // throw below. Log each rejection (Debug) so a failed install is diagnosable.
+                _log.LogDebug(LogEvents.NativePluginManifestRejected,
+                    "Skipped '{Dll}' during classification: {Reason}", dll, ex.Message);
+                continue;
+            }
             if (TryInspect(asm, dll, out var c)) return c;
         }
 
@@ -123,25 +139,40 @@ internal sealed class PluginClassifier
     }
 
     // The full name of the first public, concrete type implementing the given interface, or null.
-    private static string? FindEntryType(Assembly asm, string interfaceFullName)
+    private string? FindEntryType(Assembly asm, string interfaceFullName)
     {
         foreach (var type in SafeGetTypes(asm))
         {
             if (type is null || !type.IsPublic || type.IsAbstract || type.IsInterface) continue;
             Type[] ifaces;
             try { ifaces = type.GetInterfaces(); }
-            catch { continue; }
+            catch (Exception ex)
+            {
+                _log.LogDebug(LogEvents.NativePluginManifestRejected,
+                    "Skipped a type in '{Asm}' whose interfaces could not be read: {Reason}", asm.GetName().Name, ex.Message);
+                continue;
+            }
             if (ifaces.Any(i => i.FullName == interfaceFullName))
                 return type.FullName;
         }
         return null;
     }
 
-    private static IEnumerable<Type?> SafeGetTypes(Assembly asm)
+    private IEnumerable<Type?> SafeGetTypes(Assembly asm)
     {
         try { return asm.GetTypes(); }
-        catch (ReflectionTypeLoadException ex) { return ex.Types; }
-        catch { return Array.Empty<Type?>(); }
+        catch (ReflectionTypeLoadException ex)
+        {
+            _log.LogDebug(LogEvents.NativePluginManifestRejected,
+                "Partial type load for '{Asm}': {Reason}", asm.GetName().Name, ex.Message);
+            return ex.Types;
+        }
+        catch (Exception ex)
+        {
+            _log.LogDebug(LogEvents.NativePluginManifestRejected,
+                "Could not enumerate types in '{Asm}': {Reason}", asm.GetName().Name, ex.Message);
+            return Array.Empty<Type?>();
+        }
     }
 
     // Resolver over the plugin's own DLLs plus the runtime + app dirs (so IPlugin / the shim facade /
@@ -149,7 +180,7 @@ internal sealed class PluginClassifier
     // BaseDirectory/RuntimeDirectory supply the runtime + Fct.Abstractions (in a single-file build these
     // are the self-extract directory); the install dir's compat\ supplies the shim facade + aggregation
     // engine that a recompiled-shim plugin binds to.
-    private static PathAssemblyResolver BuildResolver(IEnumerable<string> pluginDlls)
+    private PathAssemblyResolver BuildResolver(IEnumerable<string> pluginDlls)
     {
         var byName = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
         // Plugin DLLs win over runtime/app copies of the same simple name.
@@ -171,10 +202,15 @@ internal sealed class PluginClassifier
         return new PathAssemblyResolver(byName.Values);
     }
 
-    private static IEnumerable<string> SafeEnumerateDlls(string dir)
+    private IEnumerable<string> SafeEnumerateDlls(string dir)
     {
         try { return Directory.EnumerateFiles(dir, "*.dll"); }
-        catch { return Array.Empty<string>(); }
+        catch (Exception ex)
+        {
+            _log.LogDebug(LogEvents.NativePluginManifestRejected,
+                "Could not enumerate resolver dir '{Dir}': {Reason}", dir, ex.Message);
+            return Array.Empty<string>();
+        }
     }
 
     private static string TokenHex(byte[]? token)

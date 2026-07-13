@@ -39,13 +39,17 @@ class Program
         {
             host = BuildHost(args, logStream);
             App.Services = host.Services;
+            App.Host = host;
 
             var log = host.Services.GetRequiredService<ILogger<Program>>();
             log.LogInformation(LogEvents.HostStarting, "FFXIV Combat Tracker host starting (pid {Pid})",
                 Environment.ProcessId);
             HookProcessWideExceptions(log);
 
-            host.Start();
+            // The host is NOT started here: the DI container is fully usable after builder.Build(), so
+            // the window can resolve and paint immediately. The shell starts the host runtime from
+            // MainWindow.OnOpened (after first paint), so no hosted-service work — persisted plugin
+            // loads especially — blocks the window from appearing.
             BuildAvaloniaApp().StartWithClassicDesktopLifetime(args);
             log.LogInformation(LogEvents.HostStopping, "Host shutting down");
             return 0;
@@ -59,7 +63,10 @@ class Program
         {
             if (host is not null)
             {
-                host.StopAsync().GetAwaiter().GetResult();
+                // StopAsync is safe whether or not the host was started (the window can close before
+                // OnOpened brings the runtime online); guard so a shutdown hiccup can't mask the exit.
+                try { host.StopAsync().GetAwaiter().GetResult(); }
+                catch (Exception ex) { Log.Warning(ex, "Host stop faulted during shutdown"); }
                 host.Dispose();   // disposes the Serilog provider → flushes sinks
             }
             Log.CloseAndFlush();

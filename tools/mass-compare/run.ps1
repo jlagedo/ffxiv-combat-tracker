@@ -35,7 +35,7 @@
   ./tools/mass-compare/run.ps1
   ./tools/mass-compare/run.ps1 -MaxLines 200000        # quick: cap lines per file
   ./tools/mass-compare/run.ps1 -SkipOracle             # reuse existing oracle.tsv captures
-  ./tools/mass-compare/run.ps1 -PluginBaseline -FfxivPluginDll "E:\tmp\plugins\FFXIV_ACT_Plugin_3.0.2.3\FFXIV_ACT_Plugin.dll"
+  ./tools/mass-compare/run.ps1 -PluginBaseline -FfxivPluginDll "C:\path\to\FFXIV_ACT_Plugin.dll"
 #>
 [CmdletBinding()]
 param(
@@ -81,7 +81,7 @@ if (-not $SkipOracle) {
 }
 
 # ---- Real-ACT baseline: plugin swings -> real ACT engine -> *.oracle.exports.tsv ----
-if (-not $ActDir) { $ActDir = "E:\dev\Advanced Combat Tracker" }
+if (-not $ActDir) { $ActDir = Join-Path $env:APPDATA "Advanced Combat Tracker" }
 $actExe = Join-Path $ActDir "Advanced Combat Tracker.exe"
 if (-not (Test-Path $actExe)) {
     throw "ACT binary not found at $actExe (set -ActDir or `$env:ACT_DIR). The real-ACT baseline is required for the parity diff."

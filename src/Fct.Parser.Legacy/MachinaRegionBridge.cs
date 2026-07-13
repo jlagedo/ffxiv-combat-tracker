@@ -8,8 +8,8 @@ namespace Fct.Parser.Legacy
     // OverlayPlugin's FFXIVRepository reads the client's FFXIV
     // region from Machina's own singleton (FFXIVRepository.GetMachinaRegion(),
     // Assembly.Load("Machina.FFXIV") -> Machina.FFXIV.Headers.Opcodes.OpcodeManager.Instance.GameRegion,
-    // reflection), NEVER from IDataRepository.GetGameRegion() (confirmed against
-    // E:\dev\OverlayPlugin\OverlayPlugin.Core\Integration\FFXIVRepository.cs:384-403). So a KR/CN client
+    // reflection), NEVER from IDataRepository.GetGameRegion() (confirmed against OverlayPlugin's
+    // OverlayPlugin.Core/Integration/FFXIVRepository.cs). So a KR/CN client
     // needs the forwarded region pushed into Machina's OpcodeManager directly, or OverlayPlugin's own
     // Machina-based packet capture (NetworkParser) keeps decoding with the Global opcode table.
     //
@@ -17,7 +17,7 @@ namespace Fct.Parser.Legacy
     // loads it — the real parser via Costura-embedded resources, or OverlayPlugin's own copy for its
     // network capture) — this bridge is reflection-only, best-effort, and MUST NEVER throw or block the
     // consumer stand-in's Fold(): Machina defaults its own OpcodeManager to Global
-    // (E:\dev\ffxiv\act\machina\Machina.FFXIV\Headers\Opcodes\OpcodeManager.cs SetRegion's own
+    // (Machina.FFXIV's Headers/Opcodes/OpcodeManager.cs SetRegion's own
     // unknown-region fallback), already correct for the primary (Global) audience, so this gates
     // nothing (plan §7) — it matters only for KR/CN clients, and only once Machina.FFXIV happens to be
     // loaded in this process.

@@ -27,7 +27,7 @@ Pipeline (one continuous plugin session, then two aggregations of the same swing
 2. **Real-ACT baseline** — `tools/act-oracle ActOracle --folder <outFolder>` aggregates each
    `<name>.oracle.tsv` through the **real ACT binary**'s `EncounterData`/`CombatantData` and dumps its
    `ExportVariables` to `<name>.oracle.exports.tsv`. Needs the ACT install (default
-   `E:\dev\Advanced Combat Tracker`; set `-ActDir`/`$env:ACT_DIR`).
+   `%APPDATA%\Advanced Combat Tracker`; set `-ActDir`/`$env:ACT_DIR`).
 3. **Our engine** — `Fct.LegacyHost.exe --mass-engine-exports <outFolder>` aggregates the **same**
    `<name>.oracle.tsv` swings through our `Fct.Compat.Act` engine and dumps its `ExportVariables` to
    `<name>.engine.exports.tsv`. The plugin is not loaded here — parsing already happened.

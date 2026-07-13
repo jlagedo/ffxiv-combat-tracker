@@ -3,6 +3,8 @@ using System.Collections.Generic;
 using System.Collections.ObjectModel;
 using System.Collections.Specialized;
 using System.Linq;
+using System.Threading;
+using System.Threading.Tasks;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using Fct.Abstractions;
@@ -46,6 +48,16 @@ public sealed partial class MainViewModel : ObservableObject
     private readonly INotificationHub? _hub;
     private readonly IPluginRegistry? _registry;
     private readonly IUiDispatcher? _dispatcher;
+
+    // In-flight legacy loads keyed by plugin key: each has a watchdog that removes the pending
+    // placeholder if the satellite never announces the plugin (a silent load failure or crash).
+    // Only touched on the UI thread (every mutation goes through PostToUi).
+    private readonly Dictionary<string, CancellationTokenSource> _pendingLoads = new(StringComparer.OrdinalIgnoreCase);
+
+    // How long a legacy plugin may sit in the "Starting" placeholder before we give up and drop it.
+    // Generously past the router's 30 s command-channel wait plus a slow parser/CEF init; an announce
+    // that beats the watchdog cancels it, and a late announce after it re-adds the row anyway.
+    private static readonly TimeSpan PendingLoadTimeout = TimeSpan.FromSeconds(60);
 
     // Raised when the user asks to (re)launch or add a plugin; the window owns those OS interactions.
     public event Action? SatelliteRestartRequested;
@@ -141,6 +153,8 @@ public sealed partial class MainViewModel : ObservableObject
     };
 
     // The registry roster changed (a native/shim plugin loaded or unloaded); add/drop rows by id.
+    // A pending "Starting" placeholder (AddPendingModernPlugin) is left in place — it isn't in the
+    // registry yet — and is upgraded to the real row once its id appears.
     private void OnRosterChanged()
     {
         if (_registry is null) return;
@@ -148,14 +162,79 @@ public sealed partial class MainViewModel : ObservableObject
         {
             var infos = _registry.LoadedPlugins;
             for (int i = ModernPlugins.Count - 1; i >= 0; i--)
-                if (!infos.Any(x => x.Id == ModernPlugins[i].Key))
-                    ModernPlugins.RemoveAt(i);
+            {
+                var row = ModernPlugins[i];
+                if (row.Status == PluginStatus.Loading) continue;   // a load still in flight — keep it
+                if (infos.All(x => x.Id != row.Key)) ModernPlugins.RemoveAt(i);
+            }
             foreach (var info in infos)
-                if (ModernPlugins.All(p => p.Key != info.Id))
+            {
+                var existing = ModernPlugins.FirstOrDefault(p => p.Key == info.Id);
+                if (existing is null)
+                {
                     ModernPlugins.Add(BuildModernRow(info));
+                }
+                else if (existing.Status == PluginStatus.Loading)
+                {
+                    // The pending placeholder's plugin finished loading: replace it with the real row.
+                    var upgraded = BuildModernRow(info);
+                    ModernPlugins[ModernPlugins.IndexOf(existing)] = upgraded;
+                    if (ReferenceEquals(SelectedPlugin, existing)) SelectedPlugin = upgraded;
+                }
+            }
             RaiseRosterChanged();
         });
     }
+
+    // A native / recompiled-shim install just began loading in-process: show a "Starting" placeholder
+    // immediately so the roster isn't silent while InitializeAsync runs. The load is time-boxed by the
+    // host (no watchdog needed): success upgrades the row via OnRosterChanged, failure removes it via
+    // FailModernPlugin.
+    internal void AddPendingModernPlugin(string id, string title)
+    {
+        PostToUi(() =>
+        {
+            var existing = ModernPlugins.FirstOrDefault(p => p.Key == id);
+            if (existing is not null)
+            {
+                existing.Status = PluginStatus.Loading;   // a re-install of a loaded plugin: back to loading
+            }
+            else
+            {
+                var row = BuildPendingModernRow(id, title);
+                ModernPlugins.Add(row);
+                if (SelectedPlugin is null) SelectedPlugin = row;
+            }
+            RaiseRosterChanged();
+        });
+    }
+
+    // An in-process load faulted or was rejected: drop its placeholder. Guarded on the Loading state so
+    // a row that actually loaded (raced ahead via OnRosterChanged) is left alone. The host already
+    // surfaced the fault (quarantine notification), so no extra toast here.
+    internal void FailModernPlugin(string id)
+    {
+        PostToUi(() =>
+        {
+            var row = ModernPlugins.FirstOrDefault(p => p.Key == id);
+            if (row is null || row.Status != PluginStatus.Loading) return;
+            ModernPlugins.Remove(row);
+            if (ReferenceEquals(SelectedPlugin, row))
+                SelectedPlugin = ModernPlugins.FirstOrDefault() ?? (PluginViewModel?)LegacyPlugins.FirstOrDefault();
+            RaiseRosterChanged();
+        });
+    }
+
+    private static PluginViewModel BuildPendingModernRow(string id, string title) => new()
+    {
+        Name = string.IsNullOrWhiteSpace(title) ? id : title,
+        Role = Resources.Plugins_ModernPluginRole,
+        Version = "—",
+        Kind = PluginKind.Native,
+        Key = id,
+        Description = Resources.Plugins_ModernPluginDescription,
+        Status = PluginStatus.Loading,
+    };
 
     private void PostToUi(Action action)
     {
@@ -411,12 +490,54 @@ public sealed partial class MainViewModel : ObservableObject
             : string.Format(Resources.Notify_EngineReady_Many, plugins.Count));
     }
 
+    // A legacy load was just requested (install / restart replay / relink): show a "Starting"
+    // placeholder immediately so the roster isn't silent during the seconds between the request and
+    // the satellite's PLUGIN announce. A watchdog drops the placeholder if that announce never comes.
+    internal void AddPendingLegacyPlugin(string key, string title)
+    {
+        PostToUi(() =>
+        {
+            var existing = LegacyPlugins.FirstOrDefault(x => x.Key == key);
+            if (existing is not null)
+            {
+                // A row already exists (e.g. a re-install / relink): flip it back to loading in place.
+                existing.Status = PluginStatus.Loading;
+                existing.HasNativeConfig = false;
+                existing.Hwnd = IntPtr.Zero;
+            }
+            else
+            {
+                var row = BuildPendingLegacyRow(key, title);
+                LegacyPlugins.Add(row);
+                if (SelectedPlugin is null) SelectedPlugin = row;
+            }
+            StartLoadWatchdog(key);
+            RefreshLegacyDerived();
+            RaiseRosterChanged();
+        });
+    }
+
     // A legacy plugin was loaded live on the satellite after startup (install / restart replay /
-    // relink). A stale row under the same key (e.g. its "files missing" placeholder) is replaced.
+    // relink). A stale row under the same key (e.g. its "files missing" placeholder, or the "Starting"
+    // placeholder from AddPendingLegacyPlugin) is replaced.
     internal void AddLegacyPlugin(SatellitePlugin p)
     {
         PostToUi(() =>
         {
+            ClearPending(p.Key);   // the announce arrived; the watchdog is no longer needed
+
+            // The satellite creates the plugin's host window before init runs, so a failed init still
+            // announces a PLUGIN frame (with a live Hwnd) — but with a failure status. Treat that as a
+            // failure and drop the row rather than showing it as Running.
+            if (IsLoadFailure(p.Status))
+            {
+                RemoveLegacyRowCore(p.Key);
+                RefreshLegacyDerived();
+                RaiseRosterChanged();
+                PublishLoadFailed(p.Key, p.Title);
+                return;
+            }
+
             var row = BuildLegacyRow(p);
             var existing = LegacyPlugins.FirstOrDefault(x => x.Key == p.Key);
             if (existing is not null)
@@ -435,6 +556,96 @@ public sealed partial class MainViewModel : ObservableObject
             if (SelectedPlugin is null) SelectedPlugin = row;
             RaiseRosterChanged();
         });
+    }
+
+    // The satellite couldn't even dispatch the load (process wouldn't launch / command channel never
+    // came up) — no PLUGIN announce will follow, so drop the pending placeholder now.
+    internal void FailPendingLegacyPlugin(string key)
+        => PostToUi(() => RemovePendingRow(key));
+
+    // The watchdog elapsed: the plugin never announced (a silent load failure / crash). Same handling.
+    private void TimeoutPendingLegacyPlugin(string key) => RemovePendingRow(key);
+
+    // Remove a placeholder whose load failed and tell the user. Guarded on the Loading state: if the
+    // plugin actually announced in the meantime (a slow load beating the watchdog), leave its row.
+    private void RemovePendingRow(string key)
+    {
+        ClearPending(key);
+        var row = LegacyPlugins.FirstOrDefault(x => x.Key == key);
+        if (row is null || row.Status != PluginStatus.Loading) return;
+        var title = row.Name;
+        RemoveLegacyRowCore(key);
+        RefreshLegacyDerived();
+        RaiseRosterChanged();
+        _hub?.Publish(NotificationSeverity.Error, Resources.Notify_Source_Plugins,
+            Resources.Notify_PluginLoadFailedTitle, string.Format(Resources.Notify_PluginLoadFailedBody, title));
+    }
+
+    private void PublishLoadFailed(string key, string title)
+        => _hub?.Publish(NotificationSeverity.Error, Resources.Notify_Source_Plugins,
+            Resources.Notify_PluginLoadFailedTitle,
+            string.Format(Resources.Notify_PluginLoadFailedBody, LegacyPluginCatalog.For(key, title).Name));
+
+    // Remove a legacy row and repair the selection. UI-thread only; callers refresh + raise around it.
+    private void RemoveLegacyRowCore(string key)
+    {
+        var row = LegacyPlugins.FirstOrDefault(x => x.Key == key);
+        if (row is null) return;
+        LegacyPlugins.Remove(row);
+        if (ReferenceEquals(SelectedPlugin, row))
+            SelectedPlugin = LegacyPlugins.FirstOrDefault() ?? (PluginViewModel?)ModernPlugins.FirstOrDefault();
+    }
+
+    // The status text a satellite reports for a load it couldn't complete ("load failed" / "DLL not found").
+    private static bool IsLoadFailure(string? status)
+        => status is not null
+           && (status.Contains("fail", StringComparison.OrdinalIgnoreCase)
+               || status.Contains("not found", StringComparison.OrdinalIgnoreCase));
+
+    // Start (or restart) the per-key watchdog that removes the placeholder if no announce arrives.
+    private void StartLoadWatchdog(string key)
+    {
+        ClearPending(key);
+        var cts = new CancellationTokenSource();
+        _pendingLoads[key] = cts;
+        _ = LoadWatchdogAsync(key, cts);
+    }
+
+    private async Task LoadWatchdogAsync(string key, CancellationTokenSource cts)
+    {
+        try { await Task.Delay(PendingLoadTimeout, cts.Token).ConfigureAwait(false); }
+        catch (OperationCanceledException) { return; }
+        PostToUi(() =>
+        {
+            // Only fire if THIS watchdog is still the active one for the key — a re-load would have
+            // replaced it in _pendingLoads.
+            if (_pendingLoads.TryGetValue(key, out var current) && ReferenceEquals(current, cts))
+                TimeoutPendingLegacyPlugin(key);
+        });
+    }
+
+    // Cancel + drop the watchdog for a key (its load resolved, one way or another). UI-thread only.
+    private void ClearPending(string key)
+    {
+        if (!_pendingLoads.TryGetValue(key, out var cts)) return;
+        _pendingLoads.Remove(key);
+        cts.Cancel();
+        cts.Dispose();
+    }
+
+    private static PluginViewModel BuildPendingLegacyRow(string key, string title)
+    {
+        var meta = LegacyPluginCatalog.For(key, title);
+        return new PluginViewModel
+        {
+            Name = meta.Name,
+            Role = meta.Role,
+            Description = meta.Description,
+            Version = "—",
+            Kind = PluginKind.Legacy,
+            Key = key,
+            Status = PluginStatus.Loading,
+        };
     }
 
     // A persisted install-by-reference plugin whose source files are gone: show a row the user can
@@ -465,11 +676,9 @@ public sealed partial class MainViewModel : ObservableObject
     {
         PostToUi(() =>
         {
-            var row = LegacyPlugins.FirstOrDefault(x => x.Key == key);
-            if (row is null) return;
-            LegacyPlugins.Remove(row);
-            if (ReferenceEquals(SelectedPlugin, row))
-                SelectedPlugin = LegacyPlugins.FirstOrDefault() ?? (PluginViewModel?)ModernPlugins.FirstOrDefault();
+            ClearPending(key);   // an unload mid-load kills the placeholder's watchdog
+            if (LegacyPlugins.All(x => x.Key != key)) return;
+            RemoveLegacyRowCore(key);
             RefreshLegacyDerived();
             RaiseRosterChanged();
         });

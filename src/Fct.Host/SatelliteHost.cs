@@ -385,14 +385,14 @@ public sealed class SatelliteHost
     {
         if (_session is null)
         {
-            _log.LogWarning(LogEvents.BridgeFrameMalformed, "SUBSCRIBE from '{Id}' ignored: no session wired", _satelliteId);
+            _log.LogWarning(LogEvents.BridgeNotWired, "SUBSCRIBE from '{Id}' ignored: no session wired", _satelliteId);
             return;
         }
         if (!SatelliteProtocol.TryParseSubscribe(line, out var tokens)) return;
         var filter = StreamCatalog.ToFilter(tokens);
         if (filter is null)
         {
-            _log.LogWarning(LogEvents.BridgeFrameMalformed,
+            _log.LogWarning(LogEvents.BridgeNotWired,
                 "SUBSCRIBE from '{Id}' matched no known streams: [{Streams}]", _satelliteId, string.Join(",", tokens));
             return;
         }
@@ -404,9 +404,9 @@ public sealed class SatelliteHost
             // so this (bridge-pump) thread never writes to the command pipe itself — a stalled satellite
             // reader must never be able to wedge the pump (it is also the event-pipe drainer).
             _egress = new SatelliteEgress(_satelliteId, _session.Events, filter, SendDownstream,
-                prime: BuildPrimeEvents(tokens));
+                prime: BuildPrimeEvents(tokens), log: _log);
         }
-        _log.LogInformation(LogEvents.BridgeHandshake,
+        _log.LogInformation(LogEvents.BridgeSubscribed,
             "Satellite '{Id}' subscribed to downstream streams [{Streams}]", _satelliteId, string.Join(",", tokens));
     }
 
@@ -460,7 +460,7 @@ public sealed class SatelliteHost
         }
         catch (Exception ex)
         {
-            _log.LogWarning(LogEvents.BridgeFrameMalformed, ex, "Snapshot priming for '{Id}' failed", _satelliteId);
+            _log.LogWarning(LogEvents.BridgeNotWired, ex, "Snapshot priming for '{Id}' failed", _satelliteId);
         }
         return events;
     }
@@ -557,7 +557,7 @@ public sealed class SatelliteHost
     {
         if (_registry is null)
         {
-            _log.LogWarning(LogEvents.BridgeFrameMalformed, "Callback registration from '{Id}' ignored: no registry wired", _satelliteId);
+            _log.LogWarning(LogEvents.BridgeNotWired, "Callback registration from '{Id}' ignored: no registry wired", _satelliteId);
             return;
         }
         lock (_cbLock)
@@ -567,7 +567,7 @@ public sealed class SatelliteHost
                 arg => SendCommand(SatelliteProtocol.FormatInvokeCb(name, arg?.ToString() ?? "")),
                 owner: this, allowDuplicate: true);
         }
-        _log.LogInformation(LogEvents.BridgeHandshake, "Satellite '{Id}' registered named callback '{Name}'", _satelliteId, name);
+        _log.LogInformation(LogEvents.BridgeSubscribed, "Satellite '{Id}' registered named callback '{Name}'", _satelliteId, name);
     }
 
     private void UnregisterCallbackProxy(string name)
@@ -587,7 +587,7 @@ public sealed class SatelliteHost
     {
         if (_audio is null)
         {
-            _log.LogWarning(LogEvents.BridgeFrameMalformed, "Audio sink registration from '{Id}' ignored: no audio output wired", _satelliteId);
+            _log.LogWarning(LogEvents.BridgeNotWired, "Audio sink registration from '{Id}' ignored: no audio output wired", _satelliteId);
             return;
         }
         bool tts = caps == "tts" || caps == "both";
@@ -601,7 +601,7 @@ public sealed class SatelliteHost
             if (_sinkTts || _sinkSound)
                 _audioSink = _audio.RegisterSink(new SatelliteAudioSinkProxy(_sinkTts, _sinkSound, SendCommand), priority: 10, terminal: true);
         }
-        _log.LogInformation(LogEvents.BridgeHandshake,
+        _log.LogInformation(LogEvents.BridgeSubscribed,
             "Satellite '{Id}' audio sink now tts={Tts} sound={Sound}", _satelliteId, _sinkTts, _sinkSound);
     }
 
@@ -674,6 +674,10 @@ public sealed class SatelliteHost
                     HandleSubscribe(line);
                 else if (TryHandleServiceUpstream(line))
                     continue;
+                else if (line.StartsWith(GameEventFrame.Prefix, StringComparison.Ordinal))
+                    // An EVT-prefixed frame that TryEmitGameEvent could not parse: a real decode failure,
+                    // not a merely-unknown frame. Warning + the dedicated id so it is not lost in Debug.
+                    _log.LogWarning(LogEvents.BridgeEventDecodeFailed, "Malformed game-event frame from satellite: {Frame}", line);
                 else
                     _log.LogDebug(LogEvents.BridgeFrameMalformed, "Unrecognized bridge frame after handshake: {Frame}", line);
             }

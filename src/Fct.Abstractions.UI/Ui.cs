@@ -46,9 +46,16 @@ namespace Fct.Abstractions.UI
     /// <summary>UI-thread marshaling for plugins updating views from background threads.</summary>
     public interface IUiDispatcher
     {
+        /// <summary>True when the caller is already on the UI thread (the modern form of <c>!InvokeRequired</c>).</summary>
         bool CheckAccess();
+
+        /// <summary>Queue <paramref name="action"/> to run on the UI thread; returns immediately (fire-and-forget).</summary>
         void Post(Action action);
+
+        /// <summary>Run <paramref name="action"/> on the UI thread and await its completion.</summary>
         Task InvokeAsync(Action action);
+
+        /// <summary>Run <paramref name="func"/> on the UI thread and await its result.</summary>
         Task<T> InvokeAsync<T>(Func<T> func);
     }
 

@@ -34,7 +34,7 @@ The pipe-delimited log line exists only because ACT had to be game-agnostic. Dro
 multi-game support and that whole string round-trip
 (packet → struct → string → regex → object → json) becomes optional.
 
-The reference decompiles for all of this live under `E:\dev` (see §13).
+The read-only reference sources for all of this are listed in §13.
 
 ---
 
@@ -246,9 +246,9 @@ through it.
 
 ---
 
-## 6. The v1 compat surface (the build scope, from the decompile)
+## 6. The v1 compat surface (the build scope)
 
-Reproduce faithfully (signatures verified against `E:\dev\ACT-decompiled`):
+Reproduce faithfully (signatures verified against the Advanced Combat Tracker reference decompilation):
 
 - **Plugin host:** `IActPluginV1.InitPlugin(TabPage, Label)` / `DeInitPlugin()`;
   assembly scan + load; `ActPluginData` entries in `ActGlobals.oFormActMain.ActPlugins`.
@@ -429,15 +429,15 @@ architectural weight beyond that routing:
 
 ## 13. Reference sources
 
-**Read-only references, never modified** (two separate decompiles — do not conflate):
+**Read-only references, never modified** (local sibling checkouts — two separate reference surfaces,
+do not conflate):
 
-- `E:\dev\OverlayPlugin` — the current ngld OverlayPlugin source (net48). Key:
+- **OverlayPlugin** — the current ngld OverlayPlugin source (net48). Key:
   `OverlayPlugin.Core/NetworkProcessors/`, `Integration/FFXIVRepository.cs`,
   `WebSocket/WSServer.cs`, `resources/opcodes.jsonc`.
-- `E:\dev\ACT-decompiled` — **Advanced Combat Tracker only** (the compat-surface oracle):
+- **Advanced Combat Tracker** (the compat-surface oracle):
   `Advanced_Combat_Tracker/{Forms/FormActMain.cs, ActGlobals.cs, IActPluginV1.cs, Models/, Events/}`,
-  plus `FFXIV_ACT_Plugin_ARCHITECTURE.md` (narrative of how the parser feeds ACT).
-- `E:\dev\FFXIV_ACT_Plugin\ffxiv_act_plugin\decompiled\` — the **FFXIV_ACT_Plugin** decompile
-  (`...common`, `...network`, `...parse`, `...memory`, `...logfile`, `machina.ffxiv`). For
-  understanding the legacy stack we host unmodified **only** — never a source to port parsing,
-  swing-production, or DoT/HoT/shield logic from.
+  plus a narrative of how the parser feeds ACT.
+- **FFXIV_ACT_Plugin** (`...common`, `...network`, `...parse`, `...memory`, `...logfile`,
+  `machina.ffxiv`). For understanding the legacy stack we host unmodified **only** — never a source
+  to port parsing, swing-production, or DoT/HoT/shield logic from.

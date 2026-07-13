@@ -29,4 +29,13 @@
     <Copyright>Copyright © 2026</Copyright>
   </PropertyGroup>
 
+  <!-- Shared version (SemVer 2.0). VersionSuffix marks pre-releases and is overridable per-build
+       (e.g. /p:VersionSuffix=alpha.2). Empty suffix ships the stable 1.0.0. The SDK derives Version
+       (1.0.0-alpha.1, the NuGet package version), AssemblyVersion/FileVersion (1.0.0.0 — suffix
+       stripped), and InformationalVersion (1.0.0-alpha.1+<git-sha>) from these. -->
+  <PropertyGroup>
+    <VersionPrefix>1.0.0</VersionPrefix>
+    <VersionSuffix>alpha.1</VersionSuffix>
+  </PropertyGroup>
+
 </Project>

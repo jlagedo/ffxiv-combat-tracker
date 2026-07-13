@@ -24,15 +24,11 @@ Design docs — **read before proposing changes:**
 
 - [`docs/NORTH-STAR.md`](docs/NORTH-STAR.md) — the fixed goals and scope boundary. Every other
   doc and decision serves this; conflicts resolve in its favor.
-- [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md) — the full design.
-- [`docs/DATA-FLOW.md`](docs/DATA-FLOW.md) — how data flows through the real upstream stack
-  (FFXIV_ACT_Plugin → ACT → OverlayPlugin) and the compat seams we reproduce.
+- [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md) — the full design: dataflow through the real
+  upstream stack (§5), the forward typed plugin surface + migration ladder (§7, §10), the
+  satellite-isolation boundary (§3c), and the load-bearing compat seams (§12).
 - [`docs/ACT-INTERFACE-MAP.md`](docs/ACT-INTERFACE-MAP.md) — the host↔plugin contract: every
   `Advanced_Combat_Tracker` member each plugin consumes, and the facade gaps.
-- [`docs/PLUGIN-API.md`](docs/PLUGIN-API.md) — the forward, typed plugin surface and migration path.
-- [`docs/TESTING.md`](docs/TESTING.md) — the parity/oracle testing model.
-- [`docs/ISOLATION-PLAN.md`](docs/ISOLATION-PLAN.md) — the satellite-isolation invariants and the
-  phased, e2e-gated implementation plan (**the live status of the topology build-out**).
 
 ## Three hard directives (these gate every decision)
 
@@ -62,7 +58,7 @@ Design docs — **read before proposing changes:**
   package's `Fct.Host/SatelliteSupervisor`-supervised satellite with the resolved role +
   subscriptions, and forwards its `LOADPLUGIN`; parser, OverlayPlugin (+ cactbot, with its whole
   CEF/Fleck stack in-satellite), Triggernometry, and Discord-Triggers are isolated today — Hojoring
-  isolation is deferred to P10 ([`docs/ISOLATION-PLAN.md`](docs/ISOLATION-PLAN.md)). `AssemblyLoadContext` isolates net10 plugins
+  isolation is deferred to P10. `AssemblyLoadContext` isolates net10 plugins
   from each other — it is **not** cross-runtime. The entire net48 leg — `Fct.LegacyHost`, the
   bridge, `Fct.Compat.Act` — is **transitional scaffolding**: each satellite exists only until its
   plugin's owner ships a net10 build, and the satellite runtime is deleted once the last plugin has
@@ -84,7 +80,7 @@ Design docs — **read before proposing changes:**
   the whole runtime; the shell supplies the Avalonia-bound pieces (`IUiDispatcher`,
   `LegacyPluginHostFactory`, localized `ISatelliteNotificationText`). ALC is isolation, **not** a fault
   boundary — a hard native crash still takes the host. `samples/Fct.SamplePlugin` is the reference
-  native plugin. Design: [`docs/PLUGIN-API.md`](docs/PLUGIN-API.md).
+  native plugin. Design: [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md) §7 (forward surface) + §10 (migration ladder).
 - **The net10 legacy compat runtime is an opt-in staged package, not a static reference.** `Fct.App`
   carries **no** ACT-impersonation identity in its `deps.json`: `Fct.Compat.Shim` + its two facades
   (`Advanced Combat Tracker`, `FFXIV_ACT_Plugin.Common`) + `Fct.Aggregation` are staged under `compat\`
@@ -102,7 +98,7 @@ Design docs — **read before proposing changes:**
   **never** decode log lines or port its parsing/swing/DoT-HoT-shield logic (see "Reference
   sources"). Parity is two-axis: our engine == real ACT fed identical plugin swings (empirical
   oracle, bit-for-bit), and every replica == the host engine fed the identical routed stream.
-  Mechanism: [`docs/DATA-FLOW.md`](docs/DATA-FLOW.md) + [`docs/TESTING.md`](docs/TESTING.md).
+  Mechanism: [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md) §5 (dataflow) + §12 (compat seams).
 - **`Fct.Abstractions` multi-targets `net48;net10`** so the same record/interface types exist on
   both sides of the bridge.
 
@@ -121,8 +117,8 @@ Design docs — **read before proposing changes:**
 | `Fct.App` | net10 | the **Avalonia shell + composition root** (MVVM): control panel, `Views/ViewModels`, localization (`Lang/`), Serilog bootstrap, and the DI wiring that binds `Fct.Host` to the UI (`IUiDispatcher`, the reflective `LegacyPluginHostFactory`, `ISatelliteNotificationText`, `EmbeddedSatelliteView`). Enables the compat runtime (`CompatRuntime.Enable`) and stages the legacy compat package under `compat\` and the net48 satellite under `satellite\` — it bundles **no** plugins and holds **no** static reference to `Fct.Compat.Shim`. |
 | `Fct.LegacyHost` | net48 | the satellite: ACT facade host + `IActPluginV1` loader, **one real plugin package per process** (`--role producer` hosts the parser; `--role consumer` hosts one consumer plugin on the P5/P6 projection; the role-gated `LOADPLUGIN` guard enforces it); the net48 end of the bridge — taps what its plugin produces, projects what the host fans in. |
 | `Fct.Parser.Legacy` | net48 | wraps the real FFXIV_ACT_Plugin. `WrappedFfxivPlugin` forwards `DataRepository`/`_iocContainer`/lifecycle to the real instance; `RingBufferDataSubscription` (`IDataSubscription` + `IRawPacketSource`) replaces the plugin's per-subscriber `BeginInvoke` fan-out with one bounded ring + single dispatch thread (~250× faster dispatch). Also holds the **synthetic parser stand-in** for a parser-free consumer satellite (`SyntheticFfxivPlugin` + `ConsumerDataSubscription`/`ConsumerDataRepository`), reached through the SDK-type-free `IConsumerStandIn` seam so the plugin-free path never JITs SDK types until the stand-in is activated. |
-| `Fct.Compat.Act` | net48 | **the ACT facade** (host surface, hosted in LegacyHost): `FormActMain`/`ActGlobals`/`SettingsSerializer`/`ActPluginData` WinForms shims + the fake-`Advanced Combat Tracker` identity. References `Fct.Aggregation` for the engine and **type-forwards** its aggregation types (`EncounterData`/`CombatantData`/…) into the `Advanced Combat Tracker` identity so the real precompiled plugins' assembly-qualified type references resolve. Parity: see load-bearing facts + `docs/TESTING.md`. |
-| `Fct.Compat.Shim` | net10-windows | recompile-shim adapter runtime re-projecting the legacy ACT/SDK programming model onto `IPluginHost`; hosts a recompiled legacy plugin (`LegacyPluginHost : IPlugin`), wires `ActGlobals.oFormActMain`, maps the SDK `IDataSubscription`/`IDataRepository`/`Combatant` surface. The in-process net10 legacy path — distinct from the net48 `Fct.Compat.Act`. Not statically referenced by `Fct.App`: staged under `compat\` and resolved into the default ALC by `CompatRuntime`. Design: [`docs/PLUGIN-API.md`](docs/PLUGIN-API.md). |
+| `Fct.Compat.Act` | net48 | **the ACT facade** (host surface, hosted in LegacyHost): `FormActMain`/`ActGlobals`/`SettingsSerializer`/`ActPluginData` WinForms shims + the fake-`Advanced Combat Tracker` identity. References `Fct.Aggregation` for the engine and **type-forwards** its aggregation types (`EncounterData`/`CombatantData`/…) into the `Advanced Combat Tracker` identity so the real precompiled plugins' assembly-qualified type references resolve. Parity: see load-bearing facts + `docs/ARCHITECTURE.md` §12. |
+| `Fct.Compat.Shim` | net10-windows | recompile-shim adapter runtime re-projecting the legacy ACT/SDK programming model onto `IPluginHost`; hosts a recompiled legacy plugin (`LegacyPluginHost : IPlugin`), wires `ActGlobals.oFormActMain`, maps the SDK `IDataSubscription`/`IDataRepository`/`Combatant` surface. The in-process net10 legacy path — distinct from the net48 `Fct.Compat.Act`. Not statically referenced by `Fct.App`: staged under `compat\` and resolved into the default ALC by `CompatRuntime`. Design: [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md) §7 + §10. |
 | `Fct.Compat.Shim.ActFacade` | net10-windows | assembly `Advanced Combat Tracker`: the POCO `ActGlobals`/`FormActMain` host surface a recompiled plugin binds to (net10 counterpart of `Fct.Compat.Act`), forwarding onto `IPluginHost`. References `Fct.Aggregation` for the engine (recompiled plugins bind the engine types via the transitive reference, so no type-forwarders are needed on this side). |
 | `Fct.Compat.Shim.SdkFacade` | net10 | assembly `FFXIV_ACT_Plugin.Common`: re-declares the SDK surface (`IDataSubscription`/`IDataRepository` + `Combatant`/`Player`/`NetworkBuff`/`PartyType`) a recompiled plugin binds to. No behavior — the `Fct.Compat.Shim` adapters map it onto the host. |
 | `Fct.StreamProbe` | net48 | **dev-only** diagnostic plugin that taps the `MasterSwing`/raw-packet stream; **not bundled or loaded** by the shipped app (`FacadeHost.LoadProbe` is a dev seam). |
@@ -142,22 +138,23 @@ multi-targeted `Fct.Bridge.Contracts` + `Fct.Logging.Contracts` libraries, refer
 
 ## Reference sources (read-only)
 
-**Never modify anything under** the `E:\dev` source trees below. The ACT members each plugin consumes
-are mapped in [`docs/ACT-INTERFACE-MAP.md`](docs/ACT-INTERFACE-MAP.md).
+**Never modify** the third-party upstream sources studied for compat — they are local sibling checkouts
+(see the global CLAUDE.md for where local repos live), read-only and never redistributed. The ACT members
+each plugin consumes are mapped in [`docs/ACT-INTERFACE-MAP.md`](docs/ACT-INTERFACE-MAP.md).
 
-- `E:\dev\OverlayPlugin` — ngld OverlayPlugin / MiniParse / cactbot host (net48).
-- `E:\dev\Triggernometry` — trigger engine (net48). ACT contact isolated in `Source\TriggernometryProxy\ProxyPlugin.cs`.
-- `E:\dev\ACT-Discord-Triggers` — Discord audio/TTS bridge (net48). Hijacks ACT's `PlayTtsMethod`/`PlaySoundMethod`; consumes no combat data.
-- `E:\dev\ACT.Hojoring` — Japanese plugin suite (net48). Heaviest consumer; also drives ACT's built-in `oFormSpellTimers`.
+- **OverlayPlugin** — ngld OverlayPlugin / MiniParse / cactbot host (net48).
+- **Triggernometry** — trigger engine (net48). ACT contact isolated in `Source\TriggernometryProxy\ProxyPlugin.cs`.
+- **ACT-Discord-Triggers** — Discord audio/TTS bridge (net48). Hijacks ACT's `PlayTtsMethod`/`PlaySoundMethod`; consumes no combat data.
+- **ACT.Hojoring** — Japanese plugin suite (net48). Heaviest consumer; also drives ACT's built-in `oFormSpellTimers`.
 
-**Two separate decompiles — do not conflate:**
+**Two separate reference surfaces — do not conflate:**
 
-- **`E:\dev\ACT-decompiled`** is **Advanced Combat Tracker** only —
-  the generic host that does MasterSwing collection + encounter **aggregation**; no FFXIV parsing.
-  With the empirical oracle (ACT's captured output), it is the authority for **our** aggregation behavior.
-- **`E:\dev\FFXIV_ACT_Plugin\ffxiv_act_plugin\decompiled\`** is the **FFXIV_ACT_Plugin** decompile,
-  here **only** to understand the legacy stack we host (load/lifecycle, the `FFXIV_ACT_Plugin.Common`
-  surface we facade). **Never** a source to port parsing/swing/DoT-HoT-shield logic from.
+- **Advanced Combat Tracker** — the generic host that does MasterSwing collection + encounter
+  **aggregation**; no FFXIV parsing. With the empirical oracle (ACT's captured output), it is the
+  authority for **our** aggregation behavior.
+- **FFXIV_ACT_Plugin** — studied **only** to understand the legacy stack we host (load/lifecycle, the
+  `FFXIV_ACT_Plugin.Common` surface we facade). **Never** a source to port parsing/swing/DoT-HoT-shield
+  logic from.
 
 ## Conventions
 
@@ -176,7 +173,7 @@ are mapped in [`docs/ACT-INTERFACE-MAP.md`](docs/ACT-INTERFACE-MAP.md).
 ## Real binaries & the ACT facade
 
 - **Real binaries:** FFXIV_ACT_Plugin.dll loads from `%APPDATA%\Advanced Combat Tracker\Plugins\`;
-  the ACT install + OverlayPlugin 0.19.101 live at `E:\dev\Advanced Combat Tracker\`. Nothing is bundled
+  the ACT install + OverlayPlugin 0.19.101 live in a local Advanced Combat Tracker install. Nothing is bundled
   and nothing is boot-loaded: the satellite starts empty and loads a real plugin **in place** only when
   the user installs it through the catalog (host `LOADPLUGIN` command). A dev standalone run
   (`Fct.LegacyHost.exe` with no `--bridge`) auto-loads FFXIV_ACT_Plugin + OverlayPlugin for convenience.
@@ -230,7 +227,7 @@ dotnet build src\Fct.App\Fct.App.csproj   # net10 host; StageSatellite + StageCo
 `Fct.App` (net10, Avalonia 12) build-depends on `Fct.LegacyHost` (net48, x64, WinForms) via a
 `ReferenceOutputAssembly=false` ProjectReference. `Fct.FlowTests` is the headless legacy↔native
 contract suite on the `Fct.Abstractions.Testing` fakes (no satellite/CEF/live game). Data-dependent
-tests skip without `FFXIV_ACT_Plugin.dll` installed. Details: [`docs/TESTING.md`](docs/TESTING.md).
+tests skip without `FFXIV_ACT_Plugin.dll` installed.
 
 ### Distributable builds — `build/` (C# / Bullseye)
 

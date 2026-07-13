@@ -15,7 +15,12 @@ using System.Text.Json;
 // plugin binds INTO an ACT-ecosystem provider (ACT host, FFXIV_ACT_Plugin, or
 // another plugin). No plugin is executed. Third-party targets are filtered out.
 
-var root = args.Length > 0 ? args[0] : @"E:\tmp\plugins";
+if (args.Length < 1)
+{
+    Console.Error.WriteLine("usage: CompatSurvey <plugins-root> [out-dir]");
+    return 1;
+}
+var root = args[0];
 var outDir = args.Length > 1 ? args[1] : Path.Combine(AppContext.BaseDirectory, "out");
 Directory.CreateDirectory(outDir);
 
@@ -246,6 +251,8 @@ Console.WriteLine($"Static ecosystem edges: {staticEdges.Count}");
 Console.WriteLine($"Dynamic reflection sites: {reflSites.Count}");
 Console.WriteLine($"Dynamic string candidates: {dynStrings.Count}");
 Console.WriteLine($"Output -> {outDir}");
+
+return 0;
 
 // ============================ helpers ============================
 static void Bump(Dictionary<string, StaticEdge> d, StaticEdge e)

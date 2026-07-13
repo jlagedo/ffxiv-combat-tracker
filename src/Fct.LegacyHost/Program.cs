@@ -1553,14 +1553,14 @@ namespace Fct.LegacyHost
                 var tts = ActGlobals.oFormActMain?.PlayTtsMethod;
                 if (tts != null)
                     System.Threading.ThreadPool.QueueUserWorkItem(_ =>
-                    { try { tts(speakText); } catch (Exception ex) { _log.LogError(LogEvents.SatelliteBooting, ex, "Relayed TTS sink threw"); } });
+                    { try { tts(speakText); } catch (Exception ex) { _log.LogError(LogEvents.ActException, ex, "Relayed TTS sink threw"); } });
             }
             else if (SatelliteProtocol.TryParsePlaySound(line, out var sndPath, out var sndVol))
             {
                 var snd = ActGlobals.oFormActMain?.PlaySoundMethod;
                 if (snd != null)
                     System.Threading.ThreadPool.QueueUserWorkItem(_ =>
-                    { try { snd(sndPath, sndVol); } catch (Exception ex) { _log.LogError(LogEvents.SatelliteBooting, ex, "Relayed sound sink threw"); } });
+                    { try { snd(sndPath, sndVol); } catch (Exception ex) { _log.LogError(LogEvents.ActException, ex, "Relayed sound sink threw"); } });
             }
             // Host-relayed named-callback invoke (P6): the host fanned an invoke to this satellite (it owns
             // the callback). Dispatch to the local delegate(s) off-thread — the callback owns its own
@@ -1570,7 +1570,7 @@ namespace Fct.LegacyHost
                 var act = ActGlobals.oFormActMain;
                 if (act != null)
                     System.Threading.ThreadPool.QueueUserWorkItem(_ =>
-                    { try { act.InvokeNamedCallbackLocal(cbName, cbArg); } catch (Exception ex) { _log.LogError(LogEvents.SatelliteBooting, ex, "Relayed named callback threw"); } });
+                    { try { act.InvokeNamedCallbackLocal(cbName, cbArg); } catch (Exception ex) { _log.LogError(LogEvents.ActException, ex, "Relayed named callback threw"); } });
             }
         }
 

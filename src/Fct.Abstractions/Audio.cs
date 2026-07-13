@@ -12,7 +12,10 @@ namespace Fct.Abstractions
     /// </summary>
     public interface IAudioOutput
     {
+        /// <summary>Speak <paramref name="text"/> through every registered sink (replaces ACT's <c>PlayTtsMethod</c>).</summary>
         void Speak(string text, AudioOptions? options = null);
+
+        /// <summary>Play the sound file at <paramref name="filePath"/> through every registered sink (replaces ACT's <c>PlaySoundMethod</c>).</summary>
         void Play(string filePath, int volume = 100);
 
         /// <summary>
@@ -30,7 +33,10 @@ namespace Fct.Abstractions
     /// </summary>
     public interface IAudioSink
     {
+        /// <summary>Render <paramref name="text"/> as speech. Return without blocking the producer.</summary>
         ValueTask SpeakAsync(string text, AudioOptions options, CancellationToken ct);
+
+        /// <summary>Play the sound file at <paramref name="filePath"/>. Return without blocking the producer.</summary>
         ValueTask PlayAsync(string filePath, int volume, CancellationToken ct);
     }
 
@@ -40,6 +46,7 @@ namespace Fct.Abstractions
     /// <summary>TTS/sound options. <see cref="Volume"/> is 0–100.</summary>
     public sealed record AudioOptions(int Volume = 100, string? Voice = null, float Rate = 1f)
     {
+        /// <summary>Shared default options (volume 100, no voice override, rate 1, both channels, async).</summary>
         public static readonly AudioOptions Default = new AudioOptions();
 
         /// <summary>Output channel (TTSYukkuri routes to L/R/Both). Defaults to <see cref="AudioChannel.Both"/>.</summary>

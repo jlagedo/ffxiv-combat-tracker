@@ -2,6 +2,9 @@ using System;
 using System.Threading;
 using Fct.Abstractions;
 using Fct.Bridge;
+using Fct.Logging;
+using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Logging.Abstractions;
 
 namespace Fct.Host
 {
@@ -22,17 +25,24 @@ namespace Fct.Host
         private readonly AutoResetEvent _signal = new(false);
         private readonly Thread _writer;
         private readonly IDisposable _subscription;
+        // A frame that fails to serialize or a dead pipe must not kill the writer or stall peers — but
+        // the failure is no longer silent: first one logs with the exception, then throttles.
+        private readonly ThrottledCounter _egressFaults;
         private int _head, _tail, _count;
         private long _sent, _dropped;
         private volatile bool _running = true;
 
         public SatelliteEgress(string satelliteId, IGameEventStream stream, GameEventFilter filter,
-            Action<string> send, int capacity = 4096, System.Collections.Generic.IReadOnlyList<GameEvent>? prime = null)
+            Action<string> send, int capacity = 4096, System.Collections.Generic.IReadOnlyList<GameEvent>? prime = null,
+            ILogger? log = null)
         {
             if (stream is null) throw new ArgumentNullException(nameof(stream));
             if (capacity < 2 || (capacity & (capacity - 1)) != 0)
                 throw new ArgumentException("capacity must be a power of two >= 2", nameof(capacity));
             _send = send ?? throw new ArgumentNullException(nameof(send));
+            _egressFaults = new ThrottledCounter(log ?? NullLogger.Instance, LogLevel.Warning,
+                LogEvents.BridgeEgressFailed,
+                "Host→satellite '" + satelliteId + "' egress dropped {Count} frame(s) (total {Total}) to a serialize error or dead pipe");
             _ring = new GameEvent[capacity];
             _mask = capacity - 1;
             _writer = new Thread(WriteLoop) { IsBackground = true, Name = "Fct.SatelliteEgress." + satelliteId };
@@ -98,7 +108,7 @@ namespace Fct.Host
                     var wire = GameEventFrame.ToWire(evt);
                     if (wire != null) { _send(wire); Interlocked.Increment(ref _sent); }
                 }
-                catch { /* a bad frame or a dead pipe must not kill the writer or stall peers */ }
+                catch (Exception ex) { _egressFaults.Record(ex); }
             }
         }
 

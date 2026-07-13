@@ -5,6 +5,9 @@ using System.Threading;
 using System.Threading.Channels;
 using System.Threading.Tasks;
 using Fct.Abstractions;
+using Fct.Logging;
+using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Logging.Abstractions;
 
 namespace Fct.Host.Hosting;
 
@@ -27,13 +30,15 @@ internal sealed class GameEventBus : IGameEventStream, IGameEventSink, IDisposab
     private readonly object _gate = new();
     private readonly List<Subscription> _subs = new();
     private readonly int _capacity;
+    private readonly ILogger _log;
     private long _sequence;
     private bool _disposed;
 
-    public GameEventBus(int capacity = 1024)
+    public GameEventBus(int capacity = 1024, ILogger<GameEventBus>? log = null)
     {
         if (capacity < 1) throw new ArgumentOutOfRangeException(nameof(capacity));
         _capacity = capacity;
+        _log = log ?? (ILogger)NullLogger<GameEventBus>.Instance;
     }
 
     /// <summary>Total events dropped across all live subscriptions (drop-oldest backpressure).</summary>
@@ -70,7 +75,7 @@ internal sealed class GameEventBus : IGameEventStream, IGameEventSink, IDisposab
     public IDisposable Subscribe(GameEventFilter filter, Action<GameEvent> handler)
     {
         if (handler is null) throw new ArgumentNullException(nameof(handler));
-        var sub = new CallbackSubscription(this, filter ?? GameEventFilter.All, handler, _capacity);
+        var sub = new CallbackSubscription(this, filter ?? GameEventFilter.All, handler, _capacity, _log);
         Add(sub);
         return sub;
     }
@@ -175,11 +180,17 @@ internal sealed class GameEventBus : IGameEventStream, IGameEventSink, IDisposab
         private readonly Action<GameEvent> _handler;
         private readonly CancellationTokenSource _cts = new();
         private readonly Task _pump;
+        // Per-subscription, so the first throw from THIS handler logs at once (with the exception),
+        // then a persistently faulting handler is throttled instead of storming the log. This is the
+        // seam that unhides engine fold errors (ModernEncounterEngine.OnEvent runs on this pump).
+        private readonly ThrottledCounter _faults;
 
-        public CallbackSubscription(GameEventBus bus, GameEventFilter filter, Action<GameEvent> handler, int capacity)
+        public CallbackSubscription(GameEventBus bus, GameEventFilter filter, Action<GameEvent> handler, int capacity, ILogger log)
             : base(bus, filter, capacity)
         {
             _handler = handler;
+            _faults = new ThrottledCounter(log, LogLevel.Error, LogEvents.BusSubscriberFaulted,
+                "A game-event subscriber threw {Count} time(s) (total {Total}); the event was dropped and the stream continues");
             _pump = Task.Run(PumpAsync);
         }
 
@@ -189,8 +200,10 @@ internal sealed class GameEventBus : IGameEventStream, IGameEventSink, IDisposab
             {
                 await foreach (var e in Channel.Reader.ReadAllAsync(_cts.Token).ConfigureAwait(false))
                 {
+                    // Isolated: a throwing handler never kills the stream or starves peers — but it is
+                    // no longer silent.
                     try { _handler(e); }
-                    catch { /* isolated: a throwing handler never kills the stream or starves peers */ }
+                    catch (Exception ex) { _faults.Record(ex); }
                 }
             }
             catch (OperationCanceledException) { /* disposed */ }

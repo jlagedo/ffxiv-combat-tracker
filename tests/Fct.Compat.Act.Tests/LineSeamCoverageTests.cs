@@ -21,7 +21,7 @@ namespace Fct.Compat.Act.Tests
         public LineSeamCoverageTests(ITestOutputHelper output) => _out = output;
 
         // One real Network_*.log line of each of the twelve types in the P0.1 required set
-        // {00,01,02,21,40,249,250,253} plus 12/22/24/26, captured from the E:\tmp\logs corpus.
+        // {00,01,02,21,40,249,250,253} plus 12/22/24/26, captured from a local log corpus.
         private static readonly string[] Slice =
         {
             "253|2026-01-03T22:50:01.0445077-03:00|FFXIV_ACT_Plugin Version: 2.7.4.9 (50BCD605C50A749F)|a7996fe26936a886",

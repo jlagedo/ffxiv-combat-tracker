@@ -48,7 +48,7 @@ Companion docs:
 
 Each plugin source tree was swept for references into the `Advanced_Combat_Tracker` namespace;
 symbols that merely *look* like ACT members but are the plugin's own types were excluded. ACT
-signatures verified against the decompile at `E:\dev\ACT-decompiled\Advanced_Combat_Tracker\`.
+signatures verified against the Advanced Combat Tracker reference decompilation.
 
 All five plugins are in scope. **ACT.Hojoring** is the heaviest consumer; its extra surface is
 chiefly the full spell-timer subsystem (§7).

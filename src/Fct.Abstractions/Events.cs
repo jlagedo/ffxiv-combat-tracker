@@ -112,8 +112,9 @@ namespace Fct.Abstractions
     /// The party/alliance roster changed (PartyList). <paramref name="PartySize"/> is the SDK's
     /// <c>PartyListChanged(partyList, partySize)</c> second argument — in alliance content it is the
     /// player's 8-person party size, distinct from (and smaller than) <see cref="Members"/>'s up-to-24
-    /// visible roster. Defaulted for source compatibility with existing call sites; not yet forwarded
-    /// or folded anywhere.
+    /// visible roster.
+    /// <para>NOT YET WIRED: <paramref name="PartySize"/> is defaulted for source compatibility and not
+    /// yet forwarded or folded — treat it as reserved.</para>
     /// </summary>
     public sealed record PartyChanged(long Sequence, DateTimeOffset Timestamp, IReadOnlyList<uint> Members, int PartySize = 0)
         : GameEvent(Sequence, Timestamp);
@@ -160,8 +161,8 @@ namespace Fct.Abstractions
     /// <c>GetGameRegion</c>/<c>GetServerTimestamp</c>/<c>IsChatLogAvailable</c>), forwarded so a consumer
     /// satellite mirrors the parser's environment without a live game process. <see cref="GameVersion"/>
     /// is <c>""</c> for an unknown version, never a placeholder; <see cref="ServerClockOffset"/> is
-    /// <see cref="TimeSpan.Zero"/> when the producer has no live memory-scanned server time. Not yet
-    /// produced or folded anywhere.
+    /// <see cref="TimeSpan.Zero"/> when the producer has no live memory-scanned server time.
+    /// <para>NOT YET WIRED: this event is not yet produced or folded anywhere — treat it as reserved.</para>
     /// </summary>
     public sealed record SessionStateChanged(long Sequence, DateTimeOffset Timestamp, string GameVersion, GameLanguage Language, GameRegion Region, TimeSpan ServerClockOffset, bool IsChatLogAvailable)
         : GameEvent(Sequence, Timestamp);

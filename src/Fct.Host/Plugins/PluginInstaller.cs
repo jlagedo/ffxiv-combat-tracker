@@ -43,6 +43,15 @@ internal sealed class PluginInstaller
 
     private static readonly TimeSpan LegacyUnloadTimeout = TimeSpan.FromSeconds(10);
 
+    /// <summary>An in-process (native / recompiled-shim) load began for (id, title). The shell shows a
+    /// loading placeholder while the plugin initializes; success surfaces via the registry roster and
+    /// failure via <see cref="NativeLoadFailed"/>. Real-legacy loads are signalled by the satellite router.</summary>
+    public event Action<string, string>? NativeLoadStarting;
+
+    /// <summary>An in-process load faulted or was rejected — no roster row will appear, so the shell
+    /// drops the pending placeholder.</summary>
+    public event Action<string>? NativeLoadFailed;
+
     public PluginInstaller(
         PluginManager manager,
         ISatellitePluginChannel satellite,
@@ -133,7 +142,7 @@ internal sealed class PluginInstaller
         }
         catch (Exception ex)
         {
-            _log.LogWarning(LogEvents.NativePluginManifestRejected, ex, "Install failed from {Source}", sourcePath);
+            _log.LogWarning(LogEvents.NativePluginInstallFailed, ex, "Install failed from {Source}", sourcePath);
             _notifications?.Publish(NotificationSeverity.Error, "Plugins", "Plugin install failed", ex.Message);
             return InstallResult.Fail(ex.Message);
         }
@@ -188,15 +197,15 @@ internal sealed class PluginInstaller
         }
         catch (Exception ex)
         {
-            _log.LogWarning(LogEvents.NativePluginFaulted, ex, "Uninstall failed for {Id}", id);
+            _log.LogWarning(LogEvents.NativePluginInstallFailed, ex, "Uninstall failed for {Id}", id);
             _notifications?.Publish(NotificationSeverity.Error, "Plugins", "Plugin removal failed", ex.Message);
             return false;
         }
     }
 
-    /// <summary>Startup (pre-UI): clear any deferred deletes, then load every persisted <i>net10</i>
-    /// plugin in-process. Real-legacy records are replayed to their package satellites
-    /// (<see cref="ReplayLegacyToSatelliteAsync"/>).</summary>
+    /// <summary>Host startup (runs when the host is started from the shell, after the window paints):
+    /// clear any deferred deletes, then load every persisted <i>net10</i> plugin in-process. Real-legacy
+    /// records are replayed to their package satellites (<see cref="ReplayLegacyToSatelliteAsync"/>).</summary>
     public async Task LoadPersistedAsync(CancellationToken ct)
     {
         _registry.Load();   // read installed-plugins.json back into memory so installs survive restarts
@@ -274,7 +283,7 @@ internal sealed class PluginInstaller
         }
         catch (Exception ex)
         {
-            _log.LogWarning(LogEvents.NativePluginManifestRejected, ex, "Relink failed for {Id} from {Dll}", id, dllPath);
+            _log.LogWarning(LogEvents.NativePluginInstallFailed, ex, "Relink failed for {Id} from {Dll}", id, dllPath);
             _notifications?.Publish(NotificationSeverity.Error, "Plugins", "Plugin relink failed", ex.Message);
             return InstallResult.Fail(ex.Message);
         }
@@ -292,17 +301,31 @@ internal sealed class PluginInstaller
         if (c.Kind == LoadKind.RealLegacy)
         {
             var dll = Path.Combine(destDir, c.AssemblyFile);
-            // The router resolves the package, spawns its satellite on demand, and forwards the load.
+            // The router resolves the package, spawns its satellite on demand, and forwards the load —
+            // and raises its own pending/failed signals, so we don't here.
             return await _satellite.RequestLoadPluginAsync(c.Id, dll, title).ConfigureAwait(false);
         }
-        var loaded = await _manager.LoadDirectoryAsync(destDir, ct).ConfigureAwait(false);
-        if (loaded is not null)
+
+        // In-process (native / recompiled-shim): show a loading placeholder while InitializeAsync runs
+        // (time-boxed). Success surfaces through the registry roster; a fault/reject returns null (or
+        // throws), so drop the placeholder.
+        NativeLoadStarting?.Invoke(c.Id, title);
+        try
+        {
+            var loaded = await _manager.LoadDirectoryAsync(destDir, ct).ConfigureAwait(false);
+            if (loaded is null) { NativeLoadFailed?.Invoke(c.Id); return false; }
             // Startup's one-time RegisterUi flush (MainWindow.OnOpened) already ran, so a plugin
             // installed live would otherwise never contribute its UI until the next restart — a
             // 'ui'-capable plugin would show the fallback details card. Flush it now; the coordinator
             // marshals to the UI thread and skips non-UI plugins.
             _ui.FlushRegisterUi(new[] { (loaded.Manifest, loaded.Instance) });
-        return loaded is not null;
+            return true;
+        }
+        catch
+        {
+            NativeLoadFailed?.Invoke(c.Id);
+            throw;
+        }
     }
 
     // Delete the install dir; if its files are still locked, defer to next-launch cleanup.

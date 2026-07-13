@@ -11,7 +11,7 @@ Not in `ffxiv-combat-tracker.slnx` (a standalone dev tool, like `build/`).
 
 ```powershell
 dotnet run --project tools/CompatSurvey -- <inputDir> <outputDir>
-# defaults: inputDir = E:\tmp\plugins , outputDir = <bin>\out
+# inputDir is required; outputDir defaults to <bin>\out
 ```
 
 Same binaries in → byte-identical output out (nodes are pinned by SHA-256).
@@ -26,8 +26,6 @@ Same binaries in → byte-identical output out (nodes are pinned by SHA-256).
 | `21-dynamic-strings.csv` | string literals matching an ecosystem member/type name |
 | `30-ledger.csv` | reflection + string rows as an `UNREVIEWED` triage worklist (the runtime-confirm step) |
 | `COMPAT-SURFACE.md` | human summary |
-
-A committed snapshot of the output lives in `docs/compat-survey/`.
 
 ## Phase 0 — embedded SDK extraction & surface harvest
 

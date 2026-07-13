@@ -51,12 +51,29 @@ namespace Fct.LegacyHost
         private long _dropped, _sent;
         private volatile bool _running = true;
 
+        // A dropped/failed forward must never kill the writer or the SDK dispatch thread — but it must
+        // not be silent. Egress (serialize/write) and backpressure (ring overflow) losses light up the
+        // ForwarderDropped id; the repo poll and the best-effort SDK reads log at Debug so a systematic
+        // failure is visible without flooding on a transient one.
+        private readonly Fct.Logging.ThrottledCounter _egressFaults;
+        private readonly Fct.Logging.ThrottledCounter _backpressureDrops;
+        private readonly Fct.Logging.ThrottledCounter _pollFaults;
+        private readonly Fct.Logging.ThrottledCounter _sdkReadFaults;
+
         public BridgeForwarder(Action<string> send, Microsoft.Extensions.Logging.ILogger log, int capacity = 4096)
         {
             if (capacity < 2 || (capacity & (capacity - 1)) != 0)
                 throw new ArgumentException("capacity must be a power of two >= 2", nameof(capacity));
             _send = send ?? throw new ArgumentNullException(nameof(send));
             _log = log ?? Microsoft.Extensions.Logging.Abstractions.NullLogger.Instance;
+            _egressFaults = new Fct.Logging.ThrottledCounter(_log, LogLevel.Warning, Fct.Logging.LogEvents.ForwarderDropped,
+                "[Forwarder] egress dropped {Count} frame(s) (total {Total}) to a serialize error or dead pipe");
+            _backpressureDrops = new Fct.Logging.ThrottledCounter(_log, LogLevel.Warning, Fct.Logging.LogEvents.ForwarderDropped,
+                "[Forwarder] ring overflow dropped {Count} frame(s) (total {Total}); a slow bridge reader is behind");
+            _pollFaults = new Fct.Logging.ThrottledCounter(_log, LogLevel.Debug, Fct.Logging.LogEvents.DispatcherDiagnostics,
+                "[Forwarder] repository snapshot poll faulted {Count} time(s) (total {Total})");
+            _sdkReadFaults = new Fct.Logging.ThrottledCounter(_log, LogLevel.Debug, Fct.Logging.LogEvents.DispatcherDiagnostics,
+                "[Forwarder] a best-effort SDK read faulted {Count} time(s) (total {Total}); using the field's safe default");
             _ring = new GameEvent[capacity];
             _mask = capacity - 1;
             _writer = new Thread(WriteLoop) { Name = "Fct.BridgeForwarder", IsBackground = true };
@@ -163,7 +180,7 @@ namespace Fct.LegacyHost
                 var p = _repo?.GetCurrentFFXIVProcess();
                 if (p != null) Enqueue(new GameProcessChanged(0, DateTimeOffset.Now, p.Id));
             }
-            catch { /* best-effort PID */ }
+            catch (Exception ex) { _sdkReadFaults.Record(ex); /* best-effort PID */ }
 
             Enqueue(BuildSessionState());
 
@@ -180,7 +197,7 @@ namespace Fct.LegacyHost
             // (only an "_EN" member exists) — forwarding *_EN for those is the SDK's own ceiling, not a
             // shortcut; there is no "selected language" version to forward instead.
             var language = Language.English;
-            try { if (_repo != null) language = _repo.GetSelectedLanguageID(); } catch { }
+            try { if (_repo != null) language = _repo.GetSelectedLanguageID(); } catch (Exception ex) { _sdkReadFaults.Record(ex); }
             ForwardResource(SkillListFor(language), ResourceKind.Action);
             ForwardResource(BuffListFor(language), ResourceKind.Status);
             ForwardResource(ResourceType.ZoneList_EN, ResourceKind.Zone);
@@ -225,9 +242,9 @@ namespace Fct.LegacyHost
             {
                 // GetGameVersion() is "" headless / when unknown (P0.3 verdict) — never a "0.0"
                 // placeholder (§3). A null return is normalized the same way.
-                try { version = repo.GetGameVersion() ?? ""; } catch { }
-                try { language = MapLanguage(repo.GetSelectedLanguageID()); } catch { }
-                try { region = MapRegion(repo.GetGameRegion()); } catch { }
+                try { version = repo.GetGameVersion() ?? ""; } catch (Exception ex) { _sdkReadFaults.Record(ex); }
+                try { language = MapLanguage(repo.GetSelectedLanguageID()); } catch (Exception ex) { _sdkReadFaults.Record(ex); }
+                try { region = MapRegion(repo.GetGameRegion()); } catch (Exception ex) { _sdkReadFaults.Record(ex); }
                 try
                 {
                     // GetServerTimestamp() is DateTime.MinValue with no live memory scan (P0.3 verdict);
@@ -237,8 +254,8 @@ namespace Fct.LegacyHost
                     if (serverTime.Year >= 2000)
                         clockOffset = serverTime - DateTime.UtcNow;
                 }
-                catch { }
-                try { chatAvailable = repo.IsChatLogAvailable(); } catch { }
+                catch (Exception ex) { _sdkReadFaults.Record(ex); }
+                try { chatAvailable = repo.IsChatLogAvailable(); } catch (Exception ex) { _sdkReadFaults.Record(ex); }
             }
             return new SessionStateChanged(0, DateTimeOffset.Now, version, language, region, clockOffset, chatAvailable);
         }
@@ -279,7 +296,7 @@ namespace Fct.LegacyHost
                 if (dict == null || dict.Count == 0) return;
                 Enqueue(new ResourceDictionaryForwarded(0, DateTimeOffset.Now, kind, new Dictionary<uint, string>(dict)));
             }
-            catch { /* best-effort table */ }
+            catch (Exception ex) { _sdkReadFaults.Record(ex); /* best-effort table */ }
         }
 
         private void StartRepositoryTimer()
@@ -314,7 +331,7 @@ namespace Fct.LegacyHost
                 foreach (var c in list) if (c != null) actors.Add(ToActor(c));
                 Enqueue(new RepositorySnapshot(0, DateTimeOffset.Now, actors));
             }
-            catch { /* a bad poll must not kill the timer */ }
+            catch (Exception ex) { _pollFaults.Record(ex); /* a bad poll must not kill the timer */ }
         }
 
         // ---- SDK / ACT handlers → GameEvent projection (no parsing) ---------------------------------
@@ -364,7 +381,7 @@ namespace Fct.LegacyHost
                     if (me != null) name = me.Name ?? "";
                 }
             }
-            catch { /* best-effort id/name */ }
+            catch (Exception ex) { _sdkReadFaults.Record(ex); /* best-effort id/name */ }
             Enqueue(new PrimaryPlayerChanged(0, DateTimeOffset.Now, id, name));
         }
 
@@ -462,6 +479,7 @@ namespace Fct.LegacyHost
 
         private void Enqueue(GameEvent evt)
         {
+            bool dropped = false;
             lock (_gate)
             {
                 if (_count == _ring.Length)
@@ -469,11 +487,13 @@ namespace Fct.LegacyHost
                     _head = (_head + 1) & _mask;   // drop oldest — never block the producer
                     _count--;
                     Interlocked.Increment(ref _dropped);
+                    dropped = true;
                 }
                 _ring[_tail] = evt;
                 _tail = (_tail + 1) & _mask;
                 _count++;
             }
+            if (dropped) _backpressureDrops.Record();   // logged outside the ring lock (throttled)
             _signal.Set();
         }
 
@@ -509,7 +529,7 @@ namespace Fct.LegacyHost
                     var wire = GameEventFrame.ToWire(evt);
                     if (wire != null) { _send(wire); Interlocked.Increment(ref _sent); }
                 }
-                catch { /* a bad frame must not kill the writer or stall the stream */ }
+                catch (Exception ex) { _egressFaults.Record(ex); /* a bad frame must not kill the writer or stall the stream */ }
             }
         }
 

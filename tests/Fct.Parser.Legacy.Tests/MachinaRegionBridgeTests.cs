@@ -43,9 +43,9 @@ namespace Fct.Parser.Legacy.Tests
 
         // THE REFLECTION-TARGET-RESOLUTION ASSERTION: a non-Global forwarded region must resolve to the
         // exact Machina.FFXIV.GameRegion member name TrySetRegion will Enum.Parse and pass to SetRegion —
-        // confirmed against the real Machina.FFXIV.GameRegion enum (E:\dev\ffxiv\act\machina\
-        // Machina.FFXIV\GameRegion.cs and the shipped IINACT copy, both Global/Chinese/Korean[/
-        // TraditionalChinese] by name). GameRegion.Unknown has no Machina equivalent (Machina's enum has
+        // confirmed against the real Machina.FFXIV.GameRegion enum (Machina.FFXIV's GameRegion.cs and the
+        // shipped IINACT copy, both Global/Chinese/Korean[/TraditionalChinese] by name).
+        // GameRegion.Unknown has no Machina equivalent (Machina's enum has
         // no member numbered 0) and must resolve to null — the signal TrySetRegion uses to leave
         // Machina's own default/last-set region alone rather than guess.
         [Theory]
