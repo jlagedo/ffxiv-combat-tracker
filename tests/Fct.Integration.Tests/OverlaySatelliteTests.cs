@@ -14,6 +14,7 @@ using Fct.Host.Hosting;
 using Microsoft.Extensions.Logging.Abstractions;
 using Xunit;
 using Xunit.Abstractions;
+using CombatSnapshot = Fct.Integration.Tests.OverlayWsHarness.CombatSnapshot;
 
 namespace Fct.Integration.Tests
 {
@@ -42,11 +43,8 @@ namespace Fct.Integration.Tests
         private readonly ITestOutputHelper _out;
         public OverlaySatelliteTests(ITestOutputHelper output) => _out = output;
 
-        // A single MiniParse CombatData push, flattened to strings (ExportVariables render as strings).
-        private sealed record CombatSnapshot(
-            string IsActive,
-            Dictionary<string, string> Encounter,
-            Dictionary<string, Dictionary<string, string>> Combatant);
+        // The MiniParse CombatData snapshot, WS frame reader, and terminal-frame wait are shared with the
+        // P9b four-package soak via OverlayWsHarness (single-sourced so the flake fix lives in one place).
 
         // (name, key) -> expected export string, read straight from the committed baseline so the assertion
         // is single-sourced with ExportVarsCompatTests. name "*ENCOUNTER*" holds the encounter-level keys.
@@ -128,7 +126,7 @@ namespace Fct.Integration.Tests
                 var combatFrames = new List<CombatSnapshot>();   // the inner CombatData "msg" objects
                 var chatLines = new List<string>();               // relayed log lines (msgtype "Chat")
                 using var readCts = new CancellationTokenSource();
-                var reader = ReadFramesAsync(ws, combatFrames, chatLines, readCts.Token);
+                var reader = OverlayWsHarness.ReadFramesAsync(ws, combatFrames, chatLines, readCts.Token);
 
                 // Fan the committed slice down: no rawlog frames → no idle-split → one whole-slice encounter
                 // matching the single-encounter oracle baseline. Include the terminal ENDC so DURATION freezes.
@@ -145,31 +143,35 @@ namespace Fct.Integration.Tests
                 var chatLine = "00|" + DateTimeOffset.Now.ToString("O") + "|0038|Sender|" + marker + "|";
                 bus.Emit(new RawLogLine(0, DateTimeOffset.Now, LogMessageType.ChatLog, chatLine, chatLine));
 
-                // Let MiniParse's push timer fire past the ENDC (its interval is ~1 s).
-                await Task.Delay(6000);
+                // Wait for the terminal (post-ENDC) frame to be pushed and the marker chat relayed, instead of
+                // a fixed delay — MiniParse's ~1 s push timer races the async fold, so a fixed wait can snapshot
+                // a partial (mid-fold) or empty frame. The wait falls back to the best captured frame on timeout
+                // so a genuine value regression still fails the got-vs-want assertions below.
+                var frame = await OverlayWsHarness.WaitForTerminalEncounter(
+                    combatFrames, chatLines, marker, TimeSpan.FromSeconds(30));
                 readCts.Cancel();
                 try { await reader; } catch (OperationCanceledException) { }
 
                 _out.WriteLine($"emitted {emitted} frames; {combatFrames.Count} CombatData pushes; {chatLines.Count} chat lines");
                 Assert.NotEmpty(combatFrames);
+                Assert.NotNull(frame);
 
-                // Prefer the post-ENDC inactive frame (frozen DURATION → deterministic encdps); else the
-                // richest frame for the split-invariant subset.
-                var inactive = combatFrames.LastOrDefault(f => f.IsActive == "false");
-                var frame = inactive ?? combatFrames.OrderByDescending(EncDamage).First();
+                // The terminal frame has a frozen DURATION → deterministic encdps; when we only captured active
+                // frames (no post-ENDC push before timeout) the split-invariant subset still holds on it.
+                var inactive = frame!.IsActive == "false" ? frame : null;
                 Assert.True(frame.Combatant.TryGetValue("YOU", out var you), "no YOU combatant in CombatData");
 
                 // Split-invariant totals (assert on any frame).
-                AssertBaseline(baseline, ("*ENCOUNTER*", "damage"), Get(frame.Encounter, "damage"), "Encounter.damage");
-                AssertBaseline(baseline, ("YOU", "damage"), Get(you!, "damage"), "YOU.damage");
-                AssertBaseline(baseline, ("YOU", "damage%"), Get(you!, "damage%"), "YOU.damage%");
+                AssertBaseline(baseline, ("*ENCOUNTER*", "damage"), OverlayWsHarness.Get(frame.Encounter, "damage"), "Encounter.damage");
+                AssertBaseline(baseline, ("YOU", "damage"), OverlayWsHarness.Get(you!, "damage"), "YOU.damage");
+                AssertBaseline(baseline, ("YOU", "damage%"), OverlayWsHarness.Get(you!, "damage%"), "YOU.damage%");
 
                 // Duration-dependent values only on the terminal inactive frame (DURATION frozen).
                 if (inactive is not null)
                 {
-                    AssertBaseline(baseline, ("*ENCOUNTER*", "DURATION"), Get(frame.Encounter, "DURATION"), "Encounter.DURATION");
-                    AssertBaseline(baseline, ("*ENCOUNTER*", "encdps"), Get(frame.Encounter, "encdps"), "Encounter.encdps");
-                    AssertBaseline(baseline, ("YOU", "encdps"), Get(you!, "encdps"), "YOU.encdps");
+                    AssertBaseline(baseline, ("*ENCOUNTER*", "DURATION"), OverlayWsHarness.Get(frame.Encounter, "DURATION"), "Encounter.DURATION");
+                    AssertBaseline(baseline, ("*ENCOUNTER*", "encdps"), OverlayWsHarness.Get(frame.Encounter, "encdps"), "Encounter.encdps");
+                    AssertBaseline(baseline, ("YOU", "encdps"), OverlayWsHarness.Get(you!, "encdps"), "YOU.encdps");
                 }
                 else
                 {
@@ -301,76 +303,12 @@ namespace Fct.Integration.Tests
             }
         }
 
-        private static string? Get(Dictionary<string, string> d, string k) => d.TryGetValue(k, out var v) ? v : null;
-
-        private static double EncDamage(CombatSnapshot f) =>
-            double.TryParse(Get(f.Encounter, "damage"), System.Globalization.NumberStyles.Any,
-                System.Globalization.CultureInfo.InvariantCulture, out var d) ? d : 0;
-
         private void AssertBaseline(Dictionary<(string, string), string> baseline,
             (string, string) key, string? got, string label)
         {
             Assert.True(baseline.TryGetValue(key, out var want), $"baseline missing {label}");
             _out.WriteLine($"{label}: got='{got}' want='{want}'");
             Assert.Equal(want, got);
-        }
-
-        // The /MiniParse LegacyHandler wraps each push as {type:broadcast, msgtype:CombatData|Chat, msg:…}.
-        // For CombatData, msg = {type, Encounter:{k:v}, Combatant:{name:{k:v}}, isActive}; every value a string.
-        private static async Task ReadFramesAsync(ClientWebSocket ws, List<CombatSnapshot> combat,
-            List<string> chat, CancellationToken ct)
-        {
-            var buf = new byte[64 * 1024];
-            var sb = new StringBuilder();
-            while (!ct.IsCancellationRequested && ws.State == WebSocketState.Open)
-            {
-                sb.Clear();
-                WebSocketReceiveResult res;
-                do
-                {
-                    res = await ws.ReceiveAsync(new ArraySegment<byte>(buf), ct);
-                    if (res.MessageType == WebSocketMessageType.Close) return;
-                    sb.Append(Encoding.UTF8.GetString(buf, 0, res.Count));
-                } while (!res.EndOfMessage);
-
-                CombatSnapshot? snap = null;
-                string? chatMsg = null;
-                try
-                {
-                    using var doc = JsonDocument.Parse(sb.ToString());
-                    var root = doc.RootElement;
-                    if (!root.TryGetProperty("msgtype", out var mt)) continue;
-                    var msgtype = mt.GetString();
-                    if (msgtype == "CombatData" && root.TryGetProperty("msg", out var msg))
-                        snap = ParseCombat(msg);
-                    else if (msgtype == "Chat" && root.TryGetProperty("msg", out var m) && m.ValueKind == JsonValueKind.String)
-                        chatMsg = m.GetString();
-                }
-                catch { continue; }
-
-                if (snap is not null) combat.Add(snap);
-                if (chatMsg is not null) chat.Add(chatMsg);
-            }
-        }
-
-        private static CombatSnapshot ParseCombat(JsonElement msg)
-        {
-            var enc = new Dictionary<string, string>();
-            if (msg.TryGetProperty("Encounter", out var e) && e.ValueKind == JsonValueKind.Object)
-                foreach (var p in e.EnumerateObject()) enc[p.Name] = p.Value.ToString();
-
-            var combatants = new Dictionary<string, Dictionary<string, string>>();
-            if (msg.TryGetProperty("Combatant", out var c) && c.ValueKind == JsonValueKind.Object)
-                foreach (var member in c.EnumerateObject())
-                {
-                    var vals = new Dictionary<string, string>();
-                    if (member.Value.ValueKind == JsonValueKind.Object)
-                        foreach (var p in member.Value.EnumerateObject()) vals[p.Name] = p.Value.ToString();
-                    combatants[member.Name] = vals;
-                }
-
-            var isActive = msg.TryGetProperty("isActive", out var a) ? a.ToString() : "";
-            return new CombatSnapshot(isActive, enc, combatants);
         }
 
         // The satellite's sandbox ACT data folder (mirrors FacadeHost.LegacyActDataDir). Resolved through

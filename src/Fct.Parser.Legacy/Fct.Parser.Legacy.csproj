@@ -3,7 +3,7 @@
   <!--
     Wraps the real (net48) FFXIV_ACT_Plugin so the unmodified OverlayPlugin binds to our
     ring-buffer IDataSubscription instead of the plugin's per-subscriber BeginInvoke fan-out.
-    See docs/DATA-FLOW.md §5 (the IRawPacketSource "build (hatch)" row).
+    See docs/ARCHITECTURE.md §3a (the IRawPacketSource opt-in escape hatch).
 
     References FFXIV_ACT_Plugin.Common (the real embedded SDK, identity 3.0.0.0 / token
     9f740ac505d6bc50) for compile only — Private=false so it is NOT copied to output. At

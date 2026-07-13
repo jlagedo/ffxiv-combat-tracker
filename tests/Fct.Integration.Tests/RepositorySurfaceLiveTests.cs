@@ -38,6 +38,11 @@ namespace Fct.Integration.Tests
     // (ConsumerDataRepositoryStubTests.ConsumerDataRepository_has_no_forwarded_backing_field_for_language_or_region_yet),
     // which proves structurally — with no real plugin/satellite involved — that both members now have an
     // Apply()-fed backing field (P3.5).
+    //
+    // Serialized with the heavy multi-satellite gates (satellite-p6): like LateJoinPrimingTests this loads the
+    // SDK (Costura) and waits a fixed budget for the stand-in to register/subscribe. Run parallel to the
+    // four-satellite tests that budget is starved by CPU oversubscription; serializing removes the contention.
+    [Collection("satellite-p6")]
     public sealed class RepositorySurfaceLiveTests
     {
         private readonly ITestOutputHelper _out;

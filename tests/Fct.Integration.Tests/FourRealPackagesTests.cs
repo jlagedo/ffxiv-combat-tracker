@@ -119,15 +119,18 @@ namespace Fct.Integration.Tests
                 var chatLine = "00|" + DateTimeOffset.Now.ToString("O") + "|0038|Sender|" + marker + "|";
                 bus.Emit(new RawLogLine(0, DateTimeOffset.Now, LogMessageType.ChatLog, chatLine, chatLine));
 
-                await Task.Delay(6000);   // MiniParse push timer fires past the terminal ENDC (~1 s interval)
+                // Wait for the terminal encounter frame to be pushed (and the marker chat relayed) instead of
+                // a fixed delay — under a four-satellite load the fold + MiniParse push can lag past any fixed
+                // window, so a fixed wait would race an arbitrary mid-fold snapshot.
+                var frame = await OverlayWsHarness.WaitForTerminalEncounter(combat, chat, marker, TimeSpan.FromSeconds(30));
                 readCts.Cancel();
                 try { await reader; } catch (OperationCanceledException) { }
 
                 _out.WriteLine($"emitted {emitted} frames; {combat.Count} CombatData pushes; {chat.Count} chat lines");
                 Assert.NotEmpty(combat);
+                Assert.NotNull(frame);
 
-                var inactive = combat.LastOrDefault(f => f.IsActive == "false");
-                var frame = inactive ?? combat.OrderByDescending(OverlayWsHarness.EncDamage).First();
+                var inactive = frame!.IsActive == "false" ? frame : null;
                 Assert.True(frame.Combatant.TryGetValue("YOU", out var you), "no YOU combatant in CombatData");
 
                 AssertBaseline(baseline, ("*ENCOUNTER*", "damage"), OverlayWsHarness.Get(frame.Encounter, "damage"), "Encounter.damage");

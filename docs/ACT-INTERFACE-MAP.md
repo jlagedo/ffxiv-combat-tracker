@@ -12,11 +12,11 @@ and run). The surface is instantiated **once per satellite** — each plugin pac
 process with its own facade, and the data behind every member below arrives over the host's routed
 streams, never a heap shared with another plugin ([`ISOLATION-PLAN.md`](ISOLATION-PLAN.md)).
 Companion docs:
-- [`DATA-FLOW.md`](DATA-FLOW.md) — the data-flow narrative through the upstream stack (§8 maps each
-  seam onto its host pipe).
-- [`TESTING.md`](TESTING.md) — the **output-value axis**: our ACT engine's `ExportVariables` held to
-  the real ACT binary, both fed the same plugin-produced swings (`AggregateCompatTests`/
-  `ExportVarsCompatTests` on fixtures; `tools/mass-compare` corpus-wide).
+- [`ARCHITECTURE.md`](ARCHITECTURE.md) §5 — the data-flow narrative through the upstream stack; §12
+  maps each seam onto its host pipe.
+- [`tools/mass-compare`](../tools/mass-compare/README.md) — the **output-value axis**: our ACT
+  engine's `ExportVariables` held to the real ACT binary, both fed the same plugin-produced swings
+  (`AggregateCompatTests`/`ExportVarsCompatTests` on fixtures; `tools/mass-compare` corpus-wide).
 
 ## Status legend
 
@@ -132,8 +132,9 @@ keys from one binary.
 | ✅ | `ActLocalization.LocalizationStrings["attackTypeTerm-all"]` | FFXIV | localized "All" bucket key |
 
 **Strategy.** Done — verified bit-for-bit on captured combat (`Aggregation.cs` + `CombatTables.cs`,
-which live in the `Fct.Aggregation` engine project; TESTING.md "Differential ACT-engine compat"), and
-corpus-wide by `tools/mass-compare` (our engine vs real ACT, identical plugin swings). These
+which live in the `Fct.Aggregation` engine project; the `act-oracle` differential fixture), and
+corpus-wide by [`tools/mass-compare`](../tools/mass-compare/README.md) (our engine vs real ACT,
+identical plugin swings). These
 model/engine types are defined in `Fct.Aggregation` and **type-forwarded** into the `Advanced Combat
 Tracker` facade identity (`Fct.Compat.Act` on net48), so the binding contract below is unchanged.
 DoT/HoT/shield *values* are the plugin's synthesis, baked into the swings both engines receive — not

@@ -2,7 +2,7 @@ using System;
 
 namespace Fct.Parser.Legacy
 {
-    // The opt-in raw-packet escape hatch (docs/DATA-FLOW.md §4.4 / §5). Lets a caller push
+    // The opt-in raw-packet escape hatch (docs/ARCHITECTURE.md §3a). Lets a caller push
     // NetworkReceived events into the dispatcher without going through the real plugin's
     // capture — the seam the integration tests use to inject synthetic packets, and the
     // future bridge feed. Injected packets share the dispatcher's ring and in-order fan-out.

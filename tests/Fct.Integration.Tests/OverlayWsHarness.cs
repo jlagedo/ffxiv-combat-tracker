@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.IO;
+using System.Linq;
 using System.Net.Sockets;
 using System.Net.WebSockets;
 using System.Text;
@@ -44,39 +45,81 @@ namespace Fct.Integration.Tests
                 System.Globalization.CultureInfo.InvariantCulture, out var d) ? d : 0;
 
         // The /MiniParse LegacyHandler wraps each push as {type:broadcast, msgtype:CombatData|Chat, msg:…}.
+        // Runs until cancelled or the socket closes; appends under the list locks because a caller polls the
+        // same lists (WaitForTerminalEncounter) while this reader is still running. A mid-run socket reset
+        // (the OverlayPlugin satellite dropping us under load or during teardown) ends the read rather than
+        // faulting the caller's awaited task — the completeness wait + timeout is what governs pass/fail.
         public static async Task ReadFramesAsync(ClientWebSocket ws, List<CombatSnapshot> combat,
             List<string> chat, CancellationToken ct)
         {
             var buf = new byte[64 * 1024];
             var sb = new StringBuilder();
-            while (!ct.IsCancellationRequested && ws.State == WebSocketState.Open)
+            try
             {
-                sb.Clear();
-                WebSocketReceiveResult res;
-                do
+                while (!ct.IsCancellationRequested && ws.State == WebSocketState.Open)
                 {
-                    res = await ws.ReceiveAsync(new ArraySegment<byte>(buf), ct);
-                    if (res.MessageType == WebSocketMessageType.Close) return;
-                    sb.Append(Encoding.UTF8.GetString(buf, 0, res.Count));
-                } while (!res.EndOfMessage);
+                    sb.Clear();
+                    WebSocketReceiveResult res;
+                    do
+                    {
+                        res = await ws.ReceiveAsync(new ArraySegment<byte>(buf), ct);
+                        if (res.MessageType == WebSocketMessageType.Close) return;
+                        sb.Append(Encoding.UTF8.GetString(buf, 0, res.Count));
+                    } while (!res.EndOfMessage);
 
-                CombatSnapshot? snap = null;
-                string? chatMsg = null;
-                try
-                {
-                    using var doc = JsonDocument.Parse(sb.ToString());
-                    var r = doc.RootElement;
-                    if (!r.TryGetProperty("msgtype", out var mt)) continue;
-                    var msgtype = mt.GetString();
-                    if (msgtype == "CombatData" && r.TryGetProperty("msg", out var msg))
-                        snap = ParseCombat(msg);
-                    else if (msgtype == "Chat" && r.TryGetProperty("msg", out var m) && m.ValueKind == JsonValueKind.String)
-                        chatMsg = m.GetString();
+                    CombatSnapshot? snap = null;
+                    string? chatMsg = null;
+                    try
+                    {
+                        using var doc = JsonDocument.Parse(sb.ToString());
+                        var r = doc.RootElement;
+                        if (!r.TryGetProperty("msgtype", out var mt)) continue;
+                        var msgtype = mt.GetString();
+                        if (msgtype == "CombatData" && r.TryGetProperty("msg", out var msg))
+                            snap = ParseCombat(msg);
+                        else if (msgtype == "Chat" && r.TryGetProperty("msg", out var m) && m.ValueKind == JsonValueKind.String)
+                            chatMsg = m.GetString();
+                    }
+                    catch { continue; }
+
+                    if (snap is not null) { lock (combat) combat.Add(snap); }
+                    if (chatMsg is not null) { lock (chat) chat.Add(chatMsg); }
                 }
-                catch { continue; }
+            }
+            catch (OperationCanceledException) { }
+            catch (WebSocketException) { }
+            catch (IOException) { }
+        }
 
-                if (snap is not null) combat.Add(snap);
-                if (chatMsg is not null) chat.Add(chatMsg);
+        // A fully-folded terminal encounter frame: post-ENDC (inactive), carrying YOU, with a real damage
+        // total. Once the encounter has ended no further swings fold into it, so this frame's totals are
+        // final — waiting for it removes the race against MiniParse's ~1 s push timer without pinning any
+        // expected value (so a genuine value regression still fails the caller's got-vs-want assertions).
+        public static bool IsTerminalComplete(CombatSnapshot f) =>
+            f.IsActive == "false" && f.Combatant.ContainsKey("YOU") && EncDamage(f) > 0;
+
+        // Poll the live reader until the terminal encounter frame has been pushed AND the relayed marker chat
+        // line has surfaced (or the timeout elapses), then return that frame. On timeout, returns the best
+        // frame captured (the terminal one if seen, else the richest by damage) so the caller still asserts
+        // got-vs-want on a real regression instead of an arbitrary mid-fold snapshot. Reads the shared lists
+        // under their locks because ReadFramesAsync appends to them concurrently.
+        public static async Task<CombatSnapshot?> WaitForTerminalEncounter(
+            List<CombatSnapshot> combat, List<string> chat, string marker, TimeSpan timeout)
+        {
+            var deadline = DateTime.UtcNow + timeout;
+            while (true)
+            {
+                CombatSnapshot? terminal, richest;
+                lock (combat)
+                {
+                    terminal = combat.LastOrDefault(IsTerminalComplete);
+                    richest = combat.Count == 0 ? null : combat.OrderByDescending(EncDamage).First();
+                }
+                bool haveChat;
+                lock (chat) haveChat = chat.Exists(l => l.Contains(marker, StringComparison.Ordinal));
+                if (terminal is not null && haveChat) return terminal;
+                if (DateTime.UtcNow >= deadline) return terminal ?? richest;
+                await Task.Delay(200);
             }
         }
 

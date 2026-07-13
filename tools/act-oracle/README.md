@@ -40,7 +40,7 @@ The same command also loads the **real `FFXIV_ACT_Plugin.dll`** and reflection-i
 `ACT_UIMods.UpdateACTTables(false)` — the exact registration the plugin runs at startup — then
 enumerates every key it registers on `CombatantData.ExportVariables`/`EncounterData.ExportVariables`
 (never a hardcoded key list) to produce `combat-slice.plugin.exportvars.tsv`, the superset baseline
-used to prove `ExportVariables` completeness (see [`docs/TESTING.md`](../../docs/TESTING.md)).
+used to prove `ExportVariables` completeness (see [`tools/mass-compare`](../mass-compare/README.md)).
 
 ```powershell
 $env:FFXIV_PLUGIN_DLL = "C:\path\to\FFXIV_ACT_Plugin.dll"   # defaults to %APPDATA%\Advanced Combat Tracker\Plugins\FFXIV_ACT_Plugin.dll

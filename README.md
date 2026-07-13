@@ -149,7 +149,8 @@ This 208-log corpus is **private play-data — it is not shipped in this repo**,
 460,432-pair number can't be reproduced from a checkout. What ships and runs anywhere is the
 fixture-level version of the same check (`AggregateCompatTests` / `ExportVarsCompatTests`),
 held to ACT bit-for-bit over **two committed slices** (1,452 pairs) on every test pass. Full
-method: [`docs/TESTING.md`](docs/TESTING.md).
+method: [`tools/mass-compare`](tools/mass-compare/README.md) (corpus-scale) and the
+`Fct.Compat.Act.Tests` fixture suite.
 
 ### What this does and doesn't prove
 

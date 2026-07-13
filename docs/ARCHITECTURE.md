@@ -266,10 +266,10 @@ Reproduce faithfully (signatures verified against the Advanced Combat Tracker re
   `CustomTriggers`.
 - **Identity:** facade assemblies named/strong-named as `Advanced Combat Tracker` /
   `FFXIV_ACT_Plugin.Common` so the unmodified DLLs bind. The aggregation engine is one strong-named
-  `Fct.Aggregation` (net48;net10) shared by both facades. The type-forward that projects the
-  engine's `Advanced_Combat_Tracker.*` types into the facade identity, and the accessor wiring for
-  the `ldsfld` ACT-core flags (`ActGlobals.charName`, …), are detailed in
-  [`DATA-FLOW.md`](DATA-FLOW.md) §3.1.
+  `Fct.Aggregation` (net48;net10) shared by both facades. Each facade type-forwards the engine's
+  `Advanced_Combat_Tracker.*` types into its own facade identity, and wires accessors for the
+  `ldsfld` ACT-core flags (`ActGlobals.charName`, …), which it keeps as real fields
+  (see the `Fct.Compat.Act` / `Fct.Aggregation` entries in [`CLAUDE.md`](../CLAUDE.md)).
 
 ---
 
@@ -311,7 +311,7 @@ statement about ownership, not runtime: the parser is a first-class citizen of t
 parser satellite, and remains the sole, owner-maintained parser — we still write zero parsing code.
 We build only the **consume/aggregate** side — the ACT aggregation engine (`Fct.Aggregation`, fed
 through the `Fct.Compat.Act` facade) — held to the real ACT binary corpus-wide (see
-`docs/TESTING.md`).
+[`tools/mass-compare`](../tools/mass-compare/README.md) and the `Fct.Compat.Act.Tests` fixture suite).
 
 ---
 
@@ -339,9 +339,9 @@ through the `Fct.Compat.Act` facade) — held to the real ACT binary corpus-wide
   ([`ISOLATION-PLAN.md`](ISOLATION-PLAN.md) P4/P9). Co-location is **not** the escape hatch;
   the budget is met by the bounded-ring design, not by moving consumers next to the producer.
 
-Open hot-path risks and the concurrency backlog — the drop-oldest lanes, single-writer pipe
-discipline, and per-subscription pumps reviewed end-to-end — are tracked in
-[`HOTPATH-ANALYSIS.md`](HOTPATH-ANALYSIS.md).
+The hot-path concerns — the drop-oldest lanes, single-writer pipe discipline, and
+per-subscription pumps — are handled by the bounded-ring design above and gated empirically by
+the four-satellite soak ([`ISOLATION-PLAN.md`](ISOLATION-PLAN.md) P9b).
 
 ---
 
@@ -409,9 +409,9 @@ path host-routed. The build order and per-phase e2e gates that get there are
 The seams that make the unmodified drop-in work — each reproduced by the facade **inside every
 satellite that needs it**, its *shape* legacy but its *data* always crossing through the host.
 Every upstream coupling (MasterSwing boundary, `FFXIVRepository` reflection shape, log-line events,
-repository polls, raw packets, TTS, named callbacks) and the exact host pipe it routes through is
-tabulated in [`DATA-FLOW.md`](DATA-FLOW.md) §8 — the canonical seam→pipe map. The seams that carry
-architectural weight beyond that routing:
+repository polls, raw packets, TTS, named callbacks) is member-mapped in
+[`ACT-INTERFACE-MAP.md`](ACT-INTERFACE-MAP.md), and the host pipe each routes through is the
+dataflow in §5 above. The seams that carry architectural weight beyond that routing:
 
 1. **Assembly identity.** The facades carry the legacy strong-name identities the five plugins
    compile against, supplied via `AppDomain.AssemblyResolve`
@@ -422,10 +422,6 @@ architectural weight beyond that routing:
    swap a *stop → unload → reload*, not a live hot-reload.
 
 ---
-
-> The end-to-end data flow through the real upstream stack, and the exact integration
-> seams this engine must reproduce, are documented in [`DATA-FLOW.md`](DATA-FLOW.md) — the
-> concrete build contract behind §6 (compat surface) and §5 (v1 dataflow).
 
 ## 13. Reference sources
 

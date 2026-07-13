@@ -38,4 +38,11 @@
     <VersionSuffix>alpha.1</VersionSuffix>
   </PropertyGroup>
 
+  <!-- Machine-local overrides (git-ignored, never committed). A developer whose real ACT install
+       lives outside the default %APPDATA% location drops a Directory.Build.local.props here to set
+       paths to the real third-party build inputs (e.g. ActExePath -> Advanced Combat Tracker.exe,
+       consumed by the P7 net48 fixtures). No machine path is ever hardcoded in a committed file. -->
+  <Import Project="$(MSBuildThisFileDirectory)Directory.Build.local.props"
+          Condition="Exists('$(MSBuildThisFileDirectory)Directory.Build.local.props')" />
+
 </Project>

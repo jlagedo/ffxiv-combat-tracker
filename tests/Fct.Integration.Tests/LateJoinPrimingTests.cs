@@ -29,6 +29,12 @@ namespace Fct.Integration.Tests
     // technique ConsumerStandInTests already uses to seed host state for a satellite under test) — the
     // real host-side BuildPrimeEvents/SatelliteEgress/StreamCatalog code runs unmodified; only the INPUT
     // (state already having happened) is synthesized, standing in for P2's not-yet-built tap.
+    //
+    // Serialized with the heavy multi-satellite gates (satellite-p6): the stand-in repository half loads the
+    // SDK (Costura) and waits a fixed budget for the subscribe→prime→Apply round-trip to converge. Run in
+    // parallel with the four-satellite tests, that budget was starved by CPU oversubscription (the GameVersion
+    // never converged in time); serializing removes the contention. The collection carries no fixture.
+    [Collection("satellite-p6")]
     public sealed class LateJoinPrimingTests
     {
         private readonly ITestOutputHelper _out;
@@ -117,7 +123,13 @@ namespace Fct.Integration.Tests
                 // 3) NOW the late consumer subscribes (rawlog + zoneparty). HandleSubscribe ->
                 // BuildPrimeEvents runs against the CURRENT (already-folded) session snapshot.
                 await consumer.StartAsync();
-                await Task.Delay(2000);   // let the background command-pump read SUBSCRIBE and prime
+                // Priming is async: SUBSCRIBE → host BuildPrimeEvents → forwarded one-shot frames land in the
+                // AutoFlush sink artifact (RunSink writes each frame live). Poll it until the primed one-shot
+                // RawLogLines arrive rather than a fixed delay — under parallel satellite load a fixed wait
+                // races the round-trip (this was the flake). This is a snapshot of PRIMING ALONE, so no later
+                // live event backfills it; the poll falls through on timeout so the assertion below still
+                // reports exactly what did/didn't arrive.
+                SpinUntilPrimedRawLines(recordPath, LastOneShot.Length, TimeSpan.FromSeconds(15));
 
                 // No live line/event follows — the artifact reflects PRIMING ALONE.
                 await consumer.ShutdownAsync(TimeSpan.FromSeconds(8));
@@ -261,6 +273,21 @@ namespace Fct.Integration.Tests
                 Thread.Sleep(50);
             }
             return File.Exists(path);
+        }
+
+        // Poll the AutoFlush sink artifact until at least `expected` primed RawLogLine frames have been
+        // written (or the timeout elapses). RunSink flushes each forwarded frame live, so this converges as
+        // soon as priming completes instead of waiting a fixed, load-fragile budget.
+        private static void SpinUntilPrimedRawLines(string path, int expected, TimeSpan timeout)
+        {
+            var deadline = Environment.TickCount64 + (long)timeout.TotalMilliseconds;
+            while (Environment.TickCount64 < deadline)
+            {
+                var count = ReadShared(path)
+                    .Count(l => GameEventFrame.TryParse(l, out var e) && e is RawLogLine);
+                if (count >= expected) return;
+                Thread.Sleep(50);
+            }
         }
 
         // The satellite keeps the artifact open (AutoFlush StreamWriter) until process exit; read with a

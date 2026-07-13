@@ -1,6 +1,11 @@
 # Third-party proprietary binaries — local build inputs only, never redistribute
 /lib/
 
+# Machine-local build/memory overrides — per-developer paths to real third-party ACT binaries
+# used only as build/test inputs; never committed.
+Directory.Build.local.props
+CLAUDE.local.md
+
 # .NET build artifacts
 bin/
 obj/

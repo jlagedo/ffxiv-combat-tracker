@@ -8,7 +8,7 @@ namespace Fct.Parser.Legacy
 {
     // The object placed in ActPluginData.pluginObj in place of the real FFXIV_ACT_Plugin
     // instance. It forwards the IActPluginV1 lifecycle to the real plugin and re-exposes the
-    // SDK surface OverlayPlugin reflects against (docs/DATA-FLOW.md §4.1), with one change:
+    // SDK surface OverlayPlugin reflects against (docs/ACT-INTERFACE-MAP.md — FFXIVRepository), with one change:
     // DataSubscription is our ring-buffer dispatcher rather than the plugin's BeginInvoke one.
     //
     //   - DataSubscription : our RingBufferDataSubscription (funnels the real plugin's events).
