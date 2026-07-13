@@ -1,15 +1,18 @@
 <Project Sdk="Microsoft.NET.Sdk">
 
   <!--
-    A minimal native plugin exercising the modern contract end-to-end (events, snapshot, registry,
-    audio, storage, raw write-back, and the IUiContributor UI face). References Fct.Abstractions +
-    Fct.Abstractions.UI; loaded by the host into its own collectible ALC. Not a library consumers
-    reference — it ships as a staged plugin folder.
+    A tutorial native plugin exercising the modern contract: configuration, the event stream (the hot
+    path), state reads, and a live UI built the idiomatic way — XAML + compiled bindings + an MVVM
+    view model. References Fct.Abstractions + Fct.Abstractions.UI; loaded by the host into its own
+    collectible ALC. Not a library consumers reference — it ships as a staged plugin folder.
   -->
   <PropertyGroup>
     <TargetFramework>net10.0</TargetFramework>
     <IsPackable>false</IsPackable>
     <EnableDynamicLoading>true</EnableDynamicLoading>
+    <!-- Compile every {Binding} against its view's x:DataType (fails the build on a typo'd path,
+         and is faster than reflection bindings). The shell uses the same default. -->
+    <AvaloniaUseCompiledBindingsByDefault>true</AvaloniaUseCompiledBindingsByDefault>
   </PropertyGroup>
 
   <ItemGroup>
@@ -17,10 +20,14 @@
     <ProjectReference Include="..\..\src\Fct.Abstractions.UI\Fct.Abstractions.UI.csproj" />
   </ItemGroup>
 
-  <!-- Compile-time only: Avalonia is host-provided and shared to the default ALC (PluginLoadContext
-       .IsShared), so it must not ship as a private plugin dependency. -->
   <ItemGroup>
+    <!-- Compile-time only: Avalonia is host-provided and shared to the default ALC (PluginLoadContext
+         .IsShared), so it must not ship as a private plugin dependency. ExcludeAssets="runtime" still
+         keeps its build assets, so the XAML compiler runs for our .axaml views. -->
     <PackageReference Include="Avalonia" ExcludeAssets="runtime" />
+    <!-- MVVM source generators. A normal (private) dependency: it is NOT host-shared, so it ships in
+         the plugin folder and loads in the plugin's own ALC. -->
+    <PackageReference Include="CommunityToolkit.Mvvm" />
   </ItemGroup>
 
   <ItemGroup>

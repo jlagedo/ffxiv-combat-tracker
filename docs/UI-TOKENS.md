@@ -94,7 +94,8 @@ views get plain values for `Thickness`/`Spacing`/`FontSize` with no resource loo
 </Border>
 ```
 
-**Code** (the pattern `Fct.SamplePlugin` uses — a page built as a `Func<Control>`):
+**Code** (equivalent for a view built in C# — `Fct.SamplePlugin` uses this for its trivial corner
+control; its main page is XAML, see [`PORTING.md`](PORTING.md) §6):
 
 ```csharp
 var title = new TextBlock { Text = "Settings" };

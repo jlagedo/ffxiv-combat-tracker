@@ -1,22 +1,29 @@
 using System;
 using System.Threading;
 using System.Threading.Tasks;
-using Avalonia;
 using Avalonia.Controls;
-using Avalonia.Layout;
+using Avalonia;
 using Fct.Abstractions;
 using Fct.Abstractions.UI;
+using Fct.SamplePlugin.ViewModels;
+using Fct.SamplePlugin.Views;
 using Microsoft.Extensions.Logging;
 
 namespace Fct.SamplePlugin;
 
-/// <summary>
-/// A minimal native plugin: subscribes to the event bus, reads a snapshot, registers a named
-/// callback, produces audio, round-trips a setting through storage, taps the raw-packet firehose,
-/// emits a synthetic custom line via the capability-gated write-back hatch, and contributes a
-/// settings page + a transient corner control (work item 9's <see cref="IUiContributor"/> face).
-/// Everything it touches is the modern contract.
-/// </summary>
+// ─────────────────────────────────────────────────────────────────────────────────────────────────
+// A native plugin, front to back — a small "live combat monitor" you can read top-to-bottom.
+//
+// It teaches the four things every plugin does, each in its own numbered lesson below:
+//   1. Configuration   — load/save typed settings through your private storage.
+//   2. The event bus   — subscribe to the typed game stream (the HOT PATH) the right way.
+//   3. Reading state   — pull a snapshot and the live encounter rollup.
+//   4. Contributing UI — a live Avalonia panel, refreshed off the hot path.
+//
+// A plugin implements IPlugin (lifecycle). Add IUiContributor to also contribute UI. The host loads
+// you into your own collectible AssemblyLoadContext, calls InitializeAsync ONCE, and DisposeAsync on
+// unload — so every handle you take here, you dispose there.
+// ─────────────────────────────────────────────────────────────────────────────────────────────────
 public sealed class SamplePlugin : IPlugin, IUiContributor
 {
     private const string SettingsPageId = "com.fct.sample.settings";
@@ -24,138 +31,193 @@ public sealed class SamplePlugin : IPlugin, IUiContributor
 
     private IPluginHost? _host;
     private IUiHost? _ui;
-    private IDisposable? _subscription;
-    private IDisposable? _callback;
-    private IDisposable? _packetSubscription;
+
+    // Every handle we take gets disposed in DisposeAsync — a leaked one can pin the collectible ALC.
+    private IDisposable? _events;
+    private IDisposable? _packets;
     private IDisposable? _cornerControl;
-    private int _launches;
+    private CancellationTokenSource? _refreshCts;
+
+    // Hot-path counters. Written from the bus handler, read from the UI refresh loop — so use
+    // Interlocked / volatile, never a lock (a lock on the hot path is a stall waiting to happen).
+    private long _actionsSeen;
+    private long _deaths;
+
+    private SampleSettings _settings = new();
+    private volatile bool _announceDeaths;   // hot-path snapshot of _settings.AnnounceDeaths
+    private MonitorViewModel? _vm;           // the UI's bound state (see Lesson 4)
 
     public async Task InitializeAsync(IPluginHost host, CancellationToken ct)
     {
         _host = host;
-        host.Logger.LogInformation("SamplePlugin initializing (id {Id}, v{Version})", host.Self.Id, host.Self.Version);
+        host.Logger.LogInformation("SamplePlugin online (id {Id}, v{Version})", host.Self.Id, host.Self.Version);
 
-        _subscription = host.Game.Events.Subscribe(GameEventFilter.All, e =>
-            host.Logger.LogInformation("SamplePlugin saw {Event} #{Seq}", e.GetType().Name, e.Sequence));
+        // ── LESSON 1: CONFIGURATION ──────────────────────────────────────────────────────────────
+        // Settings are a plain class, persisted as JSON in your private data directory. Load returns
+        // null on first run — coalesce to defaults. Keep the object; save it whenever it changes.
+        _settings = await host.Storage.LoadSettingsAsync<SampleSettings>() ?? new SampleSettings();
+        _settings.Launches++;
+        _announceDeaths = _settings.AnnounceDeaths;
+        await host.Storage.SaveSettingsAsync(_settings);
+        host.Logger.LogInformation("SamplePlugin launch #{Count}", _settings.Launches);
 
-        var snapshot = host.Game.Snapshot();
-        host.Logger.LogInformation("SamplePlugin snapshot: {Actors} actor(s), zone '{Zone}'",
-            snapshot.Actors.Count, snapshot.Zone.Name);
+        // The UI's view model exists independently of the view — the refresh loop can feed it before
+        // the settings page is ever opened. It calls back here when the user flips a setting.
+        _vm = new MonitorViewModel(SetAnnounceDeaths, ShowCornerControl) { AnnounceDeaths = _settings.AnnounceDeaths };
 
-        _callback = host.Plugins.RegisterCallback("sample.ping", arg =>
-            host.Logger.LogInformation("SamplePlugin callback ping: {Arg}", arg));
+        // ── LESSON 2: THE EVENT BUS (the hot path) ─────────────────────────────────────────────────
+        // Subscribe to the typed game stream. BEST PRACTICE, in order of impact:
+        //  • Filter to ONLY the event types you need — never GameEventFilter.All if you want two of
+        //    them. The host then never even queues the rest to you.
+        //  • Keep the handler cheap and non-blocking: bump counters, stash a value. No I/O, no
+        //    per-event logging, no locks. Your subscription has a bounded queue; a slow handler just
+        //    gets drop-oldest backpressure (it never stalls the game), but you still lose events.
+        //  • Do NOT touch the UI here. Marshal to the UI thread on a throttled cadence instead
+        //    (Lesson 4) — one repaint per frame, not one per swing.
+        //  • Switch on the concrete record; ignore the rest. New event types are additive, so an
+        //    unrecognized event is never an error.
+        var filter = new GameEventFilter(new[] { typeof(ActionEffect), typeof(DeathOccurred) });
+        _events = host.Game.Events.Subscribe(filter, OnGameEvent);
 
+        // ── Audio (cheap, fire-and-return) ─────────────────────────────────────────────────────────
+        // Speak/Play fan out to every registered sink and return immediately — safe to call from the
+        // hot path (see OnGameEvent) because they never block the producer.
         host.Audio.Speak("Sample plugin online");
 
-        // Tap the raw-packet read hatch (requires the 'raw' capability): on an inbound packet, re-emit a
-        // synthetic custom line — OverlayPlugin's RegisterNetworkParser → custom-line pattern in miniature.
-        _packetSubscription = host.RawPackets.Subscribe(p =>
+        // ── Capability-gated hatches ("raw") ─────────────────────────────────────────────────────
+        // Declared in plugin.json under "capabilities". Without "raw" these are inert no-ops and the
+        // typed bus stays opcode-free for everyone else. This mirrors OverlayPlugin's
+        // RegisterNetworkParser → custom-line round-trip in miniature. Most plugins never need this.
+        _packets = host.RawPackets.Subscribe(p =>
         {
             if (p.Direction == PacketDirection.Received)
                 host.RawLogLines.Emit((LogMessageType)258, $"258|packet-seen|{p.Bytes.Length}");
         });
-
-        // A synthetic custom (256+) line onto the live bus (requires the 'raw' capability).
         host.RawLogLines.Emit((LogMessageType)257, "257|sample-online");
 
-        await PersistLaunchAsync(host);
+        // ── LESSON 4 (driver): refresh the UI off the hot path ───────────────────────────────────
+        // A 500 ms loop projects the counters onto the live panel — decoupled from event rate, the
+        // same cadence the host's own encounter projection uses. Started here, cancelled in Dispose.
+        _refreshCts = new CancellationTokenSource();
+        _ = RunRefreshLoopAsync(_refreshCts.Token);
     }
 
-    // RegisterUi runs after InitializeAsync completes (see IUiContributor), so _launches already
-    // reflects this session's count by the time the settings page renders it.
+    // The hot-path handler. Called in-order on a background pump; keep it tiny.
+    private void OnGameEvent(GameEvent e)
+    {
+        switch (e)
+        {
+            case ActionEffect:
+                Interlocked.Increment(ref _actionsSeen);
+                break;
+            case DeathOccurred d:
+                Interlocked.Increment(ref _deaths);
+                if (_announceDeaths)                       // reads the volatile snapshot, no lock
+                    _host?.Audio.Speak($"{d.Victim.Name} down");
+                break;
+        }
+    }
+
+    // ── LESSON 3: READING STATE (pull) ───────────────────────────────────────────────────────────
+    // Two pull surfaces, both free-threaded:
+    //  • Snapshot()  — an immutable point-in-time view (player, actors, zone, party, target…).
+    //  • Encounters  — the live DPS/encounter rollup, the single source of truth the engine owns.
+    // Read them when you need a value, e.g. once per UI refresh — not per event.
+    private (string zone, bool inCombat, double dps) ReadState()
+    {
+        var host = _host!;
+        var zone = host.Game.Snapshot().Zone.Name;
+        var enc = host.Encounters.Active;                  // null when out of combat
+        return (string.IsNullOrEmpty(zone) ? "—" : zone, host.Encounters.InCombat, enc?.Dps ?? 0);
+    }
+
+    // ─────────────────────────────────────────────────────────────────────────────────────────────
+    // LESSON 4: CONTRIBUTING UI (XAML + MVVM)
+    //
+    // RegisterUi runs ONCE on the UI thread, after InitializeAsync completes. Add a settings page (the
+    // modern replacement for the legacy WinForms TabPage). Its view builds lazily on the UI thread the
+    // first time it's shown.
+    //
+    // The view IS the XAML (Views/MonitorView.axaml) — layout, styling, and data bindings all live
+    // there. Here we do the one thing XAML can't: hand it its DataContext (the view model). That is
+    // the whole idiom — build the view, set DataContext, and let bindings do the rest. Compare with
+    // BuildCornerView below, which is trivial enough to build in code.
+    // ─────────────────────────────────────────────────────────────────────────────────────────────
     public void RegisterUi(IUiHost ui)
     {
         _ui = ui;
-        ui.AddSettingsPage(new UiSurface(SettingsPageId, "Sample Plugin", BuildSettingsView));
+        ui.AddSettingsPage(new UiSurface(SettingsPageId, "Sample Monitor",
+            () => new MonitorView { DataContext = _vm }));
     }
 
-    private async Task PersistLaunchAsync(IPluginHost host)
+    private void SetAnnounceDeaths(bool on)
     {
-        var settings = await host.Storage.LoadSettingsAsync<SampleSettings>() ?? new SampleSettings();
-        settings.Launches++;
-        await host.Storage.SaveSettingsAsync(settings);
-        _launches = settings.Launches;
-        host.Logger.LogInformation("SamplePlugin launch #{Count}", settings.Launches);
+        _settings.AnnounceDeaths = on;
+        _announceDeaths = on;                              // publish to the hot path
+        _ = _host!.Storage.SaveSettingsAsync(_settings);   // persist (fire-and-forget is fine here)
     }
 
-    // Styled entirely through the plugin token contract (Fct.Abstractions.UI): the blessed `fct-*`
-    // classes for typography/surface/button, plus one raw brush token bound via DynamicResource in
-    // code — the reference for plugin authors (see docs/UI-TOKENS.md). No hardcoded colors/fonts, so
-    // this page tracks any shell restyle at runtime.
-    private Control BuildSettingsView()
+    private async Task RunRefreshLoopAsync(CancellationToken ct)
     {
-        var eyebrow = new TextBlock { Text = "SAMPLE PLUGIN" };
-        eyebrow.Classes.Add(FctStyleClasses.Eyebrow);
-
-        var title = new TextBlock { Text = "Settings" };
-        title.Classes.Add(FctStyleClasses.H1);
-
-        // Raw-token idiom: bind a brush token via DynamicResource in code, so a later shell restyle
-        // (e.g. a light variant) reaches this control at runtime. XAML authors instead write
-        // Background="{DynamicResource FctAccent}".
-        var accentRule = new Border { Height = 2, Width = 44, CornerRadius = new CornerRadius(1), HorizontalAlignment = HorizontalAlignment.Left };
-        accentRule.Bind(Border.BackgroundProperty, accentRule.GetResourceObservable(FctTokens.Accent));
-
-        var body = new TextBlock { Text = $"Launched {_launches} time(s) this session." };
-        body.Classes.Add(FctStyleClasses.Body);
-
-        var showCorner = new Button { Content = "Show corner control (5s)" };
-        showCorner.Classes.Add(FctStyleClasses.Ghost);
-        showCorner.Click += (_, _) => ShowCornerControl();
-
-        var reveal = new Button { Content = "Reveal this page" };
-        reveal.Classes.Add(FctStyleClasses.Ghost);
-        reveal.Click += (_, _) => _ui?.RevealPage(SettingsPageId);
-
-        var card = new Border();
-        card.Classes.Add(FctStyleClasses.Card);
-        card.Child = new StackPanel
+        using var timer = new PeriodicTimer(TimeSpan.FromMilliseconds(500));
+        try
         {
-            Spacing = FctMetrics.SpaceSm,
-            Children = { eyebrow, title, accentRule, body, showCorner, reveal },
-        };
-
-        return new StackPanel
-        {
-            Margin = new Thickness(FctMetrics.SpaceLg),
-            Spacing = FctMetrics.SpaceMd,
-            Children = { card },
-        };
+            while (await timer.WaitForNextTickAsync(ct))
+                // The loop runs on a background thread, so hop to the UI thread to touch controls.
+                // BEST PRACTICE: marshal via the host dispatcher (the modern InvokeRequired/Invoke).
+                _ui?.Dispatcher.Post(RefreshOnce);
+        }
+        catch (OperationCanceledException) { /* normal on unload */ }
     }
 
+    // Runs on the UI thread. Reads the cheap counters + pull surfaces and pushes them into the view
+    // model; the XAML bindings repaint. Setting ObservableProperties must happen on the UI thread,
+    // which is why the refresh loop marshals through the dispatcher.
+    private void RefreshOnce()
+    {
+        if (_vm is null || _host is null) return;
+        var (zone, inCombat, dps) = ReadState();
+        _vm.Zone = zone;
+        _vm.InCombat = inCombat;
+        _vm.ActionsSeen = Interlocked.Read(ref _actionsSeen);
+        _vm.Deaths = Interlocked.Read(ref _deaths);
+        _vm.Dps = dps;
+    }
+
+    // A transient corner notification (Triggernometry's CornerControlAdd). Dispose to remove.
     private void ShowCornerControl()
     {
         if (_ui is null) return;
         _cornerControl?.Dispose();
-        _cornerControl = _ui.AddCornerControl(new UiSurface(CornerControlId, "Sample corner control", BuildCornerView));
+        _cornerControl = _ui.AddCornerControl(new UiSurface(CornerControlId, "Sample alert", BuildCornerView));
 
         var ui = _ui;
         _ = Task.Delay(TimeSpan.FromSeconds(5)).ContinueWith(_ =>
-            ui.Dispatcher.Post(() =>
-            {
-                _cornerControl?.Dispose();
-                _cornerControl = null;
-            }));
+            ui.Dispatcher.Post(() => { _cornerControl?.Dispose(); _cornerControl = null; }));
     }
 
     private static Control BuildCornerView() => new Border
     {
-        Padding = new Thickness(12),
+        Padding = new Thickness(FctMetrics.SpaceMd),
         Child = new TextBlock { Text = "Hello from Fct.SamplePlugin!" },
     };
 
-    public ValueTask DisposeAsync()
+    // Teardown: cancel the loop, dispose every handle. The host awaits this before unloading the ALC.
+    public async ValueTask DisposeAsync()
     {
         _host?.Logger.LogInformation("SamplePlugin disposing");
-        _subscription?.Dispose();
-        _callback?.Dispose();
-        _packetSubscription?.Dispose();
+        _refreshCts?.Cancel();
+        _events?.Dispose();
+        _packets?.Dispose();
         _cornerControl?.Dispose();
-        return default;
+        _refreshCts?.Dispose();
+        await Task.CompletedTask;
     }
 
+    // Your settings type: a plain class, serialized by System.Text.Json. Keep it small and versionable.
     private sealed class SampleSettings
     {
         public int Launches { get; set; }
+        public bool AnnounceDeaths { get; set; }
     }
 }

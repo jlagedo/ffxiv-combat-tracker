@@ -43,6 +43,7 @@ folder (not a NuGet package consumers reference). The reference csproj
     <TargetFramework>net10.0</TargetFramework>
     <IsPackable>false</IsPackable>
     <EnableDynamicLoading>true</EnableDynamicLoading>
+    <AvaloniaUseCompiledBindingsByDefault>true</AvaloniaUseCompiledBindingsByDefault>  <!-- UI only -->
   </PropertyGroup>
 
   <ItemGroup>
@@ -50,10 +51,12 @@ folder (not a NuGet package consumers reference). The reference csproj
     <ProjectReference Include="..\..\src\Fct.Abstractions.UI\Fct.Abstractions.UI.csproj" />
   </ItemGroup>
 
-  <!-- Compile-time only: Avalonia is host-provided and shared to the default ALC, so it must not
-       ship as a private plugin dependency. -->
   <ItemGroup>
+    <!-- Compile-time only: Avalonia is host-provided and shared to the default ALC, so it must not
+         ship as a private plugin dependency. -->
     <PackageReference Include="Avalonia" ExcludeAssets="runtime" />
+    <!-- Private (ships in your plugin folder): the MVVM source generators for your view models. -->
+    <PackageReference Include="CommunityToolkit.Mvvm" />
   </ItemGroup>
 
   <ItemGroup>
@@ -62,15 +65,17 @@ folder (not a NuGet package consumers reference). The reference csproj
 </Project>
 ```
 
-Two things matter here:
+Three things matter here:
 
 - **`EnableDynamicLoading=true`** lays out the plugin's private dependencies so the host's collectible
   load context can resolve them.
 - **Host-shared packages are `ExcludeAssets="runtime"`.** `Fct.Abstractions`, `Fct.Abstractions.UI`,
   `Microsoft.Extensions.Logging.Abstractions`, and anything `Avalonia*` are supplied by the host and
   shared to the default load context for a single type identity across the boundary — so they must be
-  compile-time references only, **never** shipped in your plugin folder. Drop `Fct.Abstractions.UI`
-  and the Avalonia reference if your plugin has no UI.
+  compile-time references only, **never** shipped in your plugin folder. **Your own** packages (like
+  `CommunityToolkit.Mvvm`) are the opposite: private, and they ship alongside your DLL.
+- **The UI-only lines** (`AvaloniaUseCompiledBindingsByDefault`, `Fct.Abstractions.UI`, the two package
+  references) are needed only if you contribute UI (§6). Drop them for a headless plugin.
 
 Outside the repo, reference the SDK from the NuGet packages the build produces
 (`dist\<mode>\packages\Fct.Abstractions*.nupkg`) instead of `ProjectReference`.
@@ -229,7 +234,7 @@ and re-injects a synthetic custom (256+) line — OverlayPlugin's `RegisterNetwo
 pattern in miniature:
 
 ```csharp
-_packetSubscription = host.RawPackets.Subscribe(p =>
+_packets = host.RawPackets.Subscribe(p =>
 {
     if (p.Direction == PacketDirection.Received)
         host.RawLogLines.Emit((LogMessageType)258, $"258|packet-seen|{p.Bytes.Length}");
@@ -241,39 +246,68 @@ Most plugins never need `raw` — reach for it only when you decode packets or e
 ### 6. Contribute UI (`"ui"`)
 
 Implement `IUiContributor` alongside `IPlugin` and declare `"ui"`. The host calls `RegisterUi` once, on
-the UI thread, after `InitializeAsync` completes. Add a settings page whose view is built lazily:
+the UI thread, after `InitializeAsync` completes. Build your page the idiomatic Avalonia way — a
+**XAML view + an MVVM view model** — and hand it its `DataContext`. The reference is the sample's
+[`Views/MonitorView.axaml`](../samples/Fct.SamplePlugin/Views/MonitorView.axaml) +
+[`ViewModels/MonitorViewModel.cs`](../samples/Fct.SamplePlugin/ViewModels/MonitorViewModel.cs).
+
+Two csproj settings turn on the XAML pipeline (both already in
+[`Fct.SamplePlugin.csproj`](../samples/Fct.SamplePlugin/Fct.SamplePlugin.csproj)):
+`<AvaloniaUseCompiledBindingsByDefault>true</...>` compiles each `{Binding}` against its view's
+`x:DataType`, and a private `CommunityToolkit.Mvvm` `PackageReference` supplies the `[ObservableProperty]`
+/ `[RelayCommand]` generators. The `Avalonia` reference stays `ExcludeAssets="runtime"` — its build
+assets still run the XAML compiler, and the runtime is host-provided.
+
+The view — `Classes="fct-*"` for styling, `x:DataType` so bindings compile:
+
+```xml
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:vm="using:MyPlugin.ViewModels"
+             x:Class="MyPlugin.Views.MyView"
+             x:DataType="vm:MyViewModel">
+    <Border Classes="fct-card">
+        <StackPanel Spacing="12">
+            <TextBlock Text="Settings" Classes="fct-h1"/>
+            <TextBlock Text="{Binding Status}" Classes="fct-body"/>          <!-- one-way, live -->
+            <CheckBox Content="Enabled" IsChecked="{Binding Enabled}"/>       <!-- two-way -->
+            <Button Content="Run" Classes="fct-ghost" Command="{Binding RunCommand}"/>
+        </StackPanel>
+    </Border>
+</UserControl>
+```
+
+The view model — the generators turn fields into bindable properties and methods into commands:
 
 ```csharp
-using Avalonia.Controls;
-using Fct.Abstractions.UI;
-
-public sealed class MyPlugin : IPlugin, IUiContributor
+public sealed partial class MyViewModel : ObservableObject
 {
-    private const string SettingsPageId = "com.example.myplugin.settings";
-
-    public void RegisterUi(IUiHost ui)
-        => ui.AddSettingsPage(new UiSurface(SettingsPageId, "My Plugin", BuildSettingsView));
-
-    private Control BuildSettingsView()
-    {
-        var title = new TextBlock { Text = "Settings" };
-        title.Classes.Add(FctStyleClasses.H1);          // style through the token contract
-
-        var card = new Border();
-        card.Classes.Add(FctStyleClasses.Card);
-        card.Child = new StackPanel { Spacing = FctMetrics.SpaceSm, Children = { title } };
-        return card;
-    }
+    [ObservableProperty] private string _status = "idle";   // → Status (with change notification)
+    [ObservableProperty] private bool _enabled;             // → Enabled (two-way target)
+    [RelayCommand] private void Run() { /* ... */ }         // → RunCommand
 }
 ```
 
-**Style through the token contract, never with hardcoded colors/fonts** — use the `fct-*` classes
+Then hand the view its `DataContext` in `RegisterUi` — the one thing XAML can't do for itself:
+
+```csharp
+public void RegisterUi(IUiHost ui)
+    => ui.AddSettingsPage(new UiSurface("com.example.myplugin.settings", "My Plugin",
+        () => new MyView { DataContext = _vm }));
+```
+
+**Feed the view model off the UI thread's cadence, not the event hot path.** Bump counters in your bus
+handler; a separate timer marshals through `IUiHost.Dispatcher` and writes the view-model properties
+(the sample's `RefreshOnce`). Setting an `[ObservableProperty]` must happen on the UI thread.
+
+**Style through the token contract, never with hardcoded colors/fonts** — the `fct-*` classes
 (`FctStyleClasses`), the restyle-able brush/font tokens (`FctTokens`, bound via `DynamicResource`), and
-the layout constants (`FctMetrics`). A page built this way tracks any shell restyle at runtime. The
-sample's `BuildSettingsView` is the full reference; the catalog and rules are in
-[`UI-TOKENS.md`](UI-TOKENS.md). `IUiHost` also offers `RevealPage(id)`, transient `AddCornerControl` /
-`RemoveCornerControl`, and `Dispatcher` (`IUiDispatcher`) for marshaling background work onto the UI
-thread.
+the layout constants (`FctMetrics`). A page styled this way tracks any shell restyle at runtime; catalog
+in [`UI-TOKENS.md`](UI-TOKENS.md). `IUiHost` also offers `RevealPage(id)`, transient `AddCornerControl` /
+`RemoveCornerControl`, and `Dispatcher` (`IUiDispatcher`) for marshaling background work onto the UI thread.
+
+A view simple enough not to need XAML can still be built in code (the sample's corner-alert control is
+one `Border` + `TextBlock`) — but for anything with bindings, prefer XAML.
 
 ### 7. Install and run
 

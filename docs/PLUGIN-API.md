@@ -202,7 +202,7 @@ Native example:
   "entry": "Fct.SamplePlugin.SamplePlugin",
   "capabilities": [ "raw", "ui" ],
   "name": "Sample Plugin",
-  "description": "Reference native plugin exercising the modern contract end-to-end.",
+  "description": "Tutorial native plugin: config, the event stream (hot path), state, and a live UI.",
   "author": "FFXIV Combat Tracker"
 }
 ```

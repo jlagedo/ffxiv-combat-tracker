@@ -1,0 +1,54 @@
+<!--
+  The plugin's settings page, as XAML. The wiring people usually get wrong, called out inline:
+
+    • x:Class          — must match the code-behind class (MonitorView.axaml.cs) exactly.
+    • xmlns:vm         — a CLR-namespace alias (`using:` prefix) so XAML can name the view model.
+    • x:DataType       — the type bindings compile against (AvaloniaUseCompiledBindingsByDefault=true).
+                         DataContext is set in C# (SamplePlugin.RegisterUi) to a MonitorViewModel.
+    • Classes="fct-*"  — the ONLY styling a plugin should use. These are the blessed shell classes
+                         (Fct.Abstractions.UI). Never the shell's private classes, never hardcoded
+                         colors/fonts. A page styled this way tracks shell restyles at runtime.
+    • {DynamicResource FctAccent} — bind a raw theme token the same way (Dynamic, never Static, so a
+                         later restyle reaches this control).
+-->
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:vm="using:Fct.SamplePlugin.ViewModels"
+             x:Class="Fct.SamplePlugin.Views.MonitorView"
+             x:DataType="vm:MonitorViewModel">
+
+    <StackPanel Margin="16">
+        <Border Classes="fct-card">
+            <StackPanel Spacing="12">
+
+                <TextBlock Text="Live Combat Monitor" Classes="fct-h1"/>
+                <Border Height="2" Width="44" CornerRadius="1" HorizontalAlignment="Left"
+                        Background="{DynamicResource FctAccent}"/>
+                <TextBlock Text="Values below refresh every 500 ms off the event stream." Classes="fct-subtitle"/>
+
+                <!-- One-way live read-out. The plugin writes the view model; these just display it.
+                     StringFormat formats the double in the binding, no converter needed. -->
+                <Grid ColumnDefinitions="130,*" RowDefinitions="Auto,Auto,Auto,Auto,Auto" RowSpacing="4">
+                    <TextBlock Grid.Row="0" Grid.Column="0" Text="Zone"          Classes="fct-meta"/>
+                    <TextBlock Grid.Row="0" Grid.Column="1" Text="{Binding Zone}" Classes="fct-body"/>
+                    <TextBlock Grid.Row="1" Grid.Column="0" Text="In combat"     Classes="fct-meta"/>
+                    <TextBlock Grid.Row="1" Grid.Column="1" Text="{Binding InCombat}" Classes="fct-body"/>
+                    <TextBlock Grid.Row="2" Grid.Column="0" Text="Actions seen"  Classes="fct-meta"/>
+                    <TextBlock Grid.Row="2" Grid.Column="1" Text="{Binding ActionsSeen}" Classes="fct-body"/>
+                    <TextBlock Grid.Row="3" Grid.Column="0" Text="Deaths"        Classes="fct-meta"/>
+                    <TextBlock Grid.Row="3" Grid.Column="1" Text="{Binding Deaths}" Classes="fct-body"/>
+                    <TextBlock Grid.Row="4" Grid.Column="0" Text="Raid DPS"      Classes="fct-meta"/>
+                    <TextBlock Grid.Row="4" Grid.Column="1" Text="{Binding Dps, StringFormat='{}{0:F0}'}" Classes="fct-body"/>
+                </Grid>
+
+                <!-- Two-way binding: flipping the box writes AnnounceDeaths back to the view model. -->
+                <CheckBox Content="Announce deaths (TTS)" IsChecked="{Binding AnnounceDeaths}"/>
+
+                <!-- Command binding: no click handler, the VM's [RelayCommand] runs. -->
+                <Button Content="Show corner alert (5s)" Classes="fct-ghost"
+                        HorizontalAlignment="Left" Command="{Binding ShowAlertCommand}"/>
+
+            </StackPanel>
+        </Border>
+    </StackPanel>
+</UserControl>
