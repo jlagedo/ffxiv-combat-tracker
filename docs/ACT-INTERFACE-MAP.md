@@ -373,7 +373,7 @@ default (`false` here vs `true` in real ACT) is intended.
 
 ACT is one seam. These carry the data and features ACT structurally cannot.
 
-## 14. FFXIV_ACT_Plugin SDK seam — the live data source — ✅ DONE
+## 14. FFXIV_ACT_Plugin SDK seam — the live data source — ✅ DONE (🟡 memory-signature seam)
 
 ACT is game-agnostic: it has the aggregated DPS rollup and nothing else. **Live combatant tables,
 raw + decoded packets, zone/process/player identity, and the skill/zone/world/buff name dictionaries
@@ -382,9 +382,9 @@ the FFXIV `pluginObj` from `ActPlugins` (§1) and reflects three members:
 
 | St | member | shape | consumers | why |
 |:--:|---|---|---|---|
-| ✅ | `DataRepository` (property) | `IDataRepository` (pull) | OP (~30 sites), Trig, Hojo | `GetCombatantList`, `GetCurrentPlayerID`, `GetPlayer`, `GetResourceDictionary`, `GetSelectedLanguageID`, `GetCurrentTerritoryID`, `GetCurrentFFXIVProcess`, `GetGameVersion`, `GetServerTimestamp` — party panels, target info, name→id, zone/process gating |
-| ✅ | `DataSubscription` (property) | `IDataSubscription` (11 events) | OP, Trig | `NetworkReceived`/`NetworkSent` (raw packets — OP's ~20 decoders + `RegisterNetworkParser`), `LogLine`/`ParsedLogLine` (shape-complete, bound by no v1 consumer's live path — see below), `ZoneChanged`, `ProcessChanged` (no-game liveness), `PartyListChanged`, `PrimaryPlayerChanged`. **Hojoring is NOT a subscriber** — `SubscribeXIVPluginEvents()` is empty; it is **pull-only** (polls `DataRepository` + derives zone/party/player changes by diff) |
-| ✅ | `_iocContainer` (private field, `Microsoft.MinIoC.Container`) | `GetService`/`Resolve<T>` | OP, Hojo | resolves `ILogOutput` for OP's **custom-log round-trip** (synthetic IDs ≥ 256 — MapEffect/FateDirector/CEDirector/InCombat); Hojo **casts it to `Microsoft.MinIoC.Container`** (a type compiled into `FFXIV_ACT_Plugin.dll`) and hard-gates attach on `Resolve<ILogFormat>()` **and** `Resolve<ILogOutput>()` non-null |
+| ✅ | `DataRepository` (property) | `IDataRepository` (pull) | OP (~30 sites), Trig, Hojo | `GetCombatantList`, `GetCurrentPlayerID`, `GetPlayer`, `GetResourceDictionary`, `GetSelectedLanguageID`, `GetCurrentTerritoryID`, `GetCurrentFFXIVProcess`, `GetGameVersion`, `GetServerTimestamp` — party panels, target info, name→id, zone gating, and the **memory subsystem's process handle** (`GetCurrentFFXIVProcess` — see the memory-processor seam below) |
+| ✅ | `DataSubscription` (property) | `IDataSubscription` (11 events) | OP, Trig | `NetworkReceived`/`NetworkSent` (raw packets — OP's ~20 decoders + `RegisterNetworkParser`), `LogLine`/`ParsedLogLine` (shape-complete, bound by no v1 consumer's live path — see below), `ZoneChanged`, `ProcessChanged` (drives OverlayPlugin's **memory subsystem** — the `FFXIVMemory` process handle, see the memory-processor seam below), `PartyListChanged`/`PrimaryPlayerChanged` (Trig; **OP's own wrappers for these are dead** — its party/player state is memory-sourced). **Hojoring is NOT a subscriber** — `SubscribeXIVPluginEvents()` is empty; it is **pull-only** (polls `DataRepository` + derives zone/party/player changes by diff) |
+| ✅ | `_iocContainer` (private field, `Microsoft.MinIoC.Container`) | `GetService`/`Resolve<T>` | OP, Hojo | resolves `ILogOutput` for OP's **custom-log round-trip** (synthetic IDs ≥ 256 — MapEffect/FateDirector/CEDirector/InCombat) **and** `FFXIV_ACT_Plugin.Memory.ISignatureManager` for OP's `PartyMemory` (the GroupManager address via `Read(PartyList/0x50)` — see the memory-processor seam below); Hojo **casts it to `Microsoft.MinIoC.Container`** (a type compiled into `FFXIV_ACT_Plugin.dll`) and hard-gates attach on `Resolve<ILogFormat>()` **and** `Resolve<ILogOutput>()` non-null |
 
 **Strategy — DONE.** `WrappedFfxivPlugin` (placed in `pluginObj`) forwards the real plugin's
 `DataRepository` unchanged (every `Get*` lands on the genuine repository), substitutes
@@ -425,6 +425,32 @@ stand-in also reflectively pushes the forwarded region into Machina's `OpcodeMan
 (`MachinaRegionBridge.TrySetRegion`, KR/CN only, best-effort and non-blocking — Machina's own `Global`
 default is already correct for the primary audience), so OverlayPlugin's real region seam (above)
 converges too.
+
+**OverlayPlugin memory-processor seam (`ISignatureManager`) — 🟡 gap in the isolated consumer.**
+OverlayPlugin's `MemoryProcessors/*` read the live client directly through its **own** `FFXIVMemory`
+(its own `OpenProcess` handle + its own signature scans) — OverlayPlugin's logic, not the parser's,
+running in the consumer satellite against the same live `ffxiv_dx11` the producer reads. The
+subsystem's **only** dependency on the parser's memory subsystem is a single borrowed address:
+`PartyMemory` resolves `FFXIV_ACT_Plugin.Memory.ISignatureManager` off `_iocContainer` and calls
+`Read(SignatureType.PartyList /* 0x50 */)` for the GroupManager address
+(`OverlayPlugin.Core\MemoryProcessors\Party\PartyMemory.cs:61-68`) — the sole `GetService(ISignatureManager)`
+caller in the tree. Every other processor (Combatant, Target, Enmity, Aggro, EnmityHud, InCombat,
+JobGauge, AtkStage, ContentFinderSettings, ClientFramework) self-scans and borrows nothing but the
+process handle and `GetMachinaRegion()`. The shared prerequisite for the whole subsystem is a **live,
+non-null** `GetCurrentFFXIVProcess()`/`ProcessChanged`: `FFXIVMemory.UpdateProcess` opens its handle
+from it and each processor's first scan fires from it. The FFXIV-facing event sources
+(`FFXIVRequiredEventSource`, `EnmityEventSource`, `LineInCombat`, …) are eagerly constructed at
+OverlayPlugin init, so the Party scan runs **at startup** on the first `ProcessChanged`.
+
+The synthetic stand-in's `_iocContainer` registers `ILogOutput` + `ILogFormat` only — it does **not**
+register `ISignatureManager` (`Fct.Parser.Legacy\ConsumerStandIn.cs`, `MinIocStandIn`/`StandInIocContainer`).
+So in the isolated consumer `PartyMemory`'s `GetService(ISignatureManager)` returns null and its ctor
+dereferences it: OverlayPlugin's party memory and `FFXIVRequiredEventSource.PartyChanged` are
+non-functional there, and the null-deref surfaces on the fold thread. Bit-parity requires forwarding
+the producer's real `ISignatureManager.Read(PartyList)` address over the bridge and serving it from a
+stand-in `ISignatureManager` registered in the container (refreshed on each `ProcessChanged`/signature
+refresh); the process handle itself must stay **live** — nulling it disables every memory processor,
+not only Party.
 
 **Hojoring → OverlayPlugin coupling (not an ACT seam).** Separately, Hojoring reflects **in-process**
 into OverlayPlugin.Core's `PluginLoader.Container` (`IEnmityMemory`/`ICombatantMemory`/`ITargetMemory`
